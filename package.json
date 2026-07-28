@@ -1,7 +1,7 @@
 {
   "name": "astro",
   "version": "1.0.0",
-  "description": "Astro — Electron desktop app with secure admin login.",
+  "description": "Astro Admin Panel — Electron desktop app with secure admin login.",
   "main": "electron/main.cjs",
   "author": "Your Name",
   "license": "MIT",
@@ -19,13 +19,15 @@
   },
   "build": {
     "appId": "com.yourcompany.astro",
-    "productName": "Astro",
+    "productName": "Astro Admin Panel",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "build/icon.png",
       "package.json"
     ],
     "asarUnpack": [
@@ -40,7 +42,9 @@
         ]
       }
     ],
+    "icon": "build/icon.png",
     "win": {
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "nsis",
@@ -51,6 +55,7 @@
       ]
     },
     "mac": {
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "dmg",
@@ -72,6 +77,9 @@
         "repo": "astro"
       }
     ]
+  },
+  "overrides": {
+    "tar": "^7.4.3"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

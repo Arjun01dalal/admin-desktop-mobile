@@ -1,0 +1,1 @@
+- [Package firewall workarounds](package-firewall.md) — Replit's npm firewall blocked tar@6.2.1; fixed via package.json `overrides` pinning tar ^7. Electron itself cannot run here (no display server).

@@ -1,4 +1,4 @@
-# Astro
+# Astro Admin Panel
 
 Electron desktop app (React + Vite + MUI) that opens as a calculator.
 Entering **`9100` + `=`** opens the secure admin **Login** screen.

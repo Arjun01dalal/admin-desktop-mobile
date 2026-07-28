@@ -71,7 +71,8 @@ function createWindow() {
     height: PORTRAIT_HEIGHT,
     resizable: false,
     maximizable: false,
-    title: 'Astro',
+    title: 'Astro Admin Panel',
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#1c1c1e',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
