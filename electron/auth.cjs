@@ -1,6 +1,10 @@
 const CryptoJS = require('crypto-js');
 const axios = require('axios');
 const { getApiBaseUrl, getEntkValue } = require('./config.cjs');
+const { createPinnedAgent } = require('./certPin.cjs');
+
+// Single shared agent so pinned connections can be keep-alive pooled.
+const pinnedAgent = createPinnedAgent();
 
 function encrypt(payload) {
   return CryptoJS.AES.encrypt(JSON.stringify(payload), getEntkValue()).toString();
@@ -16,6 +20,7 @@ function client() {
     baseURL: getApiBaseUrl(),
     maxBodyLength: Infinity,
     timeout: 30000,
+    httpsAgent: pinnedAgent,
   });
 }
 
