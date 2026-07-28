@@ -1,18 +1,18 @@
 import { Box } from '@mui/material';
-import thirdEyeLogo from '@/assets/third-eye-logo.png';
+import astroLogo from '@/assets/astro-logo.png';
 
 type Props = {
   size?: number;
   showGlow?: boolean;
 };
 
-/** Third Eye mark extracted from the brand logo. */
+/** Astro Admin Panel brand mark. */
 export function AstroLogo({ size = 72, showGlow = true }: Props) {
   return (
     <Box
       component="img"
-      src={thirdEyeLogo}
-      alt="Third Eye Astro"
+      src={astroLogo}
+      alt="Astro Admin Panel"
       sx={{
         width: size,
         height: size,
