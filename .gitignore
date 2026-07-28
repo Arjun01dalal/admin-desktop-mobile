@@ -11,3 +11,4 @@ release/
 *.exe
 *.blockmap
 .vite/electron/env.generated.cjs
+electron-obf/
