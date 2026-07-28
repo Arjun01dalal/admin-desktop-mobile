@@ -1,5 +1,12 @@
 export const NAV_ITEMS = [
   { id: 'welcome', label: 'Welcome', path: '/welcome' },
+  { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+  { id: 'vipDashboard', label: 'VIP Dashboard', path: '/vip-dashboard' },
+  { id: 'combinedDashboard', label: 'Combined Dashboard', path: '/combined-dashboard' },
+  { id: 'riskDashboard', label: 'Risk Dashboard', path: '/risk-dashboard' },
+  { id: 'analytics', label: 'Analytics', path: '/analytics' },
+  { id: 'masterFlow', label: 'Master Flow', path: '/master-flow' },
+  { id: 'profitLoss', label: 'Profit & Loss', path: '/profit-loss' },
   { id: 'houseGames', label: 'House Games', path: '/house-games' },
   { id: 'callerResponsibility', label: 'Caller Responsibility', path: '/caller-responsibility' },
   { id: 'playerActivity', label: 'Player Activity', path: '/player-activity' },
