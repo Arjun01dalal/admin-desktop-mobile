@@ -272,8 +272,21 @@ function registerIpc() {
   });
 }
 
+function setDockIcon() {
+  // macOS ignores the BrowserWindow `icon` option; in dev the generic
+  // Electron binary supplies the dock icon, so set it explicitly.
+  if (process.platform !== 'darwin' || !app.dock) return;
+  const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
+  try {
+    if (fs.existsSync(iconPath)) app.dock.setIcon(iconPath);
+  } catch (err) {
+    console.warn('Could not set dock icon:', err.message);
+  }
+}
+
 app.whenReady().then(() => {
   registerAppProtocol();
+  setDockIcon();
   enableGeolocationPermissions();
   createWindow();
   registerIpc();
