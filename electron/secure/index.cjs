@@ -4,6 +4,10 @@
  */
 const axios = require('axios');
 const { getApiBaseUrl } = require('../config.cjs');
+const { createPinnedAgent } = require('../certPin.cjs');
+
+// Single shared agent so pinned connections can be keep-alive pooled.
+const pinnedAgent = createPinnedAgent();
 const { encrypt, unwrap } = require('./crypto.cjs');
 const {
   sanitizeBridgePayload,
@@ -46,6 +50,7 @@ function client() {
     baseURL: getApiBaseUrl(),
     maxBodyLength: Infinity,
     timeout: 60000,
+    httpsAgent: pinnedAgent,
   });
 }
 

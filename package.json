@@ -11,11 +11,14 @@
     "start": "npm run build && electron .",
     "postinstall": "node scripts/patch-electron-location.cjs",
     "patch:location": "node scripts/patch-electron-location.cjs",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:all": "npm run build && electron-builder --mac --win",
-    "release": "npm run build && electron-builder --publish always"
+    "embed:env": "node scripts/generate-embedded-env.cjs",
+    "check:pins": "node scripts/check-cert-pins.cjs",
+    "compile:bytecode": "node scripts/compile-bytecode.cjs",
+    "dist": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder",
+    "dist:win": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --win",
+    "dist:mac": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac",
+    "dist:all": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac --win",
+    "release": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --publish always"
   },
   "build": {
     "appId": "com.yourcompany.astro",
@@ -26,21 +29,16 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*",
+      "electron-obf/**/*",
+      "!electron/**/*",
       "build/icon.png",
       "package.json"
     ],
+    "extraMetadata": {
+      "main": "electron-obf/main.cjs"
+    },
     "asarUnpack": [
       "**/node_modules/geoip-lite/data/**"
-    ],
-    "extraResources": [
-      {
-        "from": ".env",
-        "to": ".env",
-        "filter": [
-          ".env"
-        ]
-      }
     ],
     "icon": "build/icon.png",
     "win": {
@@ -88,6 +86,7 @@
     "@mui/material": "^6.4.0",
     "@tanstack/react-virtual": "^3.14.6",
     "axios": "^1.7.9",
+    "bytenode": "^1.6.0",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
     "electron-updater": "^6.3.9",
