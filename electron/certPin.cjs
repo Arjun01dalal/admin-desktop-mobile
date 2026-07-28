@@ -94,9 +94,96 @@ function createPinnedAgent() {
   });
 }
 
+/**
+ * Fetch the live certificate chain from `host:443` (WITHOUT enforcing the pin)
+ * and return each certificate's SPKI SHA-256 hash plus subject/issuer info.
+ * Used by the startup health check and scripts/check-cert-pins.cjs.
+ */
+function fetchLiveChain(host = PINNED_HOST, { timeoutMs = 10000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const socket = tls.connect(
+      {
+        host,
+        port: 443,
+        servername: host,
+        // Normal CA validation still applies; we only skip our own pin so we
+        // can observe what the server currently presents.
+        rejectUnauthorized: true,
+      },
+      () => {
+        const chain = [];
+        const seen = new Set();
+        let cert = socket.getPeerCertificate(true);
+        while (cert && typeof cert === 'object' && Object.keys(cert).length) {
+          if (cert.fingerprint256 && seen.has(cert.fingerprint256)) break;
+          if (cert.fingerprint256) seen.add(cert.fingerprint256);
+          chain.push({
+            subject: cert.subject?.CN || JSON.stringify(cert.subject || {}),
+            issuer: cert.issuer?.CN || JSON.stringify(cert.issuer || {}),
+            validTo: cert.valid_to || null,
+            spkiSha256: spkiHash(cert),
+          });
+          if (cert.issuerCertificate === cert) break;
+          cert = cert.issuerCertificate;
+        }
+        socket.end();
+        resolve(chain);
+      },
+    );
+    socket.setTimeout(timeoutMs, () => {
+      socket.destroy(new Error(`Timed out connecting to ${host}:443`));
+    });
+    socket.on('error', reject);
+  });
+}
+
+/**
+ * Compare the live chain against the shipped pins.
+ * Returns { ok, matchedHashes, chain } — ok is true when at least one
+ * certificate in the live chain matches a shipped pin.
+ */
+async function verifyPinsAgainstLive(host = PINNED_HOST, opts) {
+  const chain = await fetchLiveChain(host, opts);
+  const matchedHashes = chain
+    .map((c) => c.spkiSha256)
+    .filter((h) => h && PINNED_SPKI_SHA256.has(h));
+  return { ok: matchedHashes.length > 0, matchedHashes, chain };
+}
+
+/**
+ * Non-blocking startup health check. Never throws and never blocks the app;
+ * logs loudly if the live chain no longer matches the shipped pins so a bad
+ * rotation is caught early (the pinned agent will be failing closed).
+ * Network errors are logged quietly — being offline is not a pin failure.
+ */
+function startupPinHealthCheck({ log = console } = {}) {
+  verifyPinsAgainstLive()
+    .then((result) => {
+      if (result.ok) {
+        log.log(
+          `[certPin] health check OK: live chain for ${PINNED_HOST} matches shipped pins (${result.matchedHashes.length} match(es)).`,
+        );
+      } else {
+        log.error(
+          `[certPin] PIN MISMATCH: live certificate chain for ${PINNED_HOST} matches NONE of the shipped pins. ` +
+            'API calls will fail closed. Re-generate pins (see electron/certPin.cjs header / docs/cert-pin-rotation.md) and ship an update. ' +
+            `Live chain: ${result.chain
+              .map((c) => `${c.subject} (SPKI ${c.spkiSha256})`)
+              .join(' -> ')}`,
+        );
+      }
+    })
+    .catch((err) => {
+      log.warn(`[certPin] health check skipped (network error): ${err.message}`);
+    });
+}
+
 module.exports = {
   PINNED_HOST,
   PINNED_SPKI_SHA256,
   checkServerIdentity,
   createPinnedAgent,
+  fetchLiveChain,
+  verifyPinsAgainstLive,
+  startupPinHealthCheck,
 };

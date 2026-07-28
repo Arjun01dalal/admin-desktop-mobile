@@ -6,3 +6,4 @@ description: How/why main-process HTTPS is certificate-pinned and how to rotate 
 - We pin the SPKI SHA-256 hash (not the leaf cert), and include the Sectigo intermediate CA hash as a backup so ~90-day leaf renewals don't brick installed apps.
 - **Why:** leaf cert renews and its bytes change, but the public key (and always the issuing intermediate) stay stable; pinning SPKI + intermediate survives renewal while still rejecting mitm proxies.
 - **How to apply:** if the server re-keys AND changes issuer, regenerate hashes (openssl command is documented in electron/certPin.cjs header) and ship an app update before the old cert expires, or installed apps fail closed.
+- Rotation safeguards exist: `npm run check:pins` verifies live chain vs shipped pins pre-release, and app startup runs a non-blocking pin health check that logs `[certPin] PIN MISMATCH`. Full process in docs/cert-pin-rotation.md. Add new pins alongside old ones (overlap window) before switching certs.

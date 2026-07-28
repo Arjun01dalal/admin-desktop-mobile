@@ -12,6 +12,7 @@
     "postinstall": "node scripts/patch-electron-location.cjs",
     "patch:location": "node scripts/patch-electron-location.cjs",
     "embed:env": "node scripts/generate-embedded-env.cjs",
+    "check:pins": "node scripts/check-cert-pins.cjs",
     "dist": "npm run embed:env && npm run build && electron-builder",
     "dist:win": "npm run embed:env && npm run build && electron-builder --win",
     "dist:mac": "npm run embed:env && npm run build && electron-builder --mac",

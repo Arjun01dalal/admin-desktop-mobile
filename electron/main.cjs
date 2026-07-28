@@ -293,6 +293,8 @@ app.whenReady().then(() => {
   createWindow();
   registerIpc();
   setupAutoUpdate();
+  // Warn early (non-blocking) if the API's live cert no longer matches our pins.
+  require('./certPin.cjs').startupPinHealthCheck();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
