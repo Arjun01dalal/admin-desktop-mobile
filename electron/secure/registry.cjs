@@ -257,4 +257,10 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'profitLoss.list': {
+    method: 'POST',
+    path: '/User/getProfitLoss',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
 };

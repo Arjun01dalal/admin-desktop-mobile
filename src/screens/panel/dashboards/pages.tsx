@@ -121,19 +121,4 @@ export function MasterFlowPage() {
   );
 }
 
-export function ProfitLossPage() {
-  return (
-    <MetricDashboardPage
-      title="Profit & Loss"
-      description="Deposit vs withdrawal profit and loss."
-      action="profitLoss.depositWithdrawal"
-      metrics={[
-        { label: 'Total Deposit', field: 'totalDeposit', icon: TrendingUp, format: 'amount' },
-        { label: 'Total Withdrawal', field: 'totalWithdrawal', icon: TrendingDown, format: 'amount' },
-        { label: 'Gross P/L', field: 'grossProfitLoss', icon: ArrowDownUp, format: 'amount', signed: true },
-        { label: 'Commission', field: 'totalCommission', icon: Landmark, format: 'amount' },
-        { label: 'Net P/L', field: 'finalWinLoss', icon: Wallet, format: 'amount', signed: true },
-      ]}
-    />
-  );
-}
+export { ProfitLossPage } from './ProfitLossPage';
