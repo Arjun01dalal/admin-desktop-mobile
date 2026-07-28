@@ -1,0 +1,105 @@
+{
+  "name": "astro",
+  "version": "1.0.0",
+  "description": "Astro — Electron desktop app with secure admin login.",
+  "main": "electron/main.cjs",
+  "author": "Your Name",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && ELECTRON_DEV=1 electron .\"",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "postinstall": "node scripts/patch-electron-location.cjs",
+    "patch:location": "node scripts/patch-electron-location.cjs",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:all": "npm run build && electron-builder --mac --win",
+    "release": "npm run build && electron-builder --publish always"
+  },
+  "build": {
+    "appId": "com.yourcompany.astro",
+    "productName": "Astro",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/geoip-lite/data/**"
+    ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env",
+        "filter": [
+          ".env"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "extendInfo": {
+        "NSLocationWhenInUseUsageDescription": "Location is required to verify admin login.",
+        "NSLocationUsageDescription": "Location is required to verify admin login."
+      }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "YOUR_GITHUB_USERNAME",
+        "repo": "astro"
+      }
+    ]
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^6.4.0",
+    "@mui/material": "^6.4.0",
+    "@tanstack/react-virtual": "^3.14.6",
+    "axios": "^1.7.9",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.7",
+    "electron-updater": "^6.3.9",
+    "geoip-lite": "^1.4.10",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.4",
+    "react-toastify": "^10.0.6",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "wait-on": "^8.0.2"
+  }
+}

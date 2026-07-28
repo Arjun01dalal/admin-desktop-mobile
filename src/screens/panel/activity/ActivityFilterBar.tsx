@@ -1,0 +1,117 @@
+import {
+  Button,
+  CircularProgress,
+  Paper,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+} from '@mui/material';
+
+type ActivityFilterBarProps = {
+  startDate: string;
+  endDate: string;
+  onStartDateChange: (value: string) => void;
+  onEndDateChange: (value: string) => void;
+  onApply: () => void;
+  loading?: boolean;
+  /** When false, hide Qtech / WCO source buttons (e.g. locked deep-link). */
+  showSourceToggle?: boolean;
+  isQtech: boolean;
+  onSourceChange: (isQtech: boolean) => void;
+};
+
+const dateFieldSx = { width: 170, flexShrink: 0 };
+
+const actionBtnSx = {
+  flexShrink: 0,
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+};
+
+const sourceToggleSx = {
+  flexShrink: 0,
+  borderRadius: '999px',
+  border: '1px solid rgba(255, 159, 10, 0.55)',
+  overflow: 'hidden',
+  '& .MuiToggleButton-root': {
+    px: 2,
+    py: 1,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    color: '#ffb84d',
+    border: 'none',
+    '&.Mui-selected': {
+      background: 'linear-gradient(135deg, #ffd60a, #ff9f0a)',
+      color: '#111',
+      '&:hover': {
+        background: 'linear-gradient(135deg, #ffe066, #ffb340)',
+      },
+    },
+    '&:hover': {
+      bgcolor: 'rgba(255, 159, 10, 0.12)',
+    },
+  },
+};
+
+export function ActivityFilterBar({
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange,
+  onApply,
+  loading = false,
+  showSourceToggle = true,
+  isQtech,
+  onSourceChange,
+}: ActivityFilterBarProps) {
+  return (
+    <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflow: 'auto' }}>
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
+        <TextField
+          type="date"
+          label="From Date"
+          size="small"
+          InputLabelProps={{ shrink: true }}
+          value={startDate}
+          onChange={(e) => onStartDateChange(e.target.value)}
+          sx={dateFieldSx}
+        />
+        <TextField
+          type="date"
+          label="To Date"
+          size="small"
+          InputLabelProps={{ shrink: true }}
+          value={endDate}
+          onChange={(e) => onEndDateChange(e.target.value)}
+          sx={dateFieldSx}
+        />
+        <Button
+          variant="contained"
+          onClick={onApply}
+          disabled={loading}
+          sx={actionBtnSx}
+        >
+          Apply
+        </Button>
+        {showSourceToggle && (
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={isQtech ? 'qtech' : 'wco'}
+            onChange={(_e, value) => {
+              if (value == null) return;
+              onSourceChange(value === 'qtech');
+            }}
+            disabled={loading}
+            sx={sourceToggleSx}
+          >
+            <ToggleButton value="qtech">Qtech</ToggleButton>
+            <ToggleButton value="wco">WCO</ToggleButton>
+          </ToggleButtonGroup>
+        )}
+        {loading && <CircularProgress size={22} />}
+      </Stack>
+    </Paper>
+  );
+}

@@ -1,0 +1,63 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: #1c1c1e;
+  color: #fff;
+  overflow: hidden;
+  font-family: 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.update-toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  background: #2b2b30;
+  border: 1px solid #3a3a3f;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 2000;
+}
+
+.update-text {
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.update-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.update-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #000;
+  background: #ff9f0a;
+  cursor: pointer;
+}
+
+.update-btn.ghost {
+  background: transparent;
+  color: #a5a5a5;
+}
