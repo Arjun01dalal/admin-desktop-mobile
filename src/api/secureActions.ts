@@ -39,6 +39,12 @@ export const SECURE_ACTIONS = [
   'users.coinRemovalUsers',
   'users.getTransactionHistory',
   'mobileApp.getLinks',
+  'dashboard.summary',
+  'dashboard.depositCount',
+  'dashboard.activeCustomers',
+  'dashboard.nonPerformingUser',
+  'analytics.userBalance',
+  'profitLoss.depositWithdrawal',
 ] as const;
 
 export type SecureAction = (typeof SECURE_ACTIONS)[number];

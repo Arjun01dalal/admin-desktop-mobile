@@ -23,6 +23,15 @@ import { NewRegistersPage } from '@/screens/panel/NewRegistersPage';
 import { CoinRemovalPage } from '@/screens/panel/CoinRemovalPage';
 import { CoinRemovalDetailsPage } from '@/screens/panel/coinRemoval/CoinRemovalDetailsPage';
 import { MobileAppPage } from '@/screens/panel/MobileAppPage';
+import {
+  DashboardPage,
+  VipDashboardPage,
+  CombinedDashboardPage,
+  RiskDashboardPage,
+  AnalyticsPage,
+  MasterFlowPage,
+  ProfitLossPage,
+} from '@/screens/panel/dashboards/pages';
 import { UpdateToast } from '@/components/UpdateToast';
 import { PANEL_PATHS } from '@/layout/navItems';
 import { useSessionGuard } from '@/hooks/useSessionGuard';
@@ -153,6 +162,13 @@ export default function App() {
             <Routes>
               <Route element={<AppShell onLogout={logout} />}>
                 <Route path="/welcome" element={<WelcomePage user={user} />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/vip-dashboard" element={<VipDashboardPage />} />
+                <Route path="/combined-dashboard" element={<CombinedDashboardPage />} />
+                <Route path="/risk-dashboard" element={<RiskDashboardPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/master-flow" element={<MasterFlowPage />} />
+                <Route path="/profit-loss" element={<ProfitLossPage />} />
                 <Route path="/house-games" element={<HouseGamesPage />} />
                 <Route
                   path="/caller-responsibility"

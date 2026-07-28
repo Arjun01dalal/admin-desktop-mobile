@@ -219,4 +219,42 @@ module.exports = {
   'mobileApp.getLinks': {
     type: 'local',
   },
+
+  // Dashboards & Analytics (ported from admin-panel-domains)
+  'dashboard.summary': {
+    method: 'POST',
+    path: '/User/dashboard',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'dashboard.depositCount': {
+    method: 'POST',
+    path: '/User/depositCount',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'dashboard.activeCustomers': {
+    method: 'POST',
+    path: '/User/get-active-customers',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'dashboard.nonPerformingUser': {
+    method: 'POST',
+    path: '/User/nonPerformingUser',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'analytics.userBalance': {
+    method: 'POST',
+    path: '/change-percentage/get-user-balance',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'profitLoss.depositWithdrawal': {
+    method: 'POST',
+    path: '/transaction/deposit-withdrawal',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
 };
