@@ -26,6 +26,8 @@ cp .env.example .env
 ```
 
 - `.env` is gitignored — never commit it.
+- Installers no longer ship the plaintext `.env`; `npm run dist:*` embeds the values (base64-obfuscated) via `scripts/generate-embedded-env.cjs`. This is obfuscation, not encryption — enforce real security server-side.
+- DevTools are disabled in packaged builds.
 - The renderer never sees these values; auth calls go through IPC (`auth:send-otp`, `auth:verify-otp`, `auth:get-address`).
 
 ## App flow

@@ -17,8 +17,17 @@ if (envPath) {
   dotenv.config({ path: envPath });
 }
 
+// Packaged builds embed values at build time (see scripts/generate-embedded-env.cjs)
+// instead of shipping a plaintext .env in the installer's Resources folder.
+let embedded = {};
+try {
+  embedded = require('./env.generated.cjs');
+} catch {
+  // Not generated — fine in dev, where .env is loaded above.
+}
+
 function requireEnv(name) {
-  const value = process.env[name];
+  const value = process.env[name] || embedded[name];
   if (!value) {
     throw new Error(`Missing required env var: ${name}. Add it to .env (see .env.example).`);
   }

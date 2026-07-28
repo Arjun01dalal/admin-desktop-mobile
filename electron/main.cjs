@@ -81,6 +81,8 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      // Block DevTools in packaged builds so users can't inspect the renderer.
+      devTools: !app.isPackaged,
     },
   });
 

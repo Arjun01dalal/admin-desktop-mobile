@@ -11,11 +11,12 @@
     "start": "npm run build && electron .",
     "postinstall": "node scripts/patch-electron-location.cjs",
     "patch:location": "node scripts/patch-electron-location.cjs",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:all": "npm run build && electron-builder --mac --win",
-    "release": "npm run build && electron-builder --publish always"
+    "embed:env": "node scripts/generate-embedded-env.cjs",
+    "dist": "npm run embed:env && npm run build && electron-builder",
+    "dist:win": "npm run embed:env && npm run build && electron-builder --win",
+    "dist:mac": "npm run embed:env && npm run build && electron-builder --mac",
+    "dist:all": "npm run embed:env && npm run build && electron-builder --mac --win",
+    "release": "npm run embed:env && npm run build && electron-builder --publish always"
   },
   "build": {
     "appId": "com.yourcompany.astro",
@@ -32,15 +33,6 @@
     ],
     "asarUnpack": [
       "**/node_modules/geoip-lite/data/**"
-    ],
-    "extraResources": [
-      {
-        "from": ".env",
-        "to": ".env",
-        "filter": [
-          ".env"
-        ]
-      }
     ],
     "icon": "build/icon.png",
     "win": {
