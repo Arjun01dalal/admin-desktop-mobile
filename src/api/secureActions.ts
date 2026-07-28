@@ -45,6 +45,7 @@ export const SECURE_ACTIONS = [
   'dashboard.nonPerformingUser',
   'analytics.userBalance',
   'profitLoss.depositWithdrawal',
+  'profitLoss.list',
 ] as const;
 
 export type SecureAction = (typeof SECURE_ACTIONS)[number];
