@@ -12,6 +12,8 @@ import {
 import { toast } from 'react-toastify';
 import { useLocationController } from '@/controllers/LocationProvider';
 import { AstroLogo } from '@/components/AstroLogo';
+import { persistRoleFromLogin } from '@/auth/permissions';
+import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import type { AddressInfo, AuthUser } from '@/types/gcalc';
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
@@ -147,6 +149,14 @@ export function Login({ onSuccess, onBack }: Props) {
       localStorage.setItem('role_id', String(result.user.Role_ID || ''));
       localStorage.setItem('user', JSON.stringify(result.user));
       localStorage.setItem('token', result.token);
+      persistRoleFromLogin(result.user);
+
+      // Role_ID → Responsibilities (drives side nav). Prefer fresh API list.
+      try {
+        await syncResponsibilitiesForRole(String(result.user.Role_ID || ''));
+      } catch {
+        // Keep login Responsibilities from verify-otp if sync fails.
+      }
 
       toast.success('Login successful');
       onSuccess(result.user, result.token);

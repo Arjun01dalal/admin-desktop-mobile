@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -11,16 +11,16 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { hasPermission } from '@/auth/permissions';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { CLIENT_NAMES } from '@/constants/clientNames';
+import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { formatAmount, formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
-import type { CallerRow } from './constants';
-import type { StoredCallerUser } from './utils';
-
+import { maskMobile } from '@/screens/panel/shared';
+import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
+import { roleFlags, type StoredCallerUser } from './utils';
 type CheckByInfo = {
   name?: string;
   city?: string;
@@ -145,7 +145,6 @@ function pickWithdrawalTotals(data: unknown): {
 }
 
 export function CallerDepositListPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as ListState;
   const list = state.list;
@@ -159,7 +158,8 @@ export function CallerDepositListPage() {
   const user = getStoredUser<
     StoredCallerUser & { clientName?: string | string[]; allotedApps?: string | string[] }
   >();
-
+  const { isCaller } = roleFlags(user?.Role_ID);
+  const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
   const appOptions = useMemo(() => {
     const allotted = user?.clientName || user?.allotedApps;
     if (Array.isArray(allotted) && allotted.length) return allotted.map(String);
@@ -264,7 +264,7 @@ export function CallerDepositListPage() {
   }, [loadRemote]);
 
   const title = isWithdrawal
-    ? 'Withdraw List'
+    ? 'Refund List'
     : isUniquePending
       ? 'Unique Pending'
       : 'Deposit List';
@@ -288,15 +288,21 @@ export function CallerDepositListPage() {
         )}
       />
     ));
-    const app = col('app', 'App Name', (r) =>
-      String(r.appName || r.clientName || '-'),
+    const app = col('app', 'App Code', (r) =>
+      appCodeForName(
+        r.clientName || r.appName || r.app_name || r.AppName || r.subDomain,
+      ),
     );
     const mobile = col('mobile', 'Mobile No', (r) =>
-      String(r.userMobile || r.mobile || '-'),
+      maskMobile(
+        isWithdrawal ? r.mobile || r.userMobile : r.userMobile || r.mobile,
+        canShowMobile,
+      ),
     );
-    const created = col('created', 'Created At', (r) =>
-      formatDisplayDate(r.createdAt || r.created_at),
-    );
+    const created = col('created', 'Created At', (r) => {
+      const raw = r.createdOn || r.createdAt || r.created_at;
+      return formatDisplayDate(raw) || String(raw || '-');
+    });
     const amount = col('amount', 'Amount', (r) =>
       formatAmount(r.amount || r.Amount),
     );
@@ -306,39 +312,49 @@ export function CallerDepositListPage() {
     const status = col('status', 'Status', (r) => String(r.status || '-'));
 
     if (isWithdrawal) {
-      return [
+      const cols: CommonTableColumn<CallerRow>[] = [
         sr,
         name,
         dp,
         app,
-        col('ubank', 'User Bank Name', (r) => String(r.userBankName || '-')),
-        col('acc', 'Account No', (r) =>
-          String(r.accountNo || r.accountNumber || '-'),
-        ),
-        col('bank', 'Bank Name', (r) => String(r.bankName || '-')),
+      ];
+      if (!isCaller) {
+        cols.push(
+          col('ubank', 'User Bank Name', (r) => String(r.userBankName || '-')),
+          col('acc', 'Account No', (r) =>
+            String(r.accountNo || r.accountNumber || '-'),
+          ),
+          col('bank', 'Bank Name', (r) => String(r.bankName || '-')),
+        );
+      }
+      cols.push(
         col('bonus', 'Bonus Laps', (r) => formatAmount(r.bonusLaps)),
         col('comm', 'Commission Amount', (r) =>
           formatAmount(r.commissionAmount),
         ),
-        col('check', 'Check By', (r) => renderCheckBy(r.checkBy ?? r.checkedBy), {
-          cellSx: { whiteSpace: 'normal', minWidth: 170 },
-        }),
-        col(
-          'cross',
-          <>
-            Cross
-            <br />
-            Check By
-          </>,
-          (r) => renderCheckBy(r.crossCheckBy ?? r.crossCheckedBy),
-          { cellSx: { whiteSpace: 'normal', minWidth: 170 } },
-        ),
-        mobile,
-        created,
-        amount,
-        order,
-        status,
-      ];
+      );
+      if (!isCaller) {
+        cols.push(
+          col('check', 'Check By', (r) => renderCheckBy(r.checkBy ?? r.checkedBy), {
+            cellSx: { whiteSpace: 'normal', minWidth: 170 },
+          }),
+          col(
+            'cross',
+            <>
+              Cross
+              <br />
+              Check By
+            </>,
+            (r) => renderCheckBy(r.crossCheckBy ?? r.crossCheckedBy),
+            { cellSx: { whiteSpace: 'normal', minWidth: 170 } },
+          ),
+        );
+      }
+      if (!isCaller) cols.push(mobile);
+      cols.push(created, amount);
+      if (!isCaller) cols.push(order);
+      cols.push(status);
+      return cols;
     }
 
     const cols: CommonTableColumn<CallerRow>[] = [
@@ -346,28 +362,40 @@ export function CallerDepositListPage() {
       name,
       dp,
       app,
-      mobile,
-      created,
-      amount,
-      order,
-      col('gateway', 'Payment Gateway Name', (r) =>
-        String(r.paymentGatewayName || r.gateway || '-'),
-      ),
-      col('ptype', 'Payment Type', (r) => String(r.paymentType || r.type || '-')),
     ];
+    if (!isCaller) cols.push(mobile);
+    cols.push(created, amount);
+
+    if (!isCaller) {
+      cols.push(
+        order,
+        col('gateway', 'Payment Gateway Name', (r) =>
+          String(r.paymentGatewayName || r.gateway || '-'),
+        ),
+      );
+    }
+
+    // Hide Payment Type from callers on Unique Pending only
+    if (!(isCaller && isUniquePending)) {
+      cols.push(
+        col('ptype', 'Payment Type', (r) => String(r.paymentType || r.type || '-')),
+      );
+    }
 
     if (isUniquePending) {
       cols.push(
-        col('state', 'State', (r) => String(r.state || '-')),
-        col('city', 'City', (r) => String(r.city || '-')),
+        col('state', 'State', (r) => String(r.state || r.userState || '-')),
+        col('city', 'City', (r) => String(r.city || r.userCity || '-')),
         col('emp', 'Emp Code', (r) => String(r.empCode || '-')),
-        col('mid', 'Mid', (r) => String(r.mid || '-')),
       );
+      if (!isCaller) {
+        cols.push(col('mid', 'Mid', (r) => String(r.mid || '-')));
+      }
     }
 
     cols.push(status);
     return cols;
-  }, [isWithdrawal, isUniquePending]);
+  }, [isWithdrawal, isUniquePending, isCaller, canShowMobile]);
 
   if (!list && !empCode) {
     return (
@@ -376,16 +404,9 @@ export function CallerDepositListPage() {
           {title}
         </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
-          <Typography mb={2} color="text.secondary">
+          <Typography color="text.secondary">
             No caller selected.
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/caller-responsibility')}
-          >
-            Back
-          </Button>
         </Paper>
       </Box>
     );
@@ -393,24 +414,9 @@ export function CallerDepositListPage() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={2}
-        alignItems="center"
-        mb={2}
-      >
-        <Button
-          variant="contained"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/caller-responsibility')}
-          sx={{ flexShrink: 0 }}
-        >
-          Back
-        </Button>
-        <Typography variant="h5" fontWeight={700}>
-          {title} — {String(list?.subAdminName || empCode || '')}
-        </Typography>
-      </Stack>
+      <Typography variant="h5" fontWeight={700} mb={2}>
+        {title} — {String(list?.subAdminName || empCode || '')}
+      </Typography>
 
       {(isWithdrawal || isUniquePending) && (
         <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflow: 'auto' }}>
@@ -473,7 +479,7 @@ export function CallerDepositListPage() {
                 />
                 <TextField
                   select
-                  label="App Name"
+                  label="App Code"
                   size="small"
                   fullWidth={false}
                   value={clientName}
@@ -488,7 +494,7 @@ export function CallerDepositListPage() {
                   </MenuItem>
                   {appOptions.map((app) => (
                     <MenuItem key={app} value={app}>
-                      {app}
+                      {appCodeForName(app)}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -534,22 +540,22 @@ export function CallerDepositListPage() {
               sx={{ mt: 1.5, overflow: 'auto' }}
             >
               <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-                {`Total User (${withdrawalTotals.all.count ?? 0}) : ${Math.round(
+                {`Total User (${withdrawalTotals.all.count ?? 0}) : ${formatAmount(
                   Number(withdrawalTotals.all.amount ?? 0),
                 )}`}
               </Typography>
               <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-                {`Approved Count (${withdrawalTotals.approved.count ?? 0}) : ${Math.round(
+                {`Approved Count (${withdrawalTotals.approved.count ?? 0}) : ${formatAmount(
                   Number(withdrawalTotals.approved.amount ?? 0),
                 )}`}
               </Typography>
               <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-                {`Canceled Count (${withdrawalTotals.cancel.count ?? 0}) : ${Math.round(
+                {`Canceled Count (${withdrawalTotals.cancel.count ?? 0}) : ${formatAmount(
                   Number(withdrawalTotals.cancel.amount ?? 0),
                 )}`}
               </Typography>
               <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-                {`Pending Count (${withdrawalTotals.pending.count ?? 0}) : ${Math.round(
+                {`Pending Count (${withdrawalTotals.pending.count ?? 0}) : ${formatAmount(
                   Number(withdrawalTotals.pending.amount ?? 0),
                 )}`}
               </Typography>

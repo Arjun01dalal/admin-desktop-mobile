@@ -12,6 +12,7 @@ import {
 const SKIP_SESSION_LOGOUT = new Set<SecureAction>([
   'auth.sendOtp',
   'auth.verifyOtp',
+  'auth.getResponsibility',
 ]);
 
 export type SecureResult<T = unknown> = {

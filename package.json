@@ -1,7 +1,7 @@
 {
   "name": "astro",
-  "version": "1.0.0",
-  "description": "Astro Admin Panel — Electron desktop app with secure admin login.",
+  "version": "1.0.7",
+  "description": "Astro CS Panel — Electron desktop app with secure admin login.",
   "main": "electron/main.cjs",
   "author": "Your Name",
   "license": "MIT",
@@ -14,15 +14,19 @@
     "embed:env": "node scripts/generate-embedded-env.cjs",
     "check:pins": "node scripts/check-cert-pins.cjs",
     "compile:bytecode": "node scripts/compile-bytecode.cjs",
+    "compile:bytecode:win": "node scripts/compile-bytecode.cjs --for-win",
     "dist": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder",
-    "dist:win": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --win",
+    "dist:win": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --win",
     "dist:mac": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac",
-    "dist:all": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac --win",
-    "release": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --publish always"
+    "dist:all": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --mac --win",
+    "release": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --publish always",
+    "release:win": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --win --publish always",
+    "release:mac": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac --publish always",
+    "release:all": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --mac --win --publish always"
   },
   "build": {
     "appId": "com.yourcompany.astro",
-    "productName": "Astro Admin Panel",
+    "productName": "Astro CS Panel",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -60,6 +64,12 @@
           "arch": [
             "universal"
           ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
         }
       ],
       "category": "public.app-category.utilities",
@@ -71,8 +81,9 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "YOUR_GITHUB_USERNAME",
-        "repo": "astro"
+        "owner": "Arjun01dalal",
+        "repo": "admin-desktop-mobile",
+        "releaseType": "release"
       }
     ]
   },

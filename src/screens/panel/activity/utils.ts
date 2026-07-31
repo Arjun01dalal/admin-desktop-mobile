@@ -89,7 +89,7 @@ export function formatMetric(value: number): string | number {
 }
 
 export function formatGgr(value: number): string {
-  return value.toFixed(2);
+  return String(formatAmount(value));
 }
 
 /** Normalize secureApi payload for WCO `{ items }` or QTech array. */

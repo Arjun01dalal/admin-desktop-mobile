@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 type Props = {
   title: string;
@@ -23,7 +23,16 @@ export function PanelPage({
   children,
 }: Props) {
   return (
-    <div className="min-h-full space-y-6 p-1">
+    <div className="relative min-h-full space-y-6 p-1">
+      {loading && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center pt-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            Loading…
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>

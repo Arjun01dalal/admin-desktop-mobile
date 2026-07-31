@@ -34,9 +34,15 @@ function requireEnv(name) {
   return value;
 }
 
+function optionalEnv(name) {
+  return process.env[name] || embedded[name] || '';
+}
+
 module.exports = {
   getApiBaseUrl: () => requireEnv('API_BASE_URL'),
   getEntkValue: () => requireEnv('ENTK_VALUE'),
+  /** Read-only GitHub token for private-repo auto-update checks (optional). */
+  getGhUpdateToken: () => optionalEnv('GH_UPDATE_TOKEN'),
   // Only true when launched via `npm run dev` (Vite server running).
   useViteDevServer: process.env.ELECTRON_DEV === '1',
   isPackaged: app.isPackaged,

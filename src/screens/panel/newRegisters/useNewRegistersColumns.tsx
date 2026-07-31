@@ -2,6 +2,7 @@ import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '@mui/material';
 import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { CopyText, type CommonTableColumn } from '@/components/CommonTable';
+import { appCodeForName } from '@/constants/clientNames';
 import {
   AadharFilter,
   AccNoFilter,
@@ -20,23 +21,53 @@ import {
   UserComesFromFilter,
 } from './ColumnFilters';
 import type { UserRow } from './types';
-import { formatAadharAddress, nestedDpId, nestedName } from './utils';
+import {
+  formatAadharAddress,
+  nestedDpId,
+  nestedName,
+  pickAadharNumber,
+  pickAccountNumber,
+  pickAppName,
+  pickLastActivity,
+  pickPlayIn,
+  pickUserBankName,
+} from './utils';
+
+/** Columns hidden from caller / caller_new roles. */
+const CALLER_HIDDEN_COLUMN_IDS = new Set([
+  'mobile',
+  'userBankName',
+  'accountNumber',
+  'aadharNumber',
+  'email',
+  'previousCallerName',
+  'previousCallerDpId',
+  'currentCaller',
+  'referredCode',
+  'referralCode',
+  'action',
+  'blockReason',
+  'aadharAddress',
+  'kyc',
+]);
 
 export type UseNewRegistersColumnsParams = {
   page: number;
   itemsPerPage: number;
   setBlockTarget: Dispatch<SetStateAction<UserRow | null>>;
+  isCaller?: boolean;
 };
 
 export function useNewRegistersColumns({
   page,
   itemsPerPage,
   setBlockTarget,
+  isCaller = false,
 }: UseNewRegistersColumnsParams): CommonTableColumn<UserRow>[] {
   const rowOffset = (page - 1) * itemsPerPage;
 
-  return useMemo<CommonTableColumn<UserRow>[]>(
-    () => [
+  return useMemo<CommonTableColumn<UserRow>[]>(() => {
+    const cols: CommonTableColumn<UserRow>[] = [
       {
         id: 'index',
         label: '#',
@@ -74,7 +105,7 @@ export function useNewRegistersColumns({
         label: 'Balance',
         align: 'right',
         filter: <BalanceFilter />,
-        render: (row) => Math.floor(Number(row.balance) || 0),
+        render: (row) => formatAmount(Math.floor(Number(row.balance) || 0)),
       },
       {
         id: 'lastActivity',
@@ -86,10 +117,7 @@ export function useNewRegistersColumns({
           </>
         ),
         filter: <EmptyRecordFilter />,
-        render: (row) =>
-          row.activeUser
-            ? `${formatDisplayDate(row.activeUser)} | ${formatDisplayTime(row.activeUser)}`
-            : '',
+        render: (row) => pickLastActivity(row),
       },
       {
         id: 'userBankName',
@@ -101,7 +129,7 @@ export function useNewRegistersColumns({
           </>
         ),
         filter: null,
-        render: (row) => String(row.userBankName || '-'),
+        render: (row) => pickUserBankName(row),
       },
       {
         id: 'appName',
@@ -109,17 +137,17 @@ export function useNewRegistersColumns({
           <>
             App
             <br />
-            Name
+            Code
           </>
         ),
         filter: <AppNameFilter />,
-        render: (row) => String(row.clientName || '-'),
+        render: (row) => appCodeForName(pickAppName(row)),
       },
       {
         id: 'playIn',
-        label: 'Play In',
+        label: 'In',
         filter: <PlayInFilter />,
-        render: (row) => String(row.played || '-'),
+        render: (row) => pickPlayIn(row),
       },
       {
         id: 'encryptedDpId',
@@ -151,7 +179,7 @@ export function useNewRegistersColumns({
       {
         id: 'kyc',
         label: 'Kyc',
-        filter: <AccNoFilter />,
+        filter: null,
         render: (row) => (row.kyc === true ? 'Done' : 'Not Done'),
       },
       {
@@ -163,8 +191,8 @@ export function useNewRegistersColumns({
             Number
           </>
         ),
-        filter: null,
-        render: (row) => String(row.accountNumber || '-'),
+        filter: <AccNoFilter />,
+        render: (row) => pickAccountNumber(row),
       },
       {
         id: 'aadharNumber',
@@ -176,7 +204,7 @@ export function useNewRegistersColumns({
           </>
         ),
         filter: <AadharFilter />,
-        render: (row) => String(row.aadhaarNumber || '-'),
+        render: (row) => pickAadharNumber(row),
       },
       {
         id: 'email',
@@ -278,7 +306,7 @@ export function useNewRegistersColumns({
         id: 'playerAppVersion',
         label: (
           <>
-            Player App
+            User App
             <br />
             Version
           </>
@@ -314,9 +342,9 @@ export function useNewRegistersColumns({
         id: 'bonusBalance',
         label: (
           <>
-            Bonus
+            Free Points
             <br />
-            Balance
+            Bonus
           </>
         ),
         align: 'right',
@@ -356,7 +384,9 @@ export function useNewRegistersColumns({
         filter: null,
         render: (row) => formatAadharAddress(row),
       },
-    ],
-    [rowOffset, setBlockTarget],
-  );
+    ];
+
+    if (!isCaller) return cols;
+    return cols.filter((col) => !CALLER_HIDDEN_COLUMN_IDS.has(col.id));
+  }, [rowOffset, setBlockTarget, isCaller]);
 }

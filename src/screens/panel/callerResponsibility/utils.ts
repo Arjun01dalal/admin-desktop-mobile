@@ -5,6 +5,7 @@ import {
   RESP_TOTAL_DEPOSIT,
   type CallerRow,
 } from './constants';
+import { formatAmount } from '@/utils/dates';
 
 export type StoredCallerUser = {
   _id?: string;
@@ -17,14 +18,14 @@ export type StoredCallerUser = {
 export function roundAmt(value: unknown): number | string {
   const n = Number(value);
   if (!Number.isFinite(n)) return '-';
-  return Math.round(n);
+  return formatAmount(Math.round(n));
 }
 
 export function pnl(deposit: unknown, withdrawApproved: unknown): number | string {
   const d = Number(deposit);
   const w = Number(withdrawApproved);
   if (!Number.isFinite(d) || !Number.isFinite(w)) return '-';
-  return Math.round(d - w);
+  return formatAmount(Math.round(d - w));
 }
 
 export function displayName(value: unknown, empty = '-'): string {

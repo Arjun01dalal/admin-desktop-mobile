@@ -8,6 +8,7 @@ import {
   Typography,
 } from '@mui/material';
 import { TableSearchBar } from '@/components/TableSearchBar';
+import { appCodeForName } from '@/constants/clientNames';
 import { DEPOSIT_STATES, PLAY_IN_OPTIONS } from './constants';
 import { useNewRegistersFilters } from './FiltersContext';
 
@@ -89,7 +90,7 @@ export function AppNameFilter() {
       <MenuItem value="">All</MenuItem>
       {appOptions.map((name) => (
         <MenuItem key={name} value={name}>
-          {name}
+          {appCodeForName(name)}
         </MenuItem>
       ))}
     </TextField>
@@ -102,7 +103,7 @@ export function PlayInFilter() {
     <TextField
       select
       size="small"
-      label="Select Win In"
+      label="Select In"
       value={searchPlayInStatus}
       onChange={(e) => setSearchPlayInStatus(e.target.value)}
       sx={{ minWidth: 110 }}

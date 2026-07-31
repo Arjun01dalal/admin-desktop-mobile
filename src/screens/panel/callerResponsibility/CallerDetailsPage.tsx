@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -11,13 +11,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { getStoredUser, todayIST } from '@/utils/dates';
 import type { CallerRow } from './constants';
-import type { StoredCallerUser } from './utils';
+import { roleFlags, type StoredCallerUser } from './utils';
 
 type NavState = {
   empCode?: string;
@@ -33,11 +33,11 @@ function daysAgoISO(days: number): string {
 }
 
 export function CallerDetailsPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const nav = (location.state || {}) as NavState;
   const empCode = String(nav.empCode || '');
   const user = getStoredUser<StoredCallerUser>();
+  const { isCaller } = roleFlags(user?.Role_ID);
 
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
@@ -121,8 +121,8 @@ export function CallerDetailsPage() {
     [rows, tab],
   );
 
-  const columns = useMemo<CommonTableColumn<DetailRow>[]>(
-    () => [
+  const columns = useMemo<CommonTableColumn<DetailRow>[]>(() => {
+    const cols: CommonTableColumn<DetailRow>[] = [
       { id: '#', label: '#', width: 48, render: (_r, i) => i + 1 },
       {
         id: 'name',
@@ -134,15 +134,19 @@ export function CallerDetailsPage() {
         label: 'DP ID',
         render: (r) => <CopyText value={String(r._id || r.userId || '')} />,
       },
-      {
+    ];
+    if (!isCaller) {
+      cols.push({
         id: 'mobile',
         label: 'Mobile',
         render: (r) => String(r.mobile || r.userMobile || '-'),
-      },
+      });
+    }
+    cols.push(
       {
         id: 'app',
-        label: 'App',
-        render: (r) => String(r.clientName || r.appName || '-'),
+        label: 'App Code',
+        render: (r) => appCodeForName(r.clientName || r.appName),
       },
       {
         id: 'city',
@@ -154,9 +158,9 @@ export function CallerDetailsPage() {
         label: 'State',
         render: (r) => String(r.state || '-'),
       },
-    ],
-    [],
-  );
+    );
+    return cols;
+  }, [isCaller]);
 
   if (!empCode) {
     return (
@@ -165,16 +169,9 @@ export function CallerDetailsPage() {
           Caller Details
         </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
-          <Typography mb={2} color="text.secondary">
+          <Typography color="text.secondary">
             No caller selected.
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/caller-responsibility')}
-          >
-            Back
-          </Button>
         </Paper>
       </Box>
     );
@@ -184,26 +181,16 @@ export function CallerDetailsPage() {
 
   return (
     <Box>
-      <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-        <Button
-          variant="contained"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/caller-responsibility')}
-          sx={{ flexShrink: 0 }}
-        >
-          Back
-        </Button>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
-            Caller Details — {empCode}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Deposit: {nav.deposit != null ? Math.round(Number(nav.deposit)) : '-'}
-            {' · '}
-            E:{String(ecs.E ?? '-')} C:{String(ecs.C ?? '-')} S:{String(ecs.S ?? '-')}
-          </Typography>
-        </Box>
-      </Stack>
+      <Box mb={2}>
+        <Typography variant="h5" fontWeight={700}>
+          Caller Details — {empCode}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Deposit: {nav.deposit != null ? Math.round(Number(nav.deposit)) : '-'}
+          {' · '}
+          E:{String(ecs.E ?? '-')} C:{String(ecs.C ?? '-')} S:{String(ecs.S ?? '-')}
+        </Typography>
+      </Box>
 
       <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
         <Stack

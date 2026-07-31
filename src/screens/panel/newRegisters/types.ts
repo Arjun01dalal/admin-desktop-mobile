@@ -46,6 +46,7 @@ export type UsersListResponse = {
 
 export type NewRegistersAdmin = {
   name?: string;
+  empCode?: string;
   extensionId?: string[];
   serverId?: string | number;
   clientName?: string | string[];

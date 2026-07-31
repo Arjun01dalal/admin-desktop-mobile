@@ -1,41 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
-import { toast } from 'react-toastify';
-import { secureApi } from '@/api/secureClient';
+import { useMemo } from 'react';
+import { Box, Typography } from '@mui/material';
 import { getStoredUser } from '@/utils/dates';
+import { buildMobileAppLinks } from '@/constants/mobileAppLinks';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-
-type AppLink = {
-  name: string;
-  key: string;
-  registrationLink: string;
-  depositLink: string;
-};
+import type { MobileAppLink } from '@/constants/mobileAppLinks';
 
 export function MobileAppPage() {
   const user = getStoredUser<{ empCode?: string }>();
-  const [loading, setLoading] = useState(true);
-  const [apps, setApps] = useState<AppLink[]>([]);
+  const empCode = String(user?.empCode || '001').trim() || '001';
+  const apps = useMemo(() => buildMobileAppLinks(empCode), [empCode]);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await secureApi<AppLink[]>('mobileApp.getLinks', {
-          empCode: user?.empCode || '001',
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to load app links');
-          return;
-        }
-        setApps(res.data || []);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user?.empCode]);
-
-  const columns = useMemo<CommonTableColumn<AppLink>[]>(
+  const columns = useMemo<CommonTableColumn<MobileAppLink>[]>(
     () => [
       {
         id: 'index',
@@ -45,8 +20,9 @@ export function MobileAppPage() {
       },
       {
         id: 'name',
-        label: 'App Name',
-        render: (row) => row.name,
+        label: 'App Code',
+        width: 100,
+        render: (row) => row.code,
       },
       {
         id: 'registration',
@@ -70,17 +46,12 @@ export function MobileAppPage() {
         Mobile App
       </Typography>
 
-      {loading ? (
-        <CircularProgress />
-      ) : (
-        <CommonTable
-          columns={columns}
-          rows={apps}
-          getRowKey={(row) => row.key}
-          loading={loading}
-          emptyMessage="No apps"
-        />
-      )}
+      <CommonTable
+        columns={columns}
+        rows={apps}
+        getRowKey={(row) => row.key}
+        emptyMessage="No apps"
+      />
     </Box>
   );
 }

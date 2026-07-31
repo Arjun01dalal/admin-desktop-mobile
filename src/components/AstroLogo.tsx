@@ -6,13 +6,13 @@ type Props = {
   showGlow?: boolean;
 };
 
-/** Astro Admin Panel brand mark. */
+/** Astro CS Panel brand mark. */
 export function AstroLogo({ size = 72, showGlow = true }: Props) {
   return (
     <Box
       component="img"
       src={astroLogo}
-      alt="Astro Admin Panel"
+      alt="Astro CS Panel"
       sx={{
         width: size,
         height: size,

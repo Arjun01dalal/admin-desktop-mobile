@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
-  Button,
   CircularProgress,
   Pagination,
   Stack,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { formatDisplayDate, formatDisplayTime, todayIST } from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import {
   docsOf,
@@ -29,7 +27,6 @@ type DetailsState = {
 };
 
 export function CoinRemovalDetailsPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as DetailsState;
 
@@ -125,7 +122,7 @@ export function CoinRemovalDetailsPage() {
       {
         id: 'balance',
         label: 'Balance',
-        render: (row) => row.balance ?? 0,
+        render: (row) => formatAmount(row.balance ?? 0),
       },
       {
         id: 'updatedBy',
@@ -167,12 +164,6 @@ export function CoinRemovalDetailsPage() {
         <Typography color="text.secondary" mb={2}>
           No user selected.
         </Typography>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/coin-removal')}
-        >
-          Back
-        </Button>
       </Box>
     );
   }
@@ -180,13 +171,6 @@ export function CoinRemovalDetailsPage() {
   return (
     <Box>
       <Stack direction="row" alignItems="center" spacing={2} mb={2}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/coin-removal')}
-          sx={{ flexShrink: 0 }}
-        >
-          Back
-        </Button>
         <Box>
           <Typography variant="h5" fontWeight={700}>
             {user.name || 'Coin Removal Details'}

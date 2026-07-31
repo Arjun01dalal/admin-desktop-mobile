@@ -11,7 +11,15 @@ contextBridge.exposeInMainWorld('gcalc', {
 
   showLogin: () => ipcRenderer.send('gcalc:show-login'),
   showWelcome: () => ipcRenderer.send('gcalc:show-welcome'),
-  showCalculator: () => ipcRenderer.send('gcalc:show-calculator'),
+  /** @deprecated Use showSite — kept for compatibility */
+  showCalculator: () => ipcRenderer.send('gcalc:show-site'),
+  showSite: () => ipcRenderer.send('gcalc:show-site'),
+  hideSite: () => ipcRenderer.send('gcalc:hide-site'),
+
+  onRequestLogin: (cb) => {
+    if (typeof cb !== 'function') return;
+    ipcRenderer.on('astro:request-login', () => cb());
+  },
 
   sendOtp: (payload) => safeInvoke('auth:send-otp', payload),
   verifyOtp: (payload) => safeInvoke('auth:verify-otp', payload),
@@ -54,5 +62,6 @@ contextBridge.exposeInMainWorld('gcalc', {
     if (typeof cb !== 'function') return;
     ipcRenderer.on('update:error', (_e, d) => cb(d));
   },
+  getUpdateStatus: () => safeInvoke('update:get-status'),
   installUpdate: () => ipcRenderer.send('update:install'),
 });

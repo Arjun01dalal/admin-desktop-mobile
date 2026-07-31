@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Button, Paper, Stack, Typography } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useLocation } from 'react-router-dom';
+import { Box, Paper, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount } from '@/utils/dates';
-import { ACTION_BTN_SX } from './activity/constants';
 import {
   getMetric,
   providerLabel,
@@ -114,7 +112,6 @@ function buildDetailRows(data: ActivityRow, isQtech: boolean): DetailRow[] {
 }
 
 export function PlayerActivityDetailsPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as DetailsState;
   const player = state.data;
@@ -183,17 +180,9 @@ export function PlayerActivityDetailsPage() {
           Player Activity Details
         </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
-          <Typography color="text.secondary" mb={2}>
+          <Typography color="text.secondary">
             No player selected. Open a UserId from Player Activity.
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/player-activity')}
-            sx={ACTION_BTN_SX}
-          >
-            Back
-          </Button>
         </Paper>
       </Box>
     );
@@ -203,25 +192,9 @@ export function PlayerActivityDetailsPage() {
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        alignItems={{ xs: 'stretch', sm: 'center' }}
-        justifyContent="space-between"
-        mb={2}
-      >
-        <Typography variant="h5" fontWeight={700}>
-          {id || 'Player'} — Providers
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/player-activity')}
-          sx={ACTION_BTN_SX}
-        >
-          Back
-        </Button>
-      </Stack>
+      <Typography variant="h5" fontWeight={700} mb={2}>
+        {id || 'Player'} — Providers
+      </Typography>
 
       <CommonTable
         columns={columns}

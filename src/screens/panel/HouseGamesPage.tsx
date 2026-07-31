@@ -10,7 +10,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { monthStartIST, todayIST } from '@/utils/dates';
+import { monthStartIST, todayIST, formatAmount } from '@/utils/dates';
 import TransactionTable from './houseGames/TransactionTable';
 import UpdateBetStatusModal from './houseGames/UpdateBetStatusModal';
 import {
@@ -125,7 +125,7 @@ export function HouseGamesPage() {
           </Typography>
           {totalAmount !== undefined && (
             <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-              Total Amount: {Math.round(Number(totalAmount) || 0)}
+              Total Amount: {formatAmount(Math.round(Number(totalAmount) || 0))}
             </Typography>
           )}
         </Stack>
@@ -136,6 +136,7 @@ export function HouseGamesPage() {
         currentPage={currentPage}
         itemsPerPage={itemsPerPage}
         filters={filters}
+        loading={loader}
         onFilterChange={updateFilter}
         onCheckboxChange={updateCheckboxFilter}
         onSearch={handleSearch}

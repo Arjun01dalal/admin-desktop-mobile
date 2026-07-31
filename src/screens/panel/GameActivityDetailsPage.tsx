@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Button, Paper, Stack, Typography } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useLocation } from 'react-router-dom';
+import { Box, Paper, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount } from '@/utils/dates';
-import { ACTION_BTN_SX } from './gameActivity/constants';
 import { providerLabel, type ActivityRow } from './gameActivity/utils';
 
 type GameRow = Record<string, unknown>;
@@ -19,7 +17,6 @@ function gameName(game: GameRow): string {
 }
 
 export function GameActivityDetailsPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as DetailsState;
   const provider = state.data;
@@ -87,17 +84,9 @@ export function GameActivityDetailsPage() {
           Game Activity Details
         </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
-          <Typography color="text.secondary" mb={2}>
+          <Typography color="text.secondary">
             No provider selected. Open a provider from Games Activity.
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/game-activity')}
-            sx={ACTION_BTN_SX}
-          >
-            Back
-          </Button>
         </Paper>
       </Box>
     );
@@ -105,25 +94,9 @@ export function GameActivityDetailsPage() {
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        alignItems={{ xs: 'stretch', sm: 'center' }}
-        justifyContent="space-between"
-        mb={2}
-      >
-        <Typography variant="h5" fontWeight={700}>
-          {providerLabel(provider)} — Games
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/game-activity')}
-          sx={ACTION_BTN_SX}
-        >
-          Back
-        </Button>
-      </Stack>
+      <Typography variant="h5" fontWeight={700} mb={2}>
+        {providerLabel(provider)} — Games
+      </Typography>
 
       <CommonTable
         columns={columns}

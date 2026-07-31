@@ -1,9 +1,9 @@
-const { app, BrowserWindow, ipcMain, session, protocol, net, shell, screen, clipboard } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, session, protocol, net, shell, screen, clipboard, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { autoUpdater } = require('electron-updater');
-const { useViteDevServer } = require('./config.cjs');
+const { useViteDevServer, getGhUpdateToken } = require('./config.cjs');
 const auth = require('./auth.cjs');
 const secureApi = require('./secure/index.cjs');
 
@@ -27,13 +27,18 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-// Portrait phone-like window for Calculator + Login
+// Portrait phone-like window for Login
 const PORTRAIT_WIDTH = 390;
 const PORTRAIT_HEIGHT = 720;
+
+const ASTRO_SITE_URL = 'https://admin.astrothirdeye.com/';
+/** Bottom strip of the main window for the panel Login button (under BrowserView). */
+const SITE_LOGIN_BAR_HEIGHT = 56;
 
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 
 let win = null;
+let siteView = null;
 
 function registerAppProtocol() {
   protocol.handle('app', (request) => {
@@ -71,7 +76,7 @@ function createWindow() {
     height: PORTRAIT_HEIGHT,
     resizable: false,
     maximizable: false,
-    title: 'Astro Admin Panel',
+    title: 'Astro CS Panel',
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
     backgroundColor: '#1c1c1e',
     webPreferences: {
@@ -88,6 +93,15 @@ function createWindow() {
 
   win.setMenuBarVisibility(false);
 
+  win.on('resize', () => {
+    layoutSiteView();
+  });
+
+  win.on('closed', () => {
+    destroySiteView();
+    win = null;
+  });
+
   if (useViteDevServer) {
     win.loadURL('http://127.0.0.1:5173');
     return;
@@ -103,7 +117,7 @@ function createWindow() {
   win.loadURL('app://localhost/index.html');
 }
 
-/** Compact portrait window — Calculator & Login */
+/** Compact portrait window — Login */
 function applyPortraitSize() {
   if (!win) return;
   if (win.isFullScreen()) win.setFullScreen(false);
@@ -116,21 +130,17 @@ function applyPortraitSize() {
   win.setResizable(false);
 }
 
-function applyCalculatorSize() {
-  applyPortraitSize();
-}
-
 function applyLoginSize() {
+  hideSiteView();
   applyPortraitSize();
 }
 
-/** Chrome-like landscape browser window — after successful login */
-function applyWelcomeSize() {
+/** Chrome-like landscape browser window — site + admin panel */
+function applyBrowserSize() {
   if (!win) return;
   if (win.isFullScreen()) win.setFullScreen(false);
 
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  // Typical Chrome desktop window: large landscape, ~92% of work area (capped)
   const browserW = Math.max(1100, Math.min(Math.round(sw * 0.92), 1600));
   const browserH = Math.max(700, Math.min(Math.round(sh * 0.92), 1000));
 
@@ -141,38 +151,309 @@ function applyWelcomeSize() {
   win.center();
 }
 
+function applyWelcomeSize() {
+  hideSiteView();
+  applyBrowserSize();
+}
+
+function applySiteSize() {
+  applyBrowserSize();
+  showSiteView();
+}
+
+function layoutSiteView() {
+  if (!win || !siteView || win.isDestroyed()) return;
+  const [width, height] = win.getContentSize();
+  const bar = SITE_LOGIN_BAR_HEIGHT;
+  siteView.setBounds({
+    x: 0,
+    y: 0,
+    width,
+    height: Math.max(0, height - bar),
+  });
+  siteView.setAutoResize({ width: true, height: false });
+}
+
+function destroySiteView() {
+  if (!win || !siteView) {
+    siteView = null;
+    return;
+  }
+  try {
+    win.removeBrowserView(siteView);
+  } catch {
+    // ignore
+  }
+  try {
+    if (!siteView.webContents.isDestroyed()) {
+      siteView.webContents.destroy();
+    }
+  } catch {
+    // ignore
+  }
+  siteView = null;
+}
+
+/** When true, site BrowserView must stay hidden so update dialogs are visible. */
+let blockSiteForUpdate = false;
+
+function hideSiteView() {
+  if (!win || !siteView) return;
+  try {
+    win.removeBrowserView(siteView);
+  } catch {
+    // ignore
+  }
+}
+
+function showSiteView() {
+  if (!win || win.isDestroyed()) return;
+  // BrowserView sits above the React UI and also above modal dialogs attached
+  // to the window — never re-show it while an update prompt is active.
+  if (blockSiteForUpdate) return;
+
+  if (!siteView || siteView.webContents.isDestroyed()) {
+    siteView = new BrowserView({
+      webPreferences: {
+        preload: path.join(__dirname, 'sitePreload.cjs'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        webSecurity: true,
+      },
+    });
+
+    siteView.webContents.setWindowOpenHandler(() => {
+      // Block popups — let the renderer open login or panel.
+      hideSiteView();
+      sendToRenderer('astro:request-login');
+      return { action: 'deny' };
+    });
+
+    siteView.webContents.on('will-navigate', (event, url) => {
+      try {
+        const target = new URL(url);
+        const home = new URL(ASTRO_SITE_URL);
+        // Keep browsing on the marketing site; anything else → login/panel gate.
+        if (target.origin !== home.origin) {
+          event.preventDefault();
+          hideSiteView();
+          sendToRenderer('astro:request-login');
+        }
+      } catch {
+        event.preventDefault();
+      }
+    });
+
+    siteView.webContents.loadURL(ASTRO_SITE_URL);
+  }
+
+  win.setBrowserView(siteView);
+  layoutSiteView();
+}
+
 function sendToRenderer(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
-function setupAutoUpdate() {
-  if (!app.isPackaged) return;
+/** Last update event — replayed when renderer mounts (avoids missed IPC under site view). */
+let lastUpdateEvent = null;
 
+function prepareUpdateUi() {
+  blockSiteForUpdate = true;
+  try {
+    hideSiteView();
+  } catch {
+    // ignore
+  }
+  if (win && !win.isDestroyed()) {
+    try {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      if (typeof win.moveTop === 'function') win.moveTop();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function publishUpdate(channel, payload) {
+  lastUpdateEvent = { channel, payload, at: Date.now() };
+  prepareUpdateUi();
+  sendToRenderer(channel, payload);
+}
+
+/**
+ * Use an app-modal dialog (no parent window). Parenting to `win` while a
+ * BrowserView is/was attached often puts the box behind the site on Windows.
+ */
+async function showUpdateDialog(options) {
+  prepareUpdateUi();
+  return dialog.showMessageBox(options);
+}
+
+function setupAutoUpdate() {
+  if (!app.isPackaged) {
+    console.log('autoUpdater: skipped (dev / unpackaged)');
+    return;
+  }
+
+  // Prefer baked app-update.yml (always present in NSIS/dmg). package.json
+  // `build` is stripped from the packaged asar, so do not require it.
+  // Only call setFeedURL when a private-repo token is available.
+  const updateToken =
+    process.env.GH_TOKEN ||
+    process.env.GITHUB_TOKEN ||
+    getGhUpdateToken() ||
+    '';
+  if (updateToken) {
+    try {
+      const ymlPath = path.join(process.resourcesPath, 'app-update.yml');
+      const yml = fs.existsSync(ymlPath)
+        ? fs.readFileSync(ymlPath, 'utf8')
+        : '';
+      const owner = (yml.match(/^owner:\s*(.+)$/m) || [])[1]?.trim();
+      const repo = (yml.match(/^repo:\s*(.+)$/m) || [])[1]?.trim();
+      if (owner && repo) {
+        autoUpdater.setFeedURL({
+          provider: 'github',
+          owner,
+          repo,
+          private: true,
+          token: updateToken,
+        });
+      }
+    } catch (err) {
+      console.warn('autoUpdater setFeedURL skipped:', err?.message || err);
+    }
+  }
+
+  autoUpdater.logger = {
+    info: (...a) => console.log('[autoUpdater]', ...a),
+    warn: (...a) => console.warn('[autoUpdater]', ...a),
+    error: (...a) => console.error('[autoUpdater]', ...a),
+    debug: (...a) => console.log('[autoUpdater:debug]', ...a),
+  };
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.allowDowngrade = false;
 
+  let availableDialogShown = false;
+  let readyDialogShown = false;
+  let errorDialogShown = false;
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log(
+      'autoUpdater: checking for update… current=',
+      app.getVersion(),
+      'platform=',
+      process.platform,
+    );
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('autoUpdater: up to date', info?.version || app.getVersion());
+  });
   autoUpdater.on('update-available', (info) => {
-    sendToRenderer('update:available', { version: info.version });
+    console.log('autoUpdater: update available', info.version);
+    publishUpdate('update:available', { version: info.version });
+    // Show immediately — do not wait for the ~100MB+ download to finish.
+    if (!availableDialogShown) {
+      availableDialogShown = true;
+      void showUpdateDialog({
+        type: 'info',
+        title: 'Update Available',
+        message: `Version ${info.version} is available.`,
+        detail:
+          'Downloading in the background. You will be asked to restart when it is ready (~1–3 minutes on typical connections).',
+        buttons: ['OK'],
+        noLink: true,
+      }).catch((err) =>
+        console.warn('autoUpdater available dialog failed:', err?.message || err),
+      );
+    }
   });
   autoUpdater.on('download-progress', (p) => {
-    sendToRenderer('update:progress', { percent: Math.round(p.percent) });
+    publishUpdate('update:progress', { percent: Math.round(p.percent) });
   });
-  autoUpdater.on('update-downloaded', (info) => {
-    sendToRenderer('update:ready', { version: info.version });
+  autoUpdater.on('update-downloaded', async (info) => {
+    console.log('autoUpdater: downloaded', info.version);
+    publishUpdate('update:ready', { version: info.version });
+    if (readyDialogShown) return;
+    readyDialogShown = true;
+    try {
+      const result = await showUpdateDialog({
+        type: 'info',
+        title: 'Update Ready',
+        message: `Version ${info.version} is ready to install.`,
+        detail: 'Restart now to update, or choose Later.',
+        buttons: ['Restart & Update', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall(false, true);
+      } else {
+        // User deferred install — allow site view again; React toast still available.
+        blockSiteForUpdate = false;
+      }
+    } catch (err) {
+      console.warn('autoUpdater ready dialog failed:', err?.message || err);
+      blockSiteForUpdate = false;
+    }
   });
   autoUpdater.on('error', (err) => {
-    sendToRenderer('update:error', {
-      message: String(err?.message || err),
-    });
+    const message = err?.message || String(err);
+    console.warn('autoUpdater error:', message);
+    const hint = /404|Not Found|Cannot find channel|latest-mac/i.test(message)
+      ? ' Update feed not reachable for this platform. Windows needs latest.yml; Mac needs latest-mac.yml + .zip on the public GitHub release.'
+      : '';
+    const full = message + hint;
+    publishUpdate('update:error', { message: full });
+    if (!errorDialogShown) {
+      errorDialogShown = true;
+      void showUpdateDialog({
+        type: 'error',
+        title: 'Update Check Failed',
+        message: full,
+        buttons: ['OK'],
+        noLink: true,
+      })
+        .catch(() => {})
+        .finally(() => {
+          blockSiteForUpdate = false;
+        });
+    }
   });
 
-  autoUpdater.checkForUpdates().catch(() => {});
+  const runCheck = () => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      const message = err?.message || String(err);
+      console.warn('autoUpdater checkForUpdates failed:', message);
+      publishUpdate('update:error', { message });
+    });
+  };
+
+  // Wait for renderer listeners, then check (and retry once).
+  setTimeout(runCheck, 3000);
+  setTimeout(runCheck, 15000);
 }
 
 function registerIpc() {
-  ipcMain.on('gcalc:show-calculator', applyCalculatorSize);
+  // Legacy calculator channel now opens the ThirdEye marketing site.
+  ipcMain.on('gcalc:show-calculator', applySiteSize);
+  ipcMain.on('gcalc:show-site', applySiteSize);
+  ipcMain.on('gcalc:hide-site', hideSiteView);
   ipcMain.on('gcalc:show-login', applyLoginSize);
   ipcMain.on('gcalc:show-welcome', applyWelcomeSize);
+
+  ipcMain.on('astro:request-login', () => {
+    // Only hide the site — renderer decides login vs panel based on token.
+    hideSiteView();
+    sendToRenderer('astro:request-login');
+  });
 
   ipcMain.handle('auth:send-otp', async (_event, payload) => {
     try {
@@ -270,8 +551,10 @@ function registerIpc() {
   });
 
   ipcMain.on('update:install', () => {
-    autoUpdater.quitAndInstall();
+    autoUpdater.quitAndInstall(false, true);
   });
+
+  ipcMain.handle('update:get-status', async () => lastUpdateEvent);
 }
 
 function setDockIcon() {

@@ -15,6 +15,7 @@ export function DpIdFilter() {
       onChange={(e) => onDpIdChange(e.target.value)}
       onSearch={onApplyFilters}
       placeholder="DP ID"
+      width={140}
     />
   );
 }
@@ -27,6 +28,7 @@ export function MobNoFilter() {
       onChange={(e) => onMobNoChange(e.target.value)}
       onSearch={onApplyFilters}
       placeholder="Mobile"
+      width={96}
     />
   );
 }
@@ -39,6 +41,7 @@ export function StateFilter() {
       onChange={(e) => onStateChange(e.target.value)}
       onSearch={onApplyFilters}
       placeholder="State"
+      width={80}
     />
   );
 }
@@ -51,6 +54,7 @@ export function SidFilter() {
       onChange={(e) => onSidChange(e.target.value)}
       onSearch={onApplyFilters}
       placeholder="Call ID"
+      width={100}
     />
   );
 }
@@ -66,7 +70,7 @@ export function StatusFilter() {
         onSelectedStatusChange(e.target.value);
         onPageReset();
       }}
-      sx={{ minWidth: 120 }}
+      sx={{ width: 100, minWidth: 100 }}
     >
       {CALL_STATUS_OPTIONS.map((opt) => (
         <MenuItem key={opt} value={opt}>
@@ -88,7 +92,7 @@ export function BotIdFilter() {
         onSelectedBotIdChange(e.target.value);
         onPageReset();
       }}
-      sx={{ minWidth: 90 }}
+      sx={{ width: 72, minWidth: 72 }}
     >
       <MenuItem value="All">All</MenuItem>
       {BOT_ID_OPTIONS.map((id) => (
@@ -111,7 +115,7 @@ export function CommentFilter() {
         onCommentFilterChange(e.target.value);
         onPageReset();
       }}
-      sx={{ minWidth: 140 }}
+      sx={{ width: 110, minWidth: 110 }}
     >
       {COMMENT_FILTER_OPTIONS.map((opt) => (
         <MenuItem key={opt} value={opt}>

@@ -29,20 +29,21 @@ function getRegistry() {
 
 const CDN_BASE = process.env.MOBILE_CDN_BASE || 'https://d2opi4jisa0j0o.cloudfront.net';
 
+/** Same order/codes as src/constants/clientNames.ts (AS + code for registration URLs). */
 const APP_DETAILS = [
-  { name: 'Third Eye Satro', key: 'osGames', registrationAppName: 'OSGames' },
-  { name: 'SM Games', key: 'smGames', registrationAppName: 'SMGames' },
-  { name: 'AB Games', key: 'abGames', registrationAppName: 'ABGames' },
-  { name: 'PS Games', key: 'psGames', registrationAppName: 'PSGames' },
-  { name: 'KS Games', key: 'ksGames_new', registrationAppName: 'KSGames' },
-  { name: 'PM Games', key: 'pmGames', registrationAppName: 'PMGames' },
-  { name: 'LS Games', key: 'lsGames', registrationAppName: 'LSGames' },
-  { name: 'LM Games', key: 'lmGames', registrationAppName: 'LMGames' },
-  { name: 'SG Games', key: 'sgGames_new', registrationAppName: 'SGGames' },
-  { name: 'SB Games', key: 'sbGames', registrationAppName: 'SBGames' },
-  { name: 'OM Games', key: 'omGames', registrationAppName: 'OMGames' },
-  { name: 'SB247 Games', key: 'sb247', registrationAppName: 'SB247Games' },
-  { name: 'Fairbets Games', key: 'fairbets', registrationAppName: 'FBGames' },
+  { name: 'Third Eye Astro', key: 'osGames', code: '01' },
+  { name: 'SM Games', key: 'smGames', code: '02' },
+  { name: 'SG Games', key: 'sgGames_new', code: '03' },
+  { name: 'PS Games', key: 'psGames', code: '04' },
+  { name: 'LS Games', key: 'lsGames', code: '05' },
+  { name: 'LM Games', key: 'lmGames', code: '06' },
+  { name: 'KS Games', key: 'ksGames_new', code: '07' },
+  { name: 'AB Games', key: 'abGames', code: '08' },
+  { name: 'PM Games', key: 'pmGames', code: '09' },
+  { name: 'SB Games', key: 'sbGames', code: '10' },
+  { name: 'OM Games', key: 'omGames', code: '11' },
+  { name: 'Fairbets Games', key: 'fairbets', code: '12' },
+  { name: 'SB247 Games', key: 'sb247', code: '13' },
 ];
 
 function client() {
@@ -55,12 +56,18 @@ function client() {
 }
 
 function buildMobileLinks(empCode = '001') {
-  return APP_DETAILS.map((item) => ({
-    name: item.name,
-    key: item.key,
-    registrationLink: `${CDN_BASE}/${item.registrationAppName}/${empCode}`,
-    depositLink: `${CDN_BASE}/deposit/${item.key}/${empCode}`,
-  }));
+  return APP_DETAILS.map((item) => {
+    const registrationAppName = `AS${item.code}`;
+    return {
+      name: item.name,
+      key: item.key,
+      code: item.code,
+      registrationAppName,
+      // Registration + deposit both use AS{code} path segments
+      registrationLink: `${CDN_BASE}/${registrationAppName}/${empCode}`,
+      depositLink: `${CDN_BASE}/deposit/${registrationAppName}/${empCode}`,
+    };
+  });
 }
 
 const DIALER_SERVER_MAP = {
@@ -410,11 +417,22 @@ async function execute(action, payload = {}, token = null) {
       status: response.status,
     };
   } catch (error) {
-    const apiMessage = error?.response?.data?.message;
+    const raw = error?.response?.data?.message;
+    let apiMessage =
+      typeof raw === 'string'
+        ? raw
+        : raw && typeof raw === 'object'
+          ? JSON.stringify(raw)
+          : undefined;
+    if (!apiMessage && error?.response?.data?.error) {
+      const err = error.response.data.error;
+      apiMessage = typeof err === 'string' ? err : JSON.stringify(err);
+    }
     return {
       ok: false,
       message:
-        (typeof apiMessage === 'string' && apiMessage) ||
+        apiMessage ||
+        error?.message ||
         'Secure API request failed',
       status: error?.response?.status,
     };

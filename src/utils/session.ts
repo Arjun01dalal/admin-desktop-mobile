@@ -6,6 +6,7 @@ const AUTH_STORAGE_KEYS = [
   'user',
   'token',
   'role_id',
+  'role',
   'global_logout',
   'token_last_validated_at',
   'token_validation_lock',
@@ -52,7 +53,7 @@ export function isAuthExpiredStatus(status?: number): boolean {
 }
 
 /**
- * Clears all auth data and asks App to move to the calculator.
+ * Clears all auth data and asks App to return to the ThirdEye site.
  * Safe to call many times — only the first trigger runs.
  */
 export function notifySessionExpired(

@@ -47,7 +47,7 @@ export function WelcomePage({ user }: Props) {
             textTransform: 'uppercase',
           }}
         >
-          third eye satro
+          third eye astro
         </Typography>
         <Box
           sx={{
@@ -62,7 +62,7 @@ export function WelcomePage({ user }: Props) {
             letterSpacing: 2,
           }}
         >
-          ADMIN PANEL
+          CS PANEL
         </Box>
         <Typography sx={{ mt: 3, color: 'text.secondary' }}>Signed in as {name}</Typography>
       </Box>

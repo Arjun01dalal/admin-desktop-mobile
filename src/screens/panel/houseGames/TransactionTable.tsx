@@ -2,6 +2,7 @@ import { memo, useDeferredValue, useMemo } from 'react';
 import { IconButton, Stack } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { formatAmount } from '@/utils/dates';
 import {
   AmountFilter,
   CurrencyFilter,
@@ -29,6 +30,7 @@ type Props = {
   currentPage: number;
   itemsPerPage: number;
   filters: FiltersState;
+  loading?: boolean;
   onFilterChange: (key: keyof FiltersState, value: string) => void;
   onCheckboxChange: (key: 'isBot' | 'human', checked: boolean) => void;
   onSearch: () => void;
@@ -40,6 +42,7 @@ const TransactionTable = ({
   currentPage,
   itemsPerPage,
   filters,
+  loading = false,
   onFilterChange,
   onCheckboxChange,
   onSearch,
@@ -142,7 +145,7 @@ const TransactionTable = ({
         id: 'amount',
         label: TABLE_COLUMNS[12],
         filter: <AmountFilter />,
-        render: (item) => String(item?.amount ?? '-'),
+        render: (item) => formatAmount(item?.amount ?? 0),
       },
       {
         id: 'winingPoint',
@@ -192,6 +195,7 @@ const TransactionTable = ({
         columns={columns}
         rows={deferredData}
         getRowKey={(item, index) => String(item?._id ?? item?.txnId ?? index)}
+        loading={loading}
         emptyMessage="No transactions found"
         stickyHeader
         minWidth={2100}

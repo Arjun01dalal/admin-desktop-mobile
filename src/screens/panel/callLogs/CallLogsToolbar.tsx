@@ -20,6 +20,8 @@ type CallLogsToolbarProps = {
   loading: boolean;
   actionLoading: boolean;
   fileRef: Ref<HTMLInputElement>;
+  /** Hide upload / pause (callers). */
+  isCaller?: boolean;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onCampaignChange: (value: string) => void;
@@ -40,6 +42,7 @@ export function CallLogsToolbar({
   loading,
   actionLoading,
   fileRef,
+  isCaller = false,
   onStartDateChange,
   onEndDateChange,
   onCampaignChange,
@@ -52,7 +55,14 @@ export function CallLogsToolbar({
 }: CallLogsToolbarProps) {
   return (
     <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
-      <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={1.5}
+        alignItems={{ xs: 'stretch', md: 'center' }}
+        mb={2}
+        flexWrap="wrap"
+        useFlexGap
+      >
         <TextField
           type="date"
           label="From Date"
@@ -60,7 +70,7 @@ export function CallLogsToolbar({
           InputLabelProps={{ shrink: true }}
           value={startDate}
           onChange={(e) => onStartDateChange(e.target.value)}
-          sx={{ flex: 1, minWidth: 0 }}
+          sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
         />
         <TextField
           type="date"
@@ -69,37 +79,51 @@ export function CallLogsToolbar({
           InputLabelProps={{ shrink: true }}
           value={endDate}
           onChange={(e) => onEndDateChange(e.target.value)}
-          sx={{ flex: 1, minWidth: 0 }}
+          sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
         />
-        <Button variant="contained" onClick={onApply} disabled={loading} sx={{ flexShrink: 0 }}>
+        <Button
+          variant="contained"
+          color="warning"
+          onClick={onApply}
+          disabled={loading}
+          sx={{ flexShrink: 0, fontWeight: 700 }}
+        >
           Apply
         </Button>
         <Button
           variant="contained"
+          color="warning"
           onClick={onBotCall}
           disabled={loading || actionLoading}
-          sx={{ flexShrink: 0 }}
+          sx={{ flexShrink: 0, fontWeight: 700 }}
         >
           Bot Call
         </Button>
         <Button
           variant="contained"
+          color="warning"
           onClick={onDialerCall}
           disabled={loading || actionLoading}
-          sx={{ flexShrink: 0 }}
+          sx={{ flexShrink: 0, fontWeight: 700 }}
         >
           Dialer Call
         </Button>
       </Stack>
 
-      <Stack direction="row" spacing={2} alignItems="center">
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={1.5}
+        alignItems={{ xs: 'stretch', md: 'center' }}
+        flexWrap="wrap"
+        useFlexGap
+      >
         <TextField
           select
           label="Campaign List"
           size="small"
           value={campaignId}
           onChange={(e) => onCampaignChange(e.target.value)}
-          sx={{ flex: 1, minWidth: 0 }}
+          sx={{ minWidth: { xs: '100%', md: 180 }, flex: { md: 1 } }}
         >
           <MenuItem value="">
             <em>Select campaign</em>
@@ -116,7 +140,7 @@ export function CallLogsToolbar({
           size="small"
           value={String(itemsPerPage)}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          sx={{ flex: 1, minWidth: 0 }}
+          sx={{ minWidth: { xs: '100%', md: 140 }, flexShrink: 0 }}
         >
           {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
             <MenuItem key={opt} value={opt}>
@@ -124,33 +148,37 @@ export function CallLogsToolbar({
             </MenuItem>
           ))}
         </TextField>
-        <Button
-          variant="outlined"
-          component="label"
-          disabled={actionLoading}
-          sx={{ flexShrink: 0 }}
-        >
-          Upload Data to Bot
-          <input
-            ref={fileRef}
-            hidden
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={(e) => onUpload(e.target.files?.[0])}
-          />
-        </Button>
-        <Button
-          variant="contained"
-          color="error"
-          onClick={onPauseOpen}
-          sx={{ flexShrink: 0 }}
-        >
-          Pause Bot Call
-        </Button>
+        {!isCaller && (
+          <>
+            <Button
+              variant="outlined"
+              component="label"
+              disabled={actionLoading}
+              sx={{ flexShrink: 0 }}
+            >
+              Upload Data to Bot
+              <input
+                ref={fileRef}
+                hidden
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => onUpload(e.target.files?.[0])}
+              />
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={onPauseOpen}
+              sx={{ flexShrink: 0 }}
+            >
+              Pause Bot Call
+            </Button>
+          </>
+        )}
         {(loading || actionLoading) && <CircularProgress size={22} />}
       </Stack>
 
-      <Typography variant="body2" color="text.secondary" mt={1.5}>
+      <Typography variant="body2" fontWeight={700} mt={1.5}>
         Total user count : {total}
       </Typography>
     </Paper>

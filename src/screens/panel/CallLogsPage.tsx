@@ -27,16 +27,19 @@ import { useCallLogsQuery } from './callLogs/useCallLogsQuery';
 import { useCallLogsActions } from './callLogs/useCallLogsActions';
 import type { CallLogRow, CallLogsFilterState } from './callLogs/types';
 import { MAX_COMMENT_LENGTH } from './callLogs/types';
+import { isCallLogsCaller } from './callLogs/utils';
 
 export function CallLogsPage() {
   const admin = getStoredUser<{
     _id?: string;
     name?: string;
+    Role_ID?: string;
     extensionId?: string[];
     serverId?: string | number;
-    botIds?: Array<string | number>;
+    botIds?: Array<string | number> | string;
+    botNo?: Array<string | number> | string;
   }>();
-
+  const isCaller = isCallLogsCaller(admin);
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [page, setPage] = useState(1);
@@ -74,6 +77,7 @@ export function CallLogsPage() {
     <CallLogsSelectionProvider calls={calls}>
       <CallLogsPageBody
         admin={admin}
+        isCaller={isCaller}
         startDate={startDate}
         endDate={endDate}
         page={page}
@@ -112,13 +116,16 @@ export function CallLogsPage() {
 type CallLogsAdmin = {
   _id?: string;
   name?: string;
+  Role_ID?: string;
   extensionId?: string[];
   serverId?: string | number;
-  botIds?: Array<string | number>;
+  botIds?: Array<string | number> | string;
+  botNo?: Array<string | number> | string;
 } | null;
 
 type BodyProps = {
   admin: CallLogsAdmin;
+  isCaller: boolean;
   startDate: string;
   endDate: string;
   page: number;
@@ -153,6 +160,7 @@ type BodyProps = {
 
 function CallLogsPageBody({
   admin,
+  isCaller,
   startDate,
   endDate,
   page,
@@ -317,6 +325,7 @@ function CallLogsPageBody({
         loading={loading}
         actionLoading={actionLoading}
         fileRef={fileRef}
+        isCaller={isCaller}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
         onCampaignChange={setCampaignId}
@@ -335,12 +344,14 @@ function CallLogsPageBody({
         onPauseOpen={() => setPauseOpen(true)}
       />
 
-      <BotStatusTable
-        botSummary={botSummary}
-        loading={loading}
-        actionLoading={actionLoading}
-        onReinitiateDeleted={reinitiateDeleted}
-      />
+      {!isCaller && (
+        <BotStatusTable
+          botSummary={botSummary}
+          loading={loading}
+          actionLoading={actionLoading}
+          onReinitiateDeleted={reinitiateDeleted}
+        />
+      )}
 
       <CallLogsFiltersProvider value={filtersValue}>
         <CommonTable
@@ -350,7 +361,7 @@ function CallLogsPageBody({
           loading={loading}
           emptyMessage="No call logs"
           stickyHeader
-          minWidth={2200}
+          minWidth={isCaller ? 1400 : 2300}
           dense
           virtualize
         />

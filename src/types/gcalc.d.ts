@@ -1,4 +1,4 @@
-export type AppScreen = 'calculator' | 'login' | 'welcome';
+export type AppScreen = 'site' | 'login' | 'welcome';
 
 export type AddressInfo = {
   state?: string;
@@ -11,8 +11,11 @@ export type AuthUser = {
   mobile?: string;
   name?: string;
   Role_ID?: string;
+  Role_Name?: string;
+  Responsibilities?: string[];
   block?: boolean;
-  roles?: unknown;
+  roles?: Record<string, string> | unknown;
+  empCode?: string;
   [key: string]: unknown;
 };
 
@@ -49,7 +52,11 @@ export type GCalcApi = {
   version: string;
   showLogin: () => void;
   showWelcome: () => void;
+  /** @deprecated Use showSite */
   showCalculator: () => void;
+  showSite: () => void;
+  hideSite: () => void;
+  onRequestLogin: (cb: () => void) => void;
   sendOtp: (payload: { mobile: string; token?: string | null }) => Promise<SendOtpResult>;
   verifyOtp: (payload: {
     mobile: string;
@@ -85,6 +92,11 @@ export type GCalcApi = {
   onUpdateProgress: (cb: (d: { percent: number }) => void) => void;
   onUpdateReady: (cb: (d: { version: string }) => void) => void;
   onUpdateError: (cb: (d: { message: string }) => void) => void;
+  getUpdateStatus: () => Promise<{
+    channel: string;
+    payload?: { version?: string; percent?: number; message?: string };
+    at?: number;
+  } | null>;
   installUpdate: () => void;
 };
 

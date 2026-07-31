@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
 import { STATE_LANGUAGE_MAP } from './constants';
 import type {
   CallLogRow,
@@ -39,6 +40,47 @@ export function toMinSec(second: unknown): string {
   return m <= 0 ? `${s} sec` : `${m} min ${s} sec`;
 }
 
+/** Normalize assigned bot IDs from login user (`botIds` or `botNo`). */
+export function getAssignedBotIds(user: {
+  botIds?: Array<string | number> | string;
+  botNo?: Array<string | number> | string;
+} | null | undefined): number[] {
+  const raw = user?.botIds ?? user?.botNo;
+  if (raw == null || raw === '') return [];
+  const list = Array.isArray(raw)
+    ? raw
+    : String(raw)
+        .split(/[,\s]+/)
+        .filter(Boolean);
+  return Array.from(
+    new Set(
+      list
+        .map((v) => Number(v))
+        .filter((n) => Number.isFinite(n) && n > 0),
+    ),
+  );
+}
+
+/** True for caller / caller_new Role_ID or role name. */
+export function isCallLogsCaller(user: {
+  Role_ID?: string;
+  role?: string;
+  Role_Name?: string;
+} | null | undefined): boolean {
+  const roleId = String(user?.Role_ID || localStorage.getItem('role_id') || '');
+  if (roleId && CALLER_ROLE_IDS.has(roleId)) return true;
+  const name = String(
+    localStorage.getItem('role') ||
+      user?.Role_Name ||
+      user?.role ||
+      '',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  return name === 'caller' || name === 'caller_new';
+}
+
 export function formatStatusLabel(item: CallLogRow): string {
   const status = String(item.status || '');
   const duration = item.call_duration;
@@ -46,8 +88,26 @@ export function formatStatusLabel(item: CallLogRow): string {
   if (status === 'queued') return 'Queued';
   if (status === 'deleted') return 'Deleted';
   if (['busy', 'no-answer', 'failed'].includes(status)) return 'no-answer';
-  if (status === 'completed' && !duration) return 'Not Received';
+  if (!duration && status !== 'in-progress') return 'Not Received';
+  if (status === 'completed') return 'completed';
   return status || '-';
+}
+
+export type StatusBadgeTone =
+  | 'completed'
+  | 'no-answer'
+  | 'busy'
+  | 'deleted'
+  | 'default';
+
+export function statusBadgeTone(item: CallLogRow): StatusBadgeTone {
+  const status = String(item.status || '');
+  if (status === 'deleted') return 'deleted';
+  if (status === 'queued') return 'busy';
+  if (['busy', 'no-answer', 'failed'].includes(status)) return 'no-answer';
+  if (!item.call_duration && status !== 'in-progress') return 'busy';
+  if (status === 'completed') return 'completed';
+  return 'default';
 }
 
 export function mapRowToDialSetting(item: CallLogRow) {
@@ -158,19 +218,25 @@ export function extractDialLeadsFromExcel(file: File): Promise<DialLead[]> {
 export function filterCallsClientSide(
   calls: CallLogRow[],
   selectedStatus: string,
+  assignedBotIds: number[] = [],
 ): CallLogRow[] {
+  let next = calls;
+  if (assignedBotIds.length > 0) {
+    const allowed = new Set(assignedBotIds);
+    next = next.filter((c) => allowed.has(Number(c.bot_id)));
+  }
   if (selectedStatus === 'Not Received') {
-    return calls.filter((c) => c.status === 'completed' && !c.call_duration);
+    return next.filter((c) => c.status === 'completed' && !c.call_duration);
   }
   if (selectedStatus === 'completed') {
-    return calls.filter((c) => c.status === 'completed' && c.call_duration);
+    return next.filter((c) => c.status === 'completed' && c.call_duration);
   }
   if (selectedStatus === 'no-answer') {
-    return calls.filter((c) =>
+    return next.filter((c) =>
       ['busy', 'no-answer', 'failed'].includes(String(c.status || '')),
     );
   }
-  return calls;
+  return next;
 }
 
 export type BotSummaryRow = {

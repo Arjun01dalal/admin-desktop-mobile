@@ -4,7 +4,7 @@ import { secureApi } from '@/api/secureClient';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { formatDdMmYyyy } from '@/utils/dates';
 import { POLL_INTERVAL_MS } from './constants';
-import { filterCallsClientSide } from './utils';
+import { filterCallsClientSide, getAssignedBotIds } from './utils';
 import type {
   BotStatusSummary,
   CallLogRow,
@@ -12,7 +12,10 @@ import type {
   CallLogsListResponse,
 } from './types';
 
-type AdminBots = { botIds?: Array<string | number> } | null | undefined;
+type AdminBots = {
+  botIds?: Array<string | number> | string;
+  botNo?: Array<string | number> | string;
+} | null | undefined;
 
 export function useCallLogsQuery(
   filters: CallLogsFilterState,
@@ -43,10 +46,21 @@ export function useCallLogsQuery(
           ? 'completed'
           : f.selectedStatus;
 
+    const assigned = getAssignedBotIds(adminRef.current);
     let botId: number[] | null;
-    if (f.selectedBotId === 'All') botId = null;
-    else if (f.selectedBotId) botId = [Number(f.selectedBotId)];
-    else botId = (adminRef.current?.botIds || []).map(Number);
+    if (assigned.length > 0) {
+      // Callers / users with allotted bots — only their bot data
+      if (f.selectedBotId && f.selectedBotId !== 'All') {
+        const selected = Number(f.selectedBotId);
+        botId = assigned.includes(selected) ? [selected] : assigned;
+      } else {
+        botId = assigned;
+      }
+    } else if (f.selectedBotId === 'All' || !f.selectedBotId) {
+      botId = null;
+    } else {
+      botId = [Number(f.selectedBotId)];
+    }
 
     return {
       mobileNo: f.mobNo || undefined,
@@ -74,6 +88,7 @@ export function useCallLogsQuery(
       try {
         const filter = buildFilter();
         const f = filtersRef.current;
+        const assigned = getAssignedBotIds(adminRef.current);
         const [listRes, sumRes] = await Promise.all([
           secureApi<CallLogsListResponse>('callLogs.getDialerData', {
             userId: '',
@@ -92,8 +107,14 @@ export function useCallLogsQuery(
         } else {
           const data = listRes.data || {};
           const raw = data.calls || [];
-          const nextCalls = filterCallsClientSide(raw, f.selectedStatus);
-          const nextTotal = Number(data.pagination?.totalCount ?? raw.length);
+          const nextCalls = filterCallsClientSide(
+            raw,
+            f.selectedStatus,
+            assigned,
+          );
+          const nextTotal = Number(
+            data.pagination?.totalCount ?? nextCalls.length,
+          );
           startTransition(() => {
             setCalls(nextCalls);
             setTotal(nextTotal);

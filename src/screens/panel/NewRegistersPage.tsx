@@ -12,9 +12,11 @@ import {
   Pagination,
 } from '@mui/material';
 import { todayIST, getStoredUser } from '@/utils/dates';
+import { getRoleId } from '@/auth/permissions';
 import { CommonTable } from '@/components/CommonTable';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
+import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
 import { NewRegistersToolbar } from './newRegisters/NewRegistersToolbar';
 import { NewRegistersFiltersProvider } from './newRegisters/FiltersContext';
 import { useNewRegistersColumns } from './newRegisters/useNewRegistersColumns';
@@ -24,14 +26,27 @@ import type { UserRow } from './newRegisters/types';
 
 const MAX_REMARK_LENGTH = 500;
 
+function isNewRegistersCaller(roleId?: string): boolean {
+  const id = String(roleId || getRoleId() || '');
+  if (id && CALLER_ROLE_IDS.has(id)) return true;
+  const name = String(localStorage.getItem('role') || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  return name === 'caller' || name === 'caller_new';
+}
+
 export function NewRegistersPage() {
   const admin = getStoredUser<{
     name?: string;
+    empCode?: string;
+    Role_ID?: string;
     extensionId?: string[];
     serverId?: string | number;
     clientName?: string | string[];
     allotedApps?: string | string[];
   }>();
+  const isCaller = isNewRegistersCaller(admin?.Role_ID);
 
   const appOptions = useMemo(() => {
     const allotted = admin?.clientName || admin?.allotedApps;
@@ -126,6 +141,7 @@ export function NewRegistersPage() {
     page,
     itemsPerPage,
     setBlockTarget,
+    isCaller,
   });
 
   const filtersValue = useMemo(

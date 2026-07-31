@@ -22,6 +22,14 @@ export type NewRegistersQueryFilters = {
   showEmptyRecord: boolean;
 };
 
+/** Normalize numeric emp codes so "21" and "021" match. */
+function normalizeEmpCode(value: unknown): string {
+  const s = String(value ?? '').trim();
+  if (!s) return '';
+  if (/^\d+$/.test(s)) return s.padStart(3, '0');
+  return s;
+}
+
 export function useNewRegistersQuery(
   admin: NewRegistersAdmin | null | undefined,
   page: number,
@@ -37,6 +45,7 @@ export function useNewRegistersQuery(
 
   const buildFilter = useCallback(() => {
     const f = columnFilters;
+    const empCode = normalizeEmpCode(admin?.empCode);
     const filter: Record<string, unknown> = {
       name: f.searchName || undefined,
       _id: f.searchDpId || undefined,
@@ -51,6 +60,8 @@ export function useNewRegistersQuery(
       referredCode: f.searchReferred || undefined,
       referralCodeUser: f.searchReferralCodeUser || undefined,
       mobile: f.searchMobile || undefined,
+      // Login has empCode → only own records (same as laxminarayan)
+      empCode: empCode || undefined,
     };
 
     if (f.selectedState.length > 0) {
@@ -60,7 +71,7 @@ export function useNewRegistersQuery(
     return Object.fromEntries(
       Object.entries(filter).filter(([, v]) => v !== undefined && v !== ''),
     );
-  }, [columnFilters]);
+  }, [columnFilters, admin?.empCode]);
 
   const load = useCallback(
     async (pageNo = page) => {
@@ -68,6 +79,7 @@ export function useNewRegistersQuery(
       begin();
       setLoading(true);
       try {
+        const empCode = normalizeEmpCode(admin?.empCode);
         const payload: Record<string, unknown> = {
           itemsPerPage,
           pageNo,
@@ -88,14 +100,42 @@ export function useNewRegistersQuery(
           return;
         }
 
-        const data = res.data || {};
-        let list = data.users || data.items || [];
+        const data = (res.data || {}) as UsersListResponse & {
+          payload?: UsersListResponse;
+        };
+        // Prefer `items` (same as laxminarayan fetchUserGetAll) over `users`
+        const nested =
+          data.payload &&
+          typeof data.payload === 'object' &&
+          !Array.isArray(data.payload)
+            ? data.payload
+            : data;
+        let list: UserRow[] = Array.isArray(res.data)
+          ? (res.data as UserRow[])
+          : nested.items ||
+            nested.users ||
+            data.items ||
+            data.users ||
+            [];
         if (columnFilters.showEmptyRecord) {
-          list = list.filter((row) => !row.activeUser);
+          list = list.filter(
+            (row) =>
+              !row.activeUser &&
+              !(row as { lastActivity?: unknown }).lastActivity,
+          );
         }
+        // Client-side guard if API returns all even when empCode is sent
+        if (empCode) {
+          list = list.filter(
+            (row) => normalizeEmpCode(row.empCode) === empCode,
+          );
+        }
+        const apiTotal = Number(
+          nested.total ?? nested.count ?? data.total ?? data.count ?? 0,
+        );
         startTransition(() => {
           setRows(list);
-          setTotal(data.total ?? data.count ?? 0);
+          setTotal(apiTotal || list.length);
         });
       } finally {
         end();
@@ -109,6 +149,7 @@ export function useNewRegistersQuery(
       endDate,
       admin?.clientName,
       admin?.allotedApps,
+      admin?.empCode,
       buildFilter,
       columnFilters.showEmptyRecord,
       isCurrent,

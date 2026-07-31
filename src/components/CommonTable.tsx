@@ -1,6 +1,7 @@
 import { memo, useCallback, useRef, type MouseEvent, type ReactNode } from 'react';
 import {
   Box,
+  CircularProgress,
   IconButton,
   Paper,
   Table,
@@ -60,6 +61,47 @@ export const commonTableStyles = {
   } satisfies SxProps<Theme>,
 };
 
+/** Light table tone for User Report / Laxmi-style pages. */
+export const commonTableStylesLight = {
+  paper: {
+    bgcolor: '#fff',
+    overflow: 'auto',
+    border: '1px solid #ddd',
+  } satisfies SxProps<Theme>,
+  cell: {
+    whiteSpace: 'nowrap',
+    fontSize: 13,
+    color: '#111',
+    border: '1px solid #ddd',
+    py: 1,
+    px: 1.25,
+    textAlign: 'center',
+    bgcolor: '#fff',
+  } satisfies SxProps<Theme>,
+  head: {
+    whiteSpace: 'nowrap',
+    fontSize: 13,
+    fontWeight: 700,
+    color: '#fff',
+    bgcolor: '#ff9f0a',
+    border: '1px solid #e08c00',
+    py: 1.25,
+    px: 1.5,
+    textAlign: 'center',
+  } satisfies SxProps<Theme>,
+  filter: {
+    whiteSpace: 'nowrap',
+    fontSize: 12,
+    color: '#111',
+    bgcolor: '#fff',
+    border: '1px solid #ddd',
+    py: 0.75,
+    px: 1,
+    verticalAlign: 'middle',
+    textAlign: 'center',
+  } satisfies SxProps<Theme>,
+};
+
 export type CommonTableColumn<T> = {
   id: string;
   label: ReactNode;
@@ -88,6 +130,8 @@ export type CommonTableProps<T> = {
   dense?: boolean;
   size?: 'small' | 'medium';
   onRowClick?: (row: T, index: number) => void;
+  /** Optional per-row sx (e.g. status background colors). */
+  getRowSx?: (row: T, index: number) => SxProps<Theme> | undefined;
   /**
    * Virtualize body rows for large lists.
    * - true / undefined: auto when rows.length >= virtualizeThreshold
@@ -100,6 +144,8 @@ export type CommonTableProps<T> = {
   maxHeight?: number | string;
   /** Estimated row height for the virtualizer (default dense ? 40 : 48). */
   estimateRowHeight?: number;
+  /** Use Laxmi-style light table (orange header, black text). */
+  tone?: 'dark' | 'light';
 };
 
 type BodyRowProps<T> = {
@@ -109,6 +155,7 @@ type BodyRowProps<T> = {
   cellBase: SxProps<Theme>;
   hover: boolean;
   onRowClick?: (row: T, index: number) => void;
+  getRowSx?: (row: T, index: number) => SxProps<Theme> | undefined;
   measureRef?: (node: HTMLTableRowElement | null) => void;
   dataIndex?: number;
 };
@@ -120,6 +167,7 @@ function BodyRowInner<T>({
   cellBase,
   hover,
   onRowClick,
+  getRowSx,
   measureRef,
   dataIndex,
 }: BodyRowProps<T>) {
@@ -139,13 +187,14 @@ function BodyRowInner<T>({
     [onRowClick, row, index],
   );
 
+  const rowSx = getRowSx?.(row, index);
   return (
     <TableRow
       ref={measureRef}
       data-index={dataIndex}
       hover={hover}
       onClick={onRowClick ? handleClick : undefined}
-      sx={onRowClick ? { cursor: 'pointer' } : undefined}
+      sx={[onRowClick ? { cursor: 'pointer' } : undefined, rowSx] as SxProps<Theme>}
     >
       {columns.map((col) => (
         <TableCell
@@ -182,18 +231,24 @@ export function CommonTable<T>({
   hover = true,
   dense = false,
   onRowClick,
+  getRowSx,
   virtualize,
   virtualizeThreshold = 40,
   maxHeight = 560,
   estimateRowHeight,
+  tone = 'dark',
 }: CommonTableProps<T>) {
+  const styles = tone === 'light' ? commonTableStylesLight : commonTableStyles;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const cellBase: SxProps<Theme> = dense
-    ? { ...commonTableStyles.cell, fontSize: 12, py: 1 }
-    : commonTableStyles.cell;
+    ? { ...styles.cell, fontSize: 12, py: 1 }
+    : styles.cell;
   const headBase: SxProps<Theme> = dense
-    ? { ...commonTableStyles.head, fontSize: 12, py: 1 }
-    : commonTableStyles.head;
+    ? { ...styles.head, fontSize: 12, py: 1 }
+    : styles.head;
+  const filterBase: SxProps<Theme> = dense
+    ? { ...styles.filter, fontSize: 11, py: 0.75 }
+    : styles.filter;
 
   const showFilters = columns.some((col) => col.filter != null);
   const shouldVirtualize =
@@ -263,11 +318,19 @@ export function CommonTable<T>({
               <TableCell
                 key={`${col.id}-filter`}
                 align={col.align ?? 'center'}
+                width={col.width}
                 sx={
                   [
-                    dense
-                      ? { ...commonTableStyles.filter, fontSize: 11, py: 0.75 }
-                      : commonTableStyles.filter,
+                    filterBase,
+                    col.width != null && {
+                      width: col.width,
+                      maxWidth: col.width,
+                      minWidth: col.width,
+                      boxSizing: 'border-box',
+                      overflow: 'hidden',
+                      verticalAlign: 'top',
+                    },
+                    col.headSx,
                   ] as SxProps<Theme>
                 }
               >
@@ -278,6 +341,27 @@ export function CommonTable<T>({
         )}
       </TableHead>
       <TableBody>
+        {loading && rows.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={columns.length} align="center" sx={cellBase}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  py: 4,
+                  gap: 1.5,
+                }}
+              >
+                <CircularProgress size={28} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading…
+                </Typography>
+              </Box>
+            </TableCell>
+          </TableRow>
+        )}
+
         {rows.length === 0 && !loading && (
           <TableRow>
             <TableCell colSpan={columns.length} align="center" sx={cellBase}>
@@ -309,6 +393,7 @@ export function CommonTable<T>({
                 cellBase={cellBase}
                 hover={hover}
                 onRowClick={onRowClick}
+                getRowSx={getRowSx}
                 dataIndex={virtualRow.index}
                 measureRef={virtualizer.measureElement}
               />
@@ -334,6 +419,7 @@ export function CommonTable<T>({
               cellBase={cellBase}
               hover={hover}
               onRowClick={onRowClick}
+              getRowSx={getRowSx}
             />
           ))}
       </TableBody>
@@ -342,7 +428,7 @@ export function CommonTable<T>({
 
   const scrollSx = shouldVirtualize
     ? {
-        ...commonTableStyles.paper,
+        ...styles.paper,
         // Explicit height required for virtualization scrollport (maxHeight alone
         // can collapse when combined with layout tricks).
         height: maxHeight,
@@ -350,24 +436,46 @@ export function CommonTable<T>({
         overflow: 'auto',
         willChange: 'scroll-position',
       }
-    : commonTableStyles.paper;
+    : styles.paper;
+
+  const withOverlay = (node: ReactNode) => (
+    <Box sx={{ position: 'relative' }}>
+      {node}
+      {loading && rows.length > 0 && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'rgba(10, 10, 14, 0.55)',
+            zIndex: 2,
+            borderRadius: 1,
+          }}
+        >
+          <CircularProgress size={36} />
+        </Box>
+      )}
+    </Box>
+  );
 
   if (!paper) {
-    if (!shouldVirtualize) return table;
-    return (
+    if (!shouldVirtualize) return withOverlay(table);
+    return withOverlay(
       <Box
         ref={scrollRef}
         sx={{ height: maxHeight, maxHeight, overflow: 'auto' }}
       >
         {table}
-      </Box>
+      </Box>,
     );
   }
 
-  return (
+  return withOverlay(
     <Paper ref={scrollRef} sx={scrollSx}>
       {table}
-    </Paper>
+    </Paper>,
   );
 }
 

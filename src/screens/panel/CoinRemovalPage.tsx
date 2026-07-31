@@ -2,7 +2,7 @@ import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Pagination, Stack, Typography } from '@mui/material';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { todayIST } from '@/utils/dates';
+import { todayIST, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { CoinRemovalToolbar } from './coinRemoval/CoinRemovalToolbar';
 import { useCoinRemovalQuery } from './coinRemoval/useCoinRemovalQuery';
@@ -35,7 +35,7 @@ export function CoinRemovalPage() {
 
   const openDetails = useCallback(
     (row: CoinRemovalRow) => {
-      navigate('/coin-removal/details', {
+      navigate('/coins-removal/details', {
         state: {
           user: row,
           startDate: startDate || todayIST(),
@@ -91,7 +91,7 @@ export function CoinRemovalPage() {
             onClick={() => openDetails(row)}
             sx={{ cursor: 'pointer' }}
           >
-            {row.totalBalance ?? 0}
+            {formatAmount(row.totalBalance ?? 0)}
           </Box>
         ),
       },

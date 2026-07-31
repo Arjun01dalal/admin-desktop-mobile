@@ -21,7 +21,6 @@ import {
   displayName,
   ecs,
   filterCallerRows,
-  minutesForDate,
   pnl,
   roleFlags,
   roundAmt,
@@ -169,33 +168,57 @@ export function CallerResponsibilityPage() {
   );
 
   const summaryColumns = useMemo<CommonTableColumn<(typeof summaryRow)[0]>[]>(
-    () => [
-      { id: 'emp', label: "Total Employee (Caller's)", render: (r) => r.totalEmpCodes ?? '-' },
-      { id: 'loc', label: 'Total Office Location', render: (r) => r.totalOfficeLocations ?? '-' },
-      { id: 'txn', label: 'Total Transaction', render: (r) => r.totalTransactions ?? '-' },
-      { id: 'active', label: 'Total Active Customers', render: (r) => r.totalActiveUsers ?? '-' },
-      {
-        id: 'txnCount',
-        label: 'Total Transaction Count',
-        render: (r) => r.totalTransactionCount,
-      },
-      {
-        id: 'bot',
-        label: 'Active Customers By Bot',
-        render: (r) => (
-          <Box
-            component="span"
-            onClick={openBotUsers}
-            sx={{
-              cursor: !isCaller && displayedBotCount > 0 ? 'pointer' : 'default',
-            }}
-          >
-            {r.activeByBot}
-          </Box>
-        ),
-      },
-    ],
-    [isCaller, displayedBotCount, openBotUsers],
+    () => {
+      const cols: CommonTableColumn<(typeof summaryRow)[0]>[] = [
+        {
+          id: 'emp',
+          label: "Total Employee (Caller's)",
+          render: (r) => r.totalEmpCodes ?? '-',
+        },
+      ];
+      if (showLocation) {
+        cols.push({
+          id: 'loc',
+          label: 'Total Office Location',
+          render: (r) => r.totalOfficeLocations ?? '-',
+        });
+      }
+      cols.push(
+        {
+          id: 'txn',
+          label: 'Total Transaction',
+          render: (r) => r.totalTransactions ?? '-',
+        },
+        {
+          id: 'active',
+          label: 'Total Active Customers',
+          render: (r) => r.totalActiveUsers ?? '-',
+        },
+        {
+          id: 'txnCount',
+          label: 'Total Transaction Count',
+          render: (r) => r.totalTransactionCount,
+        },
+        {
+          id: 'bot',
+          label: 'Active Customers By Bot',
+          render: (r) => (
+            <Box
+              component="span"
+              onClick={openBotUsers}
+              sx={{
+                cursor:
+                  !isCaller && displayedBotCount > 0 ? 'pointer' : 'default',
+              }}
+            >
+              {r.activeByBot}
+            </Box>
+          ),
+        },
+      );
+      return cols;
+    },
+    [isCaller, displayedBotCount, openBotUsers, showLocation],
   );
 
   const locationColumns = useMemo<CommonTableColumn<CallerRow>[]>(
@@ -222,7 +245,7 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wApp',
-        label: 'Total Withdrawal Approved Amount',
+        label: 'Total Refund Approved Amount',
         render: (r) => roundAmt(r.withdrawalApprovedAmount),
       },
       {
@@ -232,25 +255,25 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wPend',
-        label: 'Total Withdrawal Pending Amount',
+        label: 'Total Refund Pending Amount',
         render: (r) => roundAmt(r.withdrawalPendingAmount),
       },
       {
         id: 'wAppC',
-        label: 'Total Withdrawal Approved Count',
-        render: (r) => roundAmt(r.withdrawalApprovedCount),
+        label: 'Total Refund Approved Count',
+        render: (r) => r.withdrawalApprovedCount ?? '-',
       },
       {
         id: 'wPendC',
-        label: 'Total Withdrawal Pending Count',
-        render: (r) => roundAmt(r.withdrawalPendingCount),
+        label: 'Total Refund Pending Count',
+        render: (r) => r.withdrawalPendingCount ?? '-',
       },
     ],
     [],
   );
 
-  const callerColumns = useMemo<CommonTableColumn<CallerRow>[]>(
-    () => [
+  const callerColumns = useMemo<CommonTableColumn<CallerRow>[]>(() => {
+    const cols: CommonTableColumn<CallerRow>[] = [
       { id: '#', label: 'SR. No', width: 56, render: (_r, i) => i + 1 },
       {
         id: 'pseudo',
@@ -262,11 +285,17 @@ export function CallerResponsibilityPage() {
         label: 'Real Name',
         render: (r) => displayName(r.realName),
       },
-      {
+    ];
+
+    if (showLocation) {
+      cols.push({
         id: 'office',
         label: 'Office Location',
         render: (r) => String(r.officeLocation ?? '-'),
-      },
+      });
+    }
+
+    cols.push(
       {
         id: 'deposit',
         label: 'Total Deposit',
@@ -274,8 +303,8 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wAppAmt',
-        label: 'Total Withdrawal Approved Amount',
-        render: (r) => r.withdrawalApprovedAmount ?? '-',
+        label: 'Total Refund Approved Amount',
+        render: (r) => roundAmt(r.withdrawalApprovedAmount),
       },
       {
         id: 'pnl',
@@ -284,17 +313,17 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wPendAmt',
-        label: 'Total Withdrawal Pending Amount',
-        render: (r) => r.withdrawalPendingAmount ?? '-',
+        label: 'Total Refund Pending Amount',
+        render: (r) => roundAmt(r.withdrawalPendingAmount),
       },
       {
         id: 'wAppCnt',
-        label: 'Withdrawal Approved Count',
+        label: 'Refund Approved Count',
         render: (r) => r.withdrawalApprovedCount ?? '-',
       },
       {
         id: 'wPendCnt',
-        label: 'Withdrawal Pending Count',
+        label: 'Refund Pending Count',
         render: (r) => r.withdrawalPendingCount ?? '-',
       },
       {
@@ -338,7 +367,7 @@ export function CallerResponsibilityPage() {
                 });
               }}
             >
-              View Withdraw List
+              View Refund List
             </Button>
             <Button
               size="small"
@@ -364,47 +393,54 @@ export function CallerResponsibilityPage() {
           </Stack>
         ),
       },
-      {
-        id: 'ex',
-        label: 'Active Exchange Customers',
-        render: (r) => r.activeUserCount ?? '-',
-      },
-      {
-        id: 'casino',
-        label: 'Active Casino Customers',
-        render: (r) => ecs(r).E ?? '-',
-      },
-      {
-        id: 'matka',
-        label: 'Active Satta Matka Customers',
-        render: (r) => ecs(r).C ?? '-',
-      },
-      {
-        id: 'daily',
-        label: 'Daily Deposit',
-        render: (r) => ecs(r).S ?? '-',
-      },
-      {
-        id: 'time',
-        label: 'Time',
-        cellSx: { whiteSpace: 'normal' },
-        render: (r) => (
-          <Stack spacing={0.25}>
-            <span>{`Inactive: ${minutesForDate(r.inactiveTime, startDate)}`}</span>
-            <span>{`Active: ${minutesForDate(r.activeTime, startDate)}`}</span>
-          </Stack>
-        ),
-      },
-      { id: 'status', label: 'Staus', render: (r) => r.time ?? '-' },
-      { id: 'emp', label: 'Emp Code', render: (r) => String(r.empCode ?? '-') },
-      {
+    );
+
+    if (!isCaller) {
+      cols.push(
+        {
+          id: 'ex',
+          label: 'E',
+          render: (r) => r.activeUserCount ?? '-',
+        },
+        {
+          id: 'casino',
+          label: 'C',
+          render: (r) => ecs(r).E ?? '-',
+        },
+        {
+          id: 'matka',
+          label: 'S',
+          render: (r) => ecs(r).C ?? '-',
+        },
+      );
+    }
+
+    cols.push({
+      id: 'daily',
+      label: 'Daily Deposit',
+      render: (r) => roundAmt(ecs(r).S),
+    });
+
+    if (!isCaller) {
+      cols.push({ id: 'status', label: 'Status', render: (r) => r.time ?? '-' });
+    }
+
+    cols.push({
+      id: 'emp',
+      label: 'Emp Code',
+      render: (r) => String(r.empCode ?? '-'),
+    });
+
+    if (!isCaller) {
+      cols.push({
         id: 'head',
         label: 'Caller Head',
         render: (r) => displayName(r.callerHead),
-      },
-    ],
-    [navigate, startDate, endDate],
-  );
+      });
+    }
+
+    return cols;
+  }, [navigate, startDate, endDate, isCaller, showLocation]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
@@ -412,101 +448,103 @@ export function CallerResponsibilityPage() {
         Caller Responsibility
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={1.5}
-          alignItems={{ xs: 'stretch', md: 'center' }}
-          flexWrap="wrap"
-          useFlexGap
-        >
-          <TextField
-            type="date"
-            label="From Date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
-          />
-          <TextField
-            type="date"
-            label="To Date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
-          />
-          {showCallerHead && (
-            <TextField
-              select
-              label="Caller Head"
-              size="small"
-              value={callerHead}
-              onChange={(e) => setCallerHead(e.target.value)}
-              sx={{ minWidth: { xs: '100%', md: 180 }, flex: { md: 1 } }}
-            >
-              <MenuItem value="">
-                <em>Select</em>
-              </MenuItem>
-              {heads.map((h) => (
-                <MenuItem key={String(h._id || h.name)} value={String(h.name || '')}>
-                  {String(h.name || h.empCode || '-')}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
-          {showLocation && (
-            <TextField
-              select
-              label="Location"
-              size="small"
-              value={office}
-              onChange={(e) => setOffice(e.target.value)}
-              sx={{ minWidth: { xs: '100%', md: 160 }, flex: { md: 1 } }}
-            >
-              <MenuItem value="">
-                <em>Select</em>
-              </MenuItem>
-              {OFFICE_LOCATIONS.map((o) => (
-                <MenuItem key={o} value={o}>
-                  {o}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
-          <Button
-            variant="contained"
-            onClick={() => void loadMain()}
-            disabled={loading}
-            sx={{ flexShrink: 0, fontWeight: 700 }}
+      {!isCaller && (
+        <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={1.5}
+            alignItems={{ xs: 'stretch', md: 'center' }}
+            flexWrap="wrap"
+            useFlexGap
           >
-            Apply
-          </Button>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => setValidateOpen(true)}
-            sx={{ flexShrink: 0, fontWeight: 700 }}
-          >
-            Validate Data
-          </Button>
-          {loading && <CircularProgress size={22} />}
-        </Stack>
+            <TextField
+              type="date"
+              label="From Date"
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
+            />
+            <TextField
+              type="date"
+              label="To Date"
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
+            />
+            {showCallerHead && (
+              <TextField
+                select
+                label="Caller Head"
+                size="small"
+                value={callerHead}
+                onChange={(e) => setCallerHead(e.target.value)}
+                sx={{ minWidth: { xs: '100%', md: 180 }, flex: { md: 1 } }}
+              >
+                <MenuItem value="">
+                  <em>Select</em>
+                </MenuItem>
+                {heads.map((h) => (
+                  <MenuItem key={String(h._id || h.name)} value={String(h.name || '')}>
+                    {String(h.name || h.empCode || '-')}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            {showLocation && (
+              <TextField
+                select
+                label="Location"
+                size="small"
+                value={office}
+                onChange={(e) => setOffice(e.target.value)}
+                sx={{ minWidth: { xs: '100%', md: 160 }, flex: { md: 1 } }}
+              >
+                <MenuItem value="">
+                  <em>Select</em>
+                </MenuItem>
+                {OFFICE_LOCATIONS.map((o) => (
+                  <MenuItem key={o} value={o}>
+                    {o}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            <Button
+              variant="contained"
+              onClick={() => void loadMain()}
+              disabled={loading}
+              sx={{ flexShrink: 0, fontWeight: 700 }}
+            >
+              Apply
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={() => setValidateOpen(true)}
+              sx={{ flexShrink: 0, fontWeight: 700 }}
+            >
+              Validate Data
+            </Button>
+            {loading && <CircularProgress size={22} />}
+          </Stack>
 
-        <Typography
-          variant="body2"
-          mt={1.5}
-          onClick={openBotUsers}
-          sx={{
-            cursor: !isCaller && displayedBotCount > 0 ? 'pointer' : 'default',
-            width: 'fit-content',
-          }}
-        >
-          <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
-        </Typography>
-      </Paper>
+          <Typography
+            variant="body2"
+            mt={1.5}
+            onClick={openBotUsers}
+            sx={{
+              cursor: displayedBotCount > 0 ? 'pointer' : 'default',
+              width: 'fit-content',
+            }}
+          >
+            <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
+          </Typography>
+        </Paper>
+      )}
 
       {showTotalDeposit && (
         <Box mb={3}>
@@ -524,7 +562,7 @@ export function CallerResponsibilityPage() {
         </Box>
       )}
 
-      {showTotalDeposit && (
+      {showTotalDeposit && showLocation && (
         <Box mb={3}>
           <Typography variant="h6" fontWeight={700} mb={1}>
             By Office Location

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -9,12 +9,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { formatDisplayDate, todayIST } from '@/utils/dates';
+import { formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import type { CallerRow } from './constants';
+import { roleFlags, type StoredCallerUser } from './utils';
 
 type NavState = {
   activeBotUsers?: CallerRow[];
@@ -23,9 +24,10 @@ type NavState = {
 };
 
 export function ActiveBotUsersPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const nav = (location.state || {}) as NavState;
+  const user = getStoredUser<StoredCallerUser>();
+  const { isCaller } = roleFlags(user?.Role_ID);
 
   const [startDate, setStartDate] = useState(() => nav.startDate || todayIST());
   const [endDate, setEndDate] = useState(() => nav.endDate || todayIST());
@@ -55,8 +57,8 @@ export function ActiveBotUsersPage() {
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const columns = useMemo<CommonTableColumn<CallerRow>[]>(
-    () => [
+  const columns = useMemo<CommonTableColumn<CallerRow>[]>(() => {
+    const cols: CommonTableColumn<CallerRow>[] = [
       { id: '#', label: '#', width: 48, render: (_r, i) => i + 1 },
       {
         id: 'name',
@@ -68,42 +70,36 @@ export function ActiveBotUsersPage() {
         label: 'DP ID',
         render: (r) => <CopyText value={String(r._id || r.userId || '')} />,
       },
-      {
+    ];
+    if (!isCaller) {
+      cols.push({
         id: 'mobile',
         label: 'Mobile',
         render: (r) => (
           <CopyText value={String(r.mobile || r.userMobile || '')} />
         ),
-      },
+      });
+    }
+    cols.push(
       {
         id: 'app',
-        label: 'App',
-        render: (r) => String(r.clientName || r.appName || '-'),
+        label: 'App Code',
+        render: (r) => appCodeForName(r.clientName || r.appName),
       },
       {
         id: 'created',
         label: 'Created',
         render: (r) => formatDisplayDate(r.createdAt),
       },
-    ],
-    [],
-  );
+    );
+    return cols;
+  }, [isCaller]);
 
   return (
     <Box>
-      <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-        <Button
-          variant="contained"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/caller-responsibility')}
-          sx={{ flexShrink: 0 }}
-        >
-          Back
-        </Button>
-        <Typography variant="h5" fontWeight={700}>
-          Active Bot Users ({total || rows.length})
-        </Typography>
-      </Stack>
+      <Typography variant="h5" fontWeight={700} mb={2}>
+        Active Bot Users ({total || rows.length})
+      </Typography>
 
       <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
         <Stack
