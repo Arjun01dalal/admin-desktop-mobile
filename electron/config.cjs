@@ -43,6 +43,10 @@ module.exports = {
   getEntkValue: () => requireEnv('ENTK_VALUE'),
   /** Read-only GitHub token for private-repo auto-update checks (optional). */
   getGhUpdateToken: () => optionalEnv('GH_UPDATE_TOKEN'),
+  /** ntfy topic for SOS push (optional — enables cross-device alerts). */
+  getSosPushTopic: () => optionalEnv('SOS_PUSH_TOPIC'),
+  getSosPushServer: () => optionalEnv('SOS_PUSH_SERVER') || 'https://ntfy.sh',
+  optionalEnv,
   // Only true when launched via `npm run dev` (Vite server running).
   useViteDevServer: process.env.ELECTRON_DEV === '1',
   isPackaged: app.isPackaged,

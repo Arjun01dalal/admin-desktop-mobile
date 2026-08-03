@@ -1,23 +1,26 @@
 import { useCallback, useMemo, useState } from 'react';
-import { hasPermission } from '@/auth/permissions';
-import { formatDisplayDate, formatDisplayTime, formatAmount } from '@/utils/dates';
-import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
-import { appCodeForName } from '@/constants/clientNames';
 import {
-  ReportPage,
-  DataTable,
-  type DataColumn,
-  DateField,
-  PageSizeField,
-  SelectField,
-  SearchInput,
-  ApplyButton,
-  ReportPager,
+  Box,
+  Button,
+  CircularProgress,
+  MenuItem,
+  Pagination,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { hasPermission } from '@/auth/permissions';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
+import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import {
   useReportQuery,
   asPaged,
   display,
   maskMobile,
-  CLIENT_NAME_OPTIONS,
 } from './shared';
 
 type NonPerformingUserRow = {
@@ -54,10 +57,63 @@ const EMPTY_FILTERS: Filters = {
   city: '',
 };
 
-/** Non Performing User list — ops.nonPerformingUser (also available as dashboard.nonPerformingUser). */
+const filterFieldSx = {
+  minWidth: 120,
+  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+};
+
+const headerFieldSx = {
+  width: 180,
+  flexShrink: 0,
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+  '& .MuiInputLabel-root': { color: '#9aa3b5' },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+  letterSpacing: 0.4,
+  '&:hover': { bgcolor: '#e08c00' },
+};
+
+function ColumnSearch({
+  value,
+  onChange,
+  onSearch,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSearch: () => void;
+  placeholder: string;
+}) {
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSearch();
+      }}
+      sx={filterFieldSx}
+    />
+  );
+}
+
+function roundAmount(value: unknown): number {
+  return Math.floor(Number(value) || 0);
+}
+
+/** Non Performing User list — ops.nonPerformingUser. */
 export function NonPerformingUserPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd, setAppliedEnd] = useState('');
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [clientName, setClientName] = useState('');
@@ -85,12 +141,14 @@ export function NonPerformingUserPage() {
       action: 'ops.nonPerformingUser',
       buildPayload: () => ({
         pageNo: page,
-        itemsPerPage,
-        ...(startDate && endDate ? { startDate, endDate } : {}),
+        itemPerPage: itemsPerPage,
+        ...(appliedStart && appliedEnd
+          ? { startDate: appliedStart, endDate: appliedEnd }
+          : {}),
         filter: buildFilter(),
       }),
       unpack: (res) => asPaged<NonPerformingUserRow>(res.data),
-      autoDeps: [page, itemsPerPage, applied, clientName],
+      autoDeps: [page, itemsPerPage, applied, clientName, appliedStart, appliedEnd],
       errorMessage: 'Failed to load non performing users',
     });
 
@@ -100,9 +158,10 @@ export function NonPerformingUserPage() {
   }, [draft]);
 
   const applyDates = useCallback(() => {
+    setAppliedStart(startDate);
+    setAppliedEnd(endDate);
     setPage(1);
-    void load();
-  }, [load]);
+  }, [startDate, endDate]);
 
   const setDraftField = useCallback(
     (key: keyof Filters) => (value: string) =>
@@ -110,18 +169,19 @@ export function NonPerformingUserPage() {
     [],
   );
 
-  const columns = useMemo<DataColumn<NonPerformingUserRow>[]>(
+  const columns = useMemo<CommonTableColumn<NonPerformingUserRow>[]>(
     () => [
       {
         id: 'index',
         label: '#',
+        width: 56,
         render: (_row, index) => (page - 1) * itemsPerPage + index + 1,
       },
       {
         id: 'name',
         label: 'User Name',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.name}
             onChange={setDraftField('name')}
             onSearch={search}
@@ -134,7 +194,7 @@ export function NonPerformingUserPage() {
         id: 'dpId',
         label: 'Dp ID',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.dpId}
             onChange={setDraftField('dpId')}
             onSearch={search}
@@ -143,13 +203,17 @@ export function NonPerformingUserPage() {
         ),
         render: (row) => display(row._id),
       },
-      { id: 'appName', label: 'App Code', render: (row) => appCodeForName(row.clientName) },
+      {
+        id: 'appName',
+        label: 'App Code',
+        render: (row) => appCodeForName(row.clientName),
+      },
       { id: 'email', label: 'Email', render: (row) => display(row.email) },
       {
         id: 'mobile',
         label: 'Mobile',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.mobile}
             onChange={setDraftField('mobile')}
             onSearch={search}
@@ -162,25 +226,25 @@ export function NonPerformingUserPage() {
         id: 'balance',
         label: 'Balance',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.balance}
             onChange={setDraftField('balance')}
             onSearch={search}
             placeholder="Search balance"
           />
         ),
-        render: (row) => formatAmount(row.balance ?? 0),
+        render: (row) => roundAmount(row.balance),
       },
       {
         id: 'deposit',
         label: 'Deposit Amount',
-        render: (row) => formatAmount(row.totalAmount ?? 0),
+        render: (row) => roundAmount(row.totalAmount),
       },
       {
         id: 'state',
         label: 'State',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.state}
             onChange={setDraftField('state')}
             onSearch={search}
@@ -193,7 +257,7 @@ export function NonPerformingUserPage() {
         id: 'city',
         label: 'City',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.city}
             onChange={setDraftField('city')}
             onSearch={search}
@@ -229,51 +293,142 @@ export function NonPerformingUserPage() {
   );
 
   return (
-    <ReportPage
-      title="Non Performing User"
-      onRefresh={() => void load()}
-      loading={loading}
-      error={error}
-      toolbar={
-        <>
-          <DateField label="From Date" value={startDate} onChange={setStartDate} />
-          <DateField label="To Date" value={endDate} onChange={setEndDate} />
-          <PageSizeField
-            value={itemsPerPage}
-            onChange={(value) => {
-              setItemsPerPage(value);
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, p: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5" fontWeight={700}>
+          Non Performing User
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+          onClick={() => void load()}
+          disabled={loading}
+          sx={{
+            borderColor: 'rgba(255,255,255,0.2)',
+            color: '#e8e8ea',
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: '#ff9f0a',
+              bgcolor: 'rgba(255,159,10,0.08)',
+            },
+          }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflowX: 'auto' }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          alignItems="center"
+          flexWrap="nowrap"
+          useFlexGap
+          sx={{ minWidth: 'max-content' }}
+        >
+          <TextField
+            type="date"
+            label="From Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={headerFieldSx}
+          />
+          <TextField
+            type="date"
+            label="To Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            sx={headerFieldSx}
+          />
+          <TextField
+            select
+            label="Items Per Page"
+            size="small"
+            value={String(itemsPerPage)}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
               setPage(1);
             }}
-          />
-          <SelectField
-            label="App Client"
+            sx={{ ...headerFieldSx, width: 140 }}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="App Code"
+            size="small"
             value={clientName}
-            onChange={(value) => {
-              setClientName(value);
+            onChange={(e) => {
+              setClientName(e.target.value);
               setPage(1);
             }}
-            options={CLIENT_NAME_OPTIONS}
-            placeholder="All"
-          />
-          <ApplyButton onClick={applyDates} loading={loading} />
-        </>
-      }
-    >
-      <DataTable
+            SelectProps={{ displayEmpty: true }}
+            InputLabelProps={{ shrink: true }}
+            sx={{ ...headerFieldSx, width: 140 }}
+          >
+            <MenuItem value="">
+              <em>All</em>
+            </MenuItem>
+            {CLIENT_NAMES.map((name) => (
+              <MenuItem key={name} value={name}>
+                {appCodeForName(name)}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={applyDates}
+            disabled={loading}
+            sx={{ ...orangeBtnSx, height: 40, px: 2.5, flexShrink: 0 }}
+          >
+            {loading ? <CircularProgress size={18} color="inherit" /> : 'Apply'}
+          </Button>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color="text.secondary"
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Total: {total}
+          </Typography>
+        </Stack>
+      </Paper>
+
+      <CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row, index) => row._id || index}
         loading={loading}
         emptyMessage="No non performing users found"
+        stickyHeader
+        dense
         minWidth={1500}
+        maxHeight="calc(100vh - 360px)"
       />
-      <ReportPager
-        page={page}
-        totalPages={totalPages}
-        onChange={setPage}
-        disabled={loading}
-        total={total}
-      />
-    </ReportPage>
+
+      <Stack alignItems="center" mt={2}>
+        <Pagination
+          count={Math.max(1, totalPages)}
+          page={page}
+          onChange={(_e, p) => setPage(p)}
+          color="primary"
+          disabled={loading}
+        />
+      </Stack>
+    </Box>
   );
 }

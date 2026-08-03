@@ -7,30 +7,48 @@ import {
   useState,
   type FormEvent,
 } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  MenuItem,
+  Pagination,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
 import { toast } from 'react-toastify';
-import { CheckCircle2, ShieldQuestion, XCircle } from 'lucide-react';
 import { secureApi } from '@/api/secureClient';
-import { getSessionUser, hasPermission, Permissions } from '@/auth/permissions';
+import {
+  canAccessNavItem,
+  getSessionUser,
+  hasPermission,
+  Permissions,
+} from '@/auth/permissions';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { appCodeForName } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
-import { formatDisplayDate } from '@/utils/dates';
-import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
+import { dateTime, formatDisplayDate } from '@/utils/dates';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { CLIENT_NAMES } from '@/screens/panel/shared/clientNames';
-import { Button } from '@/components/ui/button';
-import {
-  ReportPage,
-  DataTable,
-  DateField,
-  SelectField,
-  PageSizeField,
-  SearchInput,
-  ApplyButton,
-  ReportPager,
-  ReportDialog,
-  display,
-  maskMobile,
-  type DataColumn,
-} from '@/screens/panel/shared';
+import { display, maskMobile } from '@/screens/panel/shared';
+
+function apiFailed(res: { ok: boolean; success?: boolean; message?: string }) {
+  return !res.ok || res.success === false;
+}
+
+const NIGHT_LOCK_KEY = 'nightLockUntil';
+const NIGHT_UNLOCK_MS = 60_000;
 
 type CheckStamp = { name?: string; date?: string } | undefined;
 
@@ -54,6 +72,7 @@ type KycRow = {
 
 type Filters = {
   name: string;
+  dpId: string;
   mobile: string;
   aadhaarNumber: string;
   accountNumber: string;
@@ -61,10 +80,61 @@ type Filters = {
 
 const EMPTY_FILTERS: Filters = {
   name: '',
+  dpId: '',
   mobile: '',
   aadhaarNumber: '',
   accountNumber: '',
 };
+
+const filterFieldSx = {
+  minWidth: 110,
+  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+  height: 36,
+  px: 2.5,
+  borderRadius: 1,
+  whiteSpace: 'nowrap' as const,
+  flexShrink: 0,
+  '&:hover': { bgcolor: '#e08c00' },
+};
+
+const toolbarFieldSx = {
+  width: 160,
+  flex: '0 0 auto',
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+};
+
+function ColumnSearch({
+  value,
+  onChange,
+  onSearch,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSearch: () => void;
+  placeholder: string;
+}) {
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSearch();
+      }}
+      sx={filterFieldSx}
+    />
+  );
+}
 
 function updatedByPayload() {
   const user = getSessionUser();
@@ -72,8 +142,12 @@ function updatedByPayload() {
 }
 
 export function UsersKycPage() {
+  const navigate = useNavigate();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
-  const canViewKyc = hasPermission(Permissions.View_KYCs);
+  const canViewKyc = canAccessNavItem({
+    id: 'usersKyc',
+    permission: Permissions.View_KYCs,
+  });
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -82,6 +156,12 @@ export function UsersKycPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [isNightLockActive, setIsNightLockActive] = useState(false);
+  const [disableNightCheck, setDisableNightCheck] = useState(false);
+  const [enableOtpOpen, setEnableOtpOpen] = useState(false);
+  const [enableOtpSent, setEnableOtpSent] = useState(false);
+  const [enableOtpValue, setEnableOtpValue] = useState('');
+  const [enableOtpLoading, setEnableOtpLoading] = useState(false);
 
   const [rows, setRows] = useState<KycRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -99,10 +179,11 @@ export function UsersKycPage() {
       setError(null);
       try {
         const filter: Record<string, string> = {};
-        if (active.name) filter.name = active.name;
-        if (active.mobile) filter.mobile = active.mobile;
-        if (active.aadhaarNumber) filter.aadhaarNumber = active.aadhaarNumber;
-        if (active.accountNumber) filter.accountNumber = active.accountNumber;
+        if (active.name.trim()) filter.name = active.name.trim();
+        if (active.dpId.trim()) filter._id = active.dpId.trim();
+        if (active.mobile.trim()) filter.mobile = active.mobile.trim();
+        if (active.aadhaarNumber.trim()) filter.aadhaarNumber = active.aadhaarNumber.trim();
+        if (active.accountNumber.trim()) filter.accountNumber = active.accountNumber.trim();
         if (appOverride) filter.clientName = appOverride;
 
         const payload: Record<string, unknown> = {
@@ -110,13 +191,16 @@ export function UsersKycPage() {
           pageNo,
           filter,
         };
-        if (startDate) payload.startDate = startDate;
-        if (endDate) payload.endDate = endDate;
+        // Match KYC.tsx filterTransaction date payload.
+        if (startDate && endDate) {
+          payload.startDate = dateTime(startDate);
+          payload.endDate = dateTime(endDate);
+        }
 
         const res = await secureApi('users.getAll', payload);
         if (!isCurrent(gen)) return;
 
-        if (!res.ok) {
+        if (apiFailed(res)) {
           const msg = res.message || 'Failed to load KYC list';
           setError(msg);
           toast.error(msg);
@@ -133,12 +217,17 @@ export function UsersKycPage() {
           ? (data.users as KycRow[])
           : Array.isArray(data.items)
             ? (data.items as KycRow[])
-            : [];
+            : Array.isArray(res.data)
+              ? (res.data as KycRow[])
+              : [];
         startTransition(() => {
           setRows(items);
           setTotalPages(Math.max(1, Number(data.totalPages) || 1));
           setTotal(Number(data.total ?? data.count) || items.length);
         });
+        if (items.length <= 0 && startDate && endDate) {
+          toast.info('No kyc registered for selected date');
+        }
       } finally {
         end();
         if (isCurrent(gen)) setLoading(false);
@@ -152,12 +241,124 @@ export function UsersKycPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, appClientName]);
 
+  // Night lock (8pm–10am IST) — Enable KYC Flow unlocks for 1 minute.
+  useEffect(() => {
+    const unlockUntil = localStorage.getItem(NIGHT_LOCK_KEY);
+    if (unlockUntil && Date.now() < Number(unlockUntil)) {
+      setDisableNightCheck(true);
+      setIsNightLockActive(false);
+      const remaining = Number(unlockUntil) - Date.now();
+      const t = window.setTimeout(() => {
+        setIsNightLockActive(true);
+        setDisableNightCheck(false);
+        localStorage.removeItem(NIGHT_LOCK_KEY);
+      }, remaining);
+      return () => window.clearTimeout(t);
+    }
+    if (unlockUntil) localStorage.removeItem(NIGHT_LOCK_KEY);
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    if (disableNightCheck) return undefined;
+
+    const checkTime = async () => {
+      try {
+        const res = await fetch(
+          'https://timeapi.io/api/Time/current/zone?timeZone=Asia/Kolkata',
+        );
+        const data = (await res.json()) as { dateTime?: string };
+        const hour = new Date(data.dateTime || Date.now()).getHours();
+        setIsNightLockActive(hour >= 20 || hour < 10);
+      } catch {
+        const hour = new Date().getHours();
+        setIsNightLockActive(hour >= 20 || hour < 10);
+      }
+    };
+
+    void checkTime();
+    const interval = window.setInterval(() => void checkTime(), 60_000);
+    return () => window.clearInterval(interval);
+  }, [disableNightCheck]);
+
+  const unlockNightLock = useCallback(() => {
+    const unlockUntil = Date.now() + NIGHT_UNLOCK_MS;
+    localStorage.setItem(NIGHT_LOCK_KEY, String(unlockUntil));
+    setIsNightLockActive(false);
+    setDisableNightCheck(true);
+    window.setTimeout(() => {
+      setIsNightLockActive(true);
+      setDisableNightCheck(false);
+      localStorage.removeItem(NIGHT_LOCK_KEY);
+    }, NIGHT_UNLOCK_MS);
+  }, []);
+
+  const sendEnableOtp = useCallback(async () => {
+    const user = getSessionUser();
+    const mobile = user?.mobile;
+    if (!mobile) {
+      toast.error('Admin mobile not found');
+      return;
+    }
+    setEnableOtpLoading(true);
+    try {
+      const res = await secureApi('users.sendBlockOtp', { mobile });
+      if (apiFailed(res)) {
+        toast.error(res.message || 'Failed to send OTP');
+        return;
+      }
+      setEnableOtpSent(true);
+      toast.success('OTP sent successfully');
+    } finally {
+      setEnableOtpLoading(false);
+    }
+  }, []);
+
+  const verifyEnableOtp = useCallback(async () => {
+    const user = getSessionUser();
+    const mobile = user?.mobile;
+    if (!mobile) {
+      toast.error('Admin mobile not found');
+      return;
+    }
+    if (enableOtpValue.trim().length !== 4) {
+      toast.error('OTP must be 4 digits');
+      return;
+    }
+    setEnableOtpLoading(true);
+    try {
+      const res = await secureApi('users.verifyBlockOtp', {
+        mobile,
+        otp: Number(enableOtpValue.trim()),
+      });
+      if (apiFailed(res)) {
+        toast.error(res.message || 'Invalid OTP');
+        return;
+      }
+      toast.success('OTP Verified');
+      unlockNightLock();
+      setEnableOtpOpen(false);
+      setEnableOtpSent(false);
+      setEnableOtpValue('');
+    } finally {
+      setEnableOtpLoading(false);
+    }
+  }, [enableOtpValue, unlockNightLock]);
+
   const deferredRows = useDeferredValue(rows);
 
   const applyDates = useCallback(() => {
+    if (!startDate) {
+      toast.error('Please select from date');
+      return;
+    }
+    if (!endDate) {
+      toast.error('Please select to date');
+      return;
+    }
     setPage(1);
     void load(1);
-  }, [load]);
+  }, [load, startDate, endDate]);
 
   const search = useCallback(() => {
     setAppliedFilters(draftFilters);
@@ -165,93 +366,225 @@ export function UsersKycPage() {
     void load(1, draftFilters);
   }, [draftFilters, load]);
 
-  // ---- Approve dialog ----
+  const setDraftField = useCallback(
+    (key: keyof Filters) => (value: string) =>
+      setDraftFilters((prev) => ({ ...prev, [key]: value })),
+    [],
+  );
+
+  const sendKycOtp = useCallback(
+    async (row: KycRow, sendOTPToClient: boolean) => {
+      const res = await secureApi('ops.kycSendOtp', {
+        sendOTPToClient,
+        mobile: row.mobile,
+        clientName: row.clientName,
+      });
+      if (apiFailed(res)) {
+        toast.error(res.message || 'Failed to send OTP');
+        return false;
+      }
+      toast.success(
+        sendOTPToClient ? 'OTP Sent Successfully' : 'Admin OTP Sent Successfully',
+      );
+      return true;
+    },
+    [],
+  );
+
   const [approveTarget, setApproveTarget] = useState<KycRow | null>(null);
+  const [approveStep, setApproveStep] = useState<'details' | 'otp'>('details');
   const [approveForm, setApproveForm] = useState({
     accountNumber: '',
     ifsc: '',
     aadhaarNumber: '',
     upiId: '',
     comment: '',
+    otp: '',
+    kycAdminOtp: '',
   });
   const [approveSubmitting, setApproveSubmitting] = useState(false);
 
   const openApprove = useCallback((row: KycRow) => {
     setApproveTarget(row);
+    setApproveStep('details');
     setApproveForm({
       accountNumber: row.accountNumber || '',
       ifsc: row.ifsc || '',
       aadhaarNumber: row.aadhaarNumber || '',
       upiId: row.upiId || '',
       comment: '',
+      otp: '',
+      kycAdminOtp: '',
     });
   }, []);
+
+  const closeApprove = useCallback(() => {
+    if (approveSubmitting) return;
+    setApproveTarget(null);
+    setApproveStep('details');
+  }, [approveSubmitting]);
 
   const submitApprove = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
       if (!approveTarget?._id) return;
+
+      if (approveStep === 'details') {
+        if (!approveForm.accountNumber.trim()) {
+          toast.error('Enter Correct Bank Account Number');
+          return;
+        }
+        if (!approveForm.aadhaarNumber.trim()) {
+          toast.error('Enter Correct Aadhar Number');
+          return;
+        }
+        if (!approveForm.ifsc.trim()) {
+          toast.error('Enter Correct IFSC Number');
+          return;
+        }
+        if (!approveForm.upiId.trim()) {
+          toast.error('Enter Correct UPI ID');
+          return;
+        }
+
+        setApproveSubmitting(true);
+        try {
+          // 1) Bank verify — POST /kyc/kyc
+          const bankRes = await secureApi('ops.kycApprove', {
+            accountNumber: approveForm.accountNumber.trim(),
+            ifsc: approveForm.ifsc.trim(),
+            aadhaarNumber: approveForm.aadhaarNumber.trim(),
+            _clientName: approveTarget.clientName,
+          });
+          if (apiFailed(bankRes)) {
+            toast.error(bankRes.message || 'KYC bank verification failed');
+            return;
+          }
+
+          // 2) UPI verify
+          const upiRes = await secureApi('ops.kycVerifyUpi', {
+            upiId: approveForm.upiId.trim(),
+            _clientName: approveTarget.clientName,
+          });
+          if (apiFailed(upiRes)) {
+            toast.error(upiRes.message || 'UPI verification failed');
+            return;
+          }
+
+          // 3) Admin OTP (sendOTPToClient: false)
+          const otpOk = await sendKycOtp(approveTarget, false);
+          if (!otpOk) return;
+
+          toast.success('OTP Sent Successfully');
+          setApproveStep('otp');
+        } finally {
+          setApproveSubmitting(false);
+        }
+        return;
+      }
+
+      // 4) Final approve — POST /kyc/kycAdminOtp
+      if (!approveForm.otp.trim()) {
+        toast.error('Please enter OTP');
+        return;
+      }
+      if (!approveForm.kycAdminOtp.trim()) {
+        toast.error('Please enter Admin OTP');
+        return;
+      }
+      if (!/^\d{4}$/.test(approveForm.otp.trim())) {
+        toast.error('Please enter a valid 4 digit OTP');
+        return;
+      }
+      if (!approveForm.comment.trim()) {
+        toast.error('Please enter Comment');
+        return;
+      }
+
       setApproveSubmitting(true);
       try {
-        const res = await secureApi('ops.kycApprove', {
+        const res = await secureApi('ops.kycAdminOtp', {
+          accountNumber: approveForm.accountNumber.trim(),
+          otp: approveForm.otp.trim(),
+          aadhaarNumber: approveForm.aadhaarNumber.trim(),
           _id: approveTarget._id,
+          upiId: approveForm.upiId.trim(),
+          kycAdminOtp: approveForm.kycAdminOtp.trim(),
+          currentKycNote: approveForm.comment.trim(),
           mobile: approveTarget.mobile,
           clientName: approveTarget.clientName,
-          accountNumber: approveForm.accountNumber,
-          ifsc: approveForm.ifsc,
-          aadhaarNumber: approveForm.aadhaarNumber,
-          upiId: approveForm.upiId,
-          currentKycNote: approveForm.comment,
           updatedBy: updatedByPayload(),
         });
-        if (!res.ok) {
+        if (apiFailed(res)) {
           toast.error(res.message || 'Failed to approve KYC');
           return;
         }
         toast.success('KYC Approved Successfully');
         setApproveTarget(null);
+        setApproveStep('details');
         void load(page);
       } finally {
         setApproveSubmitting(false);
       }
     },
-    [approveTarget, approveForm, load, page],
+    [approveTarget, approveForm, approveStep, sendKycOtp, load, page],
   );
 
-  // ---- Reject dialog ----
   const [rejectTarget, setRejectTarget] = useState<KycRow | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
+  const [rejectOtp, setRejectOtp] = useState('');
+  const [rejectAdminOtp, setRejectAdminOtp] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  const openReject = useCallback(
+    async (row: KycRow) => {
+      setRejectSubmitting(true);
+      try {
+        const ok = await sendKycOtp(row, true);
+        if (!ok) return;
+        setRejectTarget(row);
+        setRejectOtp('');
+        setRejectAdminOtp('');
+      } finally {
+        setRejectSubmitting(false);
+      }
+    },
+    [sendKycOtp],
+  );
 
   const submitReject = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
-      if (!rejectTarget?._id || !rejectReason.trim()) return;
+      if (!rejectTarget?._id) return;
+      if (!rejectOtp.trim() || !rejectAdminOtp.trim()) {
+        toast.error('Please enter Customer OTP and Admin OTP');
+        return;
+      }
       setRejectSubmitting(true);
       try {
         const res = await secureApi('ops.kycReject', {
           _id: rejectTarget._id,
           mobile: rejectTarget.mobile,
           clientName: rejectTarget.clientName,
-          reason: rejectReason.trim(),
+          otp: rejectOtp.trim(),
+          kycAdminOtp: rejectAdminOtp.trim(),
           updatedBy: updatedByPayload(),
         });
-        if (!res.ok) {
+        if (apiFailed(res)) {
           toast.error(res.message || 'Failed to reject KYC');
           return;
         }
         toast.success('KYC Rejected Successfully');
         setRejectTarget(null);
-        setRejectReason('');
+        setRejectOtp('');
+        setRejectAdminOtp('');
         void load(page);
       } finally {
         setRejectSubmitting(false);
       }
     },
-    [rejectTarget, rejectReason, load, page],
+    [rejectTarget, rejectOtp, rejectAdminOtp, load, page],
   );
 
-  // ---- Manual update dialog ----
   const [manualTarget, setManualTarget] = useState<KycRow | null>(null);
   const [manualForm, setManualForm] = useState({
     userBankName: '',
@@ -261,42 +594,99 @@ export function UsersKycPage() {
     upiId: '',
     ifsc: '',
     comment: '',
+    otp: '',
+    kycAdminOtp: '',
   });
   const [manualSubmitting, setManualSubmitting] = useState(false);
 
-  const openManual = useCallback((row: KycRow) => {
-    setManualTarget(row);
-    setManualForm({
-      userBankName: '',
-      bankName: '',
-      accountNumber: row.accountNumber || '',
-      aadhaarNumber: row.aadhaarNumber || '',
-      upiId: row.upiId || '',
-      ifsc: row.ifsc || '',
-      comment: '',
-    });
-  }, []);
+  const openManual = useCallback(
+    async (row: KycRow) => {
+      setManualSubmitting(true);
+      try {
+        const ok = await sendKycOtp(row, true);
+        if (!ok) return;
+        setManualTarget(row);
+        setManualForm({
+          userBankName: '',
+          bankName: '',
+          accountNumber: row.accountNumber || '',
+          aadhaarNumber: row.aadhaarNumber || '',
+          upiId: row.upiId || '',
+          ifsc: row.ifsc || '',
+          comment: '',
+          otp: '',
+          kycAdminOtp: '',
+        });
+      } finally {
+        setManualSubmitting(false);
+      }
+    },
+    [sendKycOtp],
+  );
 
   const submitManual = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
       if (!manualTarget?._id) return;
+      if (!manualForm.otp.trim()) {
+        toast.error('Please enter OTP');
+        return;
+      }
+      if (!manualForm.kycAdminOtp.trim()) {
+        toast.error('Please enter Admin OTP');
+        return;
+      }
+      if (!/^\d{4}$/.test(manualForm.otp.trim())) {
+        toast.error('Please enter a valid 4 digit OTP');
+        return;
+      }
+      if (!manualForm.userBankName.trim()) {
+        toast.error('Please enter user bank name');
+        return;
+      }
+      if (!manualForm.bankName.trim()) {
+        toast.error('Please enter bank name');
+        return;
+      }
+      if (!manualForm.accountNumber.trim()) {
+        toast.error('Please enter account no');
+        return;
+      }
+      if (!manualForm.aadhaarNumber.trim()) {
+        toast.error('Please enter aadhar no');
+        return;
+      }
+      if (!manualForm.upiId.trim()) {
+        toast.error('Please enter UPI ID');
+        return;
+      }
+      if (!manualForm.ifsc.trim()) {
+        toast.error('Please enter ifsc code');
+        return;
+      }
+      if (!manualForm.comment.trim()) {
+        toast.error('Please enter Comment');
+        return;
+      }
+
       setManualSubmitting(true);
       try {
         const res = await secureApi('ops.kycManualUpdate', {
           userId: manualTarget._id,
+          aadhaarNumber: manualForm.aadhaarNumber.trim(),
+          upiId: manualForm.upiId.trim(),
+          accountNumber: manualForm.accountNumber.trim(),
+          ifsc: manualForm.ifsc.trim(),
+          bankName: manualForm.bankName.trim(),
+          userBankName: manualForm.userBankName.trim(),
           mobile: manualTarget.mobile,
           clientName: manualTarget.clientName,
-          userBankName: manualForm.userBankName,
-          bankName: manualForm.bankName,
-          accountNumber: manualForm.accountNumber,
-          aadhaarNumber: manualForm.aadhaarNumber,
-          upiId: manualForm.upiId,
-          ifsc: manualForm.ifsc,
-          currentKycNote: manualForm.comment,
+          otp: manualForm.otp.trim(),
+          kycAdminOtp: manualForm.kycAdminOtp.trim(),
+          currentKycNote: manualForm.comment.trim(),
           updatedBy: updatedByPayload(),
         });
-        if (!res.ok) {
+        if (apiFailed(res)) {
           toast.error(res.message || 'Failed to save manual KYC update');
           return;
         }
@@ -310,7 +700,6 @@ export function UsersKycPage() {
     [manualTarget, manualForm, load, page],
   );
 
-  // ---- Verify UPI (inline) ----
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   const verifyUpi = useCallback(async (row: KycRow) => {
@@ -322,9 +711,9 @@ export function UsersKycPage() {
     try {
       const res = await secureApi('ops.kycVerifyUpi', {
         upiId: row.upiId,
-        clientName: row.clientName,
+        _clientName: row.clientName,
       });
-      if (!res.ok) {
+      if (apiFailed(res)) {
         toast.error(res.message || 'UPI verification failed');
         return;
       }
@@ -334,38 +723,78 @@ export function UsersKycPage() {
     }
   }, []);
 
-  const fieldCls =
-    'h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-
-  const columns = useMemo<DataColumn<KycRow>[]>(
+  const columns = useMemo<CommonTableColumn<KycRow>[]>(
     () => [
       {
         id: 'index',
         label: '#',
+        width: 56,
         render: (_row, index) => (page - 1) * pageSize + index + 1,
       },
       {
         id: 'name',
         label: 'Name',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftFilters.name}
-            placeholder="Search name"
-            onChange={(v) => setDraftFilters((prev) => ({ ...prev, name: v }))}
+            onChange={setDraftField('name')}
             onSearch={search}
+            placeholder="Search name"
           />
         ),
-        render: (row) => <span className="font-medium">{display(row.name)}</span>,
+        render: (row) => (
+          <Typography variant="body2" fontWeight={600}>
+            {display(row.name)}
+          </Typography>
+        ),
+      },
+      {
+        id: 'dpId',
+        label: 'Dp Id',
+        filter: (
+          <ColumnSearch
+            value={draftFilters.dpId}
+            onChange={setDraftField('dpId')}
+            onSearch={search}
+            placeholder="Search dp id"
+          />
+        ),
+        render: (row) => row._id || '—',
+      },
+      {
+        id: 'appCode',
+        label: 'App Code',
+        filter: (
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={appClientName}
+            onChange={(e) => {
+              setAppClientName(e.target.value);
+              setPage(1);
+            }}
+            sx={filterFieldSx}
+          >
+            <MenuItem value="">All</MenuItem>
+            {CLIENT_NAMES.map((name) => (
+              <MenuItem key={name} value={name}>
+                {appCodeForName(name)}
+              </MenuItem>
+            ))}
+          </TextField>
+        ),
+        render: (row) => appCodeForName(row.clientName),
       },
       {
         id: 'mobile',
         label: 'Mobile',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftFilters.mobile}
-            placeholder="Search mobile"
-            onChange={(v) => setDraftFilters((prev) => ({ ...prev, mobile: v }))}
+            onChange={setDraftField('mobile')}
             onSearch={search}
+            placeholder="Search mobile"
           />
         ),
         render: (row) => maskMobile(row.mobile, canShowMobile),
@@ -374,11 +803,11 @@ export function UsersKycPage() {
         id: 'aadhaar',
         label: 'Aadhar',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftFilters.aadhaarNumber}
-            placeholder="Search aadhar"
-            onChange={(v) => setDraftFilters((prev) => ({ ...prev, aadhaarNumber: v }))}
+            onChange={setDraftField('aadhaarNumber')}
             onSearch={search}
+            placeholder="Search aadhar"
           />
         ),
         render: (row) => display(row.aadhaarNumber),
@@ -387,50 +816,59 @@ export function UsersKycPage() {
         id: 'account',
         label: 'Account',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftFilters.accountNumber}
-            placeholder="Search account"
-            onChange={(v) => setDraftFilters((prev) => ({ ...prev, accountNumber: v }))}
+            onChange={setDraftField('accountNumber')}
             onSearch={search}
+            placeholder="Search account"
           />
         ),
         render: (row) => display(row.accountNumber),
       },
-      { id: 'ifsc', label: 'IFSC', render: (row) => display(row.ifsc) },
+      {
+        id: 'ifsc',
+        label: 'IFSC',
+        render: (row) => display(row.ifsc),
+      },
       {
         id: 'upi',
         label: 'UPI',
         render: (row) => (
-          <div className="flex items-center gap-1.5">
-            <span>{display(row.upiId)}</span>
-            {row.upiId && (
+          <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center">
+            <Typography variant="body2">{display(row.upiId)}</Typography>
+            {row.upiId ? (
               <Button
-                variant="ghost"
-                size="sm"
+                size="small"
+                variant="outlined"
+                startIcon={<VerifiedUserOutlinedIcon sx={{ fontSize: 14 }} />}
                 disabled={verifyingId === row._id}
                 onClick={() => void verifyUpi(row)}
-                className="h-6 px-1.5 text-xs"
+                sx={{
+                  textTransform: 'none',
+                  fontSize: 11,
+                  py: 0.25,
+                  minWidth: 0,
+                  borderColor: 'rgba(255,255,255,0.28)',
+                  color: '#e8e8ea',
+                }}
               >
-                <ShieldQuestion className="h-3.5 w-3.5" />
                 Verify
               </Button>
-            )}
-          </div>
+            ) : null}
+          </Stack>
         ),
       },
       {
         id: 'status',
         label: 'Status',
+        width: 110,
         render: (row) => (
-          <span
-            className={
-              row.kyc
-                ? 'inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-500'
-                : 'inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'
-            }
-          >
-            {row.kyc ? 'Approved' : 'Pending'}
-          </span>
+          <Chip
+            size="small"
+            label={row.kyc ? 'Approved' : 'Pending'}
+            color={row.kyc ? 'success' : 'default'}
+            sx={{ fontWeight: 600, fontSize: 11 }}
+          />
         ),
       },
       {
@@ -441,8 +879,7 @@ export function UsersKycPage() {
       {
         id: 'checkBy',
         label: 'Check By',
-        render: (row) =>
-          display(row.kycRejectCheckBy?.name || row.kycManualCheckBy?.name),
+        render: (row) => display(row.kycRejectCheckBy?.name || row.kycManualCheckBy?.name),
       },
       {
         id: 'crossCheckBy',
@@ -453,231 +890,536 @@ export function UsersKycPage() {
       {
         id: 'actions',
         label: 'Actions',
+        width: 220,
         render: (row) => (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Button variant="outline" size="sm" onClick={() => openApprove(row)}>
-              <CheckCircle2 className="h-3.5 w-3.5" />
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap justifyContent="center">
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 14 }} />}
+              disabled={isNightLockActive}
+              onClick={() => openApprove(row)}
+              sx={{
+                ...orangeBtnSx,
+                fontSize: 11,
+                px: 1,
+                py: 0.25,
+                minWidth: 0,
+                height: 28,
+                textTransform: 'none',
+              }}
+            >
               Approve
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => setRejectTarget(row)}>
-              <XCircle className="h-3.5 w-3.5" />
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              startIcon={<CancelOutlinedIcon sx={{ fontSize: 14 }} />}
+              disabled={isNightLockActive || rejectSubmitting || manualSubmitting}
+              onClick={() => void openReject(row)}
+              sx={{ textTransform: 'none', fontSize: 11, px: 1, py: 0.25, minWidth: 0 }}
+            >
               Reject
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => openManual(row)}>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={isNightLockActive || rejectSubmitting || manualSubmitting}
+              onClick={() => void openManual(row)}
+              sx={{
+                textTransform: 'none',
+                fontSize: 11,
+                px: 1,
+                py: 0.25,
+                minWidth: 0,
+                borderColor: 'rgba(255,255,255,0.28)',
+                color: '#e8e8ea',
+              }}
+            >
               Manual
             </Button>
-          </div>
+          </Stack>
         ),
       },
     ],
-    [draftFilters, search, canShowMobile, page, pageSize, verifyingId, verifyUpi, openApprove, openManual],
+    [
+      draftFilters,
+      search,
+      setDraftField,
+      canShowMobile,
+      page,
+      pageSize,
+      verifyingId,
+      verifyUpi,
+      openApprove,
+      openReject,
+      openManual,
+      rejectSubmitting,
+      manualSubmitting,
+      isNightLockActive,
+      appClientName,
+    ],
   );
 
   if (!canViewKyc) {
     return (
-      <ReportPage title="KYC">
-        <p className="text-sm text-muted-foreground">
+      <Box>
+        <Typography variant="h5" fontWeight={700} mb={2}>
+          KYC
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
           You do not have permission to view this page.
-        </p>
-      </ReportPage>
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <ReportPage
-      title="KYC"
-      loading={loading}
-      error={error}
-      onRefresh={() => void load(page)}
-      toolbar={
-        <>
-          <DateField label="From Date" value={startDate} onChange={setStartDate} />
-          <DateField label="To Date" value={endDate} onChange={setEndDate} />
-          <SelectField
-            label="App"
-            value={appClientName}
-            onChange={setAppClientName}
-            options={CLIENT_NAMES.map((name) => ({ value: name, label: name }))}
-            placeholder="All apps"
+    <Box>
+      <Typography variant="h5" fontWeight={700} mb={2}>
+        KYC
+      </Typography>
+
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
+
+      <Paper sx={{ p: 2, pt: 3, mb: 2, bgcolor: '#1a1a1f', overflow: 'visible' }}>
+        <Box sx={{ overflowX: 'auto', overflowY: 'visible', pb: 0.25 }}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          alignItems="center"
+          flexWrap="nowrap"
+          sx={{ pt: 1, minWidth: 'max-content' }}
+        >
+          <TextField
+            type="date"
+            label="From Date"
+            size="small"
+            fullWidth={false}
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={toolbarFieldSx}
           />
-          <PageSizeField
-            value={pageSize}
-            onChange={(v) => {
-              setPageSize(v);
+          <TextField
+            type="date"
+            label="To Date"
+            size="small"
+            fullWidth={false}
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            sx={toolbarFieldSx}
+          />
+          <TextField
+            select
+            label="Items Per Page"
+            size="small"
+            fullWidth={false}
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
               setPage(1);
             }}
-          />
-          <ApplyButton onClick={applyDates} loading={loading} />
-        </>
-      }
-    >
-      <DataTable
+            sx={{ ...toolbarFieldSx, width: 130 }}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={applyDates}
+            disabled={loading}
+            sx={orangeBtnSx}
+          >
+            Apply
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => navigate('/kycList')}
+            sx={orangeBtnSx}
+          >
+            KYC List
+          </Button>
+          {isNightLockActive ? (
+            <Button
+              variant="contained"
+              onClick={() => {
+                setEnableOtpOpen(true);
+                setEnableOtpSent(false);
+                setEnableOtpValue('');
+              }}
+              sx={orangeBtnSx}
+            >
+              Enable KYC Flow
+            </Button>
+          ) : null}
+        </Stack>
+        </Box>
+      </Paper>
+
+      <CommonTable
         columns={columns}
         rows={deferredRows}
         getRowKey={(row, i) => row._id || i}
         loading={loading}
         emptyMessage="No KYC records found"
+        stickyHeader
+        dense
         minWidth={1500}
+        maxHeight="calc(100vh - 300px)"
       />
 
-      <ReportPager page={page} totalPages={totalPages} onChange={setPage} disabled={loading} total={total} />
-
-      <ReportDialog
-        open={Boolean(approveTarget)}
-        title={`Approve KYC${approveTarget?.name ? ` — ${approveTarget.name}` : ''}`}
-        onClose={() => setApproveTarget(null)}
-        onSubmit={submitApprove}
-        loading={approveSubmitting}
-        submitLabel="Approve"
-      >
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          Account Number
-          <input
-            className={fieldCls}
-            value={approveForm.accountNumber}
-            onChange={(e) =>
-              setApproveForm((prev) => ({ ...prev, accountNumber: e.target.value }))
-            }
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          IFSC
-          <input
-            className={fieldCls}
-            value={approveForm.ifsc}
-            onChange={(e) => setApproveForm((prev) => ({ ...prev, ifsc: e.target.value.toUpperCase() }))}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          Aadhar Number
-          <input
-            className={fieldCls}
-            value={approveForm.aadhaarNumber}
-            onChange={(e) =>
-              setApproveForm((prev) => ({ ...prev, aadhaarNumber: e.target.value }))
-            }
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          UPI ID
-          <input
-            className={fieldCls}
-            value={approveForm.upiId}
-            onChange={(e) => setApproveForm((prev) => ({ ...prev, upiId: e.target.value }))}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          Comment
-          <input
-            className={fieldCls}
-            value={approveForm.comment}
-            onChange={(e) => setApproveForm((prev) => ({ ...prev, comment: e.target.value }))}
-          />
-        </label>
-      </ReportDialog>
-
-      <ReportDialog
-        open={Boolean(rejectTarget)}
-        title={`Reject KYC${rejectTarget?.name ? ` — ${rejectTarget.name}` : ''}`}
-        onClose={() => setRejectTarget(null)}
-        onSubmit={submitReject}
-        loading={rejectSubmitting}
-        submitLabel="Reject"
-      >
-        <textarea
-          required
-          autoFocus
-          rows={3}
-          value={rejectReason}
-          onChange={(e) => setRejectReason(e.target.value)}
-          placeholder="Reason for rejection"
-          className="w-full rounded-md border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
+        <Typography variant="body2" color="text.secondary">
+          Total: {total}
+        </Typography>
+        <Pagination
+          count={Math.max(1, totalPages)}
+          page={page}
+          onChange={(_e, p) => setPage(p)}
+          color="primary"
+          disabled={loading}
         />
-      </ReportDialog>
+      </Stack>
 
-      <ReportDialog
-        open={Boolean(manualTarget)}
-        title={`Manual KYC Update${manualTarget?.name ? ` — ${manualTarget.name}` : ''}`}
-        onClose={() => setManualTarget(null)}
-        onSubmit={submitManual}
-        loading={manualSubmitting}
-        submitLabel="Save"
-        className="max-w-lg"
+      <Dialog
+        open={Boolean(approveTarget)}
+        onClose={closeApprove}
+        fullWidth
+        maxWidth="xs"
       >
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            User Bank Name
-            <input
-              required
-              className={fieldCls}
-              value={manualForm.userBankName}
-              onChange={(e) =>
-                setManualForm((prev) => ({ ...prev, userBankName: e.target.value }))
-              }
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            Bank Name
-            <input
-              required
-              className={fieldCls}
-              value={manualForm.bankName}
-              onChange={(e) => setManualForm((prev) => ({ ...prev, bankName: e.target.value }))}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            Account No
-            <input
-              required
-              className={fieldCls}
-              value={manualForm.accountNumber}
-              onChange={(e) =>
-                setManualForm((prev) => ({ ...prev, accountNumber: e.target.value }))
-              }
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            Aadhar No
-            <input
-              required
-              className={fieldCls}
-              value={manualForm.aadhaarNumber}
-              onChange={(e) =>
-                setManualForm((prev) => ({ ...prev, aadhaarNumber: e.target.value }))
-              }
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            UPI ID
-            <input
-              required
-              className={fieldCls}
-              value={manualForm.upiId}
-              onChange={(e) => setManualForm((prev) => ({ ...prev, upiId: e.target.value }))}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            IFSC
-            <input
-              required
-              className={fieldCls}
-              value={manualForm.ifsc}
-              onChange={(e) =>
-                setManualForm((prev) => ({ ...prev, ifsc: e.target.value.toUpperCase() }))
-              }
-            />
-          </label>
-        </div>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          Comment
-          <input
-            required
-            className={fieldCls}
-            value={manualForm.comment}
-            onChange={(e) => setManualForm((prev) => ({ ...prev, comment: e.target.value }))}
-          />
-        </label>
-      </ReportDialog>
-    </ReportPage>
+        <form onSubmit={submitApprove}>
+          <DialogTitle>
+            Approve KYC{approveTarget?.name ? ` — ${approveTarget.name}` : ''}
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              {approveStep === 'details' ? (
+                <>
+                  <TextField
+                    label="Account Number"
+                    size="small"
+                    fullWidth
+                    value={approveForm.accountNumber}
+                    onChange={(e) =>
+                      setApproveForm((prev) => ({
+                        ...prev,
+                        accountNumber: e.target.value,
+                      }))
+                    }
+                  />
+                  <TextField
+                    label="IFSC"
+                    size="small"
+                    fullWidth
+                    value={approveForm.ifsc}
+                    onChange={(e) =>
+                      setApproveForm((prev) => ({
+                        ...prev,
+                        ifsc: e.target.value.toUpperCase(),
+                      }))
+                    }
+                  />
+                  <TextField
+                    label="Aadhar Number"
+                    size="small"
+                    fullWidth
+                    value={approveForm.aadhaarNumber}
+                    onChange={(e) =>
+                      setApproveForm((prev) => ({
+                        ...prev,
+                        aadhaarNumber: e.target.value,
+                      }))
+                    }
+                  />
+                  <TextField
+                    label="UPI ID"
+                    size="small"
+                    fullWidth
+                    value={approveForm.upiId}
+                    onChange={(e) =>
+                      setApproveForm((prev) => ({ ...prev, upiId: e.target.value }))
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  <TextField
+                    label="Customer OTP"
+                    size="small"
+                    fullWidth
+                    required
+                    autoFocus
+                    value={approveForm.otp}
+                    onChange={(e) =>
+                      setApproveForm((prev) => ({ ...prev, otp: e.target.value }))
+                    }
+                  />
+                  <TextField
+                    label="Admin OTP"
+                    size="small"
+                    fullWidth
+                    required
+                    value={approveForm.kycAdminOtp}
+                    onChange={(e) =>
+                      setApproveForm((prev) => ({
+                        ...prev,
+                        kycAdminOtp: e.target.value,
+                      }))
+                    }
+                  />
+                  <TextField
+                    label="Comment (For KYC Updation)"
+                    size="small"
+                    fullWidth
+                    required
+                    value={approveForm.comment}
+                    onChange={(e) =>
+                      setApproveForm((prev) => ({ ...prev, comment: e.target.value }))
+                    }
+                  />
+                </>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={closeApprove} disabled={approveSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={approveSubmitting} sx={orangeBtnSx}>
+              {approveSubmitting
+                ? 'Saving…'
+                : approveStep === 'details'
+                  ? 'Send OTP'
+                  : 'Approve'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(rejectTarget)}
+        onClose={() => !rejectSubmitting && setRejectTarget(null)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <form onSubmit={submitReject}>
+          <DialogTitle>
+            Reject KYC{rejectTarget?.name ? ` — ${rejectTarget.name}` : ''}
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              <TextField
+                label="Customer OTP"
+                size="small"
+                fullWidth
+                required
+                autoFocus
+                value={rejectOtp}
+                onChange={(e) => setRejectOtp(e.target.value)}
+              />
+              <TextField
+                label="Admin OTP"
+                size="small"
+                fullWidth
+                required
+                value={rejectAdminOtp}
+                onChange={(e) => setRejectAdminOtp(e.target.value)}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setRejectTarget(null)} disabled={rejectSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" color="error" disabled={rejectSubmitting}>
+              {rejectSubmitting ? 'Saving…' : 'Reject'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(manualTarget)}
+        onClose={() => !manualSubmitting && setManualTarget(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <form onSubmit={submitManual}>
+          <DialogTitle>
+            Manual KYC Update{manualTarget?.name ? ` — ${manualTarget.name}` : ''}
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="User Bank Name"
+                  size="small"
+                  fullWidth
+                  required
+                  value={manualForm.userBankName}
+                  onChange={(e) =>
+                    setManualForm((prev) => ({ ...prev, userBankName: e.target.value }))
+                  }
+                />
+                <TextField
+                  label="Bank Name"
+                  size="small"
+                  fullWidth
+                  required
+                  value={manualForm.bankName}
+                  onChange={(e) =>
+                    setManualForm((prev) => ({ ...prev, bankName: e.target.value }))
+                  }
+                />
+              </Stack>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="Account No"
+                  size="small"
+                  fullWidth
+                  required
+                  value={manualForm.accountNumber}
+                  onChange={(e) =>
+                    setManualForm((prev) => ({ ...prev, accountNumber: e.target.value }))
+                  }
+                />
+                <TextField
+                  label="Aadhar No"
+                  size="small"
+                  fullWidth
+                  required
+                  value={manualForm.aadhaarNumber}
+                  onChange={(e) =>
+                    setManualForm((prev) => ({ ...prev, aadhaarNumber: e.target.value }))
+                  }
+                />
+              </Stack>
+              <Stack direction="row" spacing={2}>
+                <TextField
+                  label="UPI ID"
+                  size="small"
+                  fullWidth
+                  required
+                  value={manualForm.upiId}
+                  onChange={(e) => setManualForm((prev) => ({ ...prev, upiId: e.target.value }))}
+                />
+                <TextField
+                  label="IFSC"
+                  size="small"
+                  fullWidth
+                  required
+                  value={manualForm.ifsc}
+                  onChange={(e) =>
+                    setManualForm((prev) => ({
+                      ...prev,
+                      ifsc: e.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+              </Stack>
+              <TextField
+                label="Customer OTP"
+                size="small"
+                fullWidth
+                required
+                value={manualForm.otp}
+                onChange={(e) => setManualForm((prev) => ({ ...prev, otp: e.target.value }))}
+              />
+              <TextField
+                label="Admin OTP"
+                size="small"
+                fullWidth
+                required
+                value={manualForm.kycAdminOtp}
+                onChange={(e) =>
+                  setManualForm((prev) => ({ ...prev, kycAdminOtp: e.target.value }))
+                }
+              />
+              <TextField
+                label="Comment"
+                size="small"
+                fullWidth
+                required
+                value={manualForm.comment}
+                onChange={(e) => setManualForm((prev) => ({ ...prev, comment: e.target.value }))}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setManualTarget(null)} disabled={manualSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={manualSubmitting} sx={orangeBtnSx}>
+              {manualSubmitting ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={enableOtpOpen}
+        onClose={() => !enableOtpLoading && setEnableOtpOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>OTP Verification</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} pt={1}>
+            {!enableOtpSent ? (
+              <Typography color="text.secondary">
+                OTP will be sent to super-admin
+              </Typography>
+            ) : (
+              <TextField
+                label="Enter OTP"
+                size="small"
+                fullWidth
+                autoFocus
+                value={enableOtpValue}
+                onChange={(e) => setEnableOtpValue(e.target.value)}
+                inputProps={{ maxLength: 4 }}
+              />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setEnableOtpOpen(false)}
+            disabled={enableOtpLoading}
+          >
+            Close
+          </Button>
+          {!enableOtpSent ? (
+            <Button
+              variant="contained"
+              disabled={enableOtpLoading}
+              onClick={() => void sendEnableOtp()}
+              sx={orangeBtnSx}
+            >
+              {enableOtpLoading ? 'Sending…' : 'Send OTP'}
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              disabled={enableOtpLoading}
+              onClick={() => void verifyEnableOtp()}
+              sx={orangeBtnSx}
+            >
+              {enableOtpLoading ? 'Verifying…' : 'Verify OTP'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

@@ -4,6 +4,14 @@ export function todayIST(): string {
   return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
 
+/** Match admin-panel-domains `dateTime()` — YYYY-MM-DD for getAll date filters. */
+export function dateTime(timestamp?: string | null): string {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().split('T')[0];
+}
+
 export function monthStartIST(): string {
   const d = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
@@ -53,13 +61,38 @@ export function formatDdMmYyyy(isoDate: string): string {
 }
 
 /**
+ * Coerce API date values (ISO string, ms, or unix seconds) to Date.
+ */
+export function coerceDate(value: unknown): Date | null {
+  if (value == null || value === '') return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === 'number') {
+    const ms = value < 1e12 ? value * 1000 : value;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) {
+    const n = Number(raw);
+    const ms = n < 1e12 ? n * 1000 : n;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
  * Format API date to DD-MM-YYYY in Asia/Kolkata
- * (matches laxminarayan `formatDate` for IST machines).
+ * (matches laxminarayan `formatUTCDate` / IST display).
  */
 export function formatDisplayDate(value: unknown): string {
   if (!value) return '';
-  const d = new Date(String(value));
-  if (Number.isNaN(d.getTime())) return String(value);
+  const d = coerceDate(value);
+  if (!d) return String(value);
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
     day: '2-digit',
@@ -74,20 +107,36 @@ export function formatDisplayDate(value: unknown): string {
 }
 
 /**
+ * Match laxminarayan `formatDate` — DD-MM-YYYY using local calendar parts.
+ * Used where the old panel called formatDate (not formatUTCDate).
+ */
+export function formatLocalDate(value: unknown): string {
+  if (!value) return '';
+  const d = coerceDate(value);
+  if (!d) return String(value);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = String(d.getFullYear());
+  return `${day}-${month}-${year}`;
+}
+
+/**
  * Format API datetime to h:mm AM/PM in Asia/Kolkata
  * (matches laxminarayan `formatedTime`).
  */
 export function formatDisplayTime(value: unknown): string {
   if (!value) return '';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return '';
-  const istDate = new Date(
-    date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }),
-  );
-  const hours = istDate.getHours();
-  const minutes = istDate.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const formattedHours = hours % 12 || 12;
-  const formattedMinutes = minutes < 10 ? `0${minutes}` : String(minutes);
-  return `${formattedHours}:${formattedMinutes} ${ampm}`;
+  const date = coerceDate(value);
+  if (!date) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(date);
+  const hour = parts.find((p) => p.type === 'hour')?.value;
+  const minute = parts.find((p) => p.type === 'minute')?.value;
+  const dayPeriod = parts.find((p) => p.type === 'dayPeriod')?.value;
+  if (!hour || !minute) return '';
+  return `${hour}:${minute} ${(dayPeriod || '').toUpperCase()}`.trim();
 }

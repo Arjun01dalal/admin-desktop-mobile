@@ -1,24 +1,32 @@
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { BackButton } from '@/components/BackButton';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { appCodeForName } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { todayIST, formatAmount } from '@/utils/dates';
-import { cn } from '@/lib/utils';
-import { appCodeForName } from '@/constants/clientNames';
-import {
-  ReportPage,
-  DataTable,
-  type DataColumn,
-  DateField,
-  SelectField,
-  SearchInput,
-  ApplyButton,
-  display,
-} from './shared';
+import { display } from './shared';
 
-type RtpType = 'Qtech' | 'AAA Exchange';
+type RtpType =
+  | 'Qtech'
+  | 'WCO'
+  | 'Satta Matka'
+  | 'Falcon'
+  | 'Exchange'
+  | 'AAA Exchange';
 
 type QtechGame = {
   gameId?: string;
@@ -53,15 +61,134 @@ type ExchangeRow = {
 
 type PlayerRtpRow = QtechRow | ExchangeRow;
 
-const TYPE_OPTIONS = [
-  { value: 'Qtech', label: 'Qtech' },
-  { value: 'AAA Exchange', label: 'AAA Exchange' },
+/** Same Type list as old Players RTP UI. */
+const TYPE_OPTIONS: RtpType[] = [
+  'Qtech',
+  'WCO',
+  'Satta Matka',
+  'Falcon',
+  'Exchange',
+  'AAA Exchange',
 ];
 
-function rowBgClass(winPercentage: number | undefined): string | undefined {
+/** Only these have RTP APIs wired (same as laxminarayan TYPE_CONFIG). */
+const SUPPORTED_RTP_TYPES = new Set<RtpType>(['Qtech', 'AAA Exchange']);
+
+/**
+ * Old UI: Object.entries(res?.payload || {}).
+ * secureApi with keepDataEnvelope returns the same envelope shape.
+ */
+function unpackExchangeRows(data: unknown, filterUserId: string): ExchangeRow[] {
+  const asMap = (value: unknown): Record<string, unknown> | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+  };
+
+  const envelope = asMap(data) || {};
+  let map =
+    asMap(envelope.payload) ||
+    asMap(envelope.data) ||
+    asMap(envelope.result) ||
+    asMap(envelope.report) ||
+    envelope;
+
+  // Payload sometimes arrives as a JSON string.
+  if (typeof envelope.payload === 'string') {
+    try {
+      const parsed = JSON.parse(envelope.payload) as unknown;
+      map = asMap(parsed) || map;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const list: ExchangeRow[] = [];
+
+  if (Array.isArray(map)) {
+    for (const item of map) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const row = item as Record<string, unknown>;
+      const id = String(row.userId || row._id || row.id || '');
+      if (!id) continue;
+      list.push({ ...(row as Omit<ExchangeRow, 'userId'>), userId: id });
+    }
+  } else if (map) {
+    for (const [id, value] of Object.entries(map)) {
+      if (!id || id === 'payload' || id === 'data' || id === 'success' || id === 'message') {
+        continue;
+      }
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      list.push({ ...(value as Omit<ExchangeRow, 'userId'>), userId: id });
+    }
+  }
+
+  if (!filterUserId.trim()) return list;
+  return list.filter((row) => row.userId === filterUserId.trim());
+}
+
+function unpackQtechRows(data: unknown): QtechRow[] {
+  if (Array.isArray(data)) return data as QtechRow[];
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.payload)) return obj.payload as QtechRow[];
+    if (Array.isArray(obj.items)) return obj.items as QtechRow[];
+  }
+  return [];
+}
+
+const fieldSx = {
+  flex: 1,
+  minWidth: 0,
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+};
+
+const filterFieldSx = {
+  minWidth: 120,
+  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'none' as const,
+  '&:hover': { bgcolor: '#e08c00' },
+};
+
+function ColumnSearch({
+  value,
+  onChange,
+  onSearch,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSearch: () => void;
+  placeholder: string;
+}) {
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSearch();
+      }}
+      sx={filterFieldSx}
+    />
+  );
+}
+
+function rowBgSx(winPercentage: number | undefined) {
   const pct = Number(winPercentage) || 0;
-  if (pct > 85) return 'bg-red-500/20 hover:bg-red-500/25';
-  if (pct > 70) return 'bg-orange-500/20 hover:bg-orange-500/25';
+  if (pct > 85) {
+    return { bgcolor: 'rgba(244,67,54,0.2)', '&:hover': { bgcolor: 'rgba(244,67,54,0.28)' } };
+  }
+  if (pct > 70) {
+    return { bgcolor: 'rgba(255,152,0,0.2)', '&:hover': { bgcolor: 'rgba(255,152,0,0.28)' } };
+  }
   return undefined;
 }
 
@@ -72,9 +199,7 @@ export function PlayerRtpPage() {
   const fromUserReport = Boolean(
     (location.state as { fromUserReport?: boolean } | null)?.fromUserReport,
   );
-  const seedUserId = String(
-    (location.state as { id?: string } | null)?.id || '',
-  );
+  const seedUserId = String((location.state as { id?: string } | null)?.id || '');
   const [type, setType] = useState<RtpType>('Qtech');
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
@@ -91,11 +216,16 @@ export function PlayerRtpPage() {
     begin();
     setLoading(true);
     try {
+      if (!SUPPORTED_RTP_TYPES.has(type)) {
+        startTransition(() => setRows([]));
+        return;
+      }
+
       const action = type === 'Qtech' ? 'ops.playerRtpQtech' : 'ops.playerRtpExchange';
       const res = await secureApi<unknown>(action, {
         startDate,
         endDate,
-        userId,
+        userId: userId || '',
         gameId: type === 'Qtech' ? gameId : '',
       });
 
@@ -108,22 +238,17 @@ export function PlayerRtpPage() {
       }
 
       if (type === 'Qtech') {
-        const list = Array.isArray(res.data) ? (res.data as QtechRow[]) : [];
-        startTransition(() => setRows(list));
+        startTransition(() => setRows(unpackQtechRows(res.data)));
       } else {
-        const map = (res.data && typeof res.data === 'object' ? res.data : {}) as Record<
-          string,
-          Omit<ExchangeRow, 'userId'>
-        >;
-        const list: ExchangeRow[] = Object.entries(map).map(([id, value]) => ({
-          ...value,
-          userId: id,
-        }));
-        const filtered = userId
-          ? list.filter((row) => row.userId === userId)
-          : list;
-        startTransition(() => setRows(filtered));
+        const list = unpackExchangeRows(res.data, userId);
+        startTransition(() => setRows(list));
+        if (list.length === 0 && res.message) {
+          toast.info(res.message);
+        }
       }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load players RTP');
+      startTransition(() => setRows([]));
     } finally {
       end();
       if (isCurrent(gen)) setLoading(false);
@@ -144,14 +269,19 @@ export function PlayerRtpPage() {
     void load();
   }, [load]);
 
-  const qtechColumns = useMemo<DataColumn<QtechRow>[]>(
+  const qtechColumns = useMemo<CommonTableColumn<QtechRow>[]>(
     () => [
-      { id: 'index', label: '#', render: (_row, index) => index + 1 },
+      {
+        id: 'index',
+        label: '#',
+        width: 56,
+        render: (_row, index) => index + 1,
+      },
       {
         id: 'userId',
         label: 'User ID',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftUserId}
             onChange={setDraftUserId}
             onSearch={search}
@@ -163,54 +293,112 @@ export function PlayerRtpPage() {
       {
         id: 'gameId',
         label: 'Game ID',
+        width: 160,
+        cellSx: {
+          maxWidth: 160,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        },
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftGameId}
             onChange={setDraftGameId}
             onSearch={search}
-            placeholder="Search by Game ID"
+            placeholder="Search Game ID"
           />
         ),
-        className: 'max-w-[280px] truncate',
-        render: (row) =>
-          [...(row.games || [])]
-            .sort((a, b) => (Number(b.winPercentage) || 0) - (Number(a.winPercentage) || 0))
-            .map((g) => g.gameId)
-            .filter(Boolean)
-            .join(', ') || '—',
+        render: (row) => {
+          const text =
+            [...(row.games || [])]
+              .sort((a, b) => (Number(b.winPercentage) || 0) - (Number(a.winPercentage) || 0))
+              .map((g) => g.gameId)
+              .filter(Boolean)
+              .join(', ') || '—';
+          return (
+            <Box
+              component="span"
+              title={text === '—' ? undefined : text}
+              sx={{
+                display: 'block',
+                maxWidth: 140,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {text}
+            </Box>
+          );
+        },
       },
       {
         id: 'gameCount',
         label: 'Game Count',
         render: (row) => (
-          <button
-            type="button"
-            className="font-medium text-primary underline-offset-2 hover:underline"
-            onClick={() =>
-              navigate('/playerRTPDetails', { state: { gameData: row.games || [] } })
-            }
+          <Button
+            size="small"
+            variant="text"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/playerRtp/details', { state: { gameData: row.games || [] } });
+            }}
+            sx={{
+              minWidth: 0,
+              px: 0.5,
+              fontWeight: 700,
+              color: '#ff9f0a',
+              textDecoration: 'underline',
+              textUnderlineOffset: 2,
+              textTransform: 'none',
+            }}
           >
             {row.games?.length || 0}
-          </button>
+          </Button>
         ),
       },
-      { id: 'totalAmount', label: 'Total Amount', render: (row) => formatAmount(row.combined?.totalAmount ?? 0) },
-      { id: 'totalBets', label: 'Total Bets', render: (row) => display(row.combined?.totalBets ?? 0) },
-      { id: 'totalWins', label: 'Total Wins', render: (row) => display(row.combined?.totalWins ?? 0) },
-      { id: 'winAmount', label: 'Total Wins Amount', render: (row) => formatAmount(row.combined?.winAmount ?? 0) },
-      { id: 'winPct', label: 'Total Win %', render: (row) => display(row.combined?.winPercentage ?? 0) },
+      {
+        id: 'totalAmount',
+        label: 'Total Amount',
+        render: (row) => formatAmount(row.combined?.totalAmount ?? 0),
+      },
+      {
+        id: 'totalBets',
+        label: 'Total Bets',
+        render: (row) => display(row.combined?.totalBets ?? 0),
+      },
+      {
+        id: 'totalWins',
+        label: 'Total Wins',
+        render: (row) => display(row.combined?.totalWins ?? 0),
+      },
+      {
+        id: 'winAmount',
+        label: 'Total Wins Amount',
+        render: (row) => formatAmount(row.combined?.winAmount ?? 0),
+      },
+      {
+        id: 'winPct',
+        label: 'Total Win %',
+        render: (row) => display(row.combined?.winPercentage ?? 0),
+      },
     ],
     [draftUserId, draftGameId, search, navigate],
   );
 
-  const exchangeColumns = useMemo<DataColumn<ExchangeRow>[]>(
+  const exchangeColumns = useMemo<CommonTableColumn<ExchangeRow>[]>(
     () => [
-      { id: 'index', label: '#', render: (_row, index) => index + 1 },
+      {
+        id: 'index',
+        label: '#',
+        width: 56,
+        render: (_row, index) => index + 1,
+      },
       {
         id: 'userId',
         label: 'User ID',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftUserId}
             onChange={setDraftUserId}
             onSearch={search}
@@ -219,23 +407,42 @@ export function PlayerRtpPage() {
         ),
         render: (row) => display(row.userId),
       },
-      { id: 'amount', label: 'Amount', render: (row) => formatAmount(row.amount) },
-      { id: 'clientName', label: 'App Code', render: (row) => appCodeForName(row.clientName) },
-      { id: 'name', label: 'Name', render: (row) => display(row.name) },
-      { id: 'provider', label: 'Provider', render: (row) => display(row.provider) },
-      { id: 'totalBets', label: 'Total Bets', render: (row) => display(row.totalBets) },
+      {
+        id: 'amount',
+        label: 'Amount',
+        render: (row) => formatAmount(row.amount),
+      },
+      {
+        id: 'clientName',
+        label: 'App Code',
+        render: (row) => appCodeForName(row.clientName),
+      },
+      {
+        id: 'name',
+        label: 'Name',
+        render: (row) => display(row.name),
+      },
+      {
+        id: 'provider',
+        label: 'Provider',
+        render: (row) => display(row.provider),
+      },
+      {
+        id: 'totalBets',
+        label: 'Total Bets',
+        render: (row) => display(row.totalBets),
+      },
       {
         id: 'winLoss',
         label: 'Win Loss',
         render: (row) => (
-          <span
-            className={cn(
-              'font-semibold',
-              Number(row.winLoss) < 0 ? 'text-red-500' : 'text-emerald-500',
-            )}
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color={Number(row.winLoss) < 0 ? 'error.main' : 'success.main'}
           >
             {formatAmount(row.winLoss ?? 0)}
-          </span>
+          </Typography>
         ),
       },
     ],
@@ -243,51 +450,131 @@ export function PlayerRtpPage() {
   );
 
   return (
-    <ReportPage
-      title="Players RTP"
-      onRefresh={() => void load()}
-      loading={loading}
-      actions={fromUserReport ? <BackButton /> : undefined}
-      toolbar={
-        <>
-          <DateField label="From Date" value={startDate} onChange={setStartDate} />
-          <DateField label="To Date" value={endDate} onChange={setEndDate} />
-          <SelectField
+    <Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap={1.5}
+        mb={2}
+      >
+        <Typography variant="h5" fontWeight={700}>
+          Players RTP
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {fromUserReport ? <BackButton /> : null}
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={() => void load()}
+            disabled={loading}
+            sx={{
+              borderColor: 'rgba(255,255,255,0.28)',
+              color: '#e8e8ea',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#ff9f0a',
+                bgcolor: 'rgba(255,159,10,0.08)',
+              },
+            }}
+          >
+            Refresh
+          </Button>
+        </Stack>
+      </Stack>
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+          <TextField
+            type="date"
+            label="From Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            type="date"
+            label="To Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            select
             label="Type"
+            size="small"
             value={type}
-            onChange={(value) => {
-              setType(value as RtpType);
+            onChange={(e) => {
+              setType(e.target.value as RtpType);
               setDraftUserId('');
               setDraftGameId('');
               setUserId('');
               setGameId('');
             }}
-            options={TYPE_OPTIONS}
-          />
-          <ApplyButton onClick={applyDates} loading={loading} />
-        </>
-      }
-    >
+            sx={fieldSx}
+          >
+            {TYPE_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={applyDates}
+            disabled={loading}
+            sx={{ ...orangeBtnSx, flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Apply
+          </Button>
+        </Stack>
+      </Paper>
+
       {type === 'Qtech' ? (
-        <DataTable
+        <CommonTable
           columns={qtechColumns}
           rows={rows as QtechRow[]}
           getRowKey={(row, index) => row.userId || index}
           loading={loading}
           emptyMessage="No RTP data found"
-          rowClassName={(row) => rowBgClass((row as QtechRow).combined?.winPercentage)}
+          stickyHeader
+          dense
           minWidth={1200}
+          maxHeight="calc(100vh - 300px)"
+          getRowSx={(row) => rowBgSx((row as QtechRow).combined?.winPercentage)}
         />
-      ) : (
-        <DataTable
+      ) : type === 'AAA Exchange' ? (
+        <CommonTable
           columns={exchangeColumns}
           rows={rows as ExchangeRow[]}
           getRowKey={(row, index) => row.userId || index}
           loading={loading}
           emptyMessage="No RTP data found"
+          stickyHeader
+          dense
           minWidth={1000}
+          maxHeight="calc(100vh - 300px)"
+        />
+      ) : (
+        <CommonTable
+          columns={exchangeColumns}
+          rows={[]}
+          getRowKey={(_row, index) => index}
+          loading={loading}
+          emptyMessage={`${type} RTP is not available yet`}
+          stickyHeader
+          dense
+          minWidth={1000}
+          maxHeight="calc(100vh - 300px)"
         />
       )}
-    </ReportPage>
+    </Box>
   );
 }

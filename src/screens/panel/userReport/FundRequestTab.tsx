@@ -10,8 +10,11 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { maskMobile } from '@/screens/panel/shared';
+import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
 import {
@@ -24,6 +27,7 @@ type Props = { userId: string };
 
 /** Fund Request — deposit columns match Laxmi (Payment Type … Date/Time). */
 export function FundRequestTab({ userId }: Props) {
+  const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
   const [type, setType] = useState<FundType>('deposit');
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<HistoryRow[]>([]);
@@ -206,7 +210,7 @@ export function FundRequestTab({ userId }: Props) {
           id: 'mobile',
           label: 'User Mobile',
           filter: null,
-          render: (r) => String(r.mobile || r.userMobile || '-'),
+          render: (r) => maskMobile(r.mobile || r.userMobile, canShowMobile),
         },
         {
           id: 'city',
@@ -296,7 +300,7 @@ export function FundRequestTab({ userId }: Props) {
           id: 'mobile',
           label: 'mobile',
           filter: null,
-          render: (r) => String(r.mobile || '-'),
+          render: (r) => maskMobile(r.mobile, canShowMobile),
         },
         {
           id: 'acc',
@@ -422,7 +426,7 @@ export function FundRequestTab({ userId }: Props) {
         render: (r) => formatDisplayTime(r.createdOn || r.createdAt) || '-',
       },
     ];
-  }, [amount, gateway, mid, orderId, orderKeyId, paymentType, type]);
+  }, [amount, gateway, mid, orderId, orderKeyId, paymentType, type, canShowMobile]);
 
   const typeBtn = (id: FundType, label: string) => (
     <Button

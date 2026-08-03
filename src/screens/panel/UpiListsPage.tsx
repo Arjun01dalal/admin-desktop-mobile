@@ -1,20 +1,28 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
-import { cn } from '@/lib/utils';
-import {
-  ReportPage,
-  DataTable,
-  ReportDialog,
-  useReportQuery,
-  asList,
-  type DataColumn,
-} from '@/screens/panel/shared';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { asList, useReportQuery } from '@/screens/panel/shared';
 
 type UpiRow = {
   _id: string;
@@ -26,36 +34,13 @@ type UpiRow = {
 
 const EMPTY_FORM = { name: '', upiId: '', status: false };
 
-function StatusSwitch({
-  checked,
-  disabled,
-  onToggle,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: (next: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onToggle(!checked)}
-      className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
-        checked ? 'bg-primary' : 'bg-muted',
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
-          checked ? 'translate-x-4' : 'translate-x-1',
-        )}
-      />
-    </button>
-  );
-}
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'none' as const,
+  '&:hover': { bgcolor: '#e08c00' },
+};
 
 export function UpiListsPage() {
   const [addOpen, setAddOpen] = useState(false);
@@ -155,8 +140,14 @@ export function UpiListsPage() {
     }
   }, [activeId, load]);
 
-  const columns = useMemo<DataColumn<UpiRow>[]>(() => {
-    const cols: DataColumn<UpiRow>[] = [
+  const columns = useMemo<CommonTableColumn<UpiRow>[]>(() => {
+    const cols: CommonTableColumn<UpiRow>[] = [
+      {
+        id: 'index',
+        label: '#',
+        width: 56,
+        render: (_row, index) => index + 1,
+      },
       {
         id: 'pn',
         label: 'PN',
@@ -173,11 +164,14 @@ export function UpiListsPage() {
       cols.push({
         id: 'status',
         label: 'Status',
+        width: 90,
         render: (row) => (
-          <StatusSwitch
+          <Switch
+            size="small"
             checked={Boolean(row.status)}
             disabled={togglingId === row._id}
-            onToggle={(next) => void handleToggleStatus(row, next)}
+            onChange={(_e, checked) => void handleToggleStatus(row, checked)}
+            color="warning"
           />
         ),
       });
@@ -186,16 +180,16 @@ export function UpiListsPage() {
     cols.push({
       id: 'action',
       label: 'Action',
+      width: 80,
       render: (row) => (
-        <Button
-          variant="ghost"
-          size="icon"
+        <IconButton
+          size="small"
           aria-label="Delete"
-          className="text-destructive hover:text-destructive"
           onClick={() => openDelete(row)}
+          sx={{ color: '#f44336' }}
         >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+          <DeleteIcon fontSize="small" />
+        </IconButton>
       ),
     });
 
@@ -203,74 +197,134 @@ export function UpiListsPage() {
   }, [canToggle, togglingId, handleToggleStatus, openDelete]);
 
   return (
-    <ReportPage
-      title="AB UPIs"
-      loading={loading}
-      onRefresh={() => void load()}
-      actions={
-        canAdd ? (
-          <Button onClick={openAdd}>
-            <Plus className="h-4 w-4" />
-            Add
+    <Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap={1.5}
+        mb={2}
+      >
+        <Typography variant="h5" fontWeight={700}>
+          AB UPIs
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {canAdd ? (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openAdd}
+              sx={orangeBtnSx}
+            >
+              Add
+            </Button>
+          ) : null}
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={() => void load()}
+            disabled={loading}
+            sx={{
+              borderColor: 'rgba(255,255,255,0.28)',
+              color: '#e8e8ea',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#ff9f0a',
+                bgcolor: 'rgba(255,159,10,0.08)',
+              },
+            }}
+          >
+            Refresh
           </Button>
-        ) : undefined
-      }
-    >
-      <DataTable
+        </Stack>
+      </Stack>
+
+      <CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row) => row._id}
         loading={loading}
         emptyMessage="No UPI records found"
+        stickyHeader
+        dense
         minWidth={600}
+        maxHeight="calc(100vh - 220px)"
       />
 
-      <ReportDialog
-        open={addOpen}
-        title="Add UPI"
-        onClose={() => setAddOpen(false)}
-        onSubmit={handleCreate}
-        loading={submitting}
-      >
-        <Input
-          placeholder="PN"
-          value={form.name}
-          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-          autoFocus
-        />
-        <Input
-          placeholder="UPI Id"
-          value={form.upiId}
-          onChange={(e) => setForm((prev) => ({ ...prev, upiId: e.target.value }))}
-        />
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input
-            type="checkbox"
-            checked={form.status}
-            onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.checked }))}
-            className="h-4 w-4 rounded border-input"
-          />
-          {form.status ? 'Active' : 'Inactive'}
-        </label>
-      </ReportDialog>
-
-      <ReportDialog
-        open={deleteOpen}
-        title="Are you sure?"
-        onClose={() => setDeleteOpen(false)}
-        footer={
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={submitting}>
+      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+        <form onSubmit={handleCreate}>
+          <DialogTitle>Add UPI</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              <TextField
+                label="PN"
+                size="small"
+                fullWidth
+                value={form.name}
+                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                autoFocus
+              />
+              <TextField
+                label="UPI Id"
+                size="small"
+                fullWidth
+                value={form.upiId}
+                onChange={(e) => setForm((prev) => ({ ...prev, upiId: e.target.value }))}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.status}
+                    onChange={(_e, checked) =>
+                      setForm((prev) => ({ ...prev, status: checked }))
+                    }
+                    color="warning"
+                  />
+                }
+                label={form.status ? 'Active' : 'Inactive'}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setAddOpen(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-              Delete
+            <Button type="submit" variant="contained" disabled={submitting} sx={orangeBtnSx}>
+              {submitting ? 'Saving…' : 'Submit'}
             </Button>
-          </div>
-        }
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => !submitting && setDeleteOpen(false)}
+        fullWidth
+        maxWidth="xs"
       >
-        <p className="text-sm text-muted-foreground">This UPI entry will be permanently removed.</p>
-      </ReportDialog>
-    </ReportPage>
+        <DialogTitle>Are you sure?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This UPI entry will be permanently removed.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => void handleDelete()}
+            disabled={submitting}
+          >
+            {submitting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

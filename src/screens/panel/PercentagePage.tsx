@@ -1,20 +1,27 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Pencil, Plus } from 'lucide-react';
-import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { secureApi } from '@/api/secureClient';
-import { cn } from '@/lib/utils';
-import { formatAmount } from '@/utils/dates';
 import {
-  ReportPage,
-  DataTable,
-  ReportDialog,
-  useReportQuery,
-  asList,
-  type DataColumn,
-} from '@/screens/panel/shared';
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { toast } from 'react-toastify';
+import { secureApi } from '@/api/secureClient';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { formatAmount } from '@/utils/dates';
+import { asList, useReportQuery } from '@/screens/panel/shared';
 
 type PercentageRow = {
   _id: string;
@@ -43,36 +50,13 @@ const EMPTY_FORM: PercentForm = {
   bonus: '',
 };
 
-function StatusSwitch({
-  checked,
-  disabled,
-  onToggle,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: (next: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onToggle(!checked)}
-      className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
-        checked ? 'bg-primary' : 'bg-muted',
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
-          checked ? 'translate-x-4' : 'translate-x-1',
-        )}
-      />
-    </button>
-  );
-}
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'none' as const,
+  '&:hover': { bgcolor: '#e08c00' },
+};
 
 export function PercentagePage() {
   const [addOpen, setAddOpen] = useState(false);
@@ -108,6 +92,10 @@ export function PercentagePage() {
       bonus: row.bonus !== undefined ? String(row.bonus) : '',
     });
     setEditOpen(true);
+  }, []);
+
+  const setField = useCallback((key: keyof PercentForm, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const submitForm = useCallback(
@@ -187,33 +175,61 @@ export function PercentagePage() {
     [setRows],
   );
 
-  const columns = useMemo<DataColumn<PercentageRow>[]>(
+  const columns = useMemo<CommonTableColumn<PercentageRow>[]>(
     () => [
       {
         id: 'index',
         label: '#',
-        className: 'w-12',
+        width: 64,
         render: (_row, index) => index + 1,
       },
-      { id: 'name', label: 'Name', render: (row) => row.type || '—' },
-      { id: 'percent', label: 'Percentage', render: (row) => row.percent ?? '—' },
-      { id: 'startAmount', label: 'Start Amount', render: (row) => formatAmount(row.startAmount ?? 0) },
-      { id: 'endAmount', label: 'End Amount', render: (row) => formatAmount(row.endAmount ?? 0) },
-      { id: 'bonus', label: 'Bonus', render: (row) => row.bonus ?? '—' },
+      {
+        id: 'name',
+        label: 'Name',
+        render: (row) => row.type || '—',
+      },
+      {
+        id: 'percent',
+        label: 'Percentage',
+        render: (row) => (row.percent !== undefined ? row.percent : '—'),
+      },
+      {
+        id: 'startAmount',
+        label: 'Start Amount',
+        render: (row) => formatAmount(row.startAmount ?? 0),
+      },
+      {
+        id: 'endAmount',
+        label: 'End Amount',
+        render: (row) => formatAmount(row.endAmount ?? 0),
+      },
+      {
+        id: 'bonus',
+        label: 'Bonus',
+        render: (row) => (row.bonus !== undefined ? row.bonus : '—'),
+      },
       {
         id: 'action',
         label: 'Action',
+        width: 160,
         render: (row) => (
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => openEdit(row)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <StatusSwitch
+          <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+            <IconButton
+              size="small"
+              aria-label="Edit"
+              onClick={() => openEdit(row)}
+              sx={{ color: '#ff9f0a' }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <Switch
+              size="small"
               checked={Boolean(row.status)}
               disabled={togglingType === row.type}
-              onToggle={(next) => void handleToggleStatus(row, next)}
+              onChange={(_e, checked) => void handleToggleStatus(row, checked)}
+              color="warning"
             />
-          </div>
+          </Stack>
         ),
       },
     ],
@@ -221,99 +237,170 @@ export function PercentagePage() {
   );
 
   return (
-    <ReportPage
-      title="Percentage"
-      loading={loading}
-      onRefresh={() => void load()}
-      actions={
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4" />
-          Add
-        </Button>
-      }
-    >
-      <DataTable
+    <Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap={1.5}
+        mb={2}
+      >
+        <Typography variant="h5" fontWeight={700}>
+          Percentage
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openAdd}
+            sx={orangeBtnSx}
+          >
+            Add
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={() => void load()}
+            disabled={loading}
+            sx={{
+              borderColor: 'rgba(255,255,255,0.28)',
+              color: '#e8e8ea',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#ff9f0a',
+                bgcolor: 'rgba(255,159,10,0.08)',
+              },
+            }}
+          >
+            Refresh
+          </Button>
+        </Stack>
+      </Stack>
+
+      <CommonTable
         columns={columns}
         rows={rows}
-        getRowKey={(row) => row._id}
+        getRowKey={(row, index) => row._id || row.type || index}
         loading={loading}
         emptyMessage="No percentage records found"
-        minWidth={800}
+        stickyHeader
+        dense
+        minWidth={900}
+        maxHeight="calc(100vh - 220px)"
       />
 
-      <ReportDialog
-        open={addOpen}
-        title="Add Percentage"
-        onClose={() => setAddOpen(false)}
-        onSubmit={submitForm}
-        loading={submitting}
-      >
-        <Input
-          placeholder="Type"
-          value={form.type}
-          onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-          autoFocus
-        />
-        <Input
-          type="number"
-          placeholder="Percent"
-          value={form.percent}
-          onChange={(e) => setForm((prev) => ({ ...prev, percent: e.target.value }))}
-        />
-        <Input
-          type="number"
-          placeholder="Start Amount"
-          value={form.startAmount}
-          onChange={(e) => setForm((prev) => ({ ...prev, startAmount: e.target.value }))}
-        />
-        <Input
-          type="number"
-          placeholder="End Amount"
-          value={form.endAmount}
-          onChange={(e) => setForm((prev) => ({ ...prev, endAmount: e.target.value }))}
-        />
-        <Input
-          type="number"
-          placeholder="Bonus"
-          value={form.bonus}
-          onChange={(e) => setForm((prev) => ({ ...prev, bonus: e.target.value }))}
-        />
-      </ReportDialog>
+      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+        <form onSubmit={submitForm}>
+          <DialogTitle>Add Percentage</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              <TextField
+                label="Type"
+                size="small"
+                fullWidth
+                value={form.type}
+                onChange={(e) => setField('type', e.target.value)}
+                autoFocus
+              />
+              <TextField
+                label="Percent"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.percent}
+                onChange={(e) => setField('percent', e.target.value)}
+              />
+              <TextField
+                label="Start Amount"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.startAmount}
+                onChange={(e) => setField('startAmount', e.target.value)}
+              />
+              <TextField
+                label="End Amount"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.endAmount}
+                onChange={(e) => setField('endAmount', e.target.value)}
+              />
+              <TextField
+                label="Bonus"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.bonus}
+                onChange={(e) => setField('bonus', e.target.value)}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setAddOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={submitting} sx={orangeBtnSx}>
+              {submitting ? 'Saving…' : 'Submit'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
 
-      <ReportDialog
-        open={editOpen}
-        title="Edit Percentage"
-        onClose={() => setEditOpen(false)}
-        onSubmit={submitForm}
-        loading={submitting}
-      >
-        <Input value={form.type} disabled placeholder="Type" />
-        <Input
-          type="number"
-          placeholder="Percent"
-          value={form.percent}
-          onChange={(e) => setForm((prev) => ({ ...prev, percent: e.target.value }))}
-          autoFocus
-        />
-        <Input
-          type="number"
-          placeholder="Start Amount"
-          value={form.startAmount}
-          onChange={(e) => setForm((prev) => ({ ...prev, startAmount: e.target.value }))}
-        />
-        <Input
-          type="number"
-          placeholder="End Amount"
-          value={form.endAmount}
-          onChange={(e) => setForm((prev) => ({ ...prev, endAmount: e.target.value }))}
-        />
-        <Input
-          type="number"
-          placeholder="Bonus"
-          value={form.bonus}
-          onChange={(e) => setForm((prev) => ({ ...prev, bonus: e.target.value }))}
-        />
-      </ReportDialog>
-    </ReportPage>
+      <Dialog open={editOpen} onClose={() => !submitting && setEditOpen(false)} fullWidth maxWidth="xs">
+        <form onSubmit={submitForm}>
+          <DialogTitle>Edit Percentage</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              <TextField label="Type" size="small" fullWidth value={form.type} disabled />
+              <TextField
+                label="Percent"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.percent}
+                onChange={(e) => setField('percent', e.target.value)}
+                autoFocus
+              />
+              <TextField
+                label="Start Amount"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.startAmount}
+                onChange={(e) => setField('startAmount', e.target.value)}
+              />
+              <TextField
+                label="End Amount"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.endAmount}
+                onChange={(e) => setField('endAmount', e.target.value)}
+              />
+              <TextField
+                label="Bonus"
+                type="number"
+                size="small"
+                fullWidth
+                value={form.bonus}
+                onChange={(e) => setField('bonus', e.target.value)}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setEditOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={submitting} sx={orangeBtnSx}>
+              {submitting ? 'Saving…' : 'Submit'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+    </Box>
   );
 }

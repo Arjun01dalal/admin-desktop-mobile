@@ -13,10 +13,12 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { hasPermission } from '@/auth/permissions';
 import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { getStoredUser, todayIST } from '@/utils/dates';
-import type { CallerRow } from './constants';
+import { maskMobile } from '@/screens/panel/shared';
+import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
 import { roleFlags, type StoredCallerUser } from './utils';
 
 type NavState = {
@@ -38,6 +40,7 @@ export function CallerDetailsPage() {
   const empCode = String(nav.empCode || '');
   const user = getStoredUser<StoredCallerUser>();
   const { isCaller } = roleFlags(user?.Role_ID);
+  const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
 
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
@@ -139,7 +142,8 @@ export function CallerDetailsPage() {
       cols.push({
         id: 'mobile',
         label: 'Mobile',
-        render: (r) => String(r.mobile || r.userMobile || '-'),
+        render: (r) =>
+          maskMobile(r.mobile || r.userMobile, canShowMobile),
       });
     }
     cols.push(
@@ -160,7 +164,7 @@ export function CallerDetailsPage() {
       },
     );
     return cols;
-  }, [isCaller]);
+  }, [isCaller, canShowMobile]);
 
   if (!empCode) {
     return (

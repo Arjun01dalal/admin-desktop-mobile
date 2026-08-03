@@ -5,15 +5,26 @@ import {
 } from '@/auth/permissions';
 
 function extractResponsibilityList(data: unknown): string[] {
+  const fromItem = (item: unknown): string => {
+    if (typeof item === 'string') return item;
+    if (item && typeof item === 'object') {
+      const obj = item as Record<string, unknown>;
+      const named =
+        obj.name ?? obj.Name ?? obj.enum ?? obj.Enum ?? obj.key ?? obj.Key;
+      if (named != null && String(named).trim()) return String(named).trim();
+    }
+    return '';
+  };
+
   if (Array.isArray(data)) {
-    return data.map(String).filter(Boolean);
+    return data.map(fromItem).filter(Boolean);
   }
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
     const nested =
       obj.payload ?? obj.Responsibilities ?? obj.responsibilities ?? obj.data;
     if (Array.isArray(nested)) {
-      return nested.map(String).filter(Boolean);
+      return nested.map(fromItem).filter(Boolean);
     }
   }
   return [];

@@ -160,7 +160,7 @@ export function CoinRemovalDetailsPage() {
 
   if (!user?._id) {
     return (
-      <Box>
+      <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <Typography color="text.secondary" mb={2}>
           No user selected.
         </Typography>
@@ -169,7 +169,7 @@ export function CoinRemovalDetailsPage() {
   }
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Stack direction="row" alignItems="center" spacing={2} mb={2}>
         <Box>
           <Typography variant="h5" fontWeight={700}>
@@ -192,7 +192,9 @@ export function CoinRemovalDetailsPage() {
         getRowKey={(row, i) => String(row._id || i)}
         loading={loading}
         emptyMessage="No coin removal transactions found"
-        minWidth={1100}
+        stickyHeader
+        dense
+        maxHeight="calc(100vh - 280px)"
       />
 
       {!hasSeededDocs && (

@@ -11,7 +11,8 @@ export type SortKey =
   | 'ggr'
   | 'winAmount'
   | 'totalRollbackAmount'
-  | 'rollbackAmount';
+  | 'rollbackAmount'
+  | 'licenseFeePercent';
 
 export type SortConfig = { key: SortKey; direction: 'asc' | 'desc' };
 
@@ -48,6 +49,8 @@ export function getMetric(item: ActivityRow, key: SortKey | string): number {
       return Number(
         item.totalRollbackAmount ?? totals.rollbackAmount ?? totals.totalRollbackAmount ?? 0,
       );
+    case 'licenseFeePercent':
+      return Number(item.licenseFeePercent ?? totals.licenseFeePercent ?? 0);
     default:
       return 0;
   }

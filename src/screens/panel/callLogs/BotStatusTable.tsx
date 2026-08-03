@@ -90,7 +90,7 @@ export function BotStatusTable({
   if (botSummaryRows.length === 0) return null;
 
   return (
-    <Box mb={2}>
+    <Box mb={2} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <CommonTable
         columns={botSummaryColumns}
         rows={botSummaryRows}
@@ -98,7 +98,6 @@ export function BotStatusTable({
         loading={loading}
         emptyMessage="No bot summary"
         dense
-        minWidth={1100}
         virtualize={false}
       />
     </Box>

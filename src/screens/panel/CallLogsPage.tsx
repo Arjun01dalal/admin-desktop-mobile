@@ -311,7 +311,15 @@ function CallLogsPageBody({
   );
 
   return (
-    <Box>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        overflowX: 'hidden',
+        boxSizing: 'border-box',
+      }}
+    >
       <Typography variant="h5" fontWeight={700} mb={2}>
         Call Logs
       </Typography>
@@ -361,9 +369,9 @@ function CallLogsPageBody({
           loading={loading}
           emptyMessage="No call logs"
           stickyHeader
-          minWidth={isCaller ? 1400 : 2300}
           dense
           virtualize
+          maxHeight="calc(100vh - 360px)"
         />
       </CallLogsFiltersProvider>
 
@@ -376,7 +384,10 @@ function CallLogsPageBody({
         />
       </Stack>
 
-      <Dialog open={pauseOpen} onClose={() => setPauseOpen(false)}>
+      <Dialog
+        open={!isCaller && pauseOpen}
+        onClose={() => setPauseOpen(false)}
+      >
         <DialogTitle>Enter Bot ID (For Record Deletion)</DialogTitle>
         <DialogContent>
           <TextField

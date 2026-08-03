@@ -64,4 +64,9 @@ contextBridge.exposeInMainWorld('gcalc', {
   },
   getUpdateStatus: () => safeInvoke('update:get-status'),
   installUpdate: () => ipcRenderer.send('update:install'),
+
+  /** Tell main process SOS was just activated on this machine (immediate alert). */
+  sosActivated: () => ipcRenderer.send('sos:activated'),
+  /** Tell main process SOS was cleared on this machine. */
+  sosCleared: () => ipcRenderer.send('sos:cleared'),
 });

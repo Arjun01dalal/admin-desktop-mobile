@@ -42,6 +42,13 @@ export const BLOCK_STATUS_OPTIONS = [
 
 export const DEFAULT_EMP_CODE = '001';
 
+/** Mobiles allowed to edit user empCode (admin-panel-domains SHOW_EDIT_EMP_CODE). */
+export const SHOW_EDIT_EMP_CODE = [
+  '9373114572',
+  '9561139951',
+  '9806010101',
+] as const;
+
 /**
  * Block/unblock OTP target (laxminarayan Users sendOTP).
  * SuperAdmin default; allowlisted mobiles receive OTP on their own number.

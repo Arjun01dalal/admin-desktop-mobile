@@ -15,10 +15,8 @@ export const FULL_ALLOTMENT_ROLE_IDS = new Set([
 ]);
 
 export const OFFICE_LOCATIONS = [
-  'Ajman',
   'Dubai',
   'Nagpur',
-  'Georgia',
   'Nagpur/Dubai',
 ] as const;
 

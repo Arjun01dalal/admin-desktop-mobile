@@ -1,23 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { display } from './shared';
 import {
   CALLER_HEAD_ROLE_IDS,
   CALLER_ROLE_IDS,
   OFFICE_LOCATIONS,
 } from './callerResponsibility/constants';
-import {
-  ReportPage,
-  DataTable,
-  type DataColumn,
-  SelectField,
-  ReportDialog,
-  display,
-} from './shared';
 
 type SubAdmin = {
   _id: string;
@@ -32,7 +33,6 @@ type SubAdmin = {
   botIds?: string[] | string;
   serverId?: string;
   telegram_username?: string;
-  language?: string;
 };
 
 type RoleGroup = {
@@ -47,27 +47,53 @@ type CallerRow = SubAdmin & {
   botNo: string;
   serverIds: string;
   telegramUserId: string;
-  languageDraft: string;
 };
 
 type CallerHeadOption = { id: string; name: string };
 
-const LANGUAGE_OPTIONS = [
-  'English',
-  'Hindi',
-  'Marathi',
-  'Gujarati',
-  'Punjabi',
-  'Bengali',
-  'Tamil',
-  'Telugu',
-  'Kannada',
-  'Malayalam',
-  'Odia',
-  'Assamese',
-].map((v) => ({ value: v, label: v }));
+const fieldSx = {
+  minWidth: 110,
+  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+};
 
-const LOCATION_OPTIONS = OFFICE_LOCATIONS.map((v) => ({ value: v, label: v }));
+/** Matches old UI outlined action buttons. */
+const actionBtnSx = {
+  textTransform: 'uppercase' as const,
+  fontSize: 11,
+  fontWeight: 600,
+  whiteSpace: 'nowrap' as const,
+  px: 1.5,
+  py: 0.5,
+  borderColor: '#64b5f6',
+  color: '#64b5f6',
+  bgcolor: 'transparent',
+  '&:hover': {
+    borderColor: '#90caf9',
+    bgcolor: 'rgba(100,181,246,0.1)',
+  },
+};
+
+function formatIdList(value: unknown): string {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean).join(',');
+  if (value == null || value === '') return '';
+  return String(value);
+}
+
+/** Bot IDs must be numbers — matches laxminarayan `normalizeToArray`. */
+function parseBotIds(value: string): number[] {
+  const ids = value
+    .split(',')
+    .map((v) => Number(v.trim()))
+    .filter((n) => Number.isFinite(n));
+  return Array.from(new Set(ids));
+}
+
+function parseExtensionIds(value: string): string[] {
+  return value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
 
 function toRow(subAdmin: SubAdmin, blockFallback?: boolean): CallerRow {
   return {
@@ -78,21 +104,19 @@ function toRow(subAdmin: SubAdmin, blockFallback?: boolean): CallerRow {
     botNo: '',
     serverIds: subAdmin.serverId || '',
     telegramUserId: subAdmin.telegram_username || '',
-    languageDraft: subAdmin.language || '',
   };
 }
 
-/** Caller Allotment — assign caller heads, office/bot/server/telegram/language attributes per caller. */
+/** Caller Allotment — assign caller heads and office/bot/server/telegram attributes. */
 export function CallerAllotmentPage() {
   const [rows, setRows] = useState<CallerRow[]>([]);
   const [callerHeadOptions, setCallerHeadOptions] = useState<CallerHeadOption[]>([]);
   const [callerHeadMap, setCallerHeadMap] = useState<Record<string, CallerHeadOption[]>>({});
   const [loading, setLoading] = useState(false);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [blockTarget, setBlockTarget] = useState<CallerRow | null>(null);
-  const [remark, setRemark] = useState('');
-  const [blockLoading, setBlockLoading] = useState(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const { next, isCurrent, begin, end } = useRequestGeneration();
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
 
   const load = useCallback(async () => {
     const gen = next();
@@ -159,21 +183,42 @@ export function CallerAllotmentPage() {
     [callerHeadOptions],
   );
 
-  const saveRow = useCallback(
+  const updateCallerHead = useCallback(
     async (row: CallerRow) => {
-      setSavingId(row._id);
+      const selectedHeads = callerHeadMap[row._id];
+      if (!selectedHeads?.length) {
+        toast.info('Select at least one caller head');
+        return;
+      }
+      const key = `${row._id}:head`;
+      setSavingKey(key);
+      try {
+        const res = await secureApi('ops.updateCallerHead', {
+          _id: row._id,
+          callerHead: selectedHeads.map((h) => h.name),
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update caller head');
+          return;
+        }
+        toast.success('Caller head updated');
+        void load();
+      } finally {
+        setSavingKey(null);
+      }
+    },
+    [callerHeadMap, load],
+  );
+
+  const updateOtherData = useCallback(
+    async (rowId: string) => {
+      const row = rowsRef.current.find((r) => r._id === rowId);
+      if (!row) return;
+
+      const key = `${row._id}:other`;
+      setSavingKey(key);
       try {
         const requests: Promise<{ ok: boolean; message?: string }>[] = [];
-
-        const selectedHeads = callerHeadMap[row._id];
-        if (selectedHeads?.length) {
-          requests.push(
-            secureApi('ops.updateCallerHead', {
-              _id: row._id,
-              callerHead: selectedHeads.map((h) => h.name),
-            }),
-          );
-        }
 
         if (row.location.trim()) {
           requests.push(
@@ -184,35 +229,21 @@ export function CallerAllotmentPage() {
           );
         }
 
-        const extensionId = row.extensionNo
-          .split(',')
-          .map((v) => v.trim())
-          .filter(Boolean);
-        const botIds = row.botNo
-          .split(',')
-          .map((v) => v.trim())
-          .filter(Boolean);
+        const extensionId = parseExtensionIds(row.extensionNo);
+        const botIds = parseBotIds(row.botNo);
 
         const attrPayload: Record<string, unknown> = { userId: row._id };
         if (extensionId.length) attrPayload.extensionId = extensionId;
         if (row.serverIds.trim()) attrPayload.serverId = row.serverIds.trim();
         if (botIds.length) attrPayload.botIds = botIds;
         if (row.telegramUserId.trim()) attrPayload.telegramUsername = row.telegramUserId.trim();
+
         if (Object.keys(attrPayload).length > 1) {
           requests.push(secureApi('ops.updateSubadminAttributes', attrPayload));
         }
 
-        if (row.languageDraft.trim()) {
-          requests.push(
-            secureApi('ops.updateLanguage', {
-              _id: row._id,
-              language: row.languageDraft.trim(),
-            }),
-          );
-        }
-
         if (requests.length === 0) {
-          toast.info('Nothing to save for this row');
+          toast.info('Enter Extension No, Bot ID, Server ID, Telegram ID, or Location');
           return;
         }
 
@@ -221,175 +252,199 @@ export function CallerAllotmentPage() {
         if (failed) {
           toast.error(failed.message || 'Some updates failed to save');
         } else {
-          toast.success('Caller updated successfully');
+          toast.success('Data updated successfully');
         }
         void load();
       } finally {
-        setSavingId(null);
+        setSavingKey(null);
       }
     },
-    [callerHeadMap, load],
+    [load],
   );
 
-  const openBlockDialog = useCallback((row: CallerRow) => {
-    setBlockTarget(row);
-    setRemark('');
-  }, []);
-
-  const submitBlock = useCallback(async () => {
-    if (!blockTarget) return;
-    if (!remark.trim()) {
-      toast.error('Please enter a remark');
-      return;
-    }
-    setBlockLoading(true);
-    try {
-      const res = await secureApi('ops.blockCaller', {
-        _id: blockTarget._id,
-        Role_ID: blockTarget.Role_ID,
-        status: !blockTarget.block,
-        blockReason: remark.trim(),
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to update block status');
-        return;
-      }
-      toast.success(blockTarget.block ? 'Caller unblocked' : 'Caller blocked');
-      setBlockTarget(null);
-      setRemark('');
-      void load();
-    } finally {
-      setBlockLoading(false);
-    }
-  }, [blockTarget, remark, load]);
-
-  const columns = useMemo<DataColumn<CallerRow>[]>(
+  const columns = useMemo<CommonTableColumn<CallerRow>[]>(
     () => [
-      { id: 'index', label: '#', render: (_row, index) => index + 1 },
-      { id: 'pseudo', label: 'Pseudo Name', render: (row) => display(row.name) },
-      { id: 'realName', label: 'Real Name', render: (row) => display(row.realName) },
-      { id: 'empCode', label: 'Emp Code', render: (row) => display(row.empCode) },
+      {
+        id: 'index',
+        label: '#',
+        width: 56,
+        render: (_row, index) => index + 1,
+      },
+      {
+        id: 'pseudo',
+        label: 'Pseudo Name',
+        render: (row) => display(row.name),
+      },
+      {
+        id: 'realName',
+        label: 'Real Name',
+        render: (row) => display(row.realName),
+      },
+      {
+        id: 'empCode',
+        label: 'Emp Code',
+        render: (row) => display(row.empCode),
+      },
       {
         id: 'callerHead',
         label: 'Caller Head',
-        className: 'min-w-[220px]',
+        width: 220,
         render: (row) => (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">
+          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 180 }}>
+            <Typography variant="caption" color="text.secondary" textAlign="left">
               Current: {display(row.callerHead)}
-            </span>
-            <select
-              multiple
-              className="h-20 min-w-[180px] rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground [color-scheme:dark] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            </Typography>
+            <TextField
+              select
+              SelectProps={{ multiple: true }}
+              size="small"
               value={(callerHeadMap[row._id] || []).map((h) => h.id)}
               onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                handleCallerHeadChange(row._id, selected);
+                const value = e.target.value;
+                handleCallerHeadChange(
+                  row._id,
+                  typeof value === 'string' ? value.split(',') : value,
+                );
               }}
+              sx={fieldSx}
             >
               {callerHeadOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
+                <MenuItem key={opt.id} value={opt.id}>
                   {opt.name}
-                </option>
+                </MenuItem>
               ))}
-            </select>
-          </div>
+            </TextField>
+          </Stack>
         ),
       },
       {
         id: 'location',
         label: 'Location',
+        width: 140,
         render: (row) => (
-          <SelectField
+          <TextField
+            select
+            size="small"
             value={row.location}
-            onChange={(v) => handleRowChange(row._id, 'location', v)}
-            options={LOCATION_OPTIONS}
-            placeholder="Select"
-          />
+            onChange={(e) => handleRowChange(row._id, 'location', e.target.value)}
+            sx={fieldSx}
+          >
+            <MenuItem value="">Select</MenuItem>
+            {OFFICE_LOCATIONS.map((loc) => (
+              <MenuItem key={loc} value={loc}>
+                {loc}
+              </MenuItem>
+            ))}
+          </TextField>
         ),
       },
       {
         id: 'extension',
-        label: 'Extension',
+        label: 'Extension No',
+        width: 160,
         render: (row) => (
-          <Input
-            value={row.extensionNo}
-            placeholder="e.g. 101,102"
-            className="h-8 min-w-[110px]"
-            onChange={(e) => handleRowChange(row._id, 'extensionNo', e.target.value)}
-          />
+          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 130 }}>
+            <Typography variant="caption" color="text.secondary" textAlign="left">
+              Extn ID:- {formatIdList(row.extensionId) || '—'}
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="Extension No"
+              value={row.extensionNo}
+              onChange={(e) => handleRowChange(row._id, 'extensionNo', e.target.value)}
+              sx={fieldSx}
+            />
+          </Stack>
         ),
       },
       {
         id: 'botId',
-        label: 'Bot ID',
+        label: 'Bot ID (e.g 1,2,3 ...)',
+        width: 160,
         render: (row) => (
-          <Input
-            value={row.botNo}
-            placeholder="e.g. 1,2,3"
-            className="h-8 min-w-[110px]"
-            onChange={(e) => handleRowChange(row._id, 'botNo', e.target.value)}
-          />
+          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 130 }}>
+            <Typography variant="caption" color="text.secondary" textAlign="left">
+              Bot ID:- {formatIdList(row.botIds) || '—'}
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="e.g. 1,2,3"
+              value={row.botNo}
+              onChange={(e) => handleRowChange(row._id, 'botNo', e.target.value)}
+              sx={fieldSx}
+            />
+          </Stack>
         ),
       },
       {
         id: 'serverId',
         label: 'Server ID',
+        width: 140,
         render: (row) => (
-          <Input
-            value={row.serverIds}
-            placeholder="Server ID"
-            className="h-8 min-w-[100px]"
-            onChange={(e) => handleRowChange(row._id, 'serverIds', e.target.value)}
-          />
+          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 120 }}>
+            <Typography variant="caption" color="text.secondary" textAlign="left">
+              Server ID:- {display(row.serverId)}
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="Server ID"
+              value={row.serverIds}
+              onChange={(e) => handleRowChange(row._id, 'serverIds', e.target.value)}
+              sx={fieldSx}
+            />
+          </Stack>
         ),
       },
       {
         id: 'telegramId',
         label: 'Telegram ID',
+        width: 150,
         render: (row) => (
-          <Input
-            value={row.telegramUserId}
-            placeholder="Telegram ID"
-            className="h-8 min-w-[120px]"
-            onChange={(e) => handleRowChange(row._id, 'telegramUserId', e.target.value)}
-          />
-        ),
-      },
-      {
-        id: 'language',
-        label: 'Language',
-        render: (row) => (
-          <SelectField
-            value={row.languageDraft}
-            onChange={(v) => handleRowChange(row._id, 'languageDraft', v)}
-            options={LANGUAGE_OPTIONS}
-            placeholder="Select"
-          />
+          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 130 }}>
+            <Typography variant="caption" color="text.secondary" textAlign="left">
+              Telegram ID:- {display(row.telegram_username)}
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="Telegram ID"
+              value={row.telegramUserId}
+              onChange={(e) => handleRowChange(row._id, 'telegramUserId', e.target.value)}
+              sx={fieldSx}
+            />
+          </Stack>
         ),
       },
       {
         id: 'action',
         label: 'Action',
-        className: 'min-w-[160px]',
-        render: (row) => (
-          <div className="flex flex-col gap-2">
-            <Button
-              size="sm"
-              onClick={() => void saveRow(row)}
-              disabled={savingId === row._id}
-            >
-              {savingId === row._id ? 'Saving…' : 'Save'}
-            </Button>
-            <Button
-              size="sm"
-              variant={row.block ? 'outline' : 'destructive'}
-              onClick={() => openBlockDialog(row)}
-            >
-              {row.block ? 'Un-Block' : 'Block'}
-            </Button>
-          </div>
-        ),
+        width: 180,
+        render: (row) =>
+          row.block ? (
+            <Typography variant="caption" color="error.light">
+              Blocked
+            </Typography>
+          ) : (
+            <Stack spacing={1} alignItems="center">
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={savingKey === `${row._id}:head`}
+                onClick={() => void updateCallerHead(row)}
+                sx={actionBtnSx}
+              >
+                {savingKey === `${row._id}:head` ? 'Updating…' : 'Update Caller Head'}
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={savingKey === `${row._id}:other`}
+                onClick={() => void updateOtherData(row._id)}
+                sx={actionBtnSx}
+              >
+                {savingKey === `${row._id}:other` ? 'Updating…' : 'Update Other Data'}
+              </Button>
+            </Stack>
+          ),
       },
     ],
     [
@@ -397,45 +452,62 @@ export function CallerAllotmentPage() {
       callerHeadOptions,
       handleCallerHeadChange,
       handleRowChange,
-      savingId,
-      saveRow,
-      openBlockDialog,
+      savingKey,
+      updateCallerHead,
+      updateOtherData,
     ],
   );
 
   return (
-    <ReportPage title="Caller Allotment" onRefresh={() => void load()} loading={loading}>
-      <DataTable
+    <Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap={1.5}
+        mb={2}
+      >
+        <Typography variant="h5" fontWeight={700}>
+          Caller Allotment
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={
+            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+          }
+          onClick={() => void load()}
+          disabled={loading}
+          sx={{
+            borderColor: 'rgba(255,255,255,0.28)',
+            color: '#e8e8ea',
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: '#ff9f0a',
+              bgcolor: 'rgba(255,159,10,0.08)',
+            },
+          }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      <CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row) => row._id}
         loading={loading}
         emptyMessage="No callers found"
-        rowClassName={(row) => (row.block ? 'bg-red-500/10 hover:bg-red-500/15' : undefined)}
-        minWidth={1600}
+        stickyHeader
+        dense
+        minWidth={1500}
+        maxHeight="calc(100vh - 220px)"
+        getRowSx={(row) =>
+          row.block
+            ? { bgcolor: 'rgba(244,67,54,0.12)', '&:hover': { bgcolor: 'rgba(244,67,54,0.18)' } }
+            : undefined
+        }
       />
-
-      <ReportDialog
-        open={Boolean(blockTarget)}
-        title={blockTarget?.block ? 'Unblock Caller' : 'Block Caller'}
-        onClose={() => setBlockTarget(null)}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submitBlock();
-        }}
-        submitLabel={blockLoading ? 'Submitting…' : 'Submit'}
-        loading={blockLoading}
-      >
-        <label className={cn('flex flex-col gap-1')}>
-          <span className="text-xs font-medium text-muted-foreground">Remark</span>
-          <Input
-            value={remark}
-            onChange={(e) => setRemark(e.target.value)}
-            placeholder="Enter remark"
-            autoFocus
-          />
-        </label>
-      </ReportDialog>
-    </ReportPage>
+    </Box>
   );
 }

@@ -38,8 +38,8 @@ export function ReportPage({
     >
       <div className={cn('space-y-4', className)}>
         {toolbar && (
-          <Card>
-            <CardContent className="flex flex-wrap items-end gap-3 p-4">
+          <Card className="border-border bg-card">
+            <CardContent className="flex flex-wrap items-end gap-3 bg-card p-4">
               {toolbar}
             </CardContent>
           </Card>

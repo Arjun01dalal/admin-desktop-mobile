@@ -1,8 +1,11 @@
 import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { Button } from '@mui/material';
+import { hasPermission } from '@/auth/permissions';
 import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { CopyText, type CommonTableColumn } from '@/components/CommonTable';
 import { appCodeForName } from '@/constants/clientNames';
+import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
+import { maskMobile } from '@/screens/panel/shared';
 import {
   AadharFilter,
   AccNoFilter,
@@ -65,6 +68,7 @@ export function useNewRegistersColumns({
   isCaller = false,
 }: UseNewRegistersColumnsParams): CommonTableColumn<UserRow>[] {
   const rowOffset = (page - 1) * itemsPerPage;
+  const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
 
   return useMemo<CommonTableColumn<UserRow>[]>(() => {
     const cols: CommonTableColumn<UserRow>[] = [
@@ -170,9 +174,10 @@ export function useNewRegistersColumns({
             Phone
           </>
         ),
-        filter: <MobileFilter />,
+        filter: canShowMobile ? <MobileFilter /> : null,
         render: (row) => {
           const mob = String(row.mobile || '');
+          if (!canShowMobile) return maskMobile(mob, false);
           return mob ? <CopyText value={mob} /> : '—';
         },
       },
@@ -388,5 +393,5 @@ export function useNewRegistersColumns({
 
     if (!isCaller) return cols;
     return cols.filter((col) => !CALLER_HIDDEN_COLUMN_IDS.has(col.id));
-  }, [rowOffset, setBlockTarget, isCaller]);
+  }, [rowOffset, setBlockTarget, isCaller, canShowMobile]);
 }

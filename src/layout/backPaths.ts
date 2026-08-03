@@ -9,7 +9,8 @@ export function getBackPath(pathname: string): string | null {
   if (pathname.startsWith('/coins-removal/details')) return '/coins-removal';
   if (pathname === '/coin-reports/report') return '/coins-report';
   if (pathname === '/customer-allotted') return '/customer-allotment';
-  if (pathname === '/playerRTPDetails') return '/playerRtp';
+  if (pathname === '/customer-count') return '/leaderboard';
+  if (pathname.startsWith('/playerRtp/details')) return '/playerRtp';
   if (pathname.startsWith('/caller-responsibility/deposit-list')) {
     return '/caller-responsibility';
   }
@@ -18,6 +19,24 @@ export function getBackPath(pathname: string): string | null {
   }
   if (pathname.startsWith('/caller-responsibility/details')) {
     return '/caller-responsibility';
+  }
+  if (pathname === '/fund-request-bonus-wallet-table') {
+    return '/fund-request-bonus-wallet';
+  }
+  if (pathname === '/withdraw-user-data') {
+    return '/withdrawal-fund';
+  }
+  if (pathname.startsWith('/depositList/')) {
+    return '/depositList';
+  }
+  if (pathname === '/funds/mid/payingAccount' || pathname === '/funds/payin') {
+    return '/funds/mid';
+  }
+  if (pathname === '/funds/mid') {
+    return '/funds';
+  }
+  if (pathname === '/kycList') {
+    return '/users-kyc';
   }
   return null;
 }

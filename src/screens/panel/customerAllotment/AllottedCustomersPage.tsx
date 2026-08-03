@@ -78,7 +78,19 @@ export function AllottedCustomersPage() {
       setLoading(true);
       setError(null);
       try {
-        const filter: Record<string, unknown> = { _id: customerIds };
+        const filter: Record<string, unknown> = {
+          _id: customerIds
+            .map((item) => {
+              if (item == null) return null;
+              if (typeof item === 'string' || typeof item === 'number') return String(item);
+              if (typeof item === 'object' && item !== null && '_id' in (item as object)) {
+                const id = (item as { _id?: unknown })._id;
+                return id == null ? null : String(id);
+              }
+              return null;
+            })
+            .filter((id): id is string => Boolean(id)),
+        };
         if (nameOverride) filter.name = nameOverride;
 
         const res = await secureApi('ops.myCustomersGetAll', {
@@ -101,7 +113,11 @@ export function AllottedCustomersPage() {
         }
 
         const data = (res.data || {}) as Record<string, unknown>;
-        const items = Array.isArray(data.items) ? (data.items as AllottedCustomerRow[]) : [];
+        const rawItems = Array.isArray(data.items) ? data.items : [];
+        const items = rawItems.filter(
+          (row): row is AllottedCustomerRow =>
+            Boolean(row && typeof row === 'object' && (row as AllottedCustomerRow)._id != null),
+        );
         startTransition(() => {
           setRows(items);
           setTotalPages(Math.max(1, Number(data.totalPages) || 1));

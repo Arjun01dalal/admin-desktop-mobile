@@ -34,7 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'riskDashboard',
-    label: 'Risk Dashboard',
+    label: 'Risk Analysis',
     path: '/risk-dashboard',
     permission: Permissions.risk_management_analysis,
   },
@@ -58,6 +58,12 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { id: 'houseGames', label: 'House Games', path: '/house-games' },
   {
+    id: 'leaderboard',
+    label: 'Leaderboard',
+    path: '/leaderboard',
+    permission: Permissions.caller_leaderboard_tab,
+  },
+  {
     id: 'callerResponsibility',
     label: 'Caller Responsibility',
     path: '/caller-responsibility',
@@ -68,6 +74,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Player Activity',
     path: '/player-activity',
     permission: Permissions.player_activity,
+  },
+  {
+    id: 'whatsapp',
+    label: 'Whatsapp',
+    path: '/whatsappView',
+    permission: Permissions.show_whatsapp_messages,
   },
   {
     id: 'gameActivity',
@@ -81,11 +93,23 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/call-logs',
     permission: Permissions.call_logs,
   },
+  // Always listed (laxminarayan App route has no Responsibility gate).
+  {
+    id: 'botPerformance',
+    label: 'Bot Performance',
+    path: '/botPerformance',
+  },
   {
     id: 'newRegisters',
     label: 'New Registers',
     path: '/new-registers',
     permission: Permissions.new_registrations,
+  },
+  {
+    id: 'stateWiseRegistration',
+    label: 'State wise Registration',
+    path: '/register-user-report',
+    permission: Permissions.state_wise_registartion,
   },
   {
     id: 'users',
@@ -130,12 +154,6 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.Coin_Removal,
   },
   {
-    id: 'myCustomers',
-    label: 'My Customers',
-    path: '/my-customer',
-    permission: Permissions.My_Customers,
-  },
-  {
     id: 'customerAllotment',
     label: 'Customer Allotment',
     path: '/customer-allotment',
@@ -172,6 +190,24 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_Games,
   },
   {
+    id: 'casinoSwitch',
+    label: 'Casino Switch',
+    path: '/dynamic-casino-switching',
+    permission: Permissions.casino_switch,
+  },
+  {
+    id: 'topGames',
+    label: 'Top Games',
+    path: '/top-games',
+    permission: Permissions.hide_show_games,
+  },
+  {
+    id: 'casinoTopup',
+    label: 'Casino Top-up Balance',
+    path: '/casino-topup-balance',
+    permission: Permissions.view_casino_balance,
+  },
+  {
     id: 'usersKyc',
     label: 'KYC',
     path: '/users-kyc',
@@ -184,6 +220,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_Banners,
   },
   {
+    id: 'upiPayments',
+    label: 'UPI Payments',
+    path: '/all-upi-payments',
+    permission: Permissions.UPI_Payment,
+  },
+  {
     id: 'upiLists',
     label: 'AB UPIs',
     path: '/upi-lists',
@@ -194,6 +236,42 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'UTR Providers',
     path: '/utr-provider',
     permission: Permissions.Utr_Provider,
+  },
+  {
+    id: 'instantDepositProviders',
+    label: 'Instant Deposit Providers',
+    path: '/instant-provider',
+    permission: Permissions.View_PayIn_Accounts,
+  },
+  {
+    id: 'depositProviders',
+    label: 'Deposit Providers',
+    path: '/pay-g-mid',
+    permission: Permissions.View_PayIn_Accounts,
+  },
+  {
+    id: 'depositConfig',
+    label: 'Deposit Config',
+    path: '/deposit-config',
+    permission: Permissions.Deposit_Config,
+  },
+  {
+    id: 'funds',
+    label: 'Funds',
+    path: '/funds',
+    permission: Permissions.Deposit_Config,
+  },
+  {
+    id: 'withdrawalProviders',
+    label: 'Withdrawal Providers',
+    path: '/payout-accounts',
+    permission: Permissions.View_PayOut_Accounts,
+  },
+  {
+    id: 'botData',
+    label: 'Bot Data',
+    path: '/botData',
+    permission: Permissions.bot_data_upload,
   },
   {
     id: 'playerRtp',
@@ -226,6 +304,42 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.New_Deposits,
   },
   {
+    id: 'deposit',
+    label: 'Deposit',
+    path: '/deposit',
+    permission: Permissions.View_Deposits,
+  },
+  {
+    id: 'depositList',
+    label: 'Deposit List',
+    path: '/depositList',
+    permission: Permissions.View_Deposit_List,
+  },
+  {
+    id: 'stateWiseDeposit',
+    label: 'State Wise Deposit',
+    path: '/state-wise-deposit',
+    permission: Permissions.State_Wise_Deposit,
+  },
+  {
+    id: 'withdrawal',
+    label: 'Withdrawal',
+    path: '/withdrawal',
+    permission: Permissions.View_Withdrawals,
+  },
+  {
+    id: 'withdrawalFund',
+    label: 'Withdrawal Fund',
+    path: '/withdrawal-fund',
+    permission: Permissions.withdrawal_fund,
+  },
+  {
+    id: 'fundRequest',
+    label: 'Fund Requests',
+    path: '/fund-request',
+    permission: Permissions.Fund_Request,
+  },
+  {
     id: 'socialMedia',
     label: 'Social Media',
     path: '/social-media',
@@ -236,6 +350,42 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Mobile App',
     path: '/mobile-app',
     permission: Permissions.Mobile_App,
+  },
+  {
+    id: 'incomingBotCall',
+    label: 'Incoming Bot Call',
+    path: '/incoming-bot-call',
+    permission: Permissions.show_incoming_bot,
+  },
+  {
+    id: 'rolesResponsibilities',
+    label: 'Roles & Responsibilities',
+    path: '/roles-responsibilities',
+    permission: Permissions.View_Roles_and_Responsibilities,
+  },
+  {
+    id: 'bonusWalletFundRequest',
+    label: 'Bonus Wallet Fund Requests',
+    path: '/fund-request-bonus-wallet',
+    permission: Permissions.Bonus_Wallet_Fund_Request,
+  },
+  {
+    id: 'bonusWalletRequests',
+    label: 'Bonus Wallet Requests',
+    path: '/bonus-wallet',
+    permission: Permissions.Bonus_Wallet_Request,
+  },
+  {
+    id: 'depositApprovedReport',
+    label: 'Deposit Approved Report',
+    path: '/DepositApprovedReport',
+    permission: Permissions.View_Deposits_Approved_Report,
+  },
+  {
+    id: 'uniqueDepositPending',
+    label: 'Unique Deposit Pending User',
+    path: '/unique_deposit_pending',
+    permission: Permissions.Unique_Deposit_Pending_User,
   },
 ];
 
@@ -253,5 +403,14 @@ export const PANEL_PATHS = new Set<string>([
   '/customer-allotted',
   '/add-customer',
   '/remove-customer',
-  '/playerRTPDetails',
+  '/playerRtp/details',
+  '/fund-request-bonus-wallet-table',
+  '/bonus-wallet-history',
+  '/state-wise-deposit',
+  '/withdraw-user-data',
+  '/depositList/user-wise',
+  '/funds/mid',
+  '/funds/payin',
+  '/funds/mid/payingAccount',
+  '/kycList',
 ]);

@@ -20,6 +20,7 @@ export function GameActivityDetailsPage() {
   const location = useLocation();
   const state = (location.state || {}) as DetailsState;
   const provider = state.data;
+  const isQtech = Boolean(state.isQtech);
   const games = useMemo(
     () => (Array.isArray(provider?.games) ? (provider!.games as GameRow[]) : []),
     [provider],
@@ -63,6 +64,15 @@ export function GameActivityDetailsPage() {
         label: 'RTP',
         render: (row) => formatAmount(row.rtp),
       },
+      ...(isQtech
+        ? [
+            {
+              id: 'totalRate',
+              label: 'Total Rate',
+              render: (row: GameRow) => formatAmount(row.totalRate ?? 0),
+            } satisfies CommonTableColumn<GameRow>,
+          ]
+        : []),
       {
         id: 'winAmount',
         label: 'Win Amount',
@@ -74,7 +84,7 @@ export function GameActivityDetailsPage() {
         render: (row) => formatAmount(row.winCount),
       },
     ],
-    [],
+    [isQtech],
   );
 
   if (!provider) {

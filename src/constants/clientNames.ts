@@ -33,6 +33,7 @@ const CLIENT_ALIASES: Record<string, ClientName> = {
   FAIRBETS: 'FAIRBETS',
   THIRDEYE: 'OS',
   THIRDEYEASTRO: 'OS',
+  ASTROADMIN: 'OS',
   OSGAMES: 'OS',
   // Deposit URL keys
   KSGAMESNEW: 'KS',

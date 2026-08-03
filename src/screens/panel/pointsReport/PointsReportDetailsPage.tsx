@@ -85,7 +85,7 @@ export function PointsReportDetailsPage() {
   );
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={2}>
         Coins Reports Report
       </Typography>
@@ -95,7 +95,9 @@ export function PointsReportDetailsPage() {
         rows={docs}
         getRowKey={(row, index) => row._id || index}
         emptyMessage="No documents found"
-        minWidth={1200}
+        stickyHeader
+        dense
+        maxHeight="calc(100vh - 220px)"
       />
     </Box>
   );

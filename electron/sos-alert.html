@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; media-src 'self' file: data: blob:" />
+  <title>SOS ALERT</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(160deg, #7f1d1d 0%, #450a0a 100%);
+      color: #fff;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+    .wrap {
+      box-sizing: border-box;
+      height: 100%;
+      padding: 28px 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.08em;
+      font-weight: 800;
+    }
+    p {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.45;
+      opacity: 0.92;
+    }
+    button {
+      -webkit-app-region: no-drag;
+      margin-top: 10px;
+      align-self: flex-start;
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 22px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #fef2f2;
+      color: #7f1d1d;
+    }
+    button:hover { background: #fff; }
+    button:active { transform: scale(0.98); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>SOS ALERT</h1>
+    <p>An emergency SOS has been activated. This alert will stay until you acknowledge it.</p>
+    <button type="button" id="ack">Acknowledge</button>
+  </div>
+  <!-- Danger SFX from https://www.youtube.com/shorts/B7Wf5kE-YoA -->
+  <audio id="danger" src="assets/danger.webm" preload="auto" loop></audio>
+  <script>
+    (function () {
+      var audio = document.getElementById('danger');
+      audio.volume = 1;
+
+      function stopTone() {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+        } catch (e) {}
+      }
+
+      function startTone() {
+        stopTone();
+        var play = function () {
+          var p = audio.play();
+          if (p && typeof p.catch === 'function') {
+            p.catch(function () {
+              // Retry once after a short delay (autoplay / focus).
+              setTimeout(function () {
+                audio.play().catch(function () {});
+              }, 250);
+            });
+          }
+        };
+        play();
+      }
+
+      document.getElementById('ack').addEventListener('click', function () {
+        stopTone();
+        if (window.sosAlert && typeof window.sosAlert.acknowledge === 'function') {
+          window.sosAlert.acknowledge();
+        }
+      });
+
+      startTone();
+      window.addEventListener('beforeunload', stopTone);
+      window.addEventListener('focus', function () {
+        if (audio.paused) startTone();
+      });
+    })();
+  </script>
+</body>
+</html>

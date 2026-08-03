@@ -13,10 +13,30 @@ type SosFlagPayload = {
 };
 
 export function isSosFlagEnabled(payload: unknown): boolean {
-  if (!payload || typeof payload !== 'object') return false;
-  const obj = payload as SosFlagPayload;
+  if (payload == null) return false;
+  if (typeof payload !== 'object') {
+    if (payload === true || payload === 1) return true;
+    if (typeof payload === 'string') {
+      const v = payload.trim().toLowerCase();
+      return v === 'true' || v === '1' || v === 'yes' || v === 'on';
+    }
+    return false;
+  }
+  const obj = payload as SosFlagPayload & {
+    sos?: boolean;
+    sos_flag?: boolean;
+    sosFlag?: boolean;
+    flag?: boolean;
+    payload?: SosFlagPayload;
+  };
   if (obj.sosEnabled === true || obj.enabled === true) return true;
+  if (obj.sos === true || obj.sos_flag === true || obj.sosFlag === true || obj.flag === true) {
+    return true;
+  }
   if (obj.data?.sosEnabled === true || obj.data?.enabled === true) return true;
+  if (obj.payload && typeof obj.payload === 'object') {
+    return isSosFlagEnabled(obj.payload);
+  }
   return false;
 }
 
@@ -57,8 +77,11 @@ export function useSosFlagGuard({ enabled, isExempt, onKick }: Options): {
 
       if (!active) {
         kickedRef.current = false;
+        window.gcalc?.sosCleared?.();
         return;
       }
+
+      window.gcalc?.sosActivated?.();
 
       if (isExemptRef.current() || kickedRef.current) return;
       kickedRef.current = true;

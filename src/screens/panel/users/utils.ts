@@ -1,6 +1,6 @@
 import type { SecureAction } from '@/api/secureActions';
 import { asList, asPaged, display } from '@/screens/panel/shared';
-import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { dateTime, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { DEFAULT_EMP_CODE, type UserType } from './constants';
 
 export type UserRow = {
@@ -93,6 +93,11 @@ export function empCodesEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
+/** Exact empCode match (admin-panel-domains Users.tsx list filter). */
+export function empCodesExact(a: unknown, b: unknown): boolean {
+  return trimCode(a) === trimCode(b) && trimCode(a) !== '';
+}
+
 export function isDefaultEmpCode(code: unknown): boolean {
   const c = trimCode(code);
   return c === '' || c === DEFAULT_EMP_CODE;
@@ -107,7 +112,7 @@ export function filterListByLoginEmpCode(
   if (!mine) return rows;
   return rows.filter((row) => {
     const code = trimCode(row.empCode);
-    return code !== '' && empCodesEqual(code, mine);
+    return code !== '' && empCodesExact(code, mine);
   });
 }
 
@@ -166,14 +171,14 @@ export function filterSearchByEmpCode(
   const mine = trimCode(loginEmpCode);
   if (resolved.allowOwnAndDefault && mine) {
     return rows.filter(
-      (row) => empCodesEqual(row.empCode, mine) || isDefaultEmpCode(row.empCode),
+      (row) => empCodesExact(row.empCode, mine) || isDefaultEmpCode(row.empCode),
     );
   }
   if (resolved.matchDefault) {
     return rows.filter((row) => isDefaultEmpCode(row.empCode));
   }
   if (resolved.apiEmpCode) {
-    return rows.filter((row) => empCodesEqual(row.empCode, resolved.apiEmpCode));
+    return rows.filter((row) => empCodesExact(row.empCode, resolved.apiEmpCode));
   }
   return rows;
 }
@@ -317,6 +322,9 @@ export function buildUserFilter(
   if (filters.city.trim()) filter.city = filters.city.trim();
   if (filters.states.length > 0) filter.state = filters.states;
   else if (filters.state.trim()) filter.state = filters.state.trim();
+  if (filters.deviceType.trim()) {
+    filter.deviceType = filters.deviceType.trim();
+  }
   if (clientName) filter.clientName = clientName;
   if (playedIn) filter.played = playedIn;
   if (filters.blockStatus === 'block') filter.blockUser = true;
@@ -325,7 +333,7 @@ export function buildUserFilter(
   return filter;
 }
 
-/** Build request body per user type (aligned with laxminarayan). */
+/** Build request body per user type (aligned with laxminarayan / admin-panel-domains). */
 export function buildPayloadForType(
   type: UserType,
   opts: {
@@ -335,13 +343,49 @@ export function buildPayloadForType(
     startDate: string;
     endDate: string;
     allottedApps?: string | string[];
+    /** Per-app state map from logged-in user (appWithState). */
+    appWithState?: Record<string, string[]>;
+    /** Selected clientName filter — narrows appWithState when set. */
+    selectedClientName?: string;
+    /** Column created-on range (User/getAll activeUserStart/End). */
+    activeUserStart?: string;
+    activeUserEnd?: string;
   },
 ): Record<string, unknown> {
-  const { pageNo, itemsPerPage, filter, startDate, endDate, allottedApps } =
-    opts;
+  const {
+    pageNo,
+    itemsPerPage,
+    filter,
+    startDate,
+    endDate,
+    allottedApps,
+    appWithState,
+    selectedClientName,
+    activeUserStart,
+    activeUserEnd,
+  } = opts;
+
   const dates =
-    startDate && endDate ? { startDate, endDate } : ({} as Record<string, string>);
+    startDate && endDate
+      ? { startDate: dateTime(startDate), endDate: dateTime(endDate) }
+      : ({} as Record<string, string>);
   const app = allottedApps ? { app: allottedApps } : {};
+
+  // Match Users.tsx: build appWithState from login user, optionally scoped to selected app.
+  let stateWiseFilter: Record<string, string[]> = {};
+  if (appWithState && typeof appWithState === 'object') {
+    if (selectedClientName && Array.isArray(appWithState[selectedClientName])) {
+      stateWiseFilter[selectedClientName] = [...appWithState[selectedClientName]];
+    } else {
+      Object.entries(appWithState).forEach(([key, states]) => {
+        if (Array.isArray(states)) stateWiseFilter[key] = [...states];
+      });
+    }
+  }
+  const withAppState =
+    Object.keys(stateWiseFilter).length > 0
+      ? { appWithState: stateWiseFilter }
+      : {};
 
   switch (type) {
     case 'Sub_Admin': {
@@ -360,11 +404,12 @@ export function buildPayloadForType(
         filter,
         ...(startDate && endDate
           ? {
-              activeUserStartDate: startDate,
-              activeUserEndDate: endDate,
+              activeUserStartDate: dateTime(startDate),
+              activeUserEndDate: dateTime(endDate),
             }
           : {}),
         ...app,
+        ...withAppState,
       };
     case 'Todays_Active':
       return {
@@ -373,15 +418,17 @@ export function buildPayloadForType(
         filter,
         ...dates,
         ...app,
+        ...withAppState,
       };
     case 'Non_Performing_User':
+      // /User/nonPerformingUser: itemPerPage only (itemsPerPage is rejected)
       return {
         pageNo,
         itemPerPage: itemsPerPage,
-        itemsPerPage,
         filter,
         ...dates,
         ...app,
+        ...withAppState,
       };
     case 'In_Active_Deposit':
       return {
@@ -390,6 +437,7 @@ export function buildPayloadForType(
         filter,
         ...dates,
         ...app,
+        ...withAppState,
       };
     case 'Non_Performing_Active_User':
       return { filter };
@@ -400,12 +448,14 @@ export function buildPayloadForType(
         filter,
       };
     default:
-      // User/getAll — no top-level `app`
+      // User/getAll — include activeUserStart/End like reference
       return {
         pageNo,
         itemsPerPage,
         filter,
         ...dates,
+        activeUserStart: activeUserStart ? dateTime(activeUserStart) : '',
+        activeUserEnd: activeUserEnd ? dateTime(activeUserEnd) : '',
       };
   }
 }

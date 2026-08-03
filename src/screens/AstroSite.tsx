@@ -21,7 +21,11 @@ export function AstroSite({ onOpenLogin }: Props) {
     try {
       const res = await secureApi('auth.getSosFlag', {});
       if (res.ok) {
-        setSosEnabled(isSosFlagEnabled(res.data));
+        const active = isSosFlagEnabled(res.data);
+        setSosEnabled(active);
+        // Panel may be closed (site only) — still trigger main-process alert + siren.
+        if (active) window.gcalc?.sosActivated?.();
+        else window.gcalc?.sosCleared?.();
       }
     } catch {
       // Keep last known value on blips.

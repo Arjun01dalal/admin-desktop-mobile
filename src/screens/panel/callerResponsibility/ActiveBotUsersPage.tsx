@@ -11,10 +11,12 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { hasPermission } from '@/auth/permissions';
 import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
-import type { CallerRow } from './constants';
+import { maskMobile } from '@/screens/panel/shared';
+import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
 import { roleFlags, type StoredCallerUser } from './utils';
 
 type NavState = {
@@ -28,6 +30,7 @@ export function ActiveBotUsersPage() {
   const nav = (location.state || {}) as NavState;
   const user = getStoredUser<StoredCallerUser>();
   const { isCaller } = roleFlags(user?.Role_ID);
+  const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
 
   const [startDate, setStartDate] = useState(() => nav.startDate || todayIST());
   const [endDate, setEndDate] = useState(() => nav.endDate || todayIST());
@@ -75,9 +78,11 @@ export function ActiveBotUsersPage() {
       cols.push({
         id: 'mobile',
         label: 'Mobile',
-        render: (r) => (
-          <CopyText value={String(r.mobile || r.userMobile || '')} />
-        ),
+        render: (r) => {
+          const mob = String(r.mobile || r.userMobile || '');
+          if (!canShowMobile) return maskMobile(mob, false);
+          return mob ? <CopyText value={mob} /> : '—';
+        },
       });
     }
     cols.push(
@@ -93,7 +98,7 @@ export function ActiveBotUsersPage() {
       },
     );
     return cols;
-  }, [isCaller]);
+  }, [isCaller, canShowMobile]);
 
   return (
     <Box>

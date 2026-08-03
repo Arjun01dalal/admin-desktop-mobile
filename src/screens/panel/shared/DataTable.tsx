@@ -29,6 +29,12 @@ type Props<T> = {
   onRowClick?: (row: T) => void;
   rowClassName?: (row: T, index: number) => string | undefined;
   minWidth?: number | string;
+  /** Extra classes on the <table> (e.g. `table-fixed w-full`). */
+  tableClassName?: string;
+  /** Keep header (and filter row) pinned while scrolling. */
+  stickyHeader?: boolean;
+  /** Max height of the scroll area (enables vertical scroll + sticky header). */
+  maxHeight?: number | string;
 };
 
 /** Reusable Tailwind data table for panel list pages. */
@@ -41,20 +47,33 @@ export function DataTable<T>({
   onRowClick,
   rowClassName,
   minWidth = 900,
+  tableClassName,
+  stickyHeader = true,
+  maxHeight = 'calc(100vh - 280px)',
 }: Props<T>) {
   const hasFilters = columns.some((col) => col.filter);
 
   return (
-    <Card className="relative overflow-hidden">
-      <div className="relative w-full overflow-auto">
-        <Table style={{ minWidth }}>
+    <Card className="relative overflow-hidden border-border bg-card">
+      <div
+        className="relative w-full max-w-full overflow-auto"
+        style={{ maxHeight }}
+      >
+        <Table
+          className={cn(tableClassName)}
+          style={{
+            minWidth: minWidth === '100%' ? undefined : minWidth,
+            width: '100%',
+          }}
+        >
           <TableHeader>
-            <TableRow className="border-border bg-muted/50 hover:bg-muted/50">
+            <TableRow className="border-border hover:bg-transparent">
               {columns.map((col) => (
                 <TableHead
                   key={col.id}
                   className={cn(
-                    'whitespace-nowrap text-foreground',
+                    'whitespace-nowrap border-b border-border bg-muted text-foreground',
+                    stickyHeader && 'sticky top-0 z-30',
                     col.headClassName,
                   )}
                 >
@@ -63,9 +82,15 @@ export function DataTable<T>({
               ))}
             </TableRow>
             {hasFilters && (
-              <TableRow className="border-border bg-muted/20 hover:bg-muted/20">
+              <TableRow className="border-border hover:bg-transparent">
                 {columns.map((col) => (
-                  <TableHead key={`f-${col.id}`} className="py-2">
+                  <TableHead
+                    key={`f-${col.id}`}
+                    className={cn(
+                      'border-b border-border bg-card py-2',
+                      stickyHeader && 'sticky top-10 z-20',
+                    )}
+                  >
                     {col.filter ?? null}
                   </TableHead>
                 ))}
@@ -99,6 +124,7 @@ export function DataTable<T>({
                 <TableRow
                   key={getRowKey(row, index)}
                   className={cn(
+                    'bg-card',
                     onRowClick && 'cursor-pointer',
                     rowClassName?.(row, index),
                   )}
@@ -107,7 +133,7 @@ export function DataTable<T>({
                   {columns.map((col) => (
                     <TableCell
                       key={col.id}
-                      className={cn('whitespace-nowrap', col.className)}
+                      className={cn('whitespace-nowrap bg-card', col.className)}
                     >
                       {col.render(row, index)}
                     </TableCell>

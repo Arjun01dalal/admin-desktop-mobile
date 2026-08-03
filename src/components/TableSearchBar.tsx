@@ -16,7 +16,7 @@ export function TableSearchBar({
   onChange,
   onSearch,
   placeholder = 'Search',
-  width = 130,
+  width = '100%',
 }: Props) {
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') onSearch();
@@ -33,8 +33,10 @@ export function TableSearchBar({
         border: '1px solid #c5ccd6',
         borderRadius: 1,
         width,
-        minWidth: width,
+        maxWidth: '100%',
+        minWidth: 0,
         height: 34,
+        boxSizing: 'border-box',
         boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)',
       }}
     >

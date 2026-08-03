@@ -4,30 +4,43 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import { toast } from 'react-toastify';
-import { ImageOff, ToggleLeft, ToggleRight } from 'lucide-react';
-import { secureApi } from '@/api/secureClient';
-import { useRequestGeneration } from '@/hooks/useRequestGeneration';
-import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
-import { cn } from '@/lib/utils';
 import {
-  ReportPage,
-  DataTable,
-  PageSizeField,
-  SearchInput,
-  ApplyButton,
-  ReportPager,
-  display,
-  type DataColumn,
-} from '@/screens/panel/shared';
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  MenuItem,
+  Pagination,
+  Paper,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import HideImageOutlinedIcon from '@mui/icons-material/HideImageOutlined';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { toast } from 'react-toastify';
+import { secureApi } from '@/api/secureClient';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { useRequestGeneration } from '@/hooks/useRequestGeneration';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { display } from '@/screens/panel/shared';
 
 type CasinoGameRow = {
   _id: string;
   Name?: string;
   gameId?: string;
   Game_Code?: string;
+  tableId?: string;
   category?: string;
   Category_ID?: string;
   provider?: { id?: string; name?: string };
@@ -37,6 +50,67 @@ type CasinoGameRow = {
   status?: boolean;
   [key: string]: unknown;
 };
+
+type MiraiType = 'mirai casino' | 'mirai helix' | 'mirai catfish';
+
+const PROVIDER_OPTIONS = ['QTECH', 'WACS'] as const;
+type CasinoProvider = (typeof PROVIDER_OPTIONS)[number];
+
+const GAME_CATEGORIES = [
+  'Andar Bahar',
+  'Roulette',
+  'Dragon Tiger',
+  'Lucky Sevens',
+  'Poker',
+  'Teen Patti',
+  'BlackJack',
+] as const;
+
+const filterFieldSx = {
+  minWidth: 120,
+  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+};
+
+const headerFieldSx = {
+  minWidth: 180,
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+  '& .MuiInputLabel-root': { color: '#9aa3b5' },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+  letterSpacing: 0.4,
+  '&:hover': { bgcolor: '#e08c00' },
+};
+
+function ColumnSearch({
+  value,
+  onChange,
+  onSearch,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSearch: () => void;
+  placeholder: string;
+}) {
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSearch();
+      }}
+      sx={filterFieldSx}
+    />
+  );
+}
 
 function gameCode(row: CasinoGameRow): string {
   return display(row.gameId || row.Game_Code);
@@ -54,6 +128,10 @@ function imageUrl(row: CasinoGameRow): string | null {
   return row.images?.[0]?.url || row.images?.[1]?.url || row.Thumbnail || null;
 }
 
+function asProvider(value: unknown): CasinoProvider {
+  return value === 'WACS' ? 'WACS' : 'QTECH';
+}
+
 export function CasinoGamesPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_ITEMS_PER_PAGE);
@@ -61,6 +139,24 @@ export function CasinoGamesPage() {
   const [idSearch, setIdSearch] = useState('');
   const [appliedName, setAppliedName] = useState('');
   const [appliedId, setAppliedId] = useState('');
+  const [gameCategory, setGameCategory] = useState('');
+
+  const [activeProvider, setActiveProvider] = useState<CasinoProvider>('QTECH');
+  const pendingProvider = useRef<CasinoProvider>('QTECH');
+  const [providerConfirmOpen, setProviderConfirmOpen] = useState(false);
+  const [providerSaving, setProviderSaving] = useState(false);
+
+  const [miraiOpen, setMiraiOpen] = useState(false);
+  const [lobbySwitch, setLobbySwitch] = useState(false);
+  const [helixSwitch, setHelixSwitch] = useState(false);
+  const [catfishSwitch, setCatfishSwitch] = useState(false);
+
+  const [tableIdOpen, setTableIdOpen] = useState(false);
+  const [tableIdGameName, setTableIdGameName] = useState('');
+  const [tableIdGameId, setTableIdGameId] = useState('');
+  const [tableIdValue, setTableIdValue] = useState('');
+  const [tableIdError, setTableIdError] = useState('');
+  const [tableIdSaving, setTableIdSaving] = useState(false);
 
   const [rows, setRows] = useState<CasinoGameRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -69,16 +165,55 @@ export function CasinoGamesPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const { next, isCurrent, begin, end } = useRequestGeneration();
 
+  const loadConfig = useCallback(async () => {
+    const res = await secureApi<{ activeCasinoProvider?: string }>('ops.casinoGetConfig');
+    if (!res.ok) return;
+    const provider = asProvider(
+      (res.data as { activeCasinoProvider?: string } | undefined)?.activeCasinoProvider,
+    );
+    setActiveProvider(provider);
+  }, []);
+
+  const loadMiraiStatus = useCallback(async () => {
+    const res = await secureApi<Array<{ type?: string; status?: boolean }>>('ops.casinoMiraiGet', {});
+    if (!res.ok || !Array.isArray(res.data)) return;
+    for (const item of res.data) {
+      switch (item.type) {
+        case 'mirai casino':
+          setLobbySwitch(Boolean(item.status));
+          break;
+        case 'mirai helix':
+          setHelixSwitch(Boolean(item.status));
+          break;
+        case 'mirai catfish':
+          setCatfishSwitch(Boolean(item.status));
+          break;
+        default:
+          break;
+      }
+    }
+  }, []);
+
   const load = useCallback(
-    async (pageNo = page, nameOverride = appliedName, idOverride = appliedId) => {
+    async (
+      pageNo = page,
+      nameOverride = appliedName,
+      idOverride = appliedId,
+      categoryOverride = gameCategory,
+      providerOverride = activeProvider,
+    ) => {
       const gen = next();
       begin();
       setLoading(true);
       setError(null);
       try {
         const filters: Record<string, string> = {};
-        if (nameOverride) filters.Name = nameOverride;
-        if (idOverride) filters.gameId = idOverride;
+        const nameFilter = categoryOverride.trim() || nameOverride.trim();
+        if (nameFilter) filters.Name = nameFilter;
+        if (idOverride.trim()) {
+          if (providerOverride === 'QTECH') filters.gameId = idOverride.trim();
+          else filters.Game_Code = idOverride.trim();
+        }
 
         const res = await secureApi('ops.casinoGetData', {
           pageNo,
@@ -109,13 +244,29 @@ export function CasinoGamesPage() {
         if (isCurrent(gen)) setLoading(false);
       }
     },
-    [page, pageSize, appliedName, appliedId, next, begin, end, isCurrent],
+    [
+      page,
+      pageSize,
+      appliedName,
+      appliedId,
+      gameCategory,
+      activeProvider,
+      next,
+      begin,
+      end,
+      isCurrent,
+    ],
   );
+
+  useEffect(() => {
+    void loadConfig();
+    void loadMiraiStatus();
+  }, [loadConfig, loadMiraiStatus]);
 
   useEffect(() => {
     void load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize]);
+  }, [page, pageSize, activeProvider, gameCategory]);
 
   const deferredRows = useDeferredValue(rows);
 
@@ -123,139 +274,506 @@ export function CasinoGamesPage() {
     setAppliedName(nameSearch);
     setAppliedId(idSearch);
     setPage(1);
-    void load(1, nameSearch, idSearch);
-  }, [nameSearch, idSearch, load]);
+    void load(1, nameSearch, idSearch, gameCategory, activeProvider);
+  }, [nameSearch, idSearch, gameCategory, activeProvider, load]);
 
-  const toggleStatus = useCallback(
-    async (row: CasinoGameRow) => {
-      const nextStatus = !row.status;
-      setTogglingId(row._id);
-      try {
-        const res = await secureApi('ops.casinoEditGame', {
-          gameId: row.gameId ?? row._id,
-          _id: row._id,
-          status: nextStatus,
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to update game status');
-          return;
-        }
-        setRows((prev) =>
-          prev.map((item) => (item._id === row._id ? { ...item, status: nextStatus } : item)),
-        );
-        toast.success(nextStatus ? 'Game enabled' : 'Game disabled');
-      } finally {
-        setTogglingId(null);
+  const confirmProviderChange = useCallback(async () => {
+    setProviderSaving(true);
+    try {
+      const nextProvider = pendingProvider.current;
+      const res = await secureApi('ops.casinoSetActiveProvider', {
+        casinoActiveProvider: nextProvider,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update casino provider');
+        return;
       }
-    },
-    [],
-  );
+      setActiveProvider(nextProvider);
+      setProviderConfirmOpen(false);
+      setPage(1);
+      toast.success(`Active provider set to ${nextProvider}`);
+    } finally {
+      setProviderSaving(false);
+    }
+  }, []);
 
-  const columns = useMemo<DataColumn<CasinoGameRow>[]>(
-    () => [
+  const setMiraiStatus = useCallback(async (type: MiraiType, status: boolean) => {
+    const res = await secureApi('ops.casinoMiraiStatus', { type, status });
+    if (!res.ok) {
+      toast.error(res.message || 'Failed to update Mirai status');
+      void loadMiraiStatus();
+    }
+  }, [loadMiraiStatus]);
+
+  const openTableIdDialog = useCallback((row: CasinoGameRow) => {
+    setTableIdGameName(row.Name || '');
+    setTableIdGameId(row.gameId || '');
+    setTableIdValue(row.tableId || '');
+    setTableIdError('');
+    setTableIdOpen(true);
+  }, []);
+
+  const closeTableIdDialog = useCallback(() => {
+    setTableIdOpen(false);
+    setTableIdError('');
+    setTableIdValue('');
+    setTableIdGameName('');
+    setTableIdGameId('');
+  }, []);
+
+  const submitTableId = useCallback(async () => {
+    if (!tableIdValue.trim()) {
+      setTableIdError('Please Enter Table Id');
+      return;
+    }
+    if (!tableIdGameId) {
+      toast.error('Game ID missing');
+      return;
+    }
+    setTableIdSaving(true);
+    try {
+      const res = await secureApi('ops.casinoAddTableId', {
+        tableId: tableIdValue.trim(),
+        gameId: tableIdGameId,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to save table id');
+        return;
+      }
+      setRows((prev) =>
+        prev.map((item) =>
+          item.gameId === tableIdGameId
+            ? { ...item, tableId: tableIdValue.trim() }
+            : item,
+        ),
+      );
+      toast.success('Table Id uploaded successfully');
+      closeTableIdDialog();
+    } finally {
+      setTableIdSaving(false);
+    }
+  }, [tableIdValue, tableIdGameId, closeTableIdDialog]);
+
+  const toggleStatus = useCallback(async (row: CasinoGameRow) => {
+    const nextStatus = !row.status;
+    setTogglingId(row._id);
+    try {
+      const res = await secureApi('ops.casinoEditGame', {
+        gameId: row.gameId ?? row._id,
+        _id: row._id,
+        status: nextStatus,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update game status');
+        return;
+      }
+      setRows((prev) =>
+        prev.map((item) => (item._id === row._id ? { ...item, status: nextStatus } : item)),
+      );
+      toast.success(nextStatus ? 'Game enabled' : 'Game disabled');
+    } finally {
+      setTogglingId(null);
+    }
+  }, []);
+
+  const columns = useMemo<CommonTableColumn<CasinoGameRow>[]>(() => {
+    const cols: CommonTableColumn<CasinoGameRow>[] = [
       {
         id: 'index',
         label: '#',
+        width: 56,
         render: (_row, index) => (page - 1) * pageSize + index + 1,
       },
-      { id: 'id', label: 'ID', render: (row) => <span className="text-xs">{row._id}</span> },
+      {
+        id: 'id',
+        label: 'ID',
+        render: (row) => (
+          <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
+            {row._id || '—'}
+          </Typography>
+        ),
+      },
       {
         id: 'name',
         label: 'Game Name',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={nameSearch}
-            placeholder="Search game name"
             onChange={setNameSearch}
             onSearch={search}
+            placeholder="Search game name"
           />
         ),
-        render: (row) => <span className="font-medium">{display(row.Name)}</span>,
+        render: (row) => (
+          <Typography variant="body2" fontWeight={600}>
+            {display(row.Name)}
+          </Typography>
+        ),
       },
       {
         id: 'gameId',
-        label: 'Game ID / Code',
+        label: activeProvider === 'WACS' ? 'Game Code' : 'Game ID',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={idSearch}
-            placeholder="Search game id"
             onChange={setIdSearch}
             onSearch={search}
+            placeholder={activeProvider === 'WACS' ? 'Search game code' : 'Search game id'}
           />
         ),
         render: (row) => gameCode(row),
       },
-      { id: 'providerId', label: 'Provider ID', render: providerId },
-      { id: 'category', label: 'Category', render: category },
+    ];
+
+    if (activeProvider === 'QTECH') {
+      cols.push({
+        id: 'tableId',
+        label: 'Table ID',
+        width: 140,
+        render: (row) => (
+          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+            <Typography variant="body2">{display(row.tableId)}</Typography>
+            <Button
+              size="small"
+              onClick={() => openTableIdDialog(row)}
+              sx={{
+                minWidth: 28,
+                width: 28,
+                height: 28,
+                p: 0,
+                color: '#ff9f0a',
+              }}
+              aria-label="Add table id"
+            >
+              <AddIcon fontSize="small" />
+            </Button>
+          </Stack>
+        ),
+      });
+    }
+
+    cols.push(
+      {
+        id: 'providerId',
+        label: 'Provider ID',
+        render: (row) => providerId(row),
+      },
+      {
+        id: 'category',
+        label: 'Category',
+        render: (row) => category(row),
+      },
       {
         id: 'image',
         label: 'Image',
+        width: 100,
         render: (row) => {
           const src = imageUrl(row);
           return src ? (
-            <img src={src} alt={row.Name || 'game'} className="h-10 w-16 rounded object-cover" />
+            <Box
+              component="img"
+              src={src}
+              alt={row.Name || 'game'}
+              sx={{
+                height: 40,
+                width: 64,
+                objectFit: 'cover',
+                borderRadius: 1,
+                display: 'block',
+                mx: 'auto',
+              }}
+            />
           ) : (
-            <ImageOff className="h-5 w-5 text-muted-foreground" />
+            <HideImageOutlinedIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
           );
         },
       },
       {
         id: 'status',
         label: 'Status',
+        width: 120,
         render: (row) => (
-          <button
-            type="button"
-            disabled={togglingId === row._id}
-            onClick={() => void toggleStatus(row)}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50',
-              row.status
-                ? 'bg-emerald-500/15 text-emerald-500'
-                : 'bg-muted text-muted-foreground',
-            )}
-          >
-            {row.status ? (
-              <ToggleRight className="h-4 w-4" />
-            ) : (
-              <ToggleLeft className="h-4 w-4" />
-            )}
-            {row.status ? 'Active' : 'Inactive'}
-          </button>
+          <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center">
+            <Switch
+              size="small"
+              checked={Boolean(row.status)}
+              disabled={togglingId === row._id}
+              onChange={() => void toggleStatus(row)}
+              color="warning"
+            />
+            <Chip
+              size="small"
+              label={row.status ? 'Active' : 'Inactive'}
+              color={row.status ? 'success' : 'default'}
+              sx={{ fontWeight: 600, fontSize: 11 }}
+            />
+          </Stack>
         ),
       },
-    ],
-    [page, pageSize, nameSearch, idSearch, search, togglingId, toggleStatus],
-  );
+    );
+
+    return cols;
+  }, [
+    page,
+    pageSize,
+    nameSearch,
+    idSearch,
+    search,
+    togglingId,
+    toggleStatus,
+    activeProvider,
+    openTableIdDialog,
+  ]);
 
   return (
-    <ReportPage
-      title="Casino Games"
-      loading={loading}
-      error={error}
-      onRefresh={() => void load(page)}
-      toolbar={
-        <>
-          <PageSizeField
-            value={pageSize}
-            onChange={(v) => {
-              setPageSize(v);
+    <Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap={1.5}
+        mb={2}
+      >
+        <Typography variant="h5" fontWeight={700}>
+          Casino Games
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={
+            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+          }
+          onClick={() => void load(page)}
+          disabled={loading}
+          sx={{
+            borderColor: 'rgba(255,255,255,0.28)',
+            color: '#e8e8ea',
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: '#ff9f0a',
+              bgcolor: 'rgba(255,159,10,0.08)',
+            },
+          }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
+          <TextField
+            select
+            label="Active Casino Provider"
+            size="small"
+            value={activeProvider}
+            onChange={(e) => {
+              const nextProvider = asProvider(e.target.value);
+              if (nextProvider === activeProvider) return;
+              pendingProvider.current = nextProvider;
+              setProviderConfirmOpen(true);
+            }}
+            sx={headerFieldSx}
+          >
+            {PROVIDER_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={() => {
+              void loadMiraiStatus();
+              setMiraiOpen(true);
+            }}
+            sx={{ ...orangeBtnSx, height: 40, px: 2.5, flexShrink: 0 }}
+          >
+            Mirai Games
+          </Button>
+          <TextField
+            select
+            label="Items Per Page"
+            size="small"
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
               setPage(1);
             }}
-          />
-          <ApplyButton onClick={search} loading={loading} label="Search" />
-        </>
-      }
-    >
-      <DataTable
+            sx={{ ...headerFieldSx, minWidth: 140 }}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Game Category"
+            size="small"
+            value={gameCategory}
+            onChange={(e) => {
+              setGameCategory(e.target.value);
+              setPage(1);
+            }}
+            sx={{ ...headerFieldSx, minWidth: 200 }}
+            SelectProps={{ displayEmpty: true }}
+            InputLabelProps={{ shrink: true }}
+          >
+            <MenuItem value="">
+              <em>All</em>
+            </MenuItem>
+            {GAME_CATEGORIES.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+      </Paper>
+
+      <CommonTable
         columns={columns}
         rows={deferredRows}
         getRowKey={(row, i) => row._id || i}
         loading={loading}
         emptyMessage="No casino games found"
+        stickyHeader
+        dense
         minWidth={1100}
+        maxHeight="calc(100vh - 360px)"
       />
 
-      <ReportPager page={page} totalPages={totalPages} onChange={setPage} disabled={loading} />
-    </ReportPage>
+      <Stack alignItems="center" mt={2}>
+        <Pagination
+          count={Math.max(1, totalPages)}
+          page={page}
+          onChange={(_e, p) => setPage(p)}
+          color="primary"
+          disabled={loading}
+        />
+      </Stack>
+
+      <Dialog open={providerConfirmOpen} onClose={() => setProviderConfirmOpen(false)}>
+        <DialogTitle>Are You Sure?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Change active casino provider to <strong>{pendingProvider.current}</strong>?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setProviderConfirmOpen(false)} disabled={providerSaving}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void confirmProviderChange()}
+            disabled={providerSaving}
+            sx={orangeBtnSx}
+          >
+            {providerSaving ? <CircularProgress size={18} color="inherit" /> : 'Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={miraiOpen} onClose={() => setMiraiOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Mirai Games</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} pt={1}>
+            <FormControlLabel
+              control={
+                <Switch
+                  color="warning"
+                  checked={lobbySwitch}
+                  onChange={(e) => {
+                    const nextStatus = e.target.checked;
+                    setLobbySwitch(nextStatus);
+                    void setMiraiStatus('mirai casino', nextStatus);
+                  }}
+                />
+              }
+              label="Lobby"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  color="warning"
+                  checked={helixSwitch}
+                  onChange={(e) => {
+                    const nextStatus = e.target.checked;
+                    setHelixSwitch(nextStatus);
+                    void setMiraiStatus('mirai helix', nextStatus);
+                  }}
+                />
+              }
+              label="Helix"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  color="warning"
+                  checked={catfishSwitch}
+                  onChange={(e) => {
+                    const nextStatus = e.target.checked;
+                    setCatfishSwitch(nextStatus);
+                    void setMiraiStatus('mirai catfish', nextStatus);
+                  }}
+                />
+              }
+              label="Catfish"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMiraiOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={tableIdOpen} onClose={closeTableIdDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Add Table ID</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} pt={1}>
+            <TextField
+              size="small"
+              fullWidth
+              label="Game Name"
+              value={tableIdGameName}
+              disabled
+            />
+            <TextField
+              size="small"
+              fullWidth
+              label="Enter Table Id"
+              value={tableIdValue}
+              error={Boolean(tableIdError)}
+              helperText={tableIdError || ' '}
+              onChange={(e) => {
+                setTableIdError('');
+                setTableIdValue(e.target.value);
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeTableIdDialog} disabled={tableIdSaving}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void submitTableId()}
+            disabled={tableIdSaving}
+            sx={orangeBtnSx}
+          >
+            {tableIdSaving ? <CircularProgress size={18} color="inherit" /> : 'Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

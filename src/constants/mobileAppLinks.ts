@@ -19,7 +19,7 @@ export type MobileAppDef = {
  * Registration + deposit URLs use AS{code} (e.g. AS01, AS08).
  */
 export const MOBILE_APP_DETAILS: MobileAppDef[] = [
-  { name: 'Third Eye Astro', depositKey: 'osGames', clientName: 'OS' },
+  { name: 'Astro Admin', depositKey: 'osGames', clientName: 'OS' },
   { name: 'SM Games', depositKey: 'smGames', clientName: 'SM' },
   { name: 'SG Games', depositKey: 'sgGames_new', clientName: 'SG' },
   { name: 'PS Games', depositKey: 'psGames', clientName: 'PS' },

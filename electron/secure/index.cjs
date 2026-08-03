@@ -8,7 +8,7 @@ const { createPinnedAgent } = require('../certPin.cjs');
 
 // Single shared agent so pinned connections can be keep-alive pooled.
 const pinnedAgent = createPinnedAgent();
-const { encrypt, unwrap } = require('./crypto.cjs');
+const { encrypt, decrypt } = require('./crypto.cjs');
 const {
   sanitizeBridgePayload,
   sanitizeToken,
@@ -31,7 +31,7 @@ const CDN_BASE = process.env.MOBILE_CDN_BASE || 'https://d2opi4jisa0j0o.cloudfro
 
 /** Same order/codes as src/constants/clientNames.ts (AS + code for registration URLs). */
 const APP_DETAILS = [
-  { name: 'Third Eye Astro', key: 'osGames', code: '01' },
+  { name: 'Astro Admin', key: 'osGames', code: '01' },
   { name: 'SM Games', key: 'smGames', code: '02' },
   { name: 'SG Games', key: 'sgGames_new', code: '03' },
   { name: 'PS Games', key: 'psGames', code: '04' },
@@ -270,6 +270,29 @@ async function processCallSummary(payload = {}) {
   }
 }
 
+async function listIncomingBotCalls(payload = {}) {
+  const since = String(payload.since || '').slice(0, 64);
+  if (!since) {
+    return { ok: false, message: 'since date is required' };
+  }
+  try {
+    const response = await axios.get('https://helper.callingbot.live/incoming-calls', {
+      params: { since },
+      timeout: 60000,
+    });
+    const data = response?.data || {};
+    return { ok: true, data, message: data.message };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to load incoming calls',
+    };
+  }
+}
+
 async function uploadDiallerData(payload = {}, token = null) {
   const { fileBase64, fileName, dateOfData, uploadedBy } = payload;
   if (!fileBase64 || !fileName) {
@@ -367,6 +390,12 @@ async function execute(action, payload = {}, token = null) {
     if (action === 'callLogs.processCall') {
       return processCallSummary(safePayload);
     }
+    if (action === 'incomingBot.processCall') {
+      return processCallSummary(safePayload);
+    }
+    if (action === 'incomingBot.list') {
+      return listIncomingBotCalls(safePayload);
+    }
     if (action === 'caller.uploadDiallerData') {
       return uploadDiallerData(safePayload, safeToken);
     }
@@ -374,10 +403,30 @@ async function execute(action, payload = {}, token = null) {
   }
 
   try {
-    const body = def.encryptRequest ? { token: encrypt(safePayload) } : safePayload;
+    // Optional meta: `_clientName` → HTTP `client-name` header (KYC bank/UPI calls).
+    // Stripped from the encrypted/plain body so it never hits the API payload.
+    let requestPayload = safePayload;
+    let clientNameHeader = '';
+    if (
+      safePayload &&
+      typeof safePayload === 'object' &&
+      !Array.isArray(safePayload) &&
+      safePayload._clientName != null
+    ) {
+      const { _clientName, ...rest } = safePayload;
+      requestPayload = rest;
+      clientNameHeader = String(_clientName || '')
+        .trim()
+        .toUpperCase();
+    }
+
+    const body = def.encryptRequest
+      ? { token: encrypt(requestPayload) }
+      : requestPayload;
     const headers = {
       'Content-Type': 'application/json',
       ...(safeToken ? { Authorization: `Bearer ${safeToken}` } : {}),
+      ...(clientNameHeader ? { 'client-name': clientNameHeader } : {}),
     };
 
     const response = await client().request({
@@ -385,16 +434,21 @@ async function execute(action, payload = {}, token = null) {
       url: def.path,
       data: body,
       headers,
+      // Per-action override for heavy reports (e.g. Funds payin MID dump).
+      timeout: Number(def.timeout) > 0 ? Number(def.timeout) : 60000,
     });
 
     let data = response.data;
 
     if (def.decryptResponse && data?.data != null) {
       try {
-        data = {
-          ...data,
-          data: unwrap(data.data),
-        };
+        if (typeof data.data === 'string') {
+          // Match laxminarayan decryptData — keep full envelope ({ payload: ... }).
+          const decrypted = decrypt(data.data);
+          data = { ...data, data: decrypted };
+        } else if (!def.keepDataEnvelope && data.data?.payload !== undefined) {
+          data = { ...data, data: data.data.payload };
+        }
       } catch (err) {
         if (typeof data.data === 'string') {
           return {
@@ -406,8 +460,10 @@ async function execute(action, payload = {}, token = null) {
       }
     }
 
-    // Normalize payload for renderer — never return full raw response envelope.
-    const payloadOut = data?.data?.payload ?? data?.data ?? data?.payload ?? data;
+    // keepDataEnvelope: return response.data.data as-is (old AAA Exchange reads .payload next).
+    const payloadOut = def.keepDataEnvelope
+      ? (data?.data ?? data)
+      : (data?.data?.payload ?? data?.data ?? data?.payload ?? data);
 
     return {
       ok: true,
@@ -428,11 +484,19 @@ async function execute(action, payload = {}, token = null) {
       const err = error.response.data.error;
       apiMessage = typeof err === 'string' ? err : JSON.stringify(err);
     }
+    const code = error?.code || error?.cause?.code;
+    const timedOut =
+      code === 'ETIMEDOUT' ||
+      code === 'ECONNABORTED' ||
+      /timeout|etimedout|econnaborted/i.test(String(error?.message || ''));
+
     return {
       ok: false,
       message:
         apiMessage ||
-        error?.message ||
+        (timedOut
+          ? 'Request timed out. Try again or use a shorter date range.'
+          : error?.message) ||
         'Secure API request failed',
       status: error?.response?.status,
     };

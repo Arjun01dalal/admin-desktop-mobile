@@ -449,13 +449,14 @@ export function CallerResponsibilityPage() {
       </Typography>
 
       {!isCaller && (
-        <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', width: '100%', maxWidth: '100%', minWidth: 0 }}>
           <Stack
-            direction={{ xs: 'column', md: 'row' }}
+            direction="row"
             spacing={1.5}
-            alignItems={{ xs: 'stretch', md: 'center' }}
+            alignItems="center"
             flexWrap="wrap"
             useFlexGap
+            sx={{ minWidth: 0, maxWidth: '100%' }}
           >
             <TextField
               type="date"
@@ -464,7 +465,7 @@ export function CallerResponsibilityPage() {
               InputLabelProps={{ shrink: true }}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
+              sx={{ width: 170, flexShrink: 0 }}
             />
             <TextField
               type="date"
@@ -473,7 +474,7 @@ export function CallerResponsibilityPage() {
               InputLabelProps={{ shrink: true }}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
+              sx={{ width: 170, flexShrink: 0 }}
             />
             {showCallerHead && (
               <TextField
@@ -482,7 +483,7 @@ export function CallerResponsibilityPage() {
                 size="small"
                 value={callerHead}
                 onChange={(e) => setCallerHead(e.target.value)}
-                sx={{ minWidth: { xs: '100%', md: 180 }, flex: { md: 1 } }}
+                sx={{ width: 200, flexShrink: 0 }}
               >
                 <MenuItem value="">
                   <em>Select</em>
@@ -501,7 +502,7 @@ export function CallerResponsibilityPage() {
                 size="small"
                 value={office}
                 onChange={(e) => setOffice(e.target.value)}
-                sx={{ minWidth: { xs: '100%', md: 160 }, flex: { md: 1 } }}
+                sx={{ width: 180, flexShrink: 0 }}
               >
                 <MenuItem value="">
                   <em>Select</em>
@@ -547,7 +548,7 @@ export function CallerResponsibilityPage() {
       )}
 
       {showTotalDeposit && (
-        <Box mb={3}>
+        <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
           <Typography variant="h6" fontWeight={700} mb={1}>
             Summary
           </Typography>
@@ -557,13 +558,12 @@ export function CallerResponsibilityPage() {
             getRowKey={() => 'summary'}
             loading={loading}
             emptyMessage="No summary"
-            minWidth={900}
           />
         </Box>
       )}
 
       {showTotalDeposit && showLocation && (
-        <Box mb={3}>
+        <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
           <Typography variant="h6" fontWeight={700} mb={1}>
             By Office Location
           </Typography>
@@ -573,12 +573,11 @@ export function CallerResponsibilityPage() {
             getRowKey={(r, i) => String(r.officeLocation || i)}
             loading={loading}
             emptyMessage="No office data"
-            minWidth={1000}
           />
         </Box>
       )}
 
-      <Box mb={2}>
+      <Box mb={2} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <Typography variant="h6" fontWeight={700} mb={1}>
           Caller Data
         </Typography>
@@ -588,7 +587,9 @@ export function CallerResponsibilityPage() {
           getRowKey={(r, i) => String(r.empCode || r._id || i)}
           loading={loading}
           emptyMessage="No caller data"
-          minWidth={1600}
+          stickyHeader
+          dense
+          maxHeight="calc(100vh - 360px)"
           hover
           onRowClick={(r) =>
             navigate('/caller-responsibility/details', {

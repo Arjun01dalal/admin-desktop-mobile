@@ -1,23 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  MenuItem,
+  Pagination,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
-import { formatDisplayDate, formatDisplayTime, formatAmount } from '@/utils/dates';
-import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
-import { appCodeForName } from '@/constants/clientNames';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
+import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import {
-  ReportPage,
-  DataTable,
-  type DataColumn,
-  DateField,
-  PageSizeField,
-  SelectField,
-  SearchInput,
-  ApplyButton,
-  ReportPager,
   useReportQuery,
   display,
   maskMobile,
-  CLIENT_NAME_OPTIONS,
 } from './shared';
 
 type TodaysActiveRow = {
@@ -66,6 +69,86 @@ const PLAY_IN_OPTIONS = [
   { value: 'C', label: 'C' },
   { value: 'S', label: 'S' },
 ];
+
+const filterFieldSx = {
+  minWidth: 120,
+  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+};
+
+const headerFieldSx = {
+  width: 180,
+  flexShrink: 0,
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+  '& .MuiInputLabel-root': { color: '#9aa3b5' },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+  letterSpacing: 0.4,
+  '&:hover': { bgcolor: '#e08c00' },
+};
+
+function ColumnSearch({
+  value,
+  onChange,
+  onSearch,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSearch: () => void;
+  placeholder: string;
+}) {
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSearch();
+      }}
+      sx={filterFieldSx}
+    />
+  );
+}
+
+function ColumnSelect({
+  value,
+  onChange,
+  options,
+  placeholder = 'All',
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  placeholder?: string;
+}) {
+  return (
+    <TextField
+      select
+      size="small"
+      fullWidth
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      SelectProps={{ displayEmpty: true }}
+      sx={filterFieldSx}
+    >
+      <MenuItem value="">
+        <em>{placeholder}</em>
+      </MenuItem>
+      {options.map((opt) => (
+        <MenuItem key={opt.value} value={opt.value}>
+          {opt.label}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+}
 
 /** Todays Active users — ops.activeCustomers. */
 export function TodaysActivePage() {
@@ -156,18 +239,19 @@ export function TodaysActivePage() {
     [],
   );
 
-  const columns = useMemo<DataColumn<TodaysActiveRow>[]>(() => {
-    const cols: DataColumn<TodaysActiveRow>[] = [
+  const columns = useMemo(() => {
+    const cols: CommonTableColumn<TodaysActiveRow>[] = [
       {
         id: 'index',
         label: '#',
+        width: 56,
         render: (_row, index) => (page - 1) * itemsPerPage + index + 1,
       },
       {
         id: 'name',
         label: 'Name',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.name}
             onChange={setDraftField('name')}
             onSearch={search}
@@ -180,7 +264,7 @@ export function TodaysActivePage() {
         id: 'dpId',
         label: 'Dp Id',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.dpId}
             onChange={setDraftField('dpId')}
             onSearch={search}
@@ -196,7 +280,7 @@ export function TodaysActivePage() {
         id: 'mobile',
         label: 'Mobile',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.mobile}
             onChange={setDraftField('mobile')}
             onSearch={search}
@@ -212,14 +296,16 @@ export function TodaysActivePage() {
         id: 'appName',
         label: 'App Code',
         filter: (
-          <SelectField
+          <ColumnSelect
             value={clientName}
             onChange={(value) => {
               setClientName(value);
               setPage(1);
             }}
-            options={CLIENT_NAME_OPTIONS}
-            placeholder="All"
+            options={CLIENT_NAMES.map((name) => ({
+              value: name,
+              label: appCodeForName(name),
+            }))}
           />
         ),
         render: (row) => appCodeForName(row.clientName),
@@ -228,14 +314,13 @@ export function TodaysActivePage() {
         id: 'playIn',
         label: 'In',
         filter: (
-          <SelectField
+          <ColumnSelect
             value={playedIn}
             onChange={(value) => {
               setPlayedIn(value);
               setPage(1);
             }}
             options={PLAY_IN_OPTIONS}
-            placeholder="All"
           />
         ),
         render: (row) => display(row.played),
@@ -244,7 +329,7 @@ export function TodaysActivePage() {
         id: 'account',
         label: 'Account',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.accountNumber}
             onChange={setDraftField('accountNumber')}
             onSearch={search}
@@ -257,7 +342,7 @@ export function TodaysActivePage() {
         id: 'aadhar',
         label: 'Aadhar',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.aadhaarNumber}
             onChange={setDraftField('aadhaarNumber')}
             onSearch={search}
@@ -273,7 +358,7 @@ export function TodaysActivePage() {
         id: 'email',
         label: 'Email',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.email}
             onChange={setDraftField('email')}
             onSearch={search}
@@ -289,7 +374,7 @@ export function TodaysActivePage() {
         id: 'city',
         label: 'City',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.city}
             onChange={setDraftField('city')}
             onSearch={search}
@@ -302,7 +387,7 @@ export function TodaysActivePage() {
         id: 'state',
         label: 'State',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draft.state}
             onChange={setDraftField('state')}
             onSearch={search}
@@ -312,7 +397,7 @@ export function TodaysActivePage() {
         render: (row) => display(row.state),
       },
       { id: 'device', label: 'Device', render: (row) => display(row.deviceType) },
-      { id: 'balance', label: 'Balance', render: (row) => formatAmount(row.balance ?? 0) },
+      { id: 'balance', label: 'Balance', render: (row) => Math.floor(Number(row.balance) || 0) },
       {
         id: 'playerAppVersion',
         label: 'User App Version',
@@ -331,8 +416,16 @@ export function TodaysActivePage() {
             ? `${formatDisplayDate(row.activeUser)} | ${formatDisplayTime(row.activeUser)}`
             : '—',
       },
-      { id: 'date', label: 'Date', render: (row) => (row.createdOn ? formatDisplayDate(row.createdOn) : '—') },
-      { id: 'time', label: 'Time', render: (row) => (row.createdOn ? formatDisplayTime(row.createdOn) : '—') },
+      {
+        id: 'date',
+        label: 'Date',
+        render: (row) => (row.createdOn ? formatDisplayDate(row.createdOn) : '—'),
+      },
+      {
+        id: 'time',
+        label: 'Time',
+        render: (row) => (row.createdOn ? formatDisplayTime(row.createdOn) : '—'),
+      },
     );
 
     return cols;
@@ -350,41 +443,120 @@ export function TodaysActivePage() {
   ]);
 
   return (
-    <ReportPage
-      title="Todays Active"
-      onRefresh={() => void load()}
-      loading={loading}
-      error={error}
-      toolbar={
-        <>
-          <DateField label="From Date" value={startDate} onChange={setStartDate} />
-          <DateField label="To Date" value={endDate} onChange={setEndDate} />
-          <PageSizeField
-            value={itemsPerPage}
-            onChange={(value) => {
-              setItemsPerPage(value);
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, p: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5" fontWeight={700}>
+          Todays Active
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+          onClick={() => void load()}
+          disabled={loading}
+          sx={{
+            borderColor: 'rgba(255,255,255,0.2)',
+            color: '#e8e8ea',
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: '#ff9f0a',
+              bgcolor: 'rgba(255,159,10,0.08)',
+            },
+          }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflowX: 'auto' }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          alignItems="center"
+          flexWrap="nowrap"
+          useFlexGap
+          sx={{ minWidth: 'max-content' }}
+        >
+          <TextField
+            type="date"
+            label="From Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={headerFieldSx}
+          />
+          <TextField
+            type="date"
+            label="To Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            sx={headerFieldSx}
+          />
+          <TextField
+            select
+            label="Items Per Page"
+            size="small"
+            value={String(itemsPerPage)}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
               setPage(1);
             }}
-          />
-          <ApplyButton onClick={applyDates} loading={loading} />
-        </>
-      }
-    >
-      <DataTable
+            sx={{ ...headerFieldSx, width: 140 }}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={applyDates}
+            disabled={loading}
+            sx={{ ...orangeBtnSx, height: 40, px: 2.5, flexShrink: 0 }}
+          >
+            {loading ? <CircularProgress size={18} color="inherit" /> : 'Apply'}
+          </Button>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color="text.secondary"
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Total: {total}
+          </Typography>
+        </Stack>
+      </Paper>
+
+      <CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row, index) => row._id || index}
         loading={loading}
         emptyMessage="No active users found"
+        stickyHeader
+        dense
         minWidth={1800}
+        maxHeight="calc(100vh - 360px)"
       />
-      <ReportPager
-        page={page}
-        totalPages={totalPages}
-        onChange={setPage}
-        disabled={loading}
-        total={total}
-      />
-    </ReportPage>
+
+      <Stack alignItems="center" mt={2}>
+        <Pagination
+          count={Math.max(1, totalPages)}
+          page={page}
+          onChange={(_e, p) => setPage(p)}
+          color="primary"
+          disabled={loading}
+        />
+      </Stack>
+    </Box>
   );
 }

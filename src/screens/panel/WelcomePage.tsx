@@ -47,7 +47,7 @@ export function WelcomePage({ user }: Props) {
             textTransform: 'uppercase',
           }}
         >
-          third eye astro
+          astro admin
         </Typography>
         <Box
           sx={{

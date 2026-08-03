@@ -131,20 +131,20 @@ export function LoginReportPage() {
   const roleOptions = Object.keys(grouped);
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={2}>
         Login Report
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', width: '100%' }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             select
             label="Select Role"
             size="small"
             value={selectedRoleId}
             onChange={(e) => setSelectedRoleId(e.target.value)}
-            sx={{ minWidth: 240 }}
+            sx={{ minWidth: 240, flexShrink: 0 }}
             disabled={loading || roleOptions.length === 0}
           >
             {roleOptions.map((roleId) => (
@@ -163,7 +163,9 @@ export function LoginReportPage() {
         getRowKey={(row, index) => row._id || index}
         loading={loading}
         emptyMessage="No login records found"
-        minWidth={1000}
+        stickyHeader
+        dense
+        maxHeight="calc(100vh - 280px)"
       />
     </Box>
   );

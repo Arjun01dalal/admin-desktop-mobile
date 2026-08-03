@@ -98,6 +98,10 @@ export type GCalcApi = {
     at?: number;
   } | null>;
   installUpdate: () => void;
+  /** Immediate local SOS alert (main process). */
+  sosActivated: () => void;
+  /** Clear local SOS alert (main process). */
+  sosCleared: () => void;
 };
 
 declare global {

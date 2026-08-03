@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, session, protocol, net, shell, screen, clipboard, dialog } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, session, protocol, net, shell, screen, clipboard, dialog, Tray, Menu, nativeImage, Notification } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -6,6 +6,8 @@ const { autoUpdater } = require('electron-updater');
 const { useViteDevServer, getGhUpdateToken } = require('./config.cjs');
 const auth = require('./auth.cjs');
 const secureApi = require('./secure/index.cjs');
+const { startSosMonitor } = require('./sosMonitor.cjs');
+const { startPushClient } = require('./pushService.cjs');
 
 // Optional: improves Chromium network geolocation on some platforms.
 if (process.env.GOOGLE_API_KEY) {
@@ -39,6 +41,118 @@ const DIST_DIR = path.join(__dirname, '..', 'dist');
 
 let win = null;
 let siteView = null;
+let tray = null;
+/** When true, window close actually quits (tray Quit / before-quit). */
+let isQuitting = false;
+let trayHintShown = false;
+/** Last Bearer token seen from the renderer — needed for SOS polling (API requires auth). */
+let cachedAuthToken = null;
+/** @type {{ stop?: () => void, refresh?: () => void, forceActive?: () => void, forceClear?: () => void } | null} */
+let sosMonitor = null;
+/** @type {{ stop?: () => void, publishSos?: () => Promise<boolean>, publishClear?: () => Promise<boolean> } | null} */
+let pushClient = null;
+
+function tokenStorePath() {
+  return path.join(app.getPath('userData'), 'sos-session.token');
+}
+
+function loadPersistedToken() {
+  try {
+    const p = tokenStorePath();
+    if (!fs.existsSync(p)) return null;
+    const value = fs.readFileSync(p, 'utf8').trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+function persistToken(token) {
+  try {
+    if (!token) {
+      fs.rmSync(tokenStorePath(), { force: true });
+      return;
+    }
+    fs.writeFileSync(tokenStorePath(), token, 'utf8');
+  } catch (err) {
+    console.warn('[sos] could not persist token:', err?.message || err);
+  }
+}
+
+function iconPath() {
+  return path.join(__dirname, '..', 'build', 'icon.png');
+}
+
+function showMainWindow() {
+  if (!win || win.isDestroyed()) {
+    createWindow();
+  }
+  if (!win || win.isDestroyed()) return;
+  try {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    if (typeof win.moveTop === 'function') win.moveTop();
+  } catch {
+    // ignore
+  }
+}
+
+function hideMainWindowToTray() {
+  if (!win || win.isDestroyed()) return;
+  win.hide();
+
+  if (!trayHintShown && Notification.isSupported()) {
+    trayHintShown = true;
+    try {
+      const n = new Notification({
+        title: 'Astro CS Panel',
+        body: 'Still running in the background for SOS alerts. Use the tray icon → Quit to stop.',
+        silent: true,
+      });
+      n.show();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function createTray() {
+  if (tray) return;
+
+  let image = nativeImage.createFromPath(iconPath());
+  if (image.isEmpty()) {
+    console.warn('[tray] icon missing — tray may be blank');
+  } else {
+    // Tray icons are tiny; full-size PNG looks wrong / can fail on some OS.
+    image = image.resize({ width: 24, height: 24 });
+  }
+
+  tray = new Tray(image);
+  tray.setToolTip('Astro CS Panel — SOS monitoring active');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'Open Astro CS Panel',
+        click: () => showMainWindow(),
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit (stop SOS alerts)',
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+
+  tray.on('double-click', () => showMainWindow());
+  // Windows: single click opens
+  if (process.platform === 'win32') {
+    tray.on('click', () => showMainWindow());
+  }
+}
 
 function registerAppProtocol() {
   protocol.handle('app', (request) => {
@@ -77,7 +191,7 @@ function createWindow() {
     resizable: false,
     maximizable: false,
     title: 'Astro CS Panel',
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    icon: iconPath(),
     backgroundColor: '#1c1c1e',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -95,6 +209,14 @@ function createWindow() {
 
   win.on('resize', () => {
     layoutSiteView();
+  });
+
+  // Close (X) hides to tray — SOS keeps monitoring. Use tray → Quit to exit.
+  win.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      hideMainWindowToTray();
+    }
   });
 
   win.on('closed', () => {
@@ -547,6 +669,12 @@ function registerIpc() {
     if (!action || typeof action !== 'string') {
       return { ok: false, message: 'Invalid action' };
     }
+    if (typeof token === 'string' && token.trim()) {
+      cachedAuthToken = token.trim();
+      persistToken(cachedAuthToken);
+      // First token of the session — start polling SOS immediately.
+      sosMonitor?.refresh?.();
+    }
     return secureApi.execute(action, payload || {}, token || null);
   });
 
@@ -555,35 +683,92 @@ function registerIpc() {
   });
 
   ipcMain.handle('update:get-status', async () => lastUpdateEvent);
+
+  // Broadcast SOS to other devices via push topic (ntfy).
+  ipcMain.on('sos:activated', () => {
+    void pushClient?.publishSos?.();
+  });
+  ipcMain.on('sos:cleared', () => {
+    void pushClient?.publishClear?.();
+  });
 }
 
 function setDockIcon() {
   // macOS ignores the BrowserWindow `icon` option; in dev the generic
   // Electron binary supplies the dock icon, so set it explicitly.
   if (process.platform !== 'darwin' || !app.dock) return;
-  const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
   try {
-    if (fs.existsSync(iconPath)) app.dock.setIcon(iconPath);
+    if (fs.existsSync(iconPath())) app.dock.setIcon(iconPath());
   } catch (err) {
     console.warn('Could not set dock icon:', err.message);
   }
 }
 
 app.whenReady().then(() => {
+  // Required on Windows so sticky SOS toasts are attributed to this app.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.yourcompany.astro');
+  }
+
+  // Keep SOS alive after reboot / when user "closes" the window (tray mode).
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: true,
+    });
+  } catch (err) {
+    console.warn('setLoginItemSettings failed:', err?.message || err);
+  }
+
   registerAppProtocol();
   setDockIcon();
   enableGeolocationPermissions();
+  createTray();
   createWindow();
+
+  // Launched at login / as hidden — stay in tray for SOS only.
+  const loginSettings =
+    typeof app.getLoginItemSettings === 'function'
+      ? app.getLoginItemSettings()
+      : {};
+  const startHidden =
+    Boolean(loginSettings.wasOpenedAsHidden) ||
+    process.argv.includes('--hidden') ||
+    process.argv.includes('--as-hidden');
+  if (startHidden && win && !win.isDestroyed()) {
+    win.hide();
+  }
+
   registerIpc();
   setupAutoUpdate();
+
+  // Resume SOS polling with last login token (works while window is hidden).
+  cachedAuthToken = loadPersistedToken();
+
+  sosMonitor = startSosMonitor({
+    getMainWindow: () => win,
+    getToken: () => cachedAuthToken,
+  });
+
+  // Cross-device SOS push (ntfy). Requires SOS_PUSH_TOPIC in .env.
+  pushClient = startPushClient({
+    onSosActivated: () => sosMonitor?.forceActive?.(),
+    onSosCleared: () => sosMonitor?.forceClear?.(),
+  });
+
   // Warn early (non-blocking) if the API's live cert no longer matches our pins.
   require('./certPin.cjs').startupPinHealthCheck();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    showMainWindow();
   });
 });
 
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
+// Never quit when the last window is hidden — tray keeps SOS monitoring.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  // no-op
 });

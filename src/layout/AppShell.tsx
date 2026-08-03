@@ -15,7 +15,15 @@ import {
   DialogContent,
   DialogActions,
   Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
+  InputAdornment,
+  TextField,
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { toast } from 'react-toastify';
@@ -27,6 +35,7 @@ import { secureApi } from '@/api/secureClient';
 import {
   canAccessNavItem,
   canShowSos,
+  canShowSosTypeLocation,
   getResponsibilities,
   getRoleId,
   getSessionUser,
@@ -38,6 +47,12 @@ import { useSosFlagGuard } from '@/hooks/useSosFlagGuard';
 
 const DRAWER_WIDTH = 240;
 
+const SOS_TYPES = ['Individual', 'Office', 'All'] as const;
+const SOS_LOCATIONS = ['Dubai', 'Dubai / Nagpur', 'Nagpur'] as const;
+
+type SosType = (typeof SOS_TYPES)[number];
+type SosLocation = (typeof SOS_LOCATIONS)[number];
+
 type Props = {
   onLogout: () => void;
 };
@@ -47,19 +62,55 @@ export function AppShell({ onLogout }: Props) {
   const location = useLocation();
   const [sosOpen, setSosOpen] = useState(false);
   const [sosLoading, setSosLoading] = useState(false);
+  const [sosType, setSosType] = useState<SosType | ''>('');
+  const [sosLocation, setSosLocation] = useState<SosLocation | ''>('');
+  const [sosFormError, setSosFormError] = useState('');
   const [userVersion, setUserVersion] = useState(0);
+  const [navSearch, setNavSearch] = useState('');
 
   const user = getSessionUser();
   const responsibilities = getResponsibilities(user);
   const roleKey = `${getRoleId(user)}|${responsibilities.join(',')}|${userVersion}`;
   const sosExempt = isSosExemptRole(user);
+  const showSosDetails = canShowSosTypeLocation(user);
 
   const navItems = useMemo(
     () => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)),
     [roleKey, user],
   );
 
-  const allowedPaths = useMemo(() => navItems.map((item) => item.path), [navItems]);
+  const filteredNavItems = useMemo(() => {
+    const q = navSearch.trim().toLowerCase();
+    if (!q) return navItems;
+    return navItems.filter((item) => item.label.toLowerCase().includes(q));
+  }, [navItems, navSearch]);
+
+  const allowedPaths = useMemo(() => {
+    const paths = navItems.map((item) => item.path);
+    // Nested drill-down (not in sidebar) — allow when parent is visible.
+    if (paths.includes('/fund-request-bonus-wallet')) {
+      paths.push('/fund-request-bonus-wallet-table');
+    }
+    if (paths.includes('/deposit') || paths.includes('/state-wise-deposit')) {
+      paths.push('/state-wise-deposit');
+    }
+    if (paths.includes('/withdrawal-fund')) {
+      paths.push('/withdraw-user-data');
+    }
+    if (paths.includes('/coins-report')) {
+      paths.push('/coin-reports/report');
+    }
+    if (paths.includes('/playerRtp')) {
+      paths.push('/playerRtp/details');
+    }
+    if (paths.includes('/funds')) {
+      paths.push('/funds/mid', '/funds/payin', '/funds/mid/payingAccount');
+    }
+    if (paths.includes('/users-kyc')) {
+      paths.push('/kycList');
+    }
+    return paths;
+  }, [navItems]);
   const showSos = canShowSos(user);
 
   const { sosEnabled, setSosEnabled, refresh } = useSosFlagGuard({
@@ -99,18 +150,52 @@ export function AppShell({ onLogout }: Props) {
     }
   }, [location.pathname, allowedPaths, navigate]);
 
+  const resetSosForm = () => {
+    setSosType('');
+    setSosLocation('');
+    setSosFormError('');
+  };
+
   const confirmSos = async () => {
     if (sosLoading) return;
+
+    if (showSosDetails) {
+      if (!sosType) {
+        setSosFormError('Type is required');
+        return;
+      }
+      if (sosType === 'Office' && !sosLocation) {
+        setSosFormError('Location is required for Office');
+        return;
+      }
+    }
+
+    setSosFormError('');
     setSosLoading(true);
     try {
-      const res = await secureApi('auth.sosFlag', { enabled: true });
+      const payload: Record<string, unknown> = {
+        enabled: true,
+      };
+      if (showSosDetails) {
+        payload.type = sosType;
+        if (sosType === 'Office') {
+          payload.location = sosLocation;
+        }
+      } else {
+        // Restricted roles have no Type dropdown — treat as Individual.
+        payload.type = 'Individual';
+      }
+
+      const res = await secureApi('auth.sosFlag', payload);
       if (!res.ok) {
         toast.error(res.message || 'Failed to send SOS alert');
         return;
       }
       toast.error('SOS alert sent. Support will contact you shortly.');
       setSosOpen(false);
+      resetSosForm();
       setSosEnabled(true);
+      window.gcalc?.sosActivated?.();
       if (!sosExempt) {
         onLogout();
       } else {
@@ -134,6 +219,7 @@ export function AppShell({ onLogout }: Props) {
       }
       setSosEnabled(false);
       toast.success('Users unblocked. SOS lock cleared.');
+      window.gcalc?.sosCleared?.();
       await refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to unblock users');
@@ -214,11 +300,77 @@ export function AppShell({ onLogout }: Props) {
             bgcolor: '#15151a',
             borderRight: '1px solid rgba(255,255,255,0.08)',
             pt: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           },
         }}
       >
-        <List dense>
-          {navItems.map((item) => (
+        <Box
+          sx={{
+            px: 1.25,
+            py: 1,
+            flexShrink: 0,
+            bgcolor: '#15151a',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1,
+          }}
+        >
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Search menu..."
+            value={navSearch}
+            onChange={(e) => setNavSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 18, color: 'rgba(255,255,255,0.45)' }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiInputBase-root': {
+                bgcolor: '#1a1a1f',
+                fontSize: 13,
+                borderRadius: 1.5,
+              },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'rgba(255,255,255,0.12)',
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'rgba(255,159,10,0.45)',
+              },
+              '& .Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#ff9f0a',
+              },
+            }}
+          />
+        </Box>
+
+        <List
+          dense
+          sx={{
+            flex: 1,
+            overflowY: 'auto',
+            py: 0.75,
+            '&::-webkit-scrollbar': { width: 6 },
+            '&::-webkit-scrollbar-thumb': {
+              bgcolor: 'rgba(255,255,255,0.2)',
+              borderRadius: 8,
+            },
+          }}
+        >
+          {filteredNavItems.length === 0 && (
+            <Typography
+              sx={{ px: 2, py: 1.5, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}
+            >
+              No menu found
+            </Typography>
+          )}
+          {filteredNavItems.map((item) => (
             <ListItemButton
               key={item.id}
               component={NavLink}
@@ -233,7 +385,12 @@ export function AppShell({ onLogout }: Props) {
                 },
               }}
             >
-              <ListItemText primary={item.label} />
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{
+                  sx: { fontSize: 13, whiteSpace: 'normal', wordBreak: 'break-word' },
+                }}
+              />
             </ListItemButton>
           ))}
         </List>
@@ -261,7 +418,10 @@ export function AppShell({ onLogout }: Props) {
       <Dialog
         open={sosOpen}
         onClose={() => {
-          if (!sosLoading) setSosOpen(false);
+          if (!sosLoading) {
+            setSosOpen(false);
+            resetSosForm();
+          }
         }}
         maxWidth="xs"
         fullWidth
@@ -281,11 +441,78 @@ export function AppShell({ onLogout }: Props) {
               <strong>{user?.name || user?.mobile || 'Admin'}</strong>
               {user?.empCode ? ` · Emp ${user.empCode}` : ''}.
             </Typography>
+
+            {showSosDetails && (
+              <>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={Boolean(sosFormError) && !sosType}
+                >
+                  <InputLabel id="sos-type-label">Type</InputLabel>
+                  <Select
+                    labelId="sos-type-label"
+                    label="Type"
+                    value={sosType}
+                    disabled={sosLoading}
+                    onChange={(e) => {
+                      const next = e.target.value as SosType | '';
+                      setSosType(next);
+                      if (next !== 'Office') setSosLocation('');
+                      setSosFormError('');
+                    }}
+                  >
+                    {SOS_TYPES.map((item) => (
+                      <MenuItem key={item} value={item}>
+                        {item}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {sosType === 'Office' && (
+                  <FormControl
+                    fullWidth
+                    size="small"
+                    required
+                    error={Boolean(sosFormError) && !sosLocation}
+                  >
+                    <InputLabel id="sos-location-label">Location</InputLabel>
+                    <Select
+                      labelId="sos-location-label"
+                      label="Location"
+                      value={sosLocation}
+                      disabled={sosLoading}
+                      onChange={(e) => {
+                        setSosLocation(e.target.value as SosLocation);
+                        setSosFormError('');
+                      }}
+                    >
+                      {SOS_LOCATIONS.map((item) => (
+                        <MenuItem key={item} value={item}>
+                          {item}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+              </>
+            )}
+
+            {sosFormError ? (
+              <FormHelperText error sx={{ mx: 0 }}>
+                {sosFormError}
+              </FormHelperText>
+            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button
-            onClick={() => setSosOpen(false)}
+            onClick={() => {
+              setSosOpen(false);
+              resetSosForm();
+            }}
             color="inherit"
             disabled={sosLoading}
           >
@@ -294,7 +521,11 @@ export function AppShell({ onLogout }: Props) {
           <Button
             variant="contained"
             color="error"
-            disabled={sosLoading}
+            disabled={
+              sosLoading ||
+              (showSosDetails &&
+                (!sosType || (sosType === 'Office' && !sosLocation)))
+            }
             onClick={() => void confirmSos()}
           >
             {sosLoading ? 'Sending…' : 'Confirm SOS'}

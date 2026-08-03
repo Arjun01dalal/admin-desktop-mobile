@@ -42,16 +42,22 @@ export function ReportDialog({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl',
+          'relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl',
           className,
         )}
       >
-        <h2 className="mb-4 text-lg font-semibold text-foreground">{title}</h2>
+        <h2 className="mb-5 text-lg font-semibold text-foreground">{title}</h2>
         {onSubmit ? (
           <form onSubmit={onSubmit} className="space-y-4">
             {children}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <div className="flex justify-end gap-2 pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={loading}
+                className="text-foreground"
+              >
                 {cancelLabel}
               </Button>
               <Button type="submit" disabled={loading}>
@@ -63,8 +69,13 @@ export function ReportDialog({
           <>
             <div className="space-y-4">{children}</div>
             {footer ?? (
-              <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onClose}>
+              <div className="mt-5 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  className="text-foreground"
+                >
                   {cancelLabel}
                 </Button>
               </div>

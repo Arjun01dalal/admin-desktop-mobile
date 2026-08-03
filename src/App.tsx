@@ -43,6 +43,14 @@ function lazyNamed<M extends Record<string, unknown>>(
 
 const WelcomePage = lazyNamed(() => import('@/screens/panel/WelcomePage'), 'WelcomePage');
 const HouseGamesPage = lazyNamed(() => import('@/screens/panel/HouseGamesPage'), 'HouseGamesPage');
+const LeaderboardPage = lazyNamed(
+  () => import('@/screens/panel/LeaderboardPage'),
+  'LeaderboardPage',
+);
+const LeaderboardCustomerCountPage = lazyNamed(
+  () => import('@/screens/panel/LeaderboardCustomerCountPage'),
+  'LeaderboardCustomerCountPage',
+);
 const CallerResponsibilityPage = lazyNamed(
   () => import('@/screens/panel/CallerResponsibilityPage'),
   'CallerResponsibilityPage',
@@ -80,6 +88,10 @@ const NewRegistersPage = lazyNamed(
   () => import('@/screens/panel/NewRegistersPage'),
   'NewRegistersPage',
 );
+const StateWiseRegistrationPage = lazyNamed(
+  () => import('@/screens/panel/StateWiseRegistrationPage'),
+  'StateWiseRegistrationPage',
+);
 const CoinRemovalPage = lazyNamed(
   () => import('@/screens/panel/CoinRemovalPage'),
   'CoinRemovalPage',
@@ -87,6 +99,10 @@ const CoinRemovalPage = lazyNamed(
 const CoinRemovalDetailsPage = lazyNamed(
   () => import('@/screens/panel/coinRemoval/CoinRemovalDetailsPage'),
   'CoinRemovalDetailsPage',
+);
+const CustomerAllotmentPage = lazyNamed(
+  () => import('@/screens/panel/CustomerAllotmentPage'),
+  'CustomerAllotmentPage',
 );
 const PointsReportPage = lazyNamed(
   () => import('@/screens/panel/PointsReportPage'),
@@ -117,9 +133,122 @@ const SocialMediaPage = lazyNamed(
   'SocialMediaPage',
 );
 const UpiListsPage = lazyNamed(() => import('@/screens/panel/UpiListsPage'), 'UpiListsPage');
+const UpiPaymentsPage = lazyNamed(
+  () => import('@/screens/panel/UpiPaymentsPage'),
+  'UpiPaymentsPage',
+);
 const UtrProviderPage = lazyNamed(
   () => import('@/screens/panel/UtrProviderPage'),
   'UtrProviderPage',
+);
+const InstantDepositProvidersPage = lazyNamed(
+  () => import('@/screens/panel/InstantDepositProvidersPage'),
+  'InstantDepositProvidersPage',
+);
+const DepositProvidersPage = lazyNamed(
+  () => import('@/screens/panel/DepositProvidersPage'),
+  'DepositProvidersPage',
+);
+const DepositConfigPage = lazyNamed(
+  () => import('@/screens/panel/DepositConfigPage'),
+  'DepositConfigPage',
+);
+const WithdrawalProvidersPage = lazyNamed(
+  () => import('@/screens/panel/WithdrawalProvidersPage'),
+  'WithdrawalProvidersPage',
+);
+const BotDataPage = lazyNamed(() => import('@/screens/panel/BotDataPage'), 'BotDataPage');
+const BotPerformancePage = lazyNamed(
+  () => import('@/screens/panel/BotPerformancePage'),
+  'BotPerformancePage',
+);
+const IncomingBotCallPage = lazyNamed(
+  () => import('@/screens/panel/IncomingBotCallPage'),
+  'IncomingBotCallPage',
+);
+const RolesResponsibilitiesPage = lazyNamed(
+  () => import('@/screens/panel/RolesResponsibilitiesPage'),
+  'RolesResponsibilitiesPage',
+);
+const CasinoSwitchPage = lazyNamed(
+  () => import('@/screens/panel/CasinoSwitchPage'),
+  'CasinoSwitchPage',
+);
+const TopGamesPage = lazyNamed(
+  () => import('@/screens/panel/TopGamesPage'),
+  'TopGamesPage',
+);
+const DepositListPage = lazyNamed(
+  () => import('@/screens/panel/DepositListPage'),
+  'DepositListPage',
+);
+const DepositListUserWisePage = lazyNamed(
+  () => import('@/screens/panel/DepositListUserWisePage'),
+  'DepositListUserWisePage',
+);
+const FundsPage = lazyNamed(
+  () => import('@/screens/panel/FundsPage'),
+  'FundsPage',
+);
+const FundsMidPage = lazyNamed(
+  () => import('@/screens/panel/FundsMidPage'),
+  'FundsMidPage',
+);
+const FundsPayinPage = lazyNamed(
+  () => import('@/screens/panel/FundsPayinPage'),
+  'FundsPayinPage',
+);
+const WhatsappPage = lazyNamed(
+  () => import('@/screens/panel/WhatsappPage'),
+  'WhatsappPage',
+);
+const CasinoTopupBalancePage = lazyNamed(
+  () => import('@/screens/panel/CasinoTopupBalancePage'),
+  'CasinoTopupBalancePage',
+);
+const BonusWalletFundRequestPage = lazyNamed(
+  () => import('@/screens/panel/BonusWalletFundRequestPage'),
+  'BonusWalletFundRequestPage',
+);
+const BonusWalletFundRequestTablePage = lazyNamed(
+  () => import('@/screens/panel/BonusWalletFundRequestTablePage'),
+  'BonusWalletFundRequestTablePage',
+);
+const BonusWalletRequestsPage = lazyNamed(
+  () => import('@/screens/panel/BonusWalletRequestsPage'),
+  'BonusWalletRequestsPage',
+);
+const DepositApprovedReportPage = lazyNamed(
+  () => import('@/screens/panel/DepositApprovedReportPage'),
+  'DepositApprovedReportPage',
+);
+const UniqueDepositPendingPage = lazyNamed(
+  () => import('@/screens/panel/UniqueDepositPendingPage'),
+  'UniqueDepositPendingPage',
+);
+const DepositPage = lazyNamed(
+  () => import('@/screens/panel/DepositPage'),
+  'DepositPage',
+);
+const StateWiseDepositPage = lazyNamed(
+  () => import('@/screens/panel/StateWiseDepositPage'),
+  'StateWiseDepositPage',
+);
+const WithdrawalPage = lazyNamed(
+  () => import('@/screens/panel/WithdrawalPage'),
+  'WithdrawalPage',
+);
+const WithdrawalFundPage = lazyNamed(
+  () => import('@/screens/panel/withdrawalFund'),
+  'WithdrawalFundPage',
+);
+const WithdrawUserDataPage = lazyNamed(
+  () => import('@/screens/panel/withdrawalFund'),
+  'WithdrawUserDataPage',
+);
+const FundRequestPage = lazyNamed(
+  () => import('@/screens/panel/FundRequestPage'),
+  'FundRequestPage',
 );
 const PercentagePage = lazyNamed(
   () => import('@/screens/panel/PercentagePage'),
@@ -158,14 +287,6 @@ const CallerAllotmentPage = lazyNamed(
   () => import('@/screens/panel/CallerAllotmentPage'),
   'CallerAllotmentPage',
 );
-const MyCustomersPage = lazyNamed(
-  () => import('@/screens/panel/MyCustomersPage'),
-  'MyCustomersPage',
-);
-const CustomerAllotmentPage = lazyNamed(
-  () => import('@/screens/panel/CustomerAllotmentPage'),
-  'CustomerAllotmentPage',
-);
 const AllottedCustomersPage = lazyNamed(
   () => import('@/screens/panel/customerAllotment/AllottedCustomersPage'),
   'AllottedCustomersPage',
@@ -175,6 +296,7 @@ const CasinoGamesPage = lazyNamed(
   'CasinoGamesPage',
 );
 const UsersKycPage = lazyNamed(() => import('@/screens/panel/UsersKycPage'), 'UsersKycPage');
+const KycListPage = lazyNamed(() => import('@/screens/panel/KycListPage'), 'KycListPage');
 const MobileAppPage = lazyNamed(() => import('@/screens/panel/MobileAppPage'), 'MobileAppPage');
 
 const DashboardPage = lazyNamed(
@@ -316,7 +438,11 @@ export default function App() {
       try {
         const res = await secureApi('auth.getSosFlag', {});
         if (cancelled || !res.ok) return;
-        sosBlocksLoginRef.current = isSosFlagEnabled(res.data);
+        const active = isSosFlagEnabled(res.data);
+        sosBlocksLoginRef.current = active;
+        // Site shell (panel off) — still surface SOS alert + siren via main.
+        if (active) window.gcalc?.sosActivated?.();
+        else window.gcalc?.sosCleared?.();
       } catch {
         // ignore
       }
@@ -391,6 +517,11 @@ export default function App() {
                   <Route path="/master-flow" element={<MasterFlowPage />} />
                   <Route path="/profit-loss" element={<ProfitLossPage />} />
                   <Route path="/house-games" element={<HouseGamesPage />} />
+                  <Route path="/leaderboard" element={<LeaderboardPage />} />
+                  <Route
+                    path="/customer-count"
+                    element={<LeaderboardCustomerCountPage />}
+                  />
                   <Route
                     path="/caller-responsibility"
                     element={<CallerResponsibilityPage />}
@@ -419,6 +550,10 @@ export default function App() {
                   />
                   <Route path="/call-logs" element={<CallLogsPage />} />
                   <Route path="/new-registers" element={<NewRegistersPage />} />
+                  <Route
+                    path="/register-user-report"
+                    element={<StateWiseRegistrationPage />}
+                  />
                   <Route path="/login-report" element={<LoginReportPage />} />
                   <Route
                     path="/all-user-login-report"
@@ -439,7 +574,6 @@ export default function App() {
                     path="/coins-removal/details"
                     element={<CoinRemovalDetailsPage />}
                   />
-                  <Route path="/my-customer" element={<MyCustomersPage />} />
                   <Route
                     path="/customer-allotment"
                     element={<CustomerAllotmentPage />}
@@ -460,12 +594,79 @@ export default function App() {
                   />
                   <Route path="/casino-lists" element={<CasinoGamesPage />} />
                   <Route path="/users-kyc" element={<UsersKycPage />} />
+                  <Route path="/kycList" element={<KycListPage />} />
                   <Route path="/banners" element={<BannersPage />} />
                   <Route path="/upi-lists" element={<UpiListsPage />} />
+                  <Route path="/all-upi-payments" element={<UpiPaymentsPage />} />
                   <Route path="/utr-provider" element={<UtrProviderPage />} />
+                  <Route
+                    path="/instant-provider"
+                    element={<InstantDepositProvidersPage />}
+                  />
+                  <Route path="/pay-g-mid" element={<DepositProvidersPage />} />
+                  <Route path="/deposit-config" element={<DepositConfigPage />} />
+                  <Route
+                    path="/payout-accounts"
+                    element={<WithdrawalProvidersPage />}
+                  />
+                  <Route path="/botData" element={<BotDataPage />} />
+                  <Route path="/botPerformance" element={<BotPerformancePage />} />
+                  <Route path="/incoming-bot-call" element={<IncomingBotCallPage />} />
+                  <Route
+                    path="/roles-responsibilities"
+                    element={<RolesResponsibilitiesPage />}
+                  />
+                  <Route
+                    path="/dynamic-casino-switching"
+                    element={<CasinoSwitchPage />}
+                  />
+                  <Route path="/top-games" element={<TopGamesPage />} />
+                  <Route
+                    path="/casino-topup-balance"
+                    element={<CasinoTopupBalancePage />}
+                  />
+                  <Route path="/depositList" element={<DepositListPage />} />
+                  <Route
+                    path="/depositList/user-wise"
+                    element={<DepositListUserWisePage />}
+                  />
+                  <Route path="/funds" element={<FundsPage />} />
+                  <Route path="/funds/mid" element={<FundsMidPage />} />
+                  <Route path="/funds/payin" element={<FundsPayinPage />} />
+                  <Route
+                    path="/funds/mid/payingAccount"
+                    element={<FundsPayinPage />}
+                  />
+                  <Route path="/whatsappView" element={<WhatsappPage />} />
+                  <Route
+                    path="/fund-request-bonus-wallet"
+                    element={<BonusWalletFundRequestPage />}
+                  />
+                  <Route
+                    path="/fund-request-bonus-wallet-table"
+                    element={<BonusWalletFundRequestTablePage />}
+                  />
+                  <Route path="/bonus-wallet" element={<BonusWalletRequestsPage />} />
+                  <Route
+                    path="/DepositApprovedReport"
+                    element={<DepositApprovedReportPage />}
+                  />
+                  <Route
+                    path="/unique_deposit_pending"
+                    element={<UniqueDepositPendingPage />}
+                  />
+                  <Route path="/deposit" element={<DepositPage />} />
+                  <Route
+                    path="/state-wise-deposit"
+                    element={<StateWiseDepositPage />}
+                  />
+                  <Route path="/withdrawal" element={<WithdrawalPage />} />
+                  <Route path="/withdrawal-fund" element={<WithdrawalFundPage />} />
+                  <Route path="/withdraw-user-data" element={<WithdrawUserDataPage />} />
+                  <Route path="/fund-request" element={<FundRequestPage />} />
                   <Route path="/playerRtp" element={<PlayerRtpPage />} />
                   <Route
-                    path="/playerRTPDetails"
+                    path="/playerRtp/details"
                     element={<PlayerRtpDetailsPage />}
                   />
                   <Route path="/users" element={<UsersPage />} />

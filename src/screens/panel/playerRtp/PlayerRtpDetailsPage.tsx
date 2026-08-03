@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ReportPage, DataTable, type DataColumn, display } from '../shared';
+import { Box, Typography } from '@mui/material';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount } from '@/utils/dates';
+import { display } from '../shared';
 
 type GameRtp = {
   gameId?: string;
@@ -22,28 +24,64 @@ export function PlayerRtpDetailsPage() {
   const state = (location.state || {}) as DetailsState;
   const rows = useMemo(() => state.gameData || [], [state.gameData]);
 
-  const columns = useMemo<DataColumn<GameRtp>[]>(
+  const columns = useMemo<CommonTableColumn<GameRtp>[]>(
     () => [
-      { id: 'index', label: '#', render: (_row, index) => index + 1 },
-      { id: 'gameId', label: 'Game Id', render: (row) => display(row.gameId) },
-      { id: 'totalAmount', label: 'Total Amount', render: (row) => formatAmount(row.totalAmount ?? 0) },
-      { id: 'totalBets', label: 'Total Bets', render: (row) => display(row.totalBets ?? 0) },
-      { id: 'totalWins', label: 'Total Wins', render: (row) => display(row.totalWins ?? 0) },
-      { id: 'winAmount', label: 'Wins Amount', render: (row) => formatAmount(row.winAmount ?? 0) },
-      { id: 'winPercentage', label: 'Win Percentage', render: (row) => display(row.winPercentage ?? 0) },
+      {
+        id: 'index',
+        label: '#',
+        width: 56,
+        render: (_row, index) => index + 1,
+      },
+      {
+        id: 'gameId',
+        label: 'Game Id',
+        render: (row) => display(row.gameId),
+      },
+      {
+        id: 'totalAmount',
+        label: 'Total Amount',
+        render: (row) => formatAmount(row.totalAmount ?? 0),
+      },
+      {
+        id: 'totalBets',
+        label: 'Total Bets',
+        render: (row) => display(row.totalBets ?? 0),
+      },
+      {
+        id: 'totalWins',
+        label: 'Total Wins',
+        render: (row) => display(row.totalWins ?? 0),
+      },
+      {
+        id: 'winAmount',
+        label: 'Wins Amount',
+        render: (row) => formatAmount(row.winAmount ?? 0),
+      },
+      {
+        id: 'winPercentage',
+        label: 'Win Percentage',
+        render: (row) => display(row.winPercentage ?? 0),
+      },
     ],
     [],
   );
 
   return (
-    <ReportPage title="Players RTP Details">
-      <DataTable
+    <Box>
+      <Typography variant="h5" fontWeight={700} mb={2}>
+        Players RTP Details
+      </Typography>
+
+      <CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row, index) => `${row.gameId || 'game'}-${index}`}
         emptyMessage="No game data available"
+        stickyHeader
+        dense
         minWidth={900}
+        maxHeight="calc(100vh - 220px)"
       />
-    </ReportPage>
+    </Box>
   );
 }

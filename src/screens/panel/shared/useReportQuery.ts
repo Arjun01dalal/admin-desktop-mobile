@@ -30,6 +30,8 @@ type CacheEntry = {
 
 const queryCache = new Map<string, CacheEntry>();
 const DEFAULT_CACHE_TTL_MS = 30_000;
+/** Stable default — a fresh `[]` each render would re-fire the effect forever. */
+const DEFAULT_AUTO_DEPS: unknown[] = [];
 
 function cacheKey(action: SecureAction, payload: Record<string, unknown>): string {
   try {
@@ -54,7 +56,7 @@ export function useReportQuery<T>({
   action,
   buildPayload,
   unpack,
-  autoDeps = [],
+  autoDeps = DEFAULT_AUTO_DEPS,
   errorMessage = 'Failed to load data',
   cacheTtlMs = DEFAULT_CACHE_TTL_MS,
 }: Options<T>) {

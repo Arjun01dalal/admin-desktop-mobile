@@ -44,12 +44,20 @@ const COMPILE = [
   'auth.cjs',
   'certPin.cjs',
   'location.cjs',
+  'sosMonitor.cjs',
+  'pushService.cjs',
   'secure/index.cjs',
   'secure/registry.cjs',
   'secure/crypto.cjs',
   'secure/bridgeSanitize.cjs',
 ];
-const COPY_PLAIN = ['preload.cjs', 'sitePreload.cjs'];
+const COPY_PLAIN = [
+  'preload.cjs',
+  'sitePreload.cjs',
+  'sosAlertPreload.cjs',
+  'sos-alert.html',
+  'assets/danger.webm',
+];
 
 // `--node` compiles with the local Node.js instead of Electron. Only for
 // smoke-testing the pipeline (e.g. on Replit); NEVER use it for real builds —

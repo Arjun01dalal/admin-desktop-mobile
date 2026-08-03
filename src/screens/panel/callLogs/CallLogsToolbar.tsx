@@ -54,14 +54,26 @@ export function CallLogsToolbar({
   onPauseOpen,
 }: CallLogsToolbarProps) {
   return (
-    <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+    <Paper
+      sx={{
+        p: 2,
+        mb: 2,
+        bgcolor: '#1a1a1f',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+      }}
+    >
       <Stack
-        direction={{ xs: 'column', md: 'row' }}
+        direction="row"
         spacing={1.5}
-        alignItems={{ xs: 'stretch', md: 'center' }}
+        alignItems="center"
         mb={2}
         flexWrap="wrap"
         useFlexGap
+        sx={{ minWidth: 0, maxWidth: '100%' }}
       >
         <TextField
           type="date"
@@ -70,7 +82,7 @@ export function CallLogsToolbar({
           InputLabelProps={{ shrink: true }}
           value={startDate}
           onChange={(e) => onStartDateChange(e.target.value)}
-          sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
+          sx={{ width: 170, flexShrink: 0 }}
         />
         <TextField
           type="date"
@@ -79,7 +91,7 @@ export function CallLogsToolbar({
           InputLabelProps={{ shrink: true }}
           value={endDate}
           onChange={(e) => onEndDateChange(e.target.value)}
-          sx={{ width: { xs: '100%', md: 170 }, flexShrink: 0 }}
+          sx={{ width: 170, flexShrink: 0 }}
         />
         <Button
           variant="contained"
@@ -111,11 +123,12 @@ export function CallLogsToolbar({
       </Stack>
 
       <Stack
-        direction={{ xs: 'column', md: 'row' }}
+        direction="row"
         spacing={1.5}
-        alignItems={{ xs: 'stretch', md: 'center' }}
+        alignItems="center"
         flexWrap="wrap"
         useFlexGap
+        sx={{ minWidth: 0, maxWidth: '100%' }}
       >
         <TextField
           select
@@ -123,7 +136,7 @@ export function CallLogsToolbar({
           size="small"
           value={campaignId}
           onChange={(e) => onCampaignChange(e.target.value)}
-          sx={{ minWidth: { xs: '100%', md: 180 }, flex: { md: 1 } }}
+          sx={{ width: 220, flexShrink: 0 }}
         >
           <MenuItem value="">
             <em>Select campaign</em>
@@ -140,7 +153,7 @@ export function CallLogsToolbar({
           size="small"
           value={String(itemsPerPage)}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          sx={{ minWidth: { xs: '100%', md: 140 }, flexShrink: 0 }}
+          sx={{ width: 150, flexShrink: 0 }}
         >
           {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
             <MenuItem key={opt} value={opt}>
@@ -149,31 +162,31 @@ export function CallLogsToolbar({
           ))}
         </TextField>
         {!isCaller && (
-          <>
-            <Button
-              variant="outlined"
-              component="label"
-              disabled={actionLoading}
-              sx={{ flexShrink: 0 }}
-            >
-              Upload Data to Bot
-              <input
-                ref={fileRef}
-                hidden
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(e) => onUpload(e.target.files?.[0])}
-              />
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
-              onClick={onPauseOpen}
-              sx={{ flexShrink: 0 }}
-            >
-              Pause Bot Call
-            </Button>
-          </>
+          <Button
+            variant="outlined"
+            component="label"
+            disabled={actionLoading}
+            sx={{ flexShrink: 0 }}
+          >
+            Upload Data to Bot
+            <input
+              ref={fileRef}
+              hidden
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(e) => onUpload(e.target.files?.[0])}
+            />
+          </Button>
+        )}
+        {!isCaller && (
+          <Button
+            variant="contained"
+            color="error"
+            onClick={onPauseOpen}
+            sx={{ flexShrink: 0 }}
+          >
+            Pause Bot Call
+          </Button>
         )}
         {(loading || actionLoading) && <CircularProgress size={22} />}
       </Stack>

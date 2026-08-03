@@ -32,8 +32,8 @@ export function CoinRemovalToolbar({
   onApply,
 }: CoinRemovalToolbarProps) {
   return (
-    <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
-      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+    <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', width: '100%' }}>
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
         <TextField
           type="date"
           label="From Date"
@@ -41,7 +41,7 @@ export function CoinRemovalToolbar({
           InputLabelProps={{ shrink: true }}
           value={startDate}
           onChange={(e) => onStartDateChange(e.target.value)}
-          sx={{ width: 170 }}
+          sx={{ width: 170, flexShrink: 0 }}
         />
         <TextField
           type="date"
@@ -50,7 +50,7 @@ export function CoinRemovalToolbar({
           InputLabelProps={{ shrink: true }}
           value={endDate}
           onChange={(e) => onEndDateChange(e.target.value)}
-          sx={{ width: 170 }}
+          sx={{ width: 170, flexShrink: 0 }}
         />
         <TextField
           select
@@ -58,7 +58,7 @@ export function CoinRemovalToolbar({
           size="small"
           value={String(itemsPerPage)}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          sx={{ width: 150 }}
+          sx={{ width: 150, flexShrink: 0 }}
         >
           {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
             <MenuItem key={opt} value={opt}>

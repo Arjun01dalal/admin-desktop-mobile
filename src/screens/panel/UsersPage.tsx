@@ -20,11 +20,17 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { getRoleId, getRoleName, hasPermission } from '@/auth/permissions';
+import {
+  getRoleId,
+  getRoleName,
+  hasPermission,
+  Permissions,
+} from '@/auth/permissions';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import {
   CommonTable,
@@ -52,6 +58,7 @@ import { UsersToolbar } from './users/UsersToolbar';
 import {
   BLOCK_STATUS_OPTIONS,
   resolveBlockOtpMobile,
+  SHOW_EDIT_EMP_CODE,
   type UserType,
 } from './users/constants';
 import {
@@ -85,6 +92,13 @@ import {
 
 const MAX_REMARK = 200;
 
+/** Sub_Admin office locations. */
+const SUBADMIN_LOCATIONS = ['Nagpur', 'Dubai', 'Nagpur/Dubai'] as const;
+
+type SubAdminEditType = 'name' | 'mobile' | 'telegram' | 'empCode';
+
+type RoleOption = { _id: string; Name?: string; name?: string };
+
 /** Fixed column sizing — keeps Users table compact without clipping actions. */
 function fixedCol(width: number, opts?: { fontSize?: number; px?: number }) {
   const px = opts?.px ?? 0.5;
@@ -110,7 +124,7 @@ const NAME_COL = fixedCol(128, { px: 0.75 });
 const DP_ID_COL = fixedCol(158, { px: 0.75 });
 const BANK_COL = fixedCol(100);
 const APP_COL = fixedCol(52);
-const EMP_COL = fixedCol(72);
+const EMP_COL = fixedCol(100);
 const PLAY_COL = fixedCol(52);
 const MOBILE_COL = {
   width: 168,
@@ -385,6 +399,7 @@ export function UsersPage() {
     clientName?: string | string[];
     allotedApps?: string | string[];
     accessibleStates?: string[];
+    appWithState?: Record<string, string[]>;
     extensionId?: string[] | string;
     serverId?: string | number;
   }>();
@@ -514,6 +529,51 @@ export function UsersPage() {
   const [dumpReason, setDumpReason] = useState('');
   const [otpSending, setOtpSending] = useState(false);
   const [actionBusyId, setActionBusyId] = useState('');
+
+  // Sub_Admin edit / actions (admin-panel-domains Users.tsx)
+  const [subEdit, setSubEdit] = useState<{
+    id: string;
+    type: SubAdminEditType;
+  } | null>(null);
+  const [subEditValue, setSubEditValue] = useState('');
+  const [subEditBusy, setSubEditBusy] = useState(false);
+  const [roleEditId, setRoleEditId] = useState<string | null>(null);
+  const [roleEditValue, setRoleEditValue] = useState('');
+  const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
+  const [roleEditBusy, setRoleEditBusy] = useState(false);
+  const [locationDraft, setLocationDraft] = useState<Record<string, string>>(
+    {},
+  );
+  const [locationBusyId, setLocationBusyId] = useState('');
+  const [realNameTargetId, setRealNameTargetId] = useState<string | null>(null);
+  const [realNameValue, setRealNameValue] = useState('');
+  const [realNameBusy, setRealNameBusy] = useState(false);
+  const [blockCallerTarget, setBlockCallerTarget] = useState<UserRow | null>(
+    null,
+  );
+  const [blockCallerNext, setBlockCallerNext] = useState(false);
+  const [blockCallerRemark, setBlockCallerRemark] = useState('');
+  const [blockCallerOtp, setBlockCallerOtp] = useState('');
+  const [blockCallerBusy, setBlockCallerBusy] = useState(false);
+
+  const canEditSubAdminRole = useMemo(() => {
+    if (hasPermission(Permissions.Edit_Role)) return true;
+    const name = String(getRoleName(admin) || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[-\s]+/g, '_');
+    return (
+      name === 'full_access' ||
+      name === 'dev_full_access' ||
+      name.endsWith('_full_access')
+    );
+  }, [admin]);
+
+  const canEditEmpCode = useMemo(() => {
+    const mobile = String(admin?.mobile || '').trim();
+    return (SHOW_EDIT_EMP_CODE as readonly string[]).includes(mobile);
+  }, [admin?.mobile]);
+
   const [rows, setRows] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -587,6 +647,13 @@ export function UsersPage() {
           startDate,
           endDate,
           allottedApps: userType === 'User' ? undefined : allottedApps,
+          appWithState:
+            userType === 'User' || userType === 'Sub_Admin'
+              ? undefined
+              : admin?.appWithState,
+          selectedClientName: clientName || undefined,
+          activeUserStart: applied.activeUserStart || undefined,
+          activeUserEnd: applied.activeUserEnd || undefined,
         });
 
         const res = await secureApi(actionForType(userType), payload);
@@ -625,7 +692,9 @@ export function UsersPage() {
           );
         }
 
+        // Match reference: dialer/bot source tracks the current loaded table.
         setRows(list);
+        setDialerData(list);
         setTotal(Number(parsed.total) || list.length);
       } finally {
         end();
@@ -634,6 +703,7 @@ export function UsersPage() {
     },
     [
       accessibleStates,
+      admin?.appWithState,
       allottedApps,
       applied,
       begin,
@@ -694,7 +764,7 @@ export function UsersPage() {
         accessibleStates.includes(String(row.state || '').toLowerCase()),
       );
     }
-    setDialerData(items);
+    // Count only — do not replace dialer source (list load owns dialerData).
     setGlobalCount(items.length);
     return items.length;
   }, [accessibleStates, endDate, startDate]);
@@ -710,6 +780,7 @@ export function UsersPage() {
       toast.error('Bot ID should not be empty.');
       return;
     }
+    // Prefer current table (dialerData synced on load); fall back to rows.
     const source = dialerData.length ? dialerData : rows;
     if (!source.length) {
       toast.error('No users available for bot');
@@ -932,6 +1003,264 @@ export function UsersPage() {
     }
   }, [admin?.name, dumpReason, dumpTarget, load, page]);
 
+  const openSubEdit = useCallback((id: string, type: SubAdminEditType, current?: string) => {
+    setSubEdit({ id, type });
+    setSubEditValue(String(current || ''));
+  }, []);
+
+  const submitSubEdit = useCallback(async () => {
+    if (!subEdit) return;
+    const value = subEditValue.trim();
+    if (!value) {
+      toast.error('Value is required');
+      return;
+    }
+    setSubEditBusy(true);
+    try {
+      if (subEdit.type === 'telegram') {
+        const res = await secureApi('ops.updateSubadminAttributes', {
+          userId: subEdit.id,
+          telegramUsername: value,
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update telegram');
+          return;
+        }
+      } else if (subEdit.type === 'empCode') {
+        const res = await secureApi('users.setUserEmpCode', {
+          _id: subEdit.id,
+          empCode: value,
+          modifiedBy: admin?._id,
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update emp code');
+          return;
+        }
+      } else {
+        const res = await secureApi('users.updateSubAdminName', {
+          _id: subEdit.id,
+          ...(subEdit.type === 'name' ? { name: value } : { mobile: value }),
+          updatedBy: { _id: admin?._id, name: admin?.name },
+          reason:
+            subEdit.type === 'name'
+              ? 'Correcting wrong Name'
+              : 'Correcting wrong Mobile Number',
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update');
+          return;
+        }
+      }
+      toast.success('Updated successfully');
+      setSubEdit(null);
+      setSubEditValue('');
+      void load(page);
+    } finally {
+      setSubEditBusy(false);
+    }
+  }, [admin?._id, admin?.name, load, page, subEdit, subEditValue]);
+
+  const renderEmpCodeCell = useCallback(
+    (r: UserRow) => (
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        spacing={0.5}
+        sx={{ width: '100%' }}
+      >
+        <Typography variant="body2" noWrap>
+          {String(r.empCode || '001')}
+        </Typography>
+        {canEditEmpCode ? (
+          <IconButton
+            size="small"
+            title="Edit emp code"
+            onClick={() => openSubEdit(r._id, 'empCode', String(r.empCode || '001'))}
+            sx={{ color: '#ff9f0a' }}
+          >
+            <EditOutlinedIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        ) : null}
+      </Stack>
+    ),
+    [canEditEmpCode, openSubEdit],
+  );
+
+  const openRoleEdit = useCallback(
+    async (row: UserRow) => {
+      setRoleEditId(row._id);
+      setRoleEditValue(String(row.Role_ID || ''));
+      try {
+        const res = await secureApi('roles.list', {});
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to load roles');
+          return;
+        }
+        const data = res.data as
+          | RoleOption[]
+          | { items?: RoleOption[]; payload?: RoleOption[] }
+          | undefined;
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+            ? data.items
+            : Array.isArray(data?.payload)
+              ? data.payload
+              : [];
+        setRoleOptions(list);
+      } catch {
+        toast.error('Failed to load roles');
+      }
+    },
+    [],
+  );
+
+  const submitRoleEdit = useCallback(async () => {
+    if (!roleEditId || !roleEditValue) {
+      toast.error('Please select a role');
+      return;
+    }
+    setRoleEditBusy(true);
+    try {
+      const res = await secureApi('users.updateSubAdminRole', {
+        subAdminId: roleEditId,
+        updatedBy: admin?._id,
+        roleId: roleEditValue,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update role');
+        return;
+      }
+      toast.success('Role updated');
+      setRoleEditId(null);
+      void load(page);
+    } finally {
+      setRoleEditBusy(false);
+    }
+  }, [admin?._id, load, page, roleEditId, roleEditValue]);
+
+  const updateSubAdminLocation = useCallback(
+    async (row: UserRow) => {
+      const loc = (locationDraft[row._id] || row.officeLocation || '').toString().trim();
+      if (!loc) {
+        toast.error('Please select a location');
+        return;
+      }
+      setLocationBusyId(row._id);
+      try {
+        const res = await secureApi('ops.updateOfficeLocation', {
+          _id: row._id,
+          officeLocation: loc,
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update location');
+          return;
+        }
+        toast.success('Location updated successfully');
+        void load(page);
+      } finally {
+        setLocationBusyId('');
+      }
+    },
+    [load, locationDraft, page],
+  );
+
+  const submitRealName = useCallback(async () => {
+    if (!realNameTargetId) return;
+    if (!realNameValue.trim()) {
+      toast.error('Please enter Real Name');
+      return;
+    }
+    setRealNameBusy(true);
+    try {
+      const res = await secureApi('users.updateRealName', {
+        _id: realNameTargetId,
+        realName: realNameValue.trim(),
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update real name');
+        return;
+      }
+      toast.success(res.message || 'Real name updated');
+      setRealNameTargetId(null);
+      setRealNameValue('');
+      void load(page);
+    } finally {
+      setRealNameBusy(false);
+    }
+  }, [load, page, realNameTargetId, realNameValue]);
+
+  const startBlockCaller = useCallback(
+    async (row: UserRow) => {
+      const next = !Boolean(row.block);
+      setBlockCallerBusy(true);
+      try {
+        const res = await secureApi('users.sendBlockOtp', {
+          mobile: resolveBlockOtpMobile(admin?.mobile),
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to send OTP');
+          return;
+        }
+        toast.success('OTP sent successfully to SuperAdmin');
+        setBlockCallerTarget(row);
+        setBlockCallerNext(next);
+        setBlockCallerRemark('');
+        setBlockCallerOtp('');
+      } finally {
+        setBlockCallerBusy(false);
+      }
+    },
+    [admin?.mobile],
+  );
+
+  const confirmBlockCaller = useCallback(async () => {
+    if (!blockCallerTarget) return;
+    if (!blockCallerOtp.trim()) {
+      toast.error('Please enter OTP');
+      return;
+    }
+    if (!blockCallerRemark.trim()) {
+      toast.error('Please enter remark');
+      return;
+    }
+    setBlockCallerBusy(true);
+    try {
+      const verify = await secureApi('users.verifyBlockOtp', {
+        mobile: resolveBlockOtpMobile(admin?.mobile),
+        otp: Number(blockCallerOtp.trim()),
+      });
+      if (!verify.ok) {
+        toast.error(verify.message || 'Invalid OTP');
+        return;
+      }
+      const res = await secureApi('ops.blockCaller', {
+        _id: blockCallerTarget._id,
+        Role_ID: blockCallerTarget.Role_ID,
+        status: blockCallerNext,
+        blockReason: blockCallerRemark.trim(),
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update caller block');
+        return;
+      }
+      toast.success(res.message || 'Updated successfully');
+      setBlockCallerTarget(null);
+      void load(page);
+    } finally {
+      setBlockCallerBusy(false);
+    }
+  }, [
+    admin?.mobile,
+    blockCallerNext,
+    blockCallerOtp,
+    blockCallerRemark,
+    blockCallerTarget,
+    load,
+    page,
+  ]);
+
   const columns = useMemo<CommonTableColumn<UserRow>[]>(() => {
     if (userType === 'Sub_Admin') {
       return [
@@ -945,33 +1274,109 @@ export function UsersPage() {
         {
           id: 'name',
           label: 'Name',
-          width: NAME_COL_WIDTH,
-          headSx: NAME_COL_SX,
-          cellSx: NAME_COL_SX,
+          width: 160,
           filter: (
             <FilterInput
               value={draft.name}
               onChange={setDraftField('name')}
               onSearch={search}
               placeholder="Search name"
-            compact
+              compact
             />
           ),
-          render: (r) => renderUserName(r),
+          render: (r) => (
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              spacing={0.5}
+              sx={{ width: '100%' }}
+            >
+              <Box sx={{ minWidth: 0, flex: 1 }}>{renderUserName(r)}</Box>
+              <IconButton
+                size="small"
+                title="Edit name"
+                onClick={() => openSubEdit(r._id, 'name', r.name)}
+                sx={{ color: '#ff9f0a' }}
+              >
+                <EditOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Stack>
+          ),
         },
         {
           id: 'mobile',
-          label: 'Mobile',
-          filter: (
+          label: 'Mobile Phone',
+          width: 200,
+          filter: canShowMobile ? (
             <FilterInput
               value={draft.mobile}
               onChange={setDraftField('mobile')}
               onSearch={search}
-              placeholder="Mobile"
+              placeholder="Search mobile"
             />
+          ) : null,
+          render: (r) => (
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              spacing={0.5}
+              sx={{ width: '100%' }}
+            >
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                {showMobileColumn ? (
+                  <CallingBtn item={r} reasonList="User List" botId={botId || '1'} />
+                ) : canShowMobile ? (
+                  String(r.mobile || '-')
+                ) : r.mobile ? (
+                  '**********'
+                ) : (
+                  '-'
+                )}
+              </Box>
+              <IconButton
+                size="small"
+                title="Edit mobile"
+                onClick={() => openSubEdit(r._id, 'mobile', r.mobile)}
+                sx={{ color: '#ff9f0a' }}
+              >
+                <EditOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Stack>
           ),
-          render: (r) =>
-            canShowMobile ? String(r.mobile || '-') : r.mobile ? '**********' : '-',
+        },
+        {
+          id: 'telegram',
+          label: 'Telegram ID',
+          width: 150,
+          filter: null,
+          render: (r) => (
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              spacing={0.5}
+            >
+              <Typography variant="body2" noWrap>
+                {String(r.telegram_username || r.telegramUsername || '-')}
+              </Typography>
+              <IconButton
+                size="small"
+                title="Edit telegram"
+                onClick={() =>
+                  openSubEdit(
+                    r._id,
+                    'telegram',
+                    String(r.telegram_username || r.telegramUsername || ''),
+                  )
+                }
+                sx={{ color: '#ff9f0a' }}
+              >
+                <EditOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Stack>
+          ),
         },
         {
           id: 'email',
@@ -982,8 +1387,128 @@ export function UsersPage() {
         {
           id: 'role',
           label: 'Role',
+          width: 160,
           filter: null,
-          render: (r) => String(r.Role_Name || '-'),
+          render: (r) => (
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography variant="body2" noWrap>
+                {String(r.Role_Name || '-')}
+              </Typography>
+              {canEditSubAdminRole ? (
+                <IconButton
+                  size="small"
+                  title="Edit role"
+                  onClick={() => void openRoleEdit(r)}
+                  sx={{ color: '#ff9f0a' }}
+                >
+                  <EditOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              ) : null}
+            </Stack>
+          ),
+        },
+        {
+          id: 'location',
+          label: 'Location',
+          width: 180,
+          filter: null,
+          render: (r) => {
+            const current =
+              locationDraft[r._id] ??
+              String(r.officeLocation || r.location || '');
+            return (
+              <Stack spacing={0.75} sx={{ py: 0.5, minWidth: 150 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Location :- {String(r.officeLocation || '-')}
+                </Typography>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth={false}
+                  value={current}
+                  onChange={(e) =>
+                    setLocationDraft((prev) => ({
+                      ...prev,
+                      [r._id]: e.target.value,
+                    }))
+                  }
+                  sx={{
+                    width: 150,
+                    '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 12 },
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    Select location
+                  </MenuItem>
+                  {SUBADMIN_LOCATIONS.map((loc) => (
+                    <MenuItem key={loc} value={loc}>
+                      {loc}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={locationBusyId === r._id}
+                  onClick={() => void updateSubAdminLocation(r)}
+                  sx={{
+                    bgcolor: '#ff9f0a',
+                    color: '#1a1200',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    fontSize: 11,
+                    '&:hover': { bgcolor: '#e08c00' },
+                  }}
+                >
+                  {locationBusyId === r._id ? '…' : 'Update Location'}
+                </Button>
+              </Stack>
+            );
+          },
+        },
+        {
+          id: 'action',
+          label: 'Action',
+          width: 150,
+          filter: null,
+          render: (r) => (
+            <Stack spacing={0.75} sx={{ py: 0.5 }}>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={blockCallerBusy}
+                onClick={() => void startBlockCaller(r)}
+                sx={{
+                  bgcolor: '#ff9f0a',
+                  color: '#1a1200',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  fontSize: 11,
+                  '&:hover': { bgcolor: '#e08c00' },
+                }}
+              >
+                {r.block === true ? 'Un Block Caller' : 'Block Caller'}
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => {
+                  setRealNameTargetId(r._id);
+                  setRealNameValue(String(r.realName || ''));
+                }}
+                sx={{
+                  bgcolor: '#ff9f0a',
+                  color: '#1a1200',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  fontSize: 11,
+                  '&:hover': { bgcolor: '#e08c00' },
+                }}
+              >
+                Add Real Name
+              </Button>
+            </Stack>
+          ),
         },
         {
           id: 'lastActivity',
@@ -1077,7 +1602,7 @@ export function UsersPage() {
               }
             />
           ) : null,
-          render: (r) => String(r.empCode || '-'),
+          render: (r) => renderEmpCodeCell(r),
         },
         {
           id: 'lastActive',
@@ -1834,7 +2359,7 @@ export function UsersPage() {
             compact
           />
         ) : null,
-        render: (r) => String(r.empCode || '-'),
+        render: (r) => renderEmpCodeCell(r),
       },
       {
         id: 'playIn',
@@ -2176,21 +2701,31 @@ export function UsersPage() {
     return cols;
   }, [
     actionBusyId,
+    blockCallerBusy,
     botId,
+    canEditEmpCode,
+    canEditSubAdminRole,
     canShowMobile,
     clientName,
     draft,
     hideContact,
     isCaller,
     itemsPerPage,
+    locationBusyId,
+    locationDraft,
     loginEmpCode,
+    openRoleEdit,
+    openSubEdit,
     otpSending,
     page,
+    renderEmpCodeCell,
     renderUserName,
     search,
     setDraftField,
     showMobileColumn,
+    startBlockCaller,
     startBlockWithOtp,
+    updateSubAdminLocation,
     userType,
   ]);
 
@@ -2274,7 +2809,7 @@ export function UsersPage() {
         stickyHeader
         minWidth={
           userType === 'Sub_Admin'
-            ? 900
+            ? 1600
             : userType === 'Non_Performing_Active_User'
               ? 1000
               : userType === 'LAXMI_999_Users'
@@ -2387,6 +2922,180 @@ export function UsersPage() {
             onClick={() => void confirmDump()}
           >
             Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(subEdit)}
+        onClose={() => !subEditBusy && setSubEdit(null)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>
+          Edit{' '}
+          {subEdit?.type === 'name'
+            ? 'Name'
+            : subEdit?.type === 'mobile'
+              ? 'Mobile'
+              : subEdit?.type === 'empCode'
+                ? 'Emp Code'
+                : 'Telegram ID'}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            label={
+              subEdit?.type === 'name'
+                ? 'Name'
+                : subEdit?.type === 'mobile'
+                  ? 'Mobile'
+                  : subEdit?.type === 'empCode'
+                    ? 'Emp Code'
+                    : 'Telegram Username'
+            }
+            value={subEditValue}
+            onChange={(e) => setSubEditValue(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSubEdit(null)} disabled={subEditBusy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={subEditBusy}
+            onClick={() => void submitSubEdit()}
+            sx={{ bgcolor: '#ff9f0a', color: '#1a1200', fontWeight: 700 }}
+          >
+            {subEditBusy ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(roleEditId)}
+        onClose={() => !roleEditBusy && setRoleEditId(null)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Edit Role</DialogTitle>
+        <DialogContent>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Role"
+            value={roleEditValue}
+            onChange={(e) => setRoleEditValue(e.target.value)}
+            sx={{ mt: 1 }}
+          >
+            {roleOptions.map((role) => (
+              <MenuItem key={role._id} value={role._id}>
+                {role.Name || role.name || role._id}
+              </MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRoleEditId(null)} disabled={roleEditBusy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={roleEditBusy}
+            onClick={() => void submitRoleEdit()}
+            sx={{ bgcolor: '#ff9f0a', color: '#1a1200', fontWeight: 700 }}
+          >
+            {roleEditBusy ? 'Saving…' : 'Update'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(realNameTargetId)}
+        onClose={() => !realNameBusy && setRealNameTargetId(null)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Add Real Name</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            label="Real Name"
+            value={realNameValue}
+            onChange={(e) => setRealNameValue(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setRealNameTargetId(null)}
+            disabled={realNameBusy}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={realNameBusy}
+            onClick={() => void submitRealName()}
+            sx={{ bgcolor: '#ff9f0a', color: '#1a1200', fontWeight: 700 }}
+          >
+            {realNameBusy ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(blockCallerTarget)}
+        onClose={() => !blockCallerBusy && setBlockCallerTarget(null)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>
+          {blockCallerNext ? 'Block Caller' : 'Un Block Caller'}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            label="OTP"
+            value={blockCallerOtp}
+            onChange={(e) =>
+              setBlockCallerOtp(e.target.value.replace(/\D/g, '').slice(0, 8))
+            }
+            sx={{ mt: 1, mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            size="small"
+            label="Remark"
+            value={blockCallerRemark}
+            onChange={(e) =>
+              setBlockCallerRemark(e.target.value.slice(0, MAX_REMARK))
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setBlockCallerTarget(null)}
+            disabled={blockCallerBusy}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={blockCallerBusy}
+            onClick={() => void confirmBlockCaller()}
+            sx={{ bgcolor: '#ff9f0a', color: '#1a1200', fontWeight: 700 }}
+          >
+            {blockCallerBusy ? 'Saving…' : 'Submit'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -101,13 +101,13 @@ export function CheckersReportPage() {
   );
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={2}>
         Checkers Report
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', width: '100%' }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             type="date"
             label="From Date"
@@ -115,7 +115,7 @@ export function CheckersReportPage() {
             InputLabelProps={{ shrink: true }}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            sx={{ width: 170 }}
+            sx={{ width: 170, flexShrink: 0 }}
           />
           <TextField
             type="date"
@@ -124,13 +124,13 @@ export function CheckersReportPage() {
             InputLabelProps={{ shrink: true }}
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            sx={{ width: 170 }}
+            sx={{ width: 170, flexShrink: 0 }}
           />
           <Button
             variant="contained"
             onClick={() => void load()}
             disabled={loading}
-            sx={{ fontWeight: 700 }}
+            sx={{ fontWeight: 700, flexShrink: 0 }}
           >
             Apply
           </Button>
@@ -144,7 +144,9 @@ export function CheckersReportPage() {
         getRowKey={(row) => row.name}
         loading={loading}
         emptyMessage="No data available"
-        minWidth={600}
+        stickyHeader
+        dense
+        maxHeight="calc(100vh - 280px)"
       />
     </Box>
   );

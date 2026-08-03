@@ -1,24 +1,33 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
-import { MessageSquare, Trash2 } from 'lucide-react';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  MenuItem,
+  Pagination,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ReplyIcon from '@mui/icons-material/Reply';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
 import { secureApi } from '@/api/secureClient';
 import { getSessionUser, hasPermission, Permissions } from '@/auth/permissions';
+import { CommonTable, CopyText, type CommonTableColumn } from '@/components/CommonTable';
+import { copyToClipboard } from '@/utils/clipboard';
+import { asPaged, display, maskMobile, useReportQuery } from '@/screens/panel/shared';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
-import {
-  ReportPage,
-  DataTable,
-  ReportDialog,
-  DateField,
-  PageSizeField,
-  ApplyButton,
-  ReportPager,
-  useReportQuery,
-  asPaged,
-  display,
-  type DataColumn,
-} from '@/screens/panel/shared';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 
 type FeedbackRow = {
   _id: string;
@@ -30,17 +39,29 @@ type FeedbackRow = {
   [key: string]: unknown;
 };
 
-function maskFeedbackMobile(mobile?: string): string {
-  if (!mobile) return '—';
-  const last4 = mobile.slice(-4);
-  return `****** ${last4}`;
-}
+const headerFieldSx = {
+  width: 180,
+  flexShrink: 0,
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+  '& .MuiInputLabel-root': { color: '#9aa3b5' },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+  letterSpacing: 0.4,
+  '&:hover': { bgcolor: '#e08c00' },
+};
 
 export function FeedbackPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd, setAppliedEnd] = useState('');
   const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [pageSize, setPageSize] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [replyOpen, setReplyOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeId, setActiveId] = useState('');
@@ -48,37 +69,40 @@ export function FeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const canEdit = hasPermission(Permissions.Edit_Feedback);
+  const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
 
-  const buildPayload = useCallback(() => {
-    const payload: Record<string, unknown> = {
-      pageNo: page,
-      itemsPerPage,
-      filter: { feedBackStatus: 'Pending' },
-    };
-    if (startDate && endDate) {
-      payload.startDate = startDate;
-      payload.endDate = endDate;
-    }
-    return payload;
-  }, [page, itemsPerPage, startDate, endDate]);
-
-  const unpack = useCallback(
-    (res: { data?: unknown }) => asPaged<FeedbackRow>(res.data),
-    [],
-  );
-
-  const { rows, total, totalPages, loading, load } = useReportQuery<FeedbackRow>({
+  const { rows, total, totalPages, loading, error, load } = useReportQuery<FeedbackRow>({
     action: 'ops.feedbackGetAll',
-    buildPayload,
-    unpack,
-    autoDeps: [page, itemsPerPage],
+    buildPayload: () => {
+      const payload: Record<string, unknown> = {
+        pageNo: page,
+        itemsPerPage: pageSize,
+        filter: { feedBackStatus: 'Pending' },
+      };
+      if (appliedStart && appliedEnd) {
+        payload.startDate = appliedStart;
+        payload.endDate = appliedEnd;
+      }
+      return payload;
+    },
+    unpack: (res) => asPaged<FeedbackRow>(res.data),
+    autoDeps: [page, pageSize, appliedStart, appliedEnd],
     errorMessage: 'Failed to load feedback list',
   });
 
   const applyFilters = useCallback(() => {
+    setAppliedStart(startDate);
+    setAppliedEnd(endDate);
     setPage(1);
-    void load();
-  }, [load]);
+  }, [startDate, endDate]);
+
+  const clearDates = useCallback(() => {
+    setStartDate('');
+    setEndDate('');
+    setAppliedStart('');
+    setAppliedEnd('');
+    setPage(1);
+  }, []);
 
   const openReply = useCallback((row: FeedbackRow) => {
     setActiveId(row._id);
@@ -91,34 +115,37 @@ export function FeedbackPage() {
     setDeleteOpen(true);
   }, []);
 
-  const handleReply = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-      if (!replyText.trim()) {
-        toast.error('Enter a reply message');
+  const copyMobile = useCallback(async (mobile?: string) => {
+    if (!mobile) return;
+    const ok = await copyToClipboard(mobile);
+    if (ok) toast.success('Mobile copied');
+    else toast.error('Failed to copy');
+  }, []);
+
+  const handleReply = useCallback(async () => {
+    if (!replyText.trim()) {
+      toast.error('Enter a reply message');
+      return;
+    }
+    const user = getSessionUser();
+    setSubmitting(true);
+    try {
+      const res = await secureApi('ops.feedbackUpdate', {
+        _id: activeId,
+        feedbackResponse: replyText.trim(),
+        updatedBy: { name: user?.name, _id: user?._id },
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to send reply');
         return;
       }
-      const user = getSessionUser();
-      setSubmitting(true);
-      try {
-        const res = await secureApi('ops.feedbackUpdate', {
-          _id: activeId,
-          feedbackResponse: replyText.trim(),
-          updatedBy: { name: user?.name, _id: user?._id },
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to send reply');
-          return;
-        }
-        toast.success('Reply sent');
-        setReplyOpen(false);
-        void load();
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [activeId, replyText, load],
-  );
+      toast.success('Reply sent');
+      setReplyOpen(false);
+      void load();
+    } finally {
+      setSubmitting(false);
+    }
+  }, [activeId, replyText, load]);
 
   const handleDelete = useCallback(async () => {
     setSubmitting(true);
@@ -136,24 +163,80 @@ export function FeedbackPage() {
     }
   }, [activeId, load]);
 
-  const columns = useMemo<DataColumn<FeedbackRow>[]>(
+  const columns = useMemo<CommonTableColumn<FeedbackRow>[]>(
     () => [
       {
         id: 'index',
         label: '#',
-        className: 'w-12',
-        render: (_row, index) => (page - 1) * itemsPerPage + index + 1,
+        width: 56,
+        render: (_row, index) => (page - 1) * pageSize + index + 1,
       },
-      { id: 'id', label: 'ID', render: (row) => row._id },
-      { id: 'name', label: 'Name', render: (row) => display(row.name) },
-      { id: 'mobile', label: 'Mobile', render: (row) => maskFeedbackMobile(row.mobile) },
+      {
+        id: 'id',
+        label: 'ID',
+        render: (row) => <CopyText value={row._id} breakAll />,
+      },
+      {
+        id: 'name',
+        label: 'Name',
+        render: (row) => {
+          const name = display(row.name);
+          return name === '—' ? name : name.slice(0, 15);
+        },
+      },
+      {
+        id: 'mobile',
+        label: 'Mobile',
+        render: (row) => {
+          if (!canShowMobile) {
+            return (
+              <Typography variant="body2">
+                {maskMobile(row.mobile, false)}
+              </Typography>
+            );
+          }
+          const mobile = String(row.mobile || '');
+          return (
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+              <Typography variant="body2">{mobile || '—'}</Typography>
+              {mobile ? (
+                <IconButton
+                  size="small"
+                  aria-label="Copy mobile"
+                  onClick={() => void copyMobile(row.mobile)}
+                  sx={{ color: '#ff9f0a', p: 0.25 }}
+                >
+                  <ContentCopyIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              ) : null}
+            </Stack>
+          );
+        },
+      },
       {
         id: 'message',
         label: 'Message',
-        className: 'max-w-[220px] whitespace-normal',
-        render: (row) => row.message || '—',
+        render: (row) => (
+          <Typography
+            variant="body2"
+            sx={{ maxWidth: 260, whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left' }}
+          >
+            {row.message || '—'}
+          </Typography>
+        ),
       },
-      { id: 'reply', label: 'Reply', render: (row) => row.feedbackResponse || '—' },
+      {
+        id: 'reply',
+        label: 'Reply',
+        render: (row) => (
+          <Typography
+            variant="body2"
+            sx={{ maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left' }}
+          >
+            {row.feedbackResponse || '—'}
+          </Typography>
+        ),
+      },
       {
         id: 'date',
         label: 'Date',
@@ -165,96 +248,220 @@ export function FeedbackPage() {
       {
         id: 'action',
         label: 'Action',
+        width: 170,
         render: (row) => (
-          <div className="flex items-center gap-2">
+          <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
             {canEdit && (
-              <Button variant="outline" size="sm" onClick={() => openReply(row)}>
-                <MessageSquare className="h-4 w-4" />
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<ReplyIcon sx={{ fontSize: 16 }} />}
+                onClick={() => openReply(row)}
+                sx={{ ...orangeBtnSx, fontSize: 11, px: 1.25, py: 0.25, minHeight: 28 }}
+              >
                 Respond
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
+            <IconButton
+              size="small"
               aria-label="Delete"
-              className="text-destructive hover:text-destructive"
               onClick={() => openDelete(row)}
+              sx={{ color: '#f44336' }}
             >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Stack>
         ),
       },
     ],
-    [page, itemsPerPage, canEdit, openReply, openDelete],
+    [page, pageSize, canEdit, canShowMobile, openReply, openDelete, copyMobile],
   );
 
   return (
-    <ReportPage
-      title="Pending Feedback"
-      loading={loading}
-      onRefresh={() => void load()}
-      toolbar={
-        <>
-          <DateField label="From Date" value={startDate} onChange={setStartDate} />
-          <DateField label="To Date" value={endDate} onChange={setEndDate} />
-          <PageSizeField
-            value={itemsPerPage}
-            onChange={(value) => {
-              setItemsPerPage(value);
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, p: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5" fontWeight={700}>
+          Pending Feedback
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+          onClick={() => void load()}
+          disabled={loading}
+          sx={{
+            borderColor: 'rgba(255,255,255,0.2)',
+            color: '#e8e8ea',
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: '#ff9f0a',
+              bgcolor: 'rgba(255,159,10,0.08)',
+            },
+          }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflowX: 'auto' }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          alignItems="center"
+          flexWrap="nowrap"
+          useFlexGap
+          sx={{ minWidth: 'max-content' }}
+        >
+          <TextField
+            label="From Date"
+            type="date"
+            size="small"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={headerFieldSx}
+          />
+          <TextField
+            label="To Date"
+            type="date"
+            size="small"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={headerFieldSx}
+          />
+          <TextField
+            select
+            label="Items Per Page"
+            size="small"
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
               setPage(1);
             }}
-          />
-          <ApplyButton onClick={applyFilters} loading={loading} />
-        </>
-      }
-    >
-      <DataTable
+            sx={{ ...headerFieldSx, width: 140 }}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            onClick={applyFilters}
+            disabled={loading}
+            sx={{ ...orangeBtnSx, height: 40, px: 2.5, flexShrink: 0 }}
+          >
+            {loading ? <CircularProgress size={18} color="inherit" /> : 'Apply'}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={clearDates}
+            disabled={loading}
+            sx={{
+              height: 40,
+              px: 2,
+              flexShrink: 0,
+              borderColor: 'rgba(255,255,255,0.28)',
+              color: '#e8e8ea',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#ff9f0a',
+                bgcolor: 'rgba(255,159,10,0.08)',
+              },
+            }}
+          >
+            Clear Dates
+          </Button>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color="text.secondary"
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Total: {total}
+          </Typography>
+        </Stack>
+      </Paper>
+
+      <CommonTable
         columns={columns}
         rows={rows}
-        getRowKey={(row, index) => row._id || index}
+        getRowKey={(row, i) => row._id || i}
         loading={loading}
         emptyMessage="No pending feedback found"
+        stickyHeader
+        dense
         minWidth={1100}
+        maxHeight="calc(100vh - 360px)"
       />
 
-      <ReportPager page={page} totalPages={totalPages} total={total} onChange={setPage} disabled={loading} />
-
-      <ReportDialog
-        open={replyOpen}
-        title="Reply to Feedback"
-        onClose={() => setReplyOpen(false)}
-        onSubmit={handleReply}
-        submitLabel="Update"
-        loading={submitting}
-      >
-        <textarea
-          value={replyText}
-          onChange={(e) => setReplyText(e.target.value)}
-          placeholder="Feedback reply"
-          rows={4}
-          autoFocus
-          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <Stack alignItems="center" mt={2}>
+        <Pagination
+          count={Math.max(1, totalPages)}
+          page={page}
+          onChange={(_e, p) => setPage(p)}
+          color="primary"
+          disabled={loading}
         />
-      </ReportDialog>
+      </Stack>
 
-      <ReportDialog
-        open={deleteOpen}
-        title="Do you want to delete?"
-        onClose={() => setDeleteOpen(false)}
-        footer={
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-              Delete
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-muted-foreground">This feedback will be permanently removed.</p>
-      </ReportDialog>
-    </ReportPage>
+      <Dialog open={replyOpen} onClose={() => setReplyOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Reply to Feedback</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={4}
+            label="Feedback reply"
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReplyOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleReply()}
+            disabled={submitting}
+            sx={orangeBtnSx}
+          >
+            {submitting ? <CircularProgress size={18} color="inherit" /> : 'Update'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Do you want to delete?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This feedback will be permanently removed.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => void handleDelete()}
+            disabled={submitting}
+          >
+            {submitting ? <CircularProgress size={18} color="inherit" /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

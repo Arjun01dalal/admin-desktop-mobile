@@ -1,22 +1,28 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { secureApi } from '@/api/secureClient';
-import { todayIST, formatAmount } from '@/utils/dates';
-import { cn } from '@/lib/utils';
 import {
-  ReportPage,
-  DataTable,
-  ReportDialog,
-  DateField,
-  ApplyButton,
-  useReportQuery,
-  asList,
-  type DataColumn,
-} from '@/screens/panel/shared';
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { toast } from 'react-toastify';
+import { secureApi } from '@/api/secureClient';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { todayIST, formatAmount } from '@/utils/dates';
+import { asList, useReportQuery } from '@/screens/panel/shared';
 
 type UtrRow = {
   _id: string;
@@ -37,36 +43,19 @@ const EMPTY_FORM = {
   ifsc: '',
 };
 
-function StatusSwitch({
-  checked,
-  disabled,
-  onToggle,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: (next: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onToggle(!checked)}
-      className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50',
-        checked ? 'bg-primary' : 'bg-muted',
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
-          checked ? 'translate-x-4' : 'translate-x-1',
-        )}
-      />
-    </button>
-  );
-}
+const fieldSx = {
+  flex: 1,
+  minWidth: 0,
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'none' as const,
+  '&:hover': { bgcolor: '#e08c00' },
+};
 
 export function UtrProviderPage() {
   const [startDate, setStartDate] = useState(todayIST);
@@ -182,23 +171,26 @@ export function UtrProviderPage() {
     }
   }, [activeId, load]);
 
-  const columns = useMemo<DataColumn<UtrRow>[]>(
+  const columns = useMemo<CommonTableColumn<UtrRow>[]>(
     () => [
       {
         id: 'index',
         label: '#',
-        className: 'w-12',
+        width: 56,
         render: (_row, index) => index + 1,
       },
       {
         id: 'totalAmount',
         label: 'Total Amount',
         render: (row) => (
-          <div className="text-xs">
-            Approved - <b>{formatAmount(row.approvedTotal ?? 0)}</b>
-            <br />
-            Pending - <b>{formatAmount(row.pendingTotal ?? 0)}</b>
-          </div>
+          <Stack spacing={0.25} alignItems="flex-start">
+            <Typography variant="caption">
+              Approved - <Box component="b">{formatAmount(row.approvedTotal ?? 0)}</Box>
+            </Typography>
+            <Typography variant="caption">
+              Pending - <Box component="b">{formatAmount(row.pendingTotal ?? 0)}</Box>
+            </Typography>
+          </Stack>
         ),
       },
       {
@@ -224,27 +216,30 @@ export function UtrProviderPage() {
       {
         id: 'status',
         label: 'Status',
+        width: 90,
         render: (row) => (
-          <StatusSwitch
+          <Switch
+            size="small"
             checked={Boolean(row.status)}
             disabled={togglingId === row._id}
-            onToggle={(next) => void handleToggleStatus(row, next)}
+            onChange={(_e, checked) => void handleToggleStatus(row, checked)}
+            color="warning"
           />
         ),
       },
       {
         id: 'action',
         label: 'Action',
+        width: 80,
         render: (row) => (
-          <Button
-            variant="ghost"
-            size="icon"
+          <IconButton
+            size="small"
             aria-label="Delete"
-            className="text-destructive hover:text-destructive"
             onClick={() => openDelete(row)}
+            sx={{ color: '#f44336' }}
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
         ),
       },
     ],
@@ -252,84 +247,171 @@ export function UtrProviderPage() {
   );
 
   return (
-    <ReportPage
-      title="UTR Providers"
-      loading={loading}
-      onRefresh={() => void load()}
-      actions={
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4" />
-          Add
-        </Button>
-      }
-      toolbar={
-        <>
-          <DateField label="From Date" value={startDate} onChange={setStartDate} />
-          <DateField label="To Date" value={endDate} onChange={setEndDate} />
-          <ApplyButton onClick={() => void load()} loading={loading} />
-        </>
-      }
-    >
-      <DataTable
+    <Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap={1.5}
+        mb={2}
+      >
+        <Typography variant="h5" fontWeight={700}>
+          UTR Providers
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openAdd}
+            sx={orangeBtnSx}
+          >
+            Add
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={() => void load()}
+            disabled={loading}
+            sx={{
+              borderColor: 'rgba(255,255,255,0.28)',
+              color: '#e8e8ea',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#ff9f0a',
+                bgcolor: 'rgba(255,159,10,0.08)',
+              },
+            }}
+          >
+            Refresh
+          </Button>
+        </Stack>
+      </Stack>
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+          <TextField
+            type="date"
+            label="From Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            type="date"
+            label="To Date"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            sx={fieldSx}
+          />
+          <Button
+            variant="contained"
+            onClick={() => void load()}
+            disabled={loading}
+            sx={{ ...orangeBtnSx, flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Apply
+          </Button>
+        </Stack>
+      </Paper>
+
+      <CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row) => row._id}
         loading={loading}
         emptyMessage="No UTR providers found"
+        stickyHeader
+        dense
         minWidth={1000}
+        maxHeight="calc(100vh - 300px)"
       />
 
-      <ReportDialog
-        open={addOpen}
-        title="Add UTR Provider"
-        onClose={() => setAddOpen(false)}
-        onSubmit={handleCreate}
-        loading={submitting}
-      >
-        <Input
-          placeholder="Bank Name"
-          value={form.bankName}
-          onChange={(e) => setForm((prev) => ({ ...prev, bankName: e.target.value }))}
-          autoFocus
-        />
-        <Input
-          placeholder="Bank Account Number"
-          value={form.accountNumber}
-          onChange={(e) => setForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
-        />
-        <Input
-          placeholder="Account Holder Name"
-          value={form.accountHolderName}
-          onChange={(e) => setForm((prev) => ({ ...prev, accountHolderName: e.target.value }))}
-        />
-        <Input
-          placeholder="IFSC"
-          value={form.ifsc}
-          onChange={(e) =>
-            setForm((prev) => ({ ...prev, ifsc: e.target.value.toUpperCase() }))
-          }
-        />
-      </ReportDialog>
-
-      <ReportDialog
-        open={deleteOpen}
-        title="Are you sure?"
-        onClose={() => setDeleteOpen(false)}
-        footer={
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={submitting}>
+      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+        <form onSubmit={handleCreate}>
+          <DialogTitle>Add UTR Provider</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              <TextField
+                label="Bank Name"
+                size="small"
+                fullWidth
+                value={form.bankName}
+                onChange={(e) => setForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                autoFocus
+              />
+              <TextField
+                label="Bank Account Number"
+                size="small"
+                fullWidth
+                value={form.accountNumber}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, accountNumber: e.target.value }))
+                }
+              />
+              <TextField
+                label="Account Holder Name"
+                size="small"
+                fullWidth
+                value={form.accountHolderName}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, accountHolderName: e.target.value }))
+                }
+              />
+              <TextField
+                label="IFSC"
+                size="small"
+                fullWidth
+                value={form.ifsc}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, ifsc: e.target.value.toUpperCase() }))
+                }
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setAddOpen(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-              Delete
+            <Button type="submit" variant="contained" disabled={submitting} sx={orangeBtnSx}>
+              {submitting ? 'Saving…' : 'Submit'}
             </Button>
-          </div>
-        }
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => !submitting && setDeleteOpen(false)}
+        fullWidth
+        maxWidth="xs"
       >
-        <p className="text-sm text-muted-foreground">
-          This UTR provider will be permanently removed.
-        </p>
-      </ReportDialog>
-    </ReportPage>
+        <DialogTitle>Are you sure?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This UTR provider will be permanently removed.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => void handleDelete()}
+            disabled={submitting}
+          >
+            {submitting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

@@ -116,6 +116,16 @@ export function GameActivityPage() {
         label: 'Game Count',
         render: (row) => formatMetric(gameCount(row)),
       },
+      ...(isQtech
+        ? [
+            {
+              id: 'licenseFeePercent',
+              ...sortable('licenseFeePercent', 'License Fee %'),
+              render: (row: ActivityRow) =>
+                getMetric(row, 'licenseFeePercent'),
+            } satisfies CommonTableColumn<ActivityRow>,
+          ]
+        : []),
       {
         id: 'betAmount',
         ...sortable('betAmount', 'Bet Amount'),
@@ -174,7 +184,7 @@ export function GameActivityPage() {
         render: (row) => formatMetric(getMetric(row, 'totalRollbackAmount')),
       },
     ];
-  }, [sort, toggleSort, openProvider]);
+  }, [sort, toggleSort, openProvider, isQtech]);
 
   return (
     <Box>

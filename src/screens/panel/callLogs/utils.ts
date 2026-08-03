@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx';
+import { getRoleId, getRoleName } from '@/auth/permissions';
 import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
+import type { AuthUser } from '@/types/gcalc';
 import { STATE_LANGUAGE_MAP } from './constants';
 import type {
   CallLogRow,
@@ -61,24 +63,39 @@ export function getAssignedBotIds(user: {
   );
 }
 
-/** True for caller / caller_new Role_ID or role name. */
-export function isCallLogsCaller(user: {
-  Role_ID?: string;
-  role?: string;
-  Role_Name?: string;
-} | null | undefined): boolean {
-  const roleId = String(user?.Role_ID || localStorage.getItem('role_id') || '');
-  if (roleId && CALLER_ROLE_IDS.has(roleId)) return true;
-  const name = String(
-    localStorage.getItem('role') ||
-      user?.Role_Name ||
-      user?.role ||
-      '',
-  )
+/** Normalize role label for caller checks. */
+function normalizeCallerRoleName(value: string): string {
+  return value
     .trim()
     .toLowerCase()
-    .replace(/[\s-]+/g, '_');
-  return name === 'caller' || name === 'caller_new';
+    .replace(/[\s-]+/g, '_')
+    .replace(/_+/g, '_');
+}
+
+/**
+ * True for caller Role_IDs and caller-* role names
+ * (caller, caller_new, caller_nonPerforming, caller_unique_pending, …).
+ * Excludes caller_head variants.
+ */
+export function isCallLogsCaller(
+  user: {
+    Role_ID?: string;
+    role?: string;
+    Role_Name?: string;
+    roles?: AuthUser['roles'];
+  } | null | undefined,
+): boolean {
+  const roleId = getRoleId(user ?? null).trim();
+  if (roleId && CALLER_ROLE_IDS.has(roleId)) return true;
+
+  const name = normalizeCallerRoleName(getRoleName(user ?? null));
+  if (!name) return false;
+  if (name === 'caller' || name === 'caller_new' || name === 'callernew') {
+    return true;
+  }
+  // caller_nonPerforming / caller_unique_pending / etc. — not heads
+  if (name.startsWith('caller_head')) return false;
+  return name.startsWith('caller_');
 }
 
 export function formatStatusLabel(item: CallLogRow): string {

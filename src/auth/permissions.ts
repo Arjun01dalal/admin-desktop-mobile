@@ -39,6 +39,57 @@ export const Permissions = {
   View_UPIs: 'View_UPIs',
   Add_UPI: 'Add_UPI',
   Toggle_UPI: 'Toggle_UPI',
+  View_PayIn_Accounts: 'View_PayIn_Accounts',
+  Add_PayIn_Account: 'Add_PayIn_Account',
+  Toggle_PayIn_Account: 'Toggle_PayIn_Account',
+  Delete_PayIn_Account: 'Delete_PayIn_Account',
+  Disable_Deposit_Provider_Edit: 'Disable_Deposit_Provider_Edit',
+  Update_Deposit_Amount_Edit: 'Update_Deposit_Amount_Edit',
+  Deposit_Config: 'Deposit_Config',
+  show_gateway_and_total: 'show_gateway_and_total',
+  show_gateway_only: 'show_gateway_only',
+  show_whatsapp_messages: 'show_whatsapp_messages',
+  View_PayOut_Accounts: 'View_PayOut_Accounts',
+  Add_PayOut_Account: 'Add_PayOut_Account',
+  Toggle_PayOut_Account: 'Toggle_PayOut_Account',
+  Delete_PayOut_Account: 'Delete_PayOut_Account',
+  bot_data_upload: 'bot_data_upload',
+  bot_performance: 'bot_performance',
+  show_incoming_bot: 'show_incoming_bot',
+  View_Roles_and_Responsibilities: 'View_Roles_and_Responsibilities',
+  Edit_Role: 'Edit_Role',
+  Delete_Role: 'Delete_Role',
+  add_new_role_responsibility: 'add_new_role_responsibility',
+  casino_switch: 'casino_switch',
+  casino_delete_button: 'casino_delete_button',
+  view_casino_balance: 'view_casino_balance',
+  hide_show_games: 'hide_show_games',
+  View_Deposit_List: 'View_Deposit_List',
+  Bonus_Wallet_Fund_Request: 'Bonus_Wallet_Fund_Request',
+  Bonus_Wallet_Request: 'Bonus_Wallet_Request',
+  View_Deposits_Approved_Report: 'View_Deposits_Approved_Report',
+  Unique_Deposit_Pending_User: 'Unique_Deposit_Pending_User',
+  View_Deposits: 'View_Deposits',
+  View_Withdrawals: 'View_Withdrawals',
+  withdrawal_fund: 'withdrawal_fund',
+  Fund_Request: 'Fund_Request',
+  View_Fund_Deposit: 'View_Fund_Deposit',
+  Excel: 'Excel',
+  State_Wise_Deposit: 'State_Wise_Deposit',
+  update_deposit_mid: 'update_deposit_mid',
+  withdrawals_button: 'withdrawals_button',
+  View_Reject: 'View_Reject',
+  View_Reverse: 'View_Reverse',
+  Download_Withdrawal: 'Download_Withdrawal',
+  show_all_withdrawal: 'show_all_withdrawal',
+  View_Delay_Reason: 'View_Delay_Reason',
+  Disable_Withdrawals_Check: 'Disable_Withdrawals_Check',
+  change_status: 'change_status',
+  show_mobile: 'show_mobile',
+  show_download_botton: 'show_download_botton',
+  whatsapp_icon: 'whatsapp_icon',
+  UPI_Payment: 'UPI_Payment',
+  Deposit_Pensil: 'Deposit_Pensil',
   Utr_Provider: 'Utr_Provider',
   player_rtp: 'player_rtp',
   View_Users: 'View_Users',
@@ -60,19 +111,12 @@ export const Permissions = {
   Percentage: 'Percentage',
   New_Deposits: 'New_Deposits',
   Social_Media: 'Social_Media',
+  caller_leaderboard_tab: 'caller_leaderboard_tab',
+  /** Backend typo — must match Responsibilities string */
+  state_wise_registartion: 'state_wise_registartion',
 } as const;
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions];
-
-/** Role names that must not see the SOS button. */
-const SOS_HIDDEN_ROLE_NAMES = new Set([
-  'caller',
-  'caller_new',
-  'user_coin',
-  'user&coin',
-  'user & coin',
-  'userandcoin',
-]);
 
 /** Roles that stay in the panel when SOS is active (can unblock). */
 const SOS_EXEMPT_ROLE_NAMES = new Set([
@@ -92,11 +136,33 @@ const SOS_EXEMPT_ROLE_IDS = new Set<string>([
 ]);
 
 /**
- * Known Role_IDs for User & Coin (extend when backend IDs are confirmed).
- * Caller / caller_new IDs live in CALLER_ROLE_IDS.
+ * Roles that skip Type / Location on the SOS confirm dialog.
+ * Matched by Role_Name variants and known Role_IDs.
  */
-export const USER_COIN_ROLE_IDS = new Set<string>([
-  // Add User & Coin Role_ID(s) here when known
+const SOS_DETAILS_HIDDEN_ROLE_NAMES = new Set([
+  'user_coin',
+  'user&coin',
+  'user & coin',
+  'userandcoin',
+  'banner_new',
+  'bannernew',
+  'accounts_new',
+  'accountsnew',
+  'caller_new',
+  'callernew',
+  'support_new',
+  'supportnew',
+  'banner',
+  'checker_new',
+  'checkernew',
+]);
+
+const SOS_DETAILS_HIDDEN_ROLE_IDS = new Set<string>([
+  '686242053cc84c862f86c148', // checker_new
+  '6864c9d33cc84c862f86c17a', // support_new
+  '6864ced73cc84c862f86c17f', // caller_new
+  '686bb681aa619b0a00f8527e', // accounts_new
+  '686bbadcaa619b0a00f85280', // banner_new
 ]);
 
 /**
@@ -123,14 +189,17 @@ const DASHBOARD_MOBILES = new Set([
   '9990099909',
 ]);
 
-/** Hard menu allowlists by Role_ID — when set, only these nav ids can appear. */
+/** Hard menu allowlists by Role_ID — when set, only these nav ids can appear
+ *  (plus any item whose Responsibility is granted — see canAccessNavItem). */
 const ROLE_NAV_ALLOWLIST: Record<string, readonly string[]> = {
   // caller / caller_new
   '68945961c99bca8bbc8b61ed': [
     'welcome',
     'callerResponsibility',
     'callLogs',
+    'botPerformance',
     'newRegisters',
+    'stateWiseRegistration',
     'users',
     'mobileApp',
   ],
@@ -138,7 +207,9 @@ const ROLE_NAV_ALLOWLIST: Record<string, readonly string[]> = {
     'welcome',
     'callerResponsibility',
     'callLogs',
+    'botPerformance',
     'newRegisters',
+    'stateWiseRegistration',
     'users',
     'mobileApp',
   ],
@@ -146,7 +217,9 @@ const ROLE_NAV_ALLOWLIST: Record<string, readonly string[]> = {
     'welcome',
     'callerResponsibility',
     'callLogs',
+    'botPerformance',
     'newRegisters',
+    'stateWiseRegistration',
     'users',
     'mobileApp',
   ],
@@ -278,14 +351,112 @@ export function getResponsibilities(
     .filter(Boolean);
 }
 
+/** Backend Name/Enum typos that should still unlock matching menus. */
+const PERMISSION_ALIASES: Record<string, string[]> = {
+  state_wise_registartion: [
+    'state_wise_registartion',
+    'state_wise_registration',
+    'state_wise_registtration',
+    'State wise Registration',
+    'State Wise Registration',
+  ],
+  bot_performance: [
+    'bot_performance',
+    'botPerformance',
+    'Bot Performance',
+    'Bot_Performance',
+  ],
+  bot_data_upload: [
+    'bot_data_upload',
+    'botData',
+    'Bot Data',
+    'bot_data',
+  ],
+  hide_show_games: [
+    'hide_show_games',
+    'Hide_Show_Games',
+    'top_games',
+    'Top Games',
+    'Top_Games',
+    // Same audience as Casino Games — unlock when View_Games is granted.
+    'View_Games',
+  ],
+  View_Deposit_List: [
+    'View_Deposit_List',
+    'view_deposit_list',
+    'Deposit_List',
+    'Deposit List',
+    // Same audience as Deposit — unlock when View_Deposits is granted.
+    'View_Deposits',
+  ],
+  casino_switch: [
+    'casino_switch',
+    'Casino_Switch',
+    'Casino Switch',
+    'View_Games',
+  ],
+  show_whatsapp_messages: [
+    'show_whatsapp_messages',
+    'Show_Whatsapp_Messages',
+    'whatsapp',
+    'Whatsapp',
+  ],
+  view_casino_balance: [
+    'view_casino_balance',
+    'View_Casino_Balance',
+    'casino_topup',
+    'Casino Top-up Balance',
+  ],
+};
+
+function normalizeResponsibility(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function isStateWiseRegistrationKey(value?: string): boolean {
+  if (!value) return false;
+  const normalized = normalizeResponsibility(value);
+  return (
+    normalized.includes('statewise') &&
+    (normalized.includes('regist') || normalized.includes('register'))
+  );
+}
+
+function permissionMatches(required: string, list: string[]): boolean {
+  // Match laxminarayan Private_Route: unlock despite Enum typos / ObjectId mismatch.
+  if (isStateWiseRegistrationKey(required)) return true;
+
+  // Bot Performance: laxminarayan route is ungated; unlock for nav consistently.
+  if (normalizeResponsibility(required) === 'botperformance') return true;
+
+  if (list.includes(required)) return true;
+
+  const requiredNormalized = normalizeResponsibility(required);
+  if (list.some((item) => normalizeResponsibility(item) === requiredNormalized)) {
+    return true;
+  }
+
+  const aliases = PERMISSION_ALIASES[required];
+  if (
+    aliases?.some(
+      (name) =>
+        list.includes(name) ||
+        list.some((item) => normalizeResponsibility(item) === normalizeResponsibility(name)),
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 /** True if the logged-in role may access a permission-gated nav item. */
 export function hasPermission(
   permission: string | undefined,
   user: StoredUser | null = getSessionUser(),
 ): boolean {
   if (!permission) return true;
-  const list = getResponsibilities(user);
-  return list.includes(permission);
+  return permissionMatches(permission, getResponsibilities(user));
 }
 
 export function canAccessDashboard(user: StoredUser | null = getSessionUser()): boolean {
@@ -313,14 +484,51 @@ function roleAllowlist(user: StoredUser | null): readonly string[] | null {
   return null;
 }
 
+/** Full-access admins should see every nav item (backend role may omit newly added Responsibilities). */
+function isFullAccessNavRole(user: StoredUser | null): boolean {
+  const roleId = getRoleId(user);
+  if (
+    roleId === '64f710d9a2ab78980020c5fb' ||
+    roleId === '6a33c137a6558491e0d20464' ||
+    roleId === '68677d68598bcfdd1393885b' // qa_new
+  ) {
+    return true;
+  }
+
+  for (const candidate of collectRoleNameCandidates(user)) {
+    const normalized = normalizeRoleName(candidate);
+    if (
+      normalized === 'full_access' ||
+      normalized === 'dev_full_access' ||
+      normalized === 'qa_new' ||
+      normalized.endsWith('_full_access') ||
+      normalized.includes('dev_full_access')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Final nav visibility: Role_ID allowlist + Responsibilities + dashboard Role_ID gate. */
 export function canAccessNavItem(
   item: { id: string; permission?: string },
   user: StoredUser | null = getSessionUser(),
 ): boolean {
+  // Always show Bot Performance (laxminarayan App.tsx mounts it without Responsibility).
+  if (item.id === 'botPerformance') return true;
+
+  // Full / dev / QA access — show the complete menu without waiting on new Responsibility rows.
+  if (isFullAccessNavRole(user)) return true;
+
   const allow = roleAllowlist(user);
-  // Hard role allowlist is authoritative (e.g. callers only see listed pages).
-  if (allow) return allow.includes(item.id);
+  // Hard role allowlist is the base set (e.g. callers). Also honor Responsibilities
+  // so pages unlock when the backend grants the permission.
+  if (allow) {
+    if (allow.includes(item.id)) return true;
+    if (item.permission && hasPermission(item.permission, user)) return true;
+    return false;
+  }
 
   if (
     item.id === 'dashboard' ||
@@ -333,17 +541,33 @@ export function canAccessNavItem(
   return hasPermission(item.permission, user);
 }
 
-function roleNameIsSosHidden(roleName: string): boolean {
-  if (!roleName) return false;
-  return roleNameVariants(roleName).some((v) => SOS_HIDDEN_ROLE_NAMES.has(v));
+/** SOS button is available for every logged-in role. */
+export function canShowSos(_user: StoredUser | null = getSessionUser()): boolean {
+  return true;
 }
 
-/** SOS is hidden for caller, caller_new, and user&coin. */
-export function canShowSos(user: StoredUser | null = getSessionUser()): boolean {
+/**
+ * Type / Location dropdowns on SOS confirm — hidden for restricted roles
+ * (User & Coin, banner_new, accounts_new, caller_new, support_new, banner, checker_new).
+ */
+export function canShowSosTypeLocation(
+  user: StoredUser | null = getSessionUser(),
+): boolean {
   const roleId = getRoleId(user);
-  if (roleId && CALLER_ROLE_IDS.has(roleId)) return false;
-  if (roleId && USER_COIN_ROLE_IDS.has(roleId)) return false;
-  if (roleNameIsSosHidden(getRoleName(user))) return false;
+  if (roleId && SOS_DETAILS_HIDDEN_ROLE_IDS.has(roleId)) return false;
+  // All caller / caller_new Role_IDs skip Type/Location.
+  if (roleId && CALLER_ROLE_IDS.has(roleId) && !CALLER_HEAD_ROLE_IDS.has(roleId)) {
+    return false;
+  }
+
+  for (const candidate of collectRoleNameCandidates(user)) {
+    if (roleNameVariants(candidate).some((v) => SOS_DETAILS_HIDDEN_ROLE_NAMES.has(v))) {
+      return false;
+    }
+    const normalized = normalizeRoleName(candidate);
+    if (SOS_DETAILS_HIDDEN_ROLE_NAMES.has(normalized)) return false;
+  }
+
   return true;
 }
 

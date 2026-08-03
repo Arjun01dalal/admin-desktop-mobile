@@ -5,30 +5,35 @@ import {
   useEffect,
   useMemo,
   useState,
-  type FormEvent,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  MenuItem,
+  Pagination,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import BlockIcon from '@mui/icons-material/Block';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
-import { Ban, FileBarChart, ShieldCheck, Users } from 'lucide-react';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
-import { formatAmount } from '@/utils/dates';
-import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
-import { Button } from '@/components/ui/button';
-import {
-  ReportPage,
-  DataTable,
-  DateField,
-  PageSizeField,
-  SearchInput,
-  ReportPager,
-  ReportDialog,
-  display,
-  maskMobile,
-  type DataColumn,
-} from '@/screens/panel/shared';
+import { display, maskMobile } from '@/screens/panel/shared';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 
 type DepositStat = { count?: number; totalAmount?: number };
 
@@ -74,10 +79,99 @@ type CallerReportData = {
   };
 };
 
+const filterFieldSx = {
+  minWidth: 120,
+  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+};
+
+const headerFieldSx = {
+  width: 160,
+  flexShrink: 0,
+  '& .MuiInputBase-root': { bgcolor: '#121218' },
+  '& .MuiInputLabel-root': { color: '#9aa3b5' },
+};
+
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+  letterSpacing: 0.4,
+  '&:hover': { bgcolor: '#e08c00' },
+};
+
+function ColumnSearch({
+  value,
+  onChange,
+  onSearch,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSearch: () => void;
+  placeholder: string;
+}) {
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSearch();
+      }}
+      sx={filterFieldSx}
+    />
+  );
+}
+
+function roundAmount(value: unknown): number {
+  return Math.floor(Number(value) || 0);
+}
+
 function depositLabel(stat?: DepositStat[]): string {
   const first = stat?.[0];
   if (!first) return '(0) : 0';
-  return `(${first.count ?? 0}) : ${formatAmount(first.totalAmount ?? 0)}`;
+  return `(${first.count ?? 0}) : ${roundAmount(first.totalAmount)}`;
+}
+
+function isAllotmentRow(value: unknown): value is AllotmentRow {
+  if (!value || typeof value !== 'object') return false;
+  const id = (value as AllotmentRow)._id;
+  return id != null && String(id).trim() !== '';
+}
+
+function normalizeAllotmentRow(value: AllotmentRow): AllotmentRow {
+  return { ...value, _id: String(value._id) };
+}
+
+function extractCustomerItems(data: unknown): {
+  items: AllotmentRow[];
+  totalPages: number;
+  total: number;
+} {
+  const obj =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  const nested =
+    obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+      ? (obj.payload as Record<string, unknown>)
+      : obj;
+  const raw = Array.isArray(nested.items)
+    ? nested.items
+    : Array.isArray(obj.items)
+      ? obj.items
+      : Array.isArray(data)
+        ? data
+        : [];
+  const items = raw.filter(isAllotmentRow).map(normalizeAllotmentRow);
+  return {
+    items,
+    totalPages: Math.max(1, Number(nested.totalPages ?? obj.totalPages ?? 1) || 1),
+    total: Number(nested.total ?? obj.total ?? items.length) || 0,
+  };
 }
 
 export function CustomerAllotmentPage() {
@@ -98,6 +192,58 @@ export function CustomerAllotmentPage() {
   const [error, setError] = useState<string | null>(null);
   const { next, isCurrent, begin, end } = useRequestGeneration();
 
+  const [blockTarget, setBlockTarget] = useState<AllotmentRow | null>(null);
+  const [blockRemark, setBlockRemark] = useState('');
+  const [blockSubmitting, setBlockSubmitting] = useState(false);
+
+  const [reportTarget, setReportTarget] = useState<AllotmentRow | null>(null);
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportData, setReportData] = useState<CallerReportData | null>(null);
+
+  const loadDeposits = useCallback(async (pageNo: number, size: number) => {
+    setDepositLoading(true);
+    try {
+      const res = await secureApi('ops.customerSupportDeposit', {
+        itemPerPage: size,
+        pageNo,
+      });
+      if (!res.ok || res.success === false) {
+        console.warn('[CustomerAllotment] deposit API:', res.message || res);
+        return;
+      }
+
+      const raw = res.data;
+      let list: SupportDepositEntry[] = [];
+      if (Array.isArray(raw)) {
+        list = raw as SupportDepositEntry[];
+      } else if (raw && typeof raw === 'object') {
+        const obj = raw as Record<string, unknown>;
+        if (Array.isArray(obj.items)) list = obj.items as SupportDepositEntry[];
+        else if (Array.isArray(obj.payload)) list = obj.payload as SupportDepositEntry[];
+        else {
+          // Single map { [callerId]: stats } — wrap as one entry.
+          list = [obj as SupportDepositEntry];
+        }
+      }
+
+      const merged: SupportDepositEntry = {};
+      for (const entry of list) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+        for (const [key, value] of Object.entries(entry)) {
+          if (!key || value == null) continue;
+          merged[key] = value as SupportDepositEntry[string];
+        }
+      }
+      setDepositMap(merged);
+    } catch (err) {
+      console.warn('[CustomerAllotment] deposit load failed', err);
+    } finally {
+      setDepositLoading(false);
+    }
+  }, []);
+
   const loadCustomers = useCallback(
     async (pageNo = page, filtersOverride?: Filters) => {
       const active = filtersOverride ?? appliedFilters;
@@ -107,19 +253,35 @@ export function CustomerAllotmentPage() {
       setError(null);
       try {
         const filter: Record<string, string> = {};
-        if (active.name) filter.name = active.name;
-        if (active.mobile) filter.mobile = active.mobile;
-        if (active.empCode) filter.empCode = active.empCode;
+        if (active.name.trim()) filter.name = active.name.trim();
+        if (active.mobile.trim()) filter.mobile = active.mobile.trim();
+        if (active.empCode.trim()) filter.empCode = active.empCode.trim();
 
-        const res = await secureApi('ops.customerSupportGetAll', {
-          filter,
-          itemPerPage: pageSize,
-          pageNo,
-        });
+        const size = Number(pageSize) || DEFAULT_ITEMS_PER_PAGE;
+        const safePage = Number(pageNo) || 1;
+
+        // Exact laxminarayan shape for initial load (no empty filter object).
+        const payload: Record<string, unknown> = {
+          itemPerPage: size,
+          pageNo: safePage,
+        };
+        if (Object.keys(filter).length > 0) {
+          payload.filter = filter;
+        }
+
+        const res = await secureApi('ops.customerSupportGetAll', payload);
         if (!isCurrent(gen)) return;
 
-        if (!res.ok) {
-          const msg = res.message || 'Failed to load customer allotment';
+        if (!res.ok || res.success === false) {
+          const msg =
+            res.message ||
+            'Failed to load customer allotment (get-all-customerSupport)';
+          console.error('[CustomerAllotment] customers API failed', {
+            message: res.message,
+            status: res.status,
+            payload,
+            data: res.data,
+          });
           setError(msg);
           toast.error(msg);
           startTransition(() => {
@@ -130,57 +292,55 @@ export function CustomerAllotmentPage() {
           return;
         }
 
-        const data = (res.data || {}) as Record<string, unknown>;
-        const items = Array.isArray(data.items) ? (data.items as AllotmentRow[]) : [];
+        const extracted = extractCustomerItems(res.data);
         startTransition(() => {
-          setCustomers(items);
-          setTotalPages(Math.max(1, Number(data.totalPages) || 1));
-          setTotal(Number(data.total) || items.length);
+          setCustomers(extracted.items);
+          setTotalPages(extracted.totalPages);
+          setTotal(extracted.total);
+        });
+
+        // Load deposit stats after the list succeeds (never block / toast on failure).
+        void loadDeposits(safePage, size);
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Failed to load customer allotment';
+        console.error('[CustomerAllotment] unexpected error', err);
+        setError(msg);
+        toast.error(msg);
+        startTransition(() => {
+          setCustomers([]);
+          setTotal(0);
+          setTotalPages(1);
         });
       } finally {
         end();
         if (isCurrent(gen)) setLoading(false);
       }
     },
-    [page, pageSize, appliedFilters, next, begin, end, isCurrent],
+    [page, pageSize, appliedFilters, next, begin, end, isCurrent, loadDeposits],
   );
-
-  const loadDeposits = useCallback(async (pageNo = page) => {
-    setDepositLoading(true);
-    try {
-      const res = await secureApi('ops.customerSupportDeposit', {
-        itemPerPage: pageSize,
-        pageNo,
-      });
-      if (!res.ok) return;
-      const list = Array.isArray(res.data) ? (res.data as SupportDepositEntry[]) : [];
-      const merged: SupportDepositEntry = {};
-      for (const entry of list) {
-        if (entry && typeof entry === 'object') {
-          Object.assign(merged, entry);
-        }
-      }
-      setDepositMap(merged);
-    } finally {
-      setDepositLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageSize]);
 
   useEffect(() => {
     void loadCustomers(page);
-    void loadDeposits(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize]);
 
-  const rows = useMemo<AllotmentRow[]>(
-    () =>
-      customers.map((c) => {
-        const stat = depositMap[c._id];
-        return stat ? { ...c, depositData: stat.depositData, coinData: stat.coinData } : c;
-      }),
-    [customers, depositMap],
-  );
+  const rows = useMemo<AllotmentRow[]>(() => {
+    const safe: AllotmentRow[] = [];
+    for (const c of customers) {
+      if (!c || c._id == null || String(c._id).trim() === '') continue;
+      const id = String(c._id);
+      const stat = depositMap[id];
+      safe.push(
+        stat
+          ? { ...c, _id: id, depositData: stat.depositData, coinData: stat.coinData }
+          : { ...c, _id: id },
+      );
+    }
+    return safe;
+  }, [customers, depositMap]);
   const deferredRows = useDeferredValue(rows);
 
   const search = useCallback(() => {
@@ -191,9 +351,23 @@ export function CustomerAllotmentPage() {
 
   const openAllotted = useCallback(
     (row: AllotmentRow) => {
+      if (!row?._id) return;
+      const ids = (Array.isArray(row.allotedCustomer) ? row.allotedCustomer : [])
+        .map((item) => {
+          if (item == null) return null;
+          if (typeof item === 'string' || typeof item === 'number') return String(item);
+          if (typeof item === 'object' && item !== null && '_id' in item) {
+            const id = (item as { _id?: unknown })._id;
+            return id == null ? null : String(id);
+          }
+          return null;
+        })
+        .filter((id): id is string => Boolean(id));
+
       navigate('/customer-allotted', {
         state: {
-          customer: row.allotedCustomer || [],
+          customer: ids,
+          _id: row._id,
           callerId: row._id,
           callerName: row.name,
           empCode: row.empCode,
@@ -203,47 +377,31 @@ export function CustomerAllotmentPage() {
     [navigate],
   );
 
-  // ---- Block / Unblock dialog ----
-  const [blockTarget, setBlockTarget] = useState<AllotmentRow | null>(null);
-  const [blockRemark, setBlockRemark] = useState('');
-  const [blockSubmitting, setBlockSubmitting] = useState(false);
-
-  const submitBlock = useCallback(
-    async (e: FormEvent) => {
-      e.preventDefault();
-      if (!blockTarget?._id || !blockRemark.trim()) {
-        toast.error('Please enter a remark');
+  const submitBlock = useCallback(async () => {
+    if (!blockTarget?._id || !blockRemark.trim()) {
+      toast.error('Please enter a remark');
+      return;
+    }
+    setBlockSubmitting(true);
+    try {
+      const res = await secureApi('ops.blockCaller', {
+        _id: blockTarget._id,
+        Role_ID: blockTarget.Role_ID,
+        status: !blockTarget.block,
+        blockReason: blockRemark.trim(),
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update block status');
         return;
       }
-      setBlockSubmitting(true);
-      try {
-        const res = await secureApi('ops.blockCaller', {
-          _id: blockTarget._id,
-          Role_ID: blockTarget.Role_ID,
-          status: !blockTarget.block,
-          blockReason: blockRemark.trim(),
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to update block status');
-          return;
-        }
-        toast.success(blockTarget.block ? 'Caller unblocked' : 'Caller blocked');
-        setBlockTarget(null);
-        setBlockRemark('');
-        void loadCustomers(page);
-      } finally {
-        setBlockSubmitting(false);
-      }
-    },
-    [blockTarget, blockRemark, loadCustomers, page],
-  );
-
-  // ---- Caller report dialog ----
-  const [reportTarget, setReportTarget] = useState<AllotmentRow | null>(null);
-  const [reportStartDate, setReportStartDate] = useState('');
-  const [reportEndDate, setReportEndDate] = useState('');
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportData, setReportData] = useState<CallerReportData | null>(null);
+      toast.success(blockTarget.block ? 'Caller unblocked' : 'Caller blocked');
+      setBlockTarget(null);
+      setBlockRemark('');
+      void loadCustomers(page);
+    } finally {
+      setBlockSubmitting(false);
+    }
+  }, [blockTarget, blockRemark, loadCustomers, page]);
 
   const runCallerReport = useCallback(
     async (mode: 'today' | 'range' | 'all') => {
@@ -301,31 +459,36 @@ export function CustomerAllotmentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportTarget?._id]);
 
-  const columns = useMemo<DataColumn<AllotmentRow>[]>(
+  const columns = useMemo<CommonTableColumn<AllotmentRow>[]>(
     () => [
       {
         id: 'index',
         label: '#',
+        width: 56,
         render: (_row, index) => (page - 1) * pageSize + index + 1,
       },
       {
         id: 'name',
         label: 'Name',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftFilters.name}
             placeholder="Search name"
             onChange={(v) => setDraftFilters((prev) => ({ ...prev, name: v }))}
             onSearch={search}
           />
         ),
-        render: (row) => <span className="font-medium">{display(row.name)}</span>,
+        render: (row) => (
+          <Typography variant="body2" fontWeight={600}>
+            {display(row.name)}
+          </Typography>
+        ),
       },
       {
         id: 'mobile',
         label: 'Mobile',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftFilters.mobile}
             placeholder="Search mobile"
             onChange={(v) => setDraftFilters((prev) => ({ ...prev, mobile: v }))}
@@ -340,7 +503,7 @@ export function CustomerAllotmentPage() {
         id: 'empCode',
         label: 'Emp Code',
         filter: (
-          <SearchInput
+          <ColumnSearch
             value={draftFilters.empCode}
             placeholder="Search emp code"
             onChange={(v) => setDraftFilters((prev) => ({ ...prev, empCode: v }))}
@@ -352,8 +515,7 @@ export function CustomerAllotmentPage() {
       {
         id: 'autoDeposit',
         label: 'Todays Automatic Deposit',
-        render: (row) =>
-          depositLoading ? '…' : depositLabel(row.depositData),
+        render: (row) => (depositLoading ? '…' : depositLabel(row.depositData)),
       },
       {
         id: 'coinDeposit',
@@ -364,14 +526,15 @@ export function CustomerAllotmentPage() {
         id: 'alloted',
         label: 'Allotted Customer',
         render: (row) => (
-          <button
-            type="button"
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<PeopleAltIcon sx={{ fontSize: 16 }} />}
             onClick={() => openAllotted(row)}
-            className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+            sx={{ color: '#ff9f0a', textTransform: 'none', fontWeight: 700 }}
           >
-            <Users className="h-3.5 w-3.5" />
             {row.allotedCustomer?.length ?? 0}
-          </button>
+          </Button>
         ),
       },
       {
@@ -379,14 +542,35 @@ export function CustomerAllotmentPage() {
         label: 'Action',
         render: (row) => (
           <Button
-            variant={row.block ? 'outline' : 'destructive'}
-            size="sm"
+            size="small"
+            variant="contained"
+            startIcon={<BlockIcon sx={{ fontSize: 16 }} />}
             onClick={() => {
               setBlockTarget(row);
               setBlockRemark('');
             }}
+            sx={
+              row.block
+                ? {
+                    ...orangeBtnSx,
+                    fontSize: 11,
+                    px: 1.25,
+                    py: 0.25,
+                    minHeight: 28,
+                  }
+                : {
+                    bgcolor: '#d32f2f',
+                    color: '#fff',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    fontSize: 11,
+                    px: 1.25,
+                    py: 0.25,
+                    minHeight: 28,
+                    '&:hover': { bgcolor: '#b71c1c' },
+                  }
+            }
           >
-            <Ban className="h-3.5 w-3.5" />
             {row.block ? 'Unblock' : 'Block'}
           </Button>
         ),
@@ -395,8 +579,25 @@ export function CustomerAllotmentPage() {
         id: 'callerReport',
         label: 'Caller Report',
         render: (row) => (
-          <Button variant="outline" size="sm" onClick={() => openCallerReport(row)}>
-            <FileBarChart className="h-3.5 w-3.5" />
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AssessmentIcon sx={{ fontSize: 16 }} />}
+            onClick={() => openCallerReport(row)}
+            sx={{
+              borderColor: 'rgba(255,255,255,0.28)',
+              color: '#e8e8ea',
+              textTransform: 'none',
+              fontSize: 11,
+              px: 1.25,
+              py: 0.25,
+              minHeight: 28,
+              '&:hover': {
+                borderColor: '#ff9f0a',
+                bgcolor: 'rgba(255,159,10,0.08)',
+              },
+            }}
+          >
             Report
           </Button>
         ),
@@ -407,120 +608,258 @@ export function CustomerAllotmentPage() {
         render: (row) => display(row.blockReason),
       },
     ],
-    [draftFilters, search, canShowMobile, page, pageSize, depositLoading, openAllotted, openCallerReport],
+    [
+      draftFilters,
+      search,
+      canShowMobile,
+      page,
+      pageSize,
+      depositLoading,
+      openAllotted,
+      openCallerReport,
+    ],
   );
 
   return (
-    <ReportPage
-      title="Customer Allotment"
-      loading={loading}
-      error={error}
-      onRefresh={() => {
-        void loadCustomers(page);
-        void loadDeposits(page);
-      }}
-      toolbar={
-        <PageSizeField
-          value={pageSize}
-          onChange={(v) => {
-            setPageSize(v);
-            setPage(1);
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, p: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5" fontWeight={700}>
+          Customer Allotment
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+          onClick={() => {
+            void loadCustomers(page);
           }}
-        />
-      }
-    >
-      <DataTable
+          disabled={loading}
+          sx={{
+            borderColor: 'rgba(255,255,255,0.2)',
+            color: '#e8e8ea',
+            textTransform: 'none',
+            '&:hover': {
+              borderColor: '#ff9f0a',
+              bgcolor: 'rgba(255,159,10,0.08)',
+            },
+          }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflowX: 'auto' }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          alignItems="center"
+          flexWrap="nowrap"
+          useFlexGap
+          sx={{ minWidth: 'max-content' }}
+        >
+          <TextField
+            select
+            label="Items Per Page"
+            size="small"
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            sx={{ ...headerFieldSx, width: 140 }}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            color="text.secondary"
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Total: {total}
+          </Typography>
+        </Stack>
+      </Paper>
+
+      <CommonTable
         columns={columns}
         rows={deferredRows}
-        getRowKey={(row, i) => row._id || i}
+        getRowKey={(row, i) => row?._id || i}
         loading={loading}
         emptyMessage="No callers found"
+        stickyHeader
+        dense
         minWidth={1400}
+        maxHeight="calc(100vh - 360px)"
       />
 
-      <ReportPager page={page} totalPages={totalPages} onChange={setPage} disabled={loading} total={total} />
-
-      <ReportDialog
-        open={Boolean(blockTarget)}
-        title={blockTarget?.block ? 'Unblock Caller' : 'Block Caller'}
-        onClose={() => setBlockTarget(null)}
-        onSubmit={submitBlock}
-        loading={blockSubmitting}
-        submitLabel={blockTarget?.block ? 'Unblock' : 'Block'}
-      >
-        <textarea
-          required
-          autoFocus
-          rows={3}
-          value={blockRemark}
-          onChange={(e) => setBlockRemark(e.target.value)}
-          placeholder="Please enter remark"
-          className="w-full rounded-md border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <Stack alignItems="center" mt={2}>
+        <Pagination
+          count={Math.max(1, totalPages)}
+          page={page}
+          onChange={(_e, p) => setPage(p)}
+          color="primary"
+          disabled={loading}
         />
-      </ReportDialog>
+      </Stack>
 
-      <ReportDialog
-        open={Boolean(reportTarget)}
-        title={`Caller Report${reportTarget?.name ? ` — ${reportTarget.name}` : ''}`}
-        onClose={() => setReportTarget(null)}
-        className="max-w-lg"
+      <Dialog
+        open={Boolean(blockTarget)}
+        onClose={() => setBlockTarget(null)}
+        maxWidth="xs"
+        fullWidth
       >
-        <div className="flex flex-wrap items-end gap-2">
-          <DateField label="From Date" value={reportStartDate} onChange={setReportStartDate} />
-          <DateField label="To Date" value={reportEndDate} onChange={setReportEndDate} />
+        <DialogTitle>{blockTarget?.block ? 'Unblock Caller' : 'Block Caller'}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            label="Remark"
+            value={blockRemark}
+            onChange={(e) => setBlockRemark(e.target.value)}
+            placeholder="Please enter remark"
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBlockTarget(null)} disabled={blockSubmitting}>
+            Cancel
+          </Button>
           <Button
-            size="sm"
-            disabled={!reportStartDate || !reportEndDate}
-            onClick={() => void runCallerReport('range')}
+            variant="contained"
+            onClick={() => void submitBlock()}
+            disabled={blockSubmitting}
+            sx={orangeBtnSx}
           >
-            Apply
+            {blockSubmitting ? (
+              <CircularProgress size={18} color="inherit" />
+            ) : blockTarget?.block ? (
+              'Unblock'
+            ) : (
+              'Block'
+            )}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => void runCallerReport('today')}>
-            Today
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void runCallerReport('all')}>
-            All Data
-          </Button>
-        </div>
+        </DialogActions>
+      </Dialog>
 
-        {reportLoading ? (
-          <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
-        ) : reportData ? (
-          <div className="mt-4 space-y-3">
-            <div className="flex flex-wrap gap-4 text-sm">
-              <p>
-                <span className="font-semibold">Automatic deposit:</span>{' '}
-                {depositLabel(reportData.depositData?.depositData)}
-              </p>
-              <p>
-                <span className="font-semibold">Scanner deposit:</span>{' '}
-                {depositLabel(reportData.depositData?.coinData)}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {[
-                ['Handle Customer', reportData.handleCustomer],
-                ['Feedback Completed', reportData.feedBackCompleted],
-                ['Handle Call', reportData.handleCall],
-                ['Incoming Missed', reportData.incomingMissedCall],
-                ['Outgoing Missed', reportData.outgoingMissedCall],
-                [
-                  'Spent Call Time',
-                  `${((reportData.spentCallTime || 0) / 60).toFixed(2)} min`,
-                ],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-md border border-border p-2 text-center">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                    <ShieldCheck className="h-4 w-4 text-primary" />
-                    {value ?? 0}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </ReportDialog>
-    </ReportPage>
+      <Dialog
+        open={Boolean(reportTarget)}
+        onClose={() => setReportTarget(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Caller Report{reportTarget?.name ? ` — ${reportTarget.name}` : ''}
+        </DialogTitle>
+        <DialogContent>
+          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap pt={1}>
+            <TextField
+              type="date"
+              label="From Date"
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              value={reportStartDate}
+              onChange={(e) => setReportStartDate(e.target.value)}
+              sx={headerFieldSx}
+            />
+            <TextField
+              type="date"
+              label="To Date"
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              value={reportEndDate}
+              onChange={(e) => setReportEndDate(e.target.value)}
+              sx={headerFieldSx}
+            />
+            <Button
+              variant="contained"
+              size="small"
+              disabled={!reportStartDate || !reportEndDate || reportLoading}
+              onClick={() => void runCallerReport('range')}
+              sx={{ ...orangeBtnSx, height: 36 }}
+            >
+              Apply
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={reportLoading}
+              onClick={() => void runCallerReport('today')}
+              sx={{ textTransform: 'none' }}
+            >
+              Today
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={reportLoading}
+              onClick={() => void runCallerReport('all')}
+              sx={{ textTransform: 'none' }}
+            >
+              All Data
+            </Button>
+          </Stack>
+
+          {reportLoading ? (
+            <Stack alignItems="center" py={4}>
+              <CircularProgress size={28} />
+            </Stack>
+          ) : reportData ? (
+            <Stack spacing={2} mt={2}>
+              <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap>
+                <Typography variant="body2">
+                  <strong>Automatic deposit:</strong>{' '}
+                  {depositLabel(reportData.depositData?.depositData)}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Scanner deposit:</strong>{' '}
+                  {depositLabel(reportData.depositData?.coinData)}
+                </Typography>
+              </Stack>
+              <Box
+                display="grid"
+                gridTemplateColumns={{ xs: '1fr 1fr', sm: '1fr 1fr 1fr' }}
+                gap={1.5}
+              >
+                {[
+                  ['Handle Customer', reportData.handleCustomer],
+                  ['Feedback Completed', reportData.feedBackCompleted],
+                  ['Handle Call', reportData.handleCall],
+                  ['Incoming Missed', reportData.incomingMissedCall],
+                  ['Outgoing Missed', reportData.outgoingMissedCall],
+                  [
+                    'Spent Call Time',
+                    `${((reportData.spentCallTime || 0) / 60).toFixed(2)} min`,
+                  ],
+                ].map(([label, value]) => (
+                  <Paper key={String(label)} sx={{ p: 1.5, bgcolor: '#121218', textAlign: 'center' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {label}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700}>
+                      {value ?? 0}
+                    </Typography>
+                  </Paper>
+                ))}
+              </Box>
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReportTarget(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

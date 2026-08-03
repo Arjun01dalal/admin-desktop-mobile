@@ -41,7 +41,13 @@ export function PanelPage({
         <div className="flex items-center gap-2">
           {actions}
           {onRefresh && (
-            <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              disabled={loading}
+              className="border-border bg-secondary text-foreground hover:bg-accent"
+            >
               <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
               Refresh
             </Button>

@@ -113,7 +113,7 @@ export function CoinRemovalPage() {
   );
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={2}>
         Coin Removal List
       </Typography>
@@ -139,7 +139,9 @@ export function CoinRemovalPage() {
         getRowKey={(row) => row._id}
         loading={loading}
         emptyMessage="No coin removal records found"
-        minWidth={900}
+        stickyHeader
+        dense
+        maxHeight="calc(100vh - 320px)"
         onRowClick={openDetails}
       />
 

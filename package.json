@@ -1,6 +1,6 @@
 {
   "name": "astro",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Astro CS Panel — Electron desktop app with secure admin login.",
   "main": "electron/main.cjs",
   "author": "Your Name",
@@ -22,7 +22,8 @@
     "release": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --publish always",
     "release:win": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --win --publish always",
     "release:mac": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac --publish always",
-    "release:all": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --mac --win --publish always"
+    "release:all": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --mac --win --publish always",
+    "sos-push": "node services/sos-push/server.cjs"
   },
   "build": {
     "appId": "com.yourcompany.astro",
@@ -105,11 +106,13 @@
     "electron-updater": "^6.3.9",
     "geoip-lite": "^1.4.10",
     "lucide-react": "^1.27.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.4",
     "react-toastify": "^10.0.6",
     "tailwind-merge": "^3.6.0",
+    "ws": "^8.21.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

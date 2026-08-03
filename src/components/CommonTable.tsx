@@ -1,4 +1,13 @@
-import { memo, useCallback, useRef, type MouseEvent, type ReactNode } from 'react';
+import {
+  memo,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import {
   Box,
   CircularProgress,
@@ -34,6 +43,9 @@ export const commonTableStyles = {
     py: 1.25,
     px: 1.5,
     textAlign: 'center',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    verticalAlign: 'middle',
   } satisfies SxProps<Theme>,
   /** Column title row */
   head: {
@@ -114,6 +126,12 @@ export type CommonTableColumn<T> = {
   render: (row: T, index: number) => ReactNode;
   cellSx?: SxProps<Theme>;
   headSx?: SxProps<Theme>;
+  /**
+   * Freeze column on horizontal scroll.
+   * `true` = auto left offset from prior sticky columns' widths.
+   * `number` = explicit left px.
+   */
+  stickyLeft?: boolean | number;
 };
 
 export type CommonTableProps<T> = {
@@ -158,7 +176,61 @@ type BodyRowProps<T> = {
   getRowSx?: (row: T, index: number) => SxProps<Theme> | undefined;
   measureRef?: (node: HTMLTableRowElement | null) => void;
   dataIndex?: number;
+  stickyOffsets?: Map<string, StickyMeta>;
+  stickyBodyBg?: string;
 };
+
+type StickyMeta = { left: number; width: number; isLast: boolean };
+
+function colWidthPx(col: { width?: number | string }, fallback = 120): number {
+  if (typeof col.width === 'number') return col.width;
+  if (typeof col.width === 'string' && col.width.endsWith('px')) {
+    const n = Number(col.width.replace('px', ''));
+    return Number.isFinite(n) ? n : fallback;
+  }
+  return fallback;
+}
+
+function buildStickyOffsets<T>(columns: CommonTableColumn<T>[]): Map<string, StickyMeta> {
+  const map = new Map<string, StickyMeta>();
+  let left = 0;
+  const stickyCols = columns.filter((c) => c.stickyLeft != null && c.stickyLeft !== false);
+  stickyCols.forEach((col, i) => {
+    const width = colWidthPx(col);
+    const offset = typeof col.stickyLeft === 'number' ? col.stickyLeft : left;
+    map.set(col.id, { left: offset, width, isLast: i === stickyCols.length - 1 });
+    left = offset + width;
+  });
+  return map;
+}
+
+/** Freeze column: locked pixel width + opaque fill so scroll cells cannot paint over it. */
+function stickyColSx(
+  meta: StickyMeta | undefined,
+  opts: { top?: number; zIndex: number; bgcolor: string },
+): SxProps<Theme> | undefined {
+  if (!meta) return undefined;
+  return {
+    position: 'sticky',
+    left: meta.left,
+    top: opts.top,
+    zIndex: opts.zIndex,
+    width: meta.width,
+    minWidth: meta.width,
+    maxWidth: meta.width,
+    boxSizing: 'border-box',
+    bgcolor: `${opts.bgcolor} !important`,
+    backgroundColor: `${opts.bgcolor} !important`,
+    backgroundImage: 'none !important',
+    overflow: 'hidden',
+    ...(meta.isLast
+      ? {
+          boxShadow: '12px 0 16px -10px rgba(0,0,0,0.9)',
+          borderRight: '1px solid rgba(255,255,255,0.18)',
+        }
+      : null),
+  };
+}
 
 function BodyRowInner<T>({
   row,
@@ -170,6 +242,8 @@ function BodyRowInner<T>({
   getRowSx,
   measureRef,
   dataIndex,
+  stickyOffsets,
+  stickyBodyBg = '#1a1a1f',
 }: BodyRowProps<T>) {
   const handleClick = useCallback(
     (e: MouseEvent) => {
@@ -196,16 +270,44 @@ function BodyRowInner<T>({
       onClick={onRowClick ? handleClick : undefined}
       sx={[onRowClick ? { cursor: 'pointer' } : undefined, rowSx] as SxProps<Theme>}
     >
-      {columns.map((col) => (
-        <TableCell
-          key={col.id}
-          align={col.align ?? 'center'}
-          width={col.width}
-          sx={[cellBase, col.cellSx] as SxProps<Theme>}
-        >
-          {col.render(row, index)}
-        </TableCell>
-      ))}
+      {columns.map((col) => {
+        const stickyMeta = stickyOffsets?.get(col.id);
+        const widthPx = stickyMeta?.width ?? (typeof col.width === 'number' ? col.width : undefined);
+        return (
+          <TableCell
+            key={col.id}
+            align={col.align ?? 'center'}
+            width={stickyMeta?.width ?? col.width}
+            data-sticky-left={stickyMeta ? 'true' : undefined}
+            sx={
+              [
+                cellBase,
+                widthPx != null &&
+                  (stickyMeta
+                    ? {
+                        width: widthPx,
+                        minWidth: widthPx,
+                        maxWidth: widthPx,
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                      }
+                    : {
+                        // minWidth only — maxWidth + ellipsis clips short numeric cols (e.g. "#").
+                        width: widthPx,
+                        minWidth: widthPx,
+                        boxSizing: 'border-box',
+                      }),
+                stickyMeta
+                  ? stickyColSx(stickyMeta, { zIndex: 30, bgcolor: stickyBodyBg })
+                  : { zIndex: 1 },
+                col.cellSx,
+              ] as SxProps<Theme>
+            }
+          >
+            {col.render(row, index)}
+          </TableCell>
+        );
+      })}
     </TableRow>
   );
 }
@@ -255,6 +357,27 @@ export function CommonTable<T>({
     virtualize === true ||
     (virtualize !== false && rows.length >= virtualizeThreshold);
   const rowHeight = estimateRowHeight ?? (dense ? 40 : 48);
+  const isSticky = stickyHeader || shouldVirtualize;
+  /** Measured header height so sticky filters sit fully below labels (no clipping). */
+  const headLabelRef = useRef<HTMLTableRowElement | null>(null);
+  const [labelRowHeight, setLabelRowHeight] = useState(dense ? 40 : 48);
+  useLayoutEffect(() => {
+    const el = headLabelRef.current;
+    if (!el) return;
+    const update = () => {
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) setLabelRowHeight(h);
+    };
+    update();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [columns, dense, showFilters, tone]);
+  const filterStickyTop = showFilters ? labelRowHeight : 0;
+  const stickyOffsets = useMemo(() => buildStickyOffsets(columns), [columns]);
+  const stickyHeadBg = '#ff9f0a';
+  const stickyFilterBg = tone === 'light' ? '#fff' : '#2c3340';
+  const stickyBodyBg = tone === 'light' ? '#fff' : '#1a1a1f';
 
   const virtualizer = useVirtualizer({
     count: shouldVirtualize ? rows.length : 0,
@@ -275,68 +398,102 @@ export function CommonTable<T>({
     ? virtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0)
     : 0;
 
+  const hasStickyLeft = stickyOffsets.size > 0;
+  // MUI stickyHeader class uses z-index:2 and fights left-freeze stacking — handle top sticky ourselves when freezing columns.
+  const useMuiStickyHeader = (stickyHeader || shouldVirtualize) && !hasStickyLeft;
+
   const table = (
     <Table
       size={size}
-      stickyHeader={stickyHeader || shouldVirtualize}
+      stickyHeader={useMuiStickyHeader}
       sx={{
-        minWidth: minWidth != null ? minWidth : undefined,
-        borderCollapse: 'collapse',
-        '& .MuiTableCell-root': {
-          borderCollapse: 'collapse',
-        },
+        width: '100%',
+        minWidth: minWidth != null ? minWidth : '100%',
+        tableLayout: 'auto',
+        borderCollapse: hasStickyLeft ? 'separate' : 'collapse',
+        borderSpacing: 0,
       }}
     >
       <TableHead>
-        <TableRow>
-          {columns.map((col) => (
-            <TableCell
-              key={col.id}
-              align={col.align ?? 'center'}
-              width={col.width}
-              onClick={
-                col.sortable || col.onHeaderClick ? col.onHeaderClick : undefined
-              }
-              sx={
-                [
-                  headBase,
-                  (col.sortable || col.onHeaderClick) && {
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                  },
-                  col.headSx,
-                ] as SxProps<Theme>
-              }
-            >
-              {col.label}
-            </TableCell>
-          ))}
-        </TableRow>
-        {showFilters && (
-          <TableRow>
-            {columns.map((col) => (
+        <TableRow ref={headLabelRef}>
+          {columns.map((col) => {
+            const stickyMeta = stickyOffsets.get(col.id);
+            return (
               <TableCell
-                key={`${col.id}-filter`}
+                key={col.id}
                 align={col.align ?? 'center'}
-                width={col.width}
+                width={stickyMeta?.width ?? col.width}
+                data-sticky-left={stickyMeta ? 'true' : undefined}
+                onClick={
+                  col.sortable || col.onHeaderClick ? col.onHeaderClick : undefined
+                }
                 sx={
                   [
-                    filterBase,
-                    col.width != null && {
-                      width: col.width,
-                      maxWidth: col.width,
-                      minWidth: col.width,
-                      boxSizing: 'border-box',
-                      overflow: 'hidden',
-                      verticalAlign: 'top',
+                    headBase,
+                    isSticky && {
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: stickyMeta ? 50 : 40,
+                      bgcolor: stickyHeadBg,
+                    },
+                    stickyColSx(stickyMeta, {
+                      top: isSticky ? 0 : undefined,
+                      zIndex: isSticky ? 50 : 45,
+                      bgcolor: stickyHeadBg,
+                    }),
+                    (col.sortable || col.onHeaderClick) && {
+                      cursor: 'pointer',
+                      userSelect: 'none',
                     },
                     col.headSx,
                   ] as SxProps<Theme>
                 }
               >
-                {col.filter ?? null}
+                {col.label}
               </TableCell>
-            ))}
+            );
+          })}
+        </TableRow>
+        {showFilters && (
+          <TableRow>
+            {columns.map((col) => {
+              const stickyMeta = stickyOffsets.get(col.id);
+              return (
+                <TableCell
+                  key={`${col.id}-filter`}
+                  align={col.align ?? 'center'}
+                  width={stickyMeta?.width ?? col.width}
+                  data-sticky-left={stickyMeta ? 'true' : undefined}
+                  sx={
+                    [
+                      filterBase,
+                      isSticky && {
+                        position: 'sticky',
+                        top: filterStickyTop,
+                        zIndex: stickyMeta ? 48 : 38,
+                        bgcolor: stickyFilterBg,
+                      },
+                      stickyColSx(stickyMeta, {
+                        top: isSticky ? filterStickyTop : undefined,
+                        zIndex: isSticky ? 48 : 42,
+                        bgcolor: stickyFilterBg,
+                      }),
+                      !stickyMeta &&
+                        col.width != null && {
+                          width: col.width,
+                          minWidth: col.width,
+                          boxSizing: 'border-box',
+                          overflow: 'visible',
+                          verticalAlign: 'middle',
+                        },
+                      col.headSx,
+                    ] as SxProps<Theme>
+                  }
+                >
+                  {col.filter ?? null}
+                </TableCell>
+              );
+            })}
           </TableRow>
         )}
       </TableHead>
@@ -380,14 +537,17 @@ export function CommonTable<T>({
                 />
               </TableRow>
             )}
-            {virtualItems.map((virtualRow) => (
+            {virtualItems.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              if (row == null) return null;
+              return (
               <BodyRow
                 key={
                   getRowKey
-                    ? getRowKey(rows[virtualRow.index], virtualRow.index)
+                    ? getRowKey(row, virtualRow.index)
                     : virtualRow.key
                 }
-                row={rows[virtualRow.index]}
+                row={row}
                 index={virtualRow.index}
                 columns={columns}
                 cellBase={cellBase}
@@ -396,8 +556,11 @@ export function CommonTable<T>({
                 getRowSx={getRowSx}
                 dataIndex={virtualRow.index}
                 measureRef={virtualizer.measureElement}
+                stickyOffsets={stickyOffsets}
+                stickyBodyBg={stickyBodyBg}
               />
-            ))}
+              );
+            })}
             {paddingBottom > 0 && (
               <TableRow>
                 <TableCell
@@ -410,7 +573,9 @@ export function CommonTable<T>({
         )}
 
         {!shouldVirtualize &&
-          rows.map((row, index) => (
+          rows.map((row, index) => {
+            if (row == null) return null;
+            return (
             <BodyRow
               key={getRowKey ? getRowKey(row, index) : index}
               row={row}
@@ -420,26 +585,65 @@ export function CommonTable<T>({
               hover={hover}
               onRowClick={onRowClick}
               getRowSx={getRowSx}
+              stickyOffsets={stickyOffsets}
+              stickyBodyBg={stickyBodyBg}
             />
-          ))}
+            );
+          })}
       </TableBody>
     </Table>
   );
 
-  const scrollSx = shouldVirtualize
-    ? {
-        ...styles.paper,
-        // Explicit height required for virtualization scrollport (maxHeight alone
-        // can collapse when combined with layout tricks).
-        height: maxHeight,
-        maxHeight,
-        overflow: 'auto',
-        willChange: 'scroll-position',
-      }
-    : styles.paper;
+  // Keep the scrollport width-bound so wide tables scroll inside the paper
+  // instead of expanding the page (overflow:auto alone is not enough).
+  const scrollSx: SxProps<Theme> = {
+    ...styles.paper,
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    // When embedded (paper=false), parent owns scrolling (e.g. freeze panes)
+    overflow: paper ? 'auto' : 'visible',
+    bgcolor: paper ? styles.paper.bgcolor : 'transparent',
+    ...(shouldVirtualize
+      ? {
+          height: maxHeight,
+          maxHeight,
+          overflow: 'auto',
+          willChange: 'scroll-position',
+        }
+      : paper && maxHeight
+        ? { maxHeight }
+        : null),
+    ...(hasStickyLeft
+      ? {
+          '& td[data-sticky-left="true"], & th[data-sticky-left="true"]': {
+            position: 'sticky',
+            backgroundClip: 'padding-box',
+          },
+          '& tbody td[data-sticky-left="true"]': {
+            zIndex: '30 !important',
+          },
+          '& thead th[data-sticky-left="true"]': {
+            zIndex: '50 !important',
+          },
+          '& tbody td:not([data-sticky-left="true"])': {
+            zIndex: '1 !important',
+          },
+        }
+      : null),
+  };
 
   const withOverlay = (node: ReactNode) => (
-    <Box sx={{ position: 'relative' }}>
+    <Box
+      sx={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        // overflow:hidden clips / breaks left-sticky columns in Chromium
+        overflow: hasStickyLeft ? 'visible' : 'hidden',
+      }}
+    >
       {node}
       {loading && rows.length > 0 && (
         <Box
@@ -450,7 +654,7 @@ export function CommonTable<T>({
             alignItems: 'center',
             justifyContent: 'center',
             bgcolor: 'rgba(10, 10, 14, 0.55)',
-            zIndex: 2,
+            zIndex: 60,
             borderRadius: 1,
           }}
         >
@@ -461,12 +665,8 @@ export function CommonTable<T>({
   );
 
   if (!paper) {
-    if (!shouldVirtualize) return withOverlay(table);
     return withOverlay(
-      <Box
-        ref={scrollRef}
-        sx={{ height: maxHeight, maxHeight, overflow: 'auto' }}
-      >
+      <Box ref={scrollRef} sx={scrollSx}>
         {table}
       </Box>,
     );
@@ -484,11 +684,14 @@ export function CopyText({
   value,
   breakAll = false,
   onClick,
+  getCopyValue,
 }: {
   value: string;
   breakAll?: boolean;
   /** Optional — e.g. navigate on text click (copy button still stops propagation). */
   onClick?: () => void;
+  /** Override clipboard text (e.g. gated / decoy copy). Defaults to `value`. */
+  getCopyValue?: () => string;
 }) {
   if (!value) return <>—</>;
 
@@ -519,7 +722,8 @@ export function CopyText({
         size="small"
         onClick={(e) => {
           e.stopPropagation();
-          void copyToClipboard(value);
+          const text = getCopyValue ? getCopyValue() : value;
+          void copyToClipboard(text);
         }}
         aria-label="Copy"
       >

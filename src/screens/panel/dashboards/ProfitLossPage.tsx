@@ -273,7 +273,7 @@ export function ProfitLossPage() {
   );
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Stack
         direction="row"
         alignItems="center"
@@ -281,6 +281,7 @@ export function ProfitLossPage() {
         flexWrap="wrap"
         gap={2}
         mb={2}
+        sx={{ width: '100%' }}
       >
         <Box>
           <Typography variant="h5" fontWeight={700}>
@@ -291,7 +292,7 @@ export function ProfitLossPage() {
           </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexShrink: 0 }}>
           <TextField
             select
             label="Items Per Page"
@@ -301,7 +302,7 @@ export function ProfitLossPage() {
               setPageSize(Number(e.target.value));
               setPage(1);
             }}
-            sx={{ width: 140 }}
+            sx={{ width: 140, flexShrink: 0 }}
           >
             {PAGE_SIZES.map((opt) => (
               <MenuItem key={opt} value={opt}>
@@ -317,6 +318,7 @@ export function ProfitLossPage() {
             }
             onClick={() => void refetch()}
             disabled={loading}
+            sx={{ flexShrink: 0 }}
           >
             Refresh
           </Button>
@@ -337,8 +339,8 @@ export function ProfitLossPage() {
           loading={loading}
           emptyMessage="No records found"
           stickyHeader
-          minWidth={1100}
           dense
+          maxHeight="calc(100vh - 280px)"
         />
       </ProfitLossFiltersProvider>
 
