@@ -118,7 +118,11 @@ export async function secureApi<T = unknown>(
       ok: true,
       success: data?.success !== false,
       status: res.status,
-      message: typeof data?.message === 'string' ? data.message :
+      message: typeof data?.message === 'string' ? data.message : undefined,
+      token: typeof data?.token === 'string' ? data.token : undefined,
+      data: payloadOut as T,
+    };
+  } catch (err) {
     const message =
       err instanceof Error && err.name === 'AbortError'
         ? 'Request timed out'
