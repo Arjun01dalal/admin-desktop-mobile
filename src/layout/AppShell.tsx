@@ -15,11 +15,6 @@ import {
   DialogContent,
   DialogActions,
   Stack,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormHelperText,
   InputAdornment,
   TextField,
 } from '@mui/material';
@@ -33,9 +28,9 @@ import { AstroLogo } from '@/components/AstroLogo';
 import { BackButton } from '@/components/BackButton';
 import { secureApi } from '@/api/secureClient';
 import {
+  buildSosEnablePayload,
   canAccessNavItem,
   canShowSos,
-  canShowSosTypeLocation,
   getResponsibilities,
   getRoleId,
   getSessionUser,
@@ -47,12 +42,6 @@ import { useSosFlagGuard } from '@/hooks/useSosFlagGuard';
 
 const DRAWER_WIDTH = 240;
 
-const SOS_TYPES = ['Individual', 'Office', 'All'] as const;
-const SOS_LOCATIONS = ['Dubai', 'Dubai / Nagpur', 'Nagpur'] as const;
-
-type SosType = (typeof SOS_TYPES)[number];
-type SosLocation = (typeof SOS_LOCATIONS)[number];
-
 type Props = {
   onLogout: () => void;
 };
@@ -62,9 +51,6 @@ export function AppShell({ onLogout }: Props) {
   const location = useLocation();
   const [sosOpen, setSosOpen] = useState(false);
   const [sosLoading, setSosLoading] = useState(false);
-  const [sosType, setSosType] = useState<SosType | ''>('');
-  const [sosLocation, setSosLocation] = useState<SosLocation | ''>('');
-  const [sosFormError, setSosFormError] = useState('');
   const [userVersion, setUserVersion] = useState(0);
   const [navSearch, setNavSearch] = useState('');
 
@@ -72,7 +58,6 @@ export function AppShell({ onLogout }: Props) {
   const responsibilities = getResponsibilities(user);
   const roleKey = `${getRoleId(user)}|${responsibilities.join(',')}|${userVersion}`;
   const sosExempt = isSosExemptRole(user);
-  const showSosDetails = canShowSosTypeLocation(user);
 
   const navItems = useMemo(
     () => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)),
@@ -177,6 +162,14 @@ export function AppShell({ onLogout }: Props) {
     });
   }, []);
 
+  // So office-based SOS can suppress popup on this office's panels.
+  useEffect(() => {
+    window.gcalc?.setSosLocalContext?.({
+      officeLocation: String(user?.officeLocation || user?.location || ''),
+      userId: String(user?._id || ''),
+    });
+  }, [user?._id, user?.officeLocation, user?.location]);
+
   useEffect(() => {
     const bump = () => setUserVersion((v) => v + 1);
     window.addEventListener('gcalc:user-updated', bump);
@@ -193,52 +186,35 @@ export function AppShell({ onLogout }: Props) {
     }
   }, [location.pathname, allowedPaths, navigate]);
 
-  const resetSosForm = () => {
-    setSosType('');
-    setSosLocation('');
-    setSosFormError('');
-  };
-
   const confirmSos = async () => {
     if (sosLoading) return;
 
-    if (showSosDetails) {
-      if (!sosType) {
-        setSosFormError('Type is required');
-        return;
-      }
-      if (sosType === 'Office' && !sosLocation) {
-        setSosFormError('Location is required for Office');
-        return;
-      }
+    const built = buildSosEnablePayload(user);
+    if (!built.ok) {
+      toast.error(built.message);
+      return;
     }
 
-    setSosFormError('');
     setSosLoading(true);
     try {
-      const payload: Record<string, unknown> = {
-        enabled: true,
-      };
-      if (showSosDetails) {
-        payload.type = sosType;
-        if (sosType === 'Office') {
-          payload.location = sosLocation;
-        }
-      } else {
-        // Restricted roles have no Type dropdown — treat as Individual.
-        payload.type = 'Individual';
-      }
-
-      const res = await secureApi('auth.sosFlag', payload);
+      const res = await secureApi('auth.sosFlag', built.payload);
       if (!res.ok) {
         toast.error(res.message || 'Failed to send SOS alert');
         return;
       }
       toast.error('SOS alert sent. Support will contact you shortly.');
       setSosOpen(false);
-      resetSosForm();
       setSosEnabled(true);
-      window.gcalc?.sosActivated?.();
+      // Originator panel: no local siren/ack popup. Push still goes to other devices.
+      window.gcalc?.setSosLocalContext?.({
+        officeLocation: String(user?.officeLocation || user?.location || ''),
+        userId: String(user?._id || ''),
+      });
+      window.gcalc?.sosActivated?.({
+        silent: true,
+        type: String(built.payload.type || ''),
+        location: String(built.payload.location || ''),
+      });
       if (!sosExempt) {
         onLogout();
       } else {
@@ -255,7 +231,7 @@ export function AppShell({ onLogout }: Props) {
     if (sosLoading) return;
     setSosLoading(true);
     try {
-      const res = await secureApi('auth.sosFlag', { enabled: false });
+      const res = await secureApi('auth.sosFlag', { enabled: false, type: 'all' });
       if (!res.ok) {
         toast.error(res.message || 'Failed to unblock users');
         return;
@@ -463,7 +439,6 @@ export function AppShell({ onLogout }: Props) {
         onClose={() => {
           if (!sosLoading) {
             setSosOpen(false);
-            resetSosForm();
           }
         }}
         maxWidth="xs"
@@ -484,78 +459,11 @@ export function AppShell({ onLogout }: Props) {
               <strong>{user?.name || user?.mobile || 'Admin'}</strong>
               {user?.empCode ? ` · Emp ${user.empCode}` : ''}.
             </Typography>
-
-            {showSosDetails && (
-              <>
-                <FormControl
-                  fullWidth
-                  size="small"
-                  required
-                  error={Boolean(sosFormError) && !sosType}
-                >
-                  <InputLabel id="sos-type-label">Type</InputLabel>
-                  <Select
-                    labelId="sos-type-label"
-                    label="Type"
-                    value={sosType}
-                    disabled={sosLoading}
-                    onChange={(e) => {
-                      const next = e.target.value as SosType | '';
-                      setSosType(next);
-                      if (next !== 'Office') setSosLocation('');
-                      setSosFormError('');
-                    }}
-                  >
-                    {SOS_TYPES.map((item) => (
-                      <MenuItem key={item} value={item}>
-                        {item}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                {sosType === 'Office' && (
-                  <FormControl
-                    fullWidth
-                    size="small"
-                    required
-                    error={Boolean(sosFormError) && !sosLocation}
-                  >
-                    <InputLabel id="sos-location-label">Location</InputLabel>
-                    <Select
-                      labelId="sos-location-label"
-                      label="Location"
-                      value={sosLocation}
-                      disabled={sosLoading}
-                      onChange={(e) => {
-                        setSosLocation(e.target.value as SosLocation);
-                        setSosFormError('');
-                      }}
-                    >
-                      {SOS_LOCATIONS.map((item) => (
-                        <MenuItem key={item} value={item}>
-                          {item}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
-              </>
-            )}
-
-            {sosFormError ? (
-              <FormHelperText error sx={{ mx: 0 }}>
-                {sosFormError}
-              </FormHelperText>
-            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button
-            onClick={() => {
-              setSosOpen(false);
-              resetSosForm();
-            }}
+            onClick={() => setSosOpen(false)}
             color="inherit"
             disabled={sosLoading}
           >
@@ -564,11 +472,7 @@ export function AppShell({ onLogout }: Props) {
           <Button
             variant="contained"
             color="error"
-            disabled={
-              sosLoading ||
-              (showSosDetails &&
-                (!sosType || (sosType === 'Office' && !sosLocation)))
-            }
+            disabled={sosLoading}
             onClick={() => void confirmSos()}
           >
             {sosLoading ? 'Sending…' : 'Confirm SOS'}

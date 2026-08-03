@@ -684,9 +684,16 @@ function registerIpc() {
 
   ipcMain.handle('update:get-status', async () => lastUpdateEvent);
 
+  ipcMain.handle('sos:get-state', async () => ({
+    active: Boolean(sosMonitor && typeof sosMonitor.isActive === 'function'
+      ? sosMonitor.isActive()
+      : false),
+  }));
+
   // Broadcast SOS to other devices via push topic (ntfy).
-  ipcMain.on('sos:activated', () => {
-    void pushClient?.publishSos?.();
+  // Local siren/popup is handled by sosMonitor (may suppress originator / same office).
+  ipcMain.on('sos:activated', (_event, meta = {}) => {
+    void pushClient?.publishSos?.(meta && typeof meta === 'object' ? meta : {});
   });
   ipcMain.on('sos:cleared', () => {
     void pushClient?.publishClear?.();
@@ -748,11 +755,12 @@ app.whenReady().then(() => {
   sosMonitor = startSosMonitor({
     getMainWindow: () => win,
     getToken: () => cachedAuthToken,
+    getUserDataPath: () => app.getPath('userData'),
   });
 
   // Cross-device SOS push (ntfy). Requires SOS_PUSH_TOPIC in .env.
   pushClient = startPushClient({
-    onSosActivated: () => sosMonitor?.forceActive?.(),
+    onSosActivated: (meta) => sosMonitor?.forceActive?.(meta || {}),
     onSosCleared: () => sosMonitor?.forceClear?.(),
   });
 

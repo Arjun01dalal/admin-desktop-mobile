@@ -135,34 +135,30 @@ const SOS_EXEMPT_ROLE_IDS = new Set<string>([
   '6a33c137a6558491e0d20464',
 ]);
 
-/**
- * Roles that skip Type / Location on the SOS confirm dialog.
- * Matched by Role_Name variants and known Role_IDs.
- */
-const SOS_DETAILS_HIDDEN_ROLE_NAMES = new Set([
-  'user_coin',
-  'user&coin',
-  'user & coin',
-  'userandcoin',
-  'banner_new',
-  'bannernew',
-  'accounts_new',
-  'accountsnew',
-  'caller_new',
-  'callernew',
-  'support_new',
-  'supportnew',
-  'banner',
-  'checker_new',
-  'checkernew',
+/** SOS payload `type` values expected by `/SubAdmin/sos-flag`. */
+export type SosFlagType = 'individual' | 'office-based' | 'all';
+
+/** Role_IDs that send SOS as `type: "all"`. */
+const SOS_TYPE_ALL_ROLE_IDS = new Set<string>([
+  '64f710d9a2ab78980020c5fb',
+  '6a33c137a6558491e0d20464',
+  '68677d68598bcfdd1393885b',
+  '658a877056138bb0bc4eba35',
 ]);
 
-const SOS_DETAILS_HIDDEN_ROLE_IDS = new Set<string>([
-  '686242053cc84c862f86c148', // checker_new
-  '6864c9d33cc84c862f86c17a', // support_new
-  '6864ced73cc84c862f86c17f', // caller_new
-  '686bb681aa619b0a00f8527e', // accounts_new
-  '686bbadcaa619b0a00f85280', // banner_new
+/** Role_IDs that send SOS as `type: "office-based"` (+ location). */
+const SOS_TYPE_OFFICE_ROLE_IDS = new Set<string>([
+  '6862429e3cc84c862f86c14a',
+  '686385ae3cc84c862f86c159',
+  '686385d83cc84c862f86c15a',
+  '687e3a0729c8faf0071a89ed',
+  '68809af929c8faf0071a8a20',
+  '68ad566d752033c0eb673b95',
+  '68cec78a752033c0eb673e56',
+  '6905e23abc805e57b6855913',
+  '6972104ee8e409d797e793c3',
+  '6994bc5d38a4bf7ee841daa8',
+  '69f34657f096f799a6e5dda7',
 ]);
 
 /**
@@ -546,29 +542,48 @@ export function canShowSos(_user: StoredUser | null = getSessionUser()): boolean
   return true;
 }
 
-/**
- * Type / Location dropdowns on SOS confirm — hidden for restricted roles
- * (User & Coin, banner_new, accounts_new, caller_new, support_new, banner, checker_new).
- */
-export function canShowSosTypeLocation(
+/** Resolve SOS type from the logged-in Role_ID (default: individual). */
+export function getSosTypeForRole(
   user: StoredUser | null = getSessionUser(),
-): boolean {
+): SosFlagType {
   const roleId = getRoleId(user);
-  if (roleId && SOS_DETAILS_HIDDEN_ROLE_IDS.has(roleId)) return false;
-  // All caller / caller_new Role_IDs skip Type/Location.
-  if (roleId && CALLER_ROLE_IDS.has(roleId) && !CALLER_HEAD_ROLE_IDS.has(roleId)) {
-    return false;
-  }
+  if (roleId && SOS_TYPE_ALL_ROLE_IDS.has(roleId)) return 'all';
+  if (roleId && SOS_TYPE_OFFICE_ROLE_IDS.has(roleId)) return 'office-based';
+  return 'individual';
+}
 
-  for (const candidate of collectRoleNameCandidates(user)) {
-    if (roleNameVariants(candidate).some((v) => SOS_DETAILS_HIDDEN_ROLE_NAMES.has(v))) {
-      return false;
+/**
+ * Build `/SubAdmin/sos-flag` enable payload from Role_ID.
+ * - all → `{ enabled, type: "all" }`
+ * - office-based → `{ enabled, type, location }` (from user.officeLocation)
+ * - individual → `{ enabled, type, targetCallerId }` (user._id)
+ */
+export function buildSosEnablePayload(
+  user: StoredUser | null = getSessionUser(),
+): { ok: true; payload: Record<string, unknown> } | { ok: false; message: string } {
+  const type = getSosTypeForRole(user);
+  const payload: Record<string, unknown> = {
+    enabled: true,
+    type,
+  };
+
+  if (type === 'individual') {
+    const targetCallerId = String(user?._id || '').trim();
+    if (!targetCallerId) {
+      return { ok: false, message: 'Missing user id for individual SOS' };
     }
-    const normalized = normalizeRoleName(candidate);
-    if (SOS_DETAILS_HIDDEN_ROLE_NAMES.has(normalized)) return false;
+    payload.targetCallerId = targetCallerId;
+  } else if (type === 'office-based') {
+    const location = String(
+      user?.officeLocation || user?.location || '',
+    ).trim();
+    if (!location) {
+      return { ok: false, message: 'Office location is required for office-based SOS' };
+    }
+    payload.location = location;
   }
 
-  return true;
+  return { ok: true, payload };
 }
 
 /** These roles stay logged into the panel when SOS lock is active. */

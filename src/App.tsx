@@ -479,15 +479,31 @@ export default function App() {
       return;
     }
     let cancelled = false;
+
+    const apply = (active: boolean) => {
+      if (cancelled) return;
+      sosBlocksLoginRef.current = active;
+      // Observing SOS via API must not trigger local siren / re-broadcast.
+      if (!active) window.gcalc?.sosCleared?.();
+    };
+
+    // Main process keeps SOS after logout (token cleared in renderer).
+    void window.gcalc?.getSosState?.().then((state) => {
+      if (!cancelled && state?.active) {
+        sosBlocksLoginRef.current = true;
+      }
+    });
+
+    const unsubscribe = window.gcalc?.onSosState?.((d) => {
+      sosBlocksLoginRef.current = Boolean(d?.active);
+    });
+
     const poll = async () => {
+      if (!localStorage.getItem('token')) return;
       try {
         const res = await secureApi('auth.getSosFlag', {});
         if (cancelled || !res.ok) return;
-        const active = isSosFlagEnabled(res.data);
-        sosBlocksLoginRef.current = active;
-        // Site shell (panel off) — still surface SOS alert + siren via main.
-        if (active) window.gcalc?.sosActivated?.();
-        else window.gcalc?.sosCleared?.();
+        apply(isSosFlagEnabled(res.data));
       } catch {
         // ignore
       }
@@ -498,6 +514,7 @@ export default function App() {
     }, 10_000);
     return () => {
       cancelled = true;
+      unsubscribe?.();
       window.clearInterval(id);
     };
   }, [screen]);

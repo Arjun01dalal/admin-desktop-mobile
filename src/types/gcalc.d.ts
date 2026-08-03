@@ -98,10 +98,21 @@ export type GCalcApi = {
     at?: number;
   } | null>;
   installUpdate: () => void;
-  /** Immediate local SOS alert (main process). */
-  sosActivated: () => void;
+  /** Immediate local SOS alert (main process). Pass `{ silent: true }` for originator. */
+  sosActivated: (meta?: {
+    silent?: boolean;
+    self?: boolean;
+    type?: string;
+    location?: string;
+  }) => void;
   /** Clear local SOS alert (main process). */
   sosCleared: () => void;
+  /** Tell main this panel's office location (office-based SOS suppress). */
+  setSosLocalContext: (ctx: { officeLocation?: string; userId?: string }) => void;
+  /** SOS state known by main (no renderer token required). */
+  getSosState: () => Promise<{ active?: boolean }>;
+  /** Subscribe to main-process SOS state changes. Returns unsubscribe. */
+  onSosState: (cb: (d: { active?: boolean }) => void) => () => void;
 };
 
 declare global {

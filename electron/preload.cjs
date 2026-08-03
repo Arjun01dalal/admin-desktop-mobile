@@ -66,7 +66,28 @@ contextBridge.exposeInMainWorld('gcalc', {
   installUpdate: () => ipcRenderer.send('update:install'),
 
   /** Tell main process SOS was just activated on this machine (immediate alert). */
-  sosActivated: () => ipcRenderer.send('sos:activated'),
+  sosActivated: (meta) =>
+    ipcRenderer.send(
+      'sos:activated',
+      meta && typeof meta === 'object' && !Array.isArray(meta) ? meta : {},
+    ),
   /** Tell main process SOS was cleared on this machine. */
   sosCleared: () => ipcRenderer.send('sos:cleared'),
+  /** Persist this panel's office location for office-based SOS suppress. */
+  setSosLocalContext: (ctx) =>
+    ipcRenderer.send(
+      'sos:set-local-context',
+      ctx && typeof ctx === 'object' && !Array.isArray(ctx) ? ctx : {},
+    ),
+  /** Current SOS flag known by main (works without renderer token). */
+  getSosState: () => safeInvoke('sos:get-state'),
+  /** Subscribe to SOS active/cleared from main (sosMonitor / push). */
+  onSosState: (cb) => {
+    if (typeof cb !== 'function') return () => {};
+    const handler = (_e, d) => cb(d);
+    ipcRenderer.on('sos:state', handler);
+    return () => {
+      ipcRenderer.removeListener('sos:state', handler);
+    };
+  },
 });

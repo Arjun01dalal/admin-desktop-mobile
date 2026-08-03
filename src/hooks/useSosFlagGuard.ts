@@ -81,8 +81,8 @@ export function useSosFlagGuard({ enabled, isExempt, onKick }: Options): {
         return;
       }
 
-      window.gcalc?.sosActivated?.();
-
+      // Do NOT call sosActivated here — that would siren the observing panel
+      // (and the originator). Main sosMonitor + push handle remote alerts.
       if (isExemptRef.current() || kickedRef.current) return;
       kickedRef.current = true;
       onKickRef.current();

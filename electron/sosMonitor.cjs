@@ -20,6 +20,7 @@ const secureApi = require('./secure/index.cjs');
 
 const POLL_MS = 3_000;
 const NOTIFICATION_RENEW_MS = 8_000;
+const LOCAL_CONTEXT_FILE = 'sos-local-context.json';
 
 function truthyFlag(value) {
   if (value === true || value === 1) return true;
@@ -28,6 +29,26 @@ function truthyFlag(value) {
     return v === 'true' || v === '1' || v === 'yes' || v === 'on';
   }
   return false;
+}
+
+function normalizeLocation(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/,/g, '/');
+}
+
+/** Dubai vs "Dubai / Nagpur" etc. — treat overlapping office labels as the same site. */
+function locationsMatch(a, b) {
+  const na = normalizeLocation(a);
+  const nb = normalizeLocation(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const partsA = na.split('/').filter(Boolean);
+  const partsB = nb.split('/').filter(Boolean);
+  return partsA.some((p) => partsB.includes(p));
 }
 
 function isSosFlagEnabled(payload) {
@@ -55,6 +76,22 @@ function isSosFlagEnabled(payload) {
   return false;
 }
 
+/** Pull type / location from get-sos-flag (or push) payloads when present. */
+function extractSosMeta(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return { type: '', location: '' };
+  }
+  const nest =
+    (payload.data && typeof payload.data === 'object' && payload.data) ||
+    (payload.payload && typeof payload.payload === 'object' && payload.payload) ||
+    payload;
+  const type = String(nest.type || nest.sosType || nest.sos_type || '').trim();
+  const location = String(
+    nest.location || nest.officeLocation || nest.office_location || '',
+  ).trim();
+  return { type, location };
+}
+
 function alertHtmlPath() {
   return path.join(__dirname, 'sos-alert.html');
 }
@@ -63,9 +100,10 @@ function alertHtmlPath() {
  * @param {{
  *   getMainWindow: () => import('electron').BrowserWindow | null,
  *   getToken: () => string | null,
+ *   getUserDataPath?: () => string,
  * }} opts
  */
-function startSosMonitor({ getMainWindow, getToken }) {
+function startSosMonitor({ getMainWindow, getToken, getUserDataPath }) {
   let sosActive = false;
   let acknowledged = false;
   let alertWin = null;
@@ -74,9 +112,75 @@ function startSosMonitor({ getMainWindow, getToken }) {
   let pollTimer = null;
   let ipcRegistered = false;
   let lastLoggedNoToken = 0;
+  /** This machine pressed SOS — no siren/popup here until cleared. */
+  let suppressOriginatorAlert = false;
+  /** Last known SOS meta (from silent activate / push / API). */
+  let activeSosMeta = { type: '', location: '' };
+  /** Logged-in user's office (for office-based suppress on peers). */
+  let localOfficeLocation = '';
+
+  function contextPath() {
+    try {
+      const base =
+        typeof getUserDataPath === 'function'
+          ? getUserDataPath()
+          : path.join(__dirname, '..');
+      return path.join(base, LOCAL_CONTEXT_FILE);
+    } catch {
+      return null;
+    }
+  }
+
+  function loadLocalContext() {
+    try {
+      const p = contextPath();
+      if (!p || !fs.existsSync(p)) return;
+      const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+      localOfficeLocation = String(raw?.officeLocation || '').trim();
+    } catch {
+      // ignore
+    }
+  }
+
+  function saveLocalContext() {
+    try {
+      const p = contextPath();
+      if (!p) return;
+      fs.writeFileSync(
+        p,
+        JSON.stringify({ officeLocation: localOfficeLocation }, null, 0),
+        'utf8',
+      );
+    } catch (err) {
+      log('could not persist local SOS context:', err?.message || err);
+    }
+  }
+
+  loadLocalContext();
 
   function log(...args) {
     console.log('[sosMonitor]', ...args);
+  }
+
+  function shouldSuppressAlert(meta = {}) {
+    if (suppressOriginatorAlert) return true;
+    const type = String(meta.type || activeSosMeta.type || '').trim().toLowerCase();
+    const location = String(meta.location || activeSosMeta.location || '').trim();
+    if (
+      (type === 'office-based' || type === 'office') &&
+      location &&
+      locationsMatch(localOfficeLocation, location)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  function rememberMeta(meta = {}) {
+    const type = String(meta.type || '').trim();
+    const location = String(meta.location || '').trim();
+    if (type) activeSosMeta.type = type;
+    if (location) activeSosMeta.location = location;
   }
 
   function focusMainWindow() {
@@ -256,21 +360,44 @@ function startSosMonitor({ getMainWindow, getToken }) {
     destroyAlertWindow();
   }
 
-  function onSosState(active, source = 'poll') {
-    const wasActive = sosActive;
-    sosActive = active;
+  function notifyRenderer() {
+    try {
+      const mainWin = typeof getMainWindow === 'function' ? getMainWindow() : null;
+      if (mainWin && !mainWin.isDestroyed()) {
+        mainWin.webContents.send('sos:state', { active: sosActive });
+      }
+    } catch {
+      // ignore
+    }
+  }
 
-    if (active) {
+  function onSosState(active, source = 'poll', opts = {}) {
+    const wasActive = sosActive;
+    sosActive = Boolean(active);
+
+    if (sosActive !== wasActive) {
+      notifyRenderer();
+    }
+
+    if (sosActive) {
       if (!wasActive) {
         acknowledged = false;
-        log('SOS ACTIVE via', source);
+        log('SOS ACTIVE via', source, opts.skipAlert ? '(alert suppressed)' : '');
       }
-      startAlerting();
+      if (!opts.skipAlert && !shouldSuppressAlert(opts.meta || {})) {
+        startAlerting();
+      } else if (opts.skipAlert || shouldSuppressAlert(opts.meta || {})) {
+        // Originator / same office — keep lock state, no siren/popup.
+        clearAlerting();
+        log('alert suppressed for this panel');
+      }
       return;
     }
 
     if (wasActive) log('SOS CLEARED via', source);
     acknowledged = false;
+    suppressOriginatorAlert = false;
+    activeSosMeta = { type: '', location: '' };
     clearAlerting();
   }
 
@@ -291,7 +418,17 @@ function startSosMonitor({ getMainWindow, getToken }) {
         log('getSosFlag failed:', res?.message || res?.status || 'unknown');
         return;
       }
-      onSosState(isSosFlagEnabled(res.data), 'poll');
+      const active = isSosFlagEnabled(res.data);
+      if (active) {
+        const meta = extractSosMeta(res.data);
+        rememberMeta(meta);
+        onSosState(true, 'poll', {
+          meta,
+          skipAlert: shouldSuppressAlert(meta),
+        });
+      } else {
+        onSosState(false, 'poll');
+      }
     } catch (err) {
       log('poll error:', err?.message || err);
     }
@@ -302,11 +439,37 @@ function startSosMonitor({ getMainWindow, getToken }) {
     ipcMain.on('sos:acknowledge', () => {
       acknowledge();
     });
-    ipcMain.on('sos:activated', () => {
-      onSosState(true, 'ipc');
+    ipcMain.on('sos:activated', (_event, meta = {}) => {
+      const payload = meta && typeof meta === 'object' ? meta : {};
+      const silent = Boolean(payload.silent || payload.self);
+      rememberMeta(payload);
+      if (silent) {
+        suppressOriginatorAlert = true;
+      }
+      // Same office as an office-based SOS → treat like originator site (no popup).
+      if (
+        String(payload.type || '').toLowerCase() === 'office-based' &&
+        payload.location &&
+        locationsMatch(localOfficeLocation, payload.location)
+      ) {
+        suppressOriginatorAlert = true;
+      }
+      onSosState(true, 'ipc', {
+        meta: payload,
+        skipAlert: silent || shouldSuppressAlert(payload),
+      });
     });
     ipcMain.on('sos:cleared', () => {
       onSosState(false, 'ipc');
+    });
+    ipcMain.on('sos:set-local-context', (_event, ctx = {}) => {
+      if (ctx && typeof ctx === 'object') {
+        if (ctx.officeLocation != null) {
+          localOfficeLocation = String(ctx.officeLocation || '').trim();
+          saveLocalContext();
+          log('local office location set:', localOfficeLocation || '(empty)');
+        }
+      }
     });
   }
 
@@ -326,9 +489,17 @@ function startSosMonitor({ getMainWindow, getToken }) {
     refresh() {
       void poll();
     },
-    /** Force alert from push / external trigger. */
-    forceActive() {
-      onSosState(true, 'push');
+    isActive() {
+      return sosActive;
+    },
+    /** Force alert from push / external trigger (may be suppressed). */
+    forceActive(meta = {}) {
+      const payload = meta && typeof meta === 'object' ? meta : {};
+      rememberMeta(payload);
+      onSosState(true, 'push', {
+        meta: payload,
+        skipAlert: shouldSuppressAlert(payload),
+      });
     },
     forceClear() {
       onSosState(false, 'push');
@@ -336,4 +507,4 @@ function startSosMonitor({ getMainWindow, getToken }) {
   };
 }
 
-module.exports = { startSosMonitor, isSosFlagEnabled };
+module.exports = { startSosMonitor, isSosFlagEnabled, locationsMatch, extractSosMeta };

@@ -12,25 +12,27 @@ const SOS_POLL_MS = 10_000;
 /**
  * Under the Electron BrowserView (admin.astrothirdeye.com).
  * Bottom bar: Login to main panel only when sosEnabled is false.
+ *
+ * Prefer main-process SOS state — after a SOS kick the renderer token is
+ * cleared, so get-sos-flag alone cannot hide the Login button.
  */
 export function AstroSite({ onOpenLogin }: Props) {
   const [sosEnabled, setSosEnabled] = useState(false);
   const [sosReady, setSosReady] = useState(false);
 
-  const refreshSos = useCallback(async () => {
+  const refreshSosFromApi = useCallback(async () => {
+    // get-sos-flag needs a Bearer token — skip when logged out.
+    if (!localStorage.getItem('token')) return;
     try {
       const res = await secureApi('auth.getSosFlag', {});
       if (res.ok) {
         const active = isSosFlagEnabled(res.data);
         setSosEnabled(active);
-        // Panel may be closed (site only) — still trigger main-process alert + siren.
-        if (active) window.gcalc?.sosActivated?.();
-        else window.gcalc?.sosCleared?.();
+        // Observing only — never re-trigger originator-style sosActivated.
+        if (!active) window.gcalc?.sosCleared?.();
       }
     } catch {
       // Keep last known value on blips.
-    } finally {
-      setSosReady(true);
     }
   }, []);
 
@@ -41,13 +43,41 @@ export function AstroSite({ onOpenLogin }: Props) {
     };
   }, []);
 
+  // Main process knows SOS even after logout (persisted token + sosMonitor).
   useEffect(() => {
-    void refreshSos();
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const state = await window.gcalc?.getSosState?.();
+        if (!cancelled && state?.active) {
+          setSosEnabled(true);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setSosReady(true);
+      }
+    })();
+
+    const unsubscribe = window.gcalc?.onSosState?.((d) => {
+      setSosEnabled(Boolean(d?.active));
+      setSosReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    void refreshSosFromApi();
     const id = window.setInterval(() => {
-      void refreshSos();
+      void refreshSosFromApi();
     }, SOS_POLL_MS);
     return () => window.clearInterval(id);
-  }, [refreshSos]);
+  }, [refreshSosFromApi]);
 
   const showLogin = sosReady && !sosEnabled;
 
@@ -113,6 +143,10 @@ export function AstroSite({ onOpenLogin }: Props) {
           >
             Login to Panel
           </Button>
+        ) : sosReady && sosEnabled ? (
+          <Typography variant="body2" color="error.light" fontWeight={700}>
+            SOS active — login disabled
+          </Typography>
         ) : null}
       </Box>
     </Box>

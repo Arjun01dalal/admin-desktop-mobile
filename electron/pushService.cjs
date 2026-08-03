@@ -66,9 +66,10 @@ function startPushClient(handlers = {}) {
     if (msg.id) lastMsgId = msg.id;
 
     const title = String(msg.title || '').toLowerCase();
-    const body = String(msg.message || msg.body || '').toLowerCase();
+    const body = String(msg.message || msg.body || '');
+    const bodyLower = body.toLowerCase();
     const tags = Array.isArray(msg.tags) ? msg.tags.join(',') : String(msg.tags || '');
-    const combined = `${title} ${body} ${tags}`;
+    const combined = `${title} ${bodyLower} ${tags}`;
 
     if (/\bSOS_CLEAR\b/i.test(combined) || combined.includes('sos cleared') || combined.includes('sos_clear')) {
       log('received SOS clear');
@@ -81,8 +82,14 @@ function startPushClient(handlers = {}) {
       tags.includes('siren') ||
       tags.includes('rotating_light')
     ) {
-      log('received SOS activate');
-      handlers.onSosActivated?.();
+      const typeMatch = body.match(/\btype=([^\s]+)/i);
+      const locMatch = body.match(/\blocation=(.+?)(?:\s*::|\s*$)/i);
+      const meta = {
+        type: typeMatch ? String(typeMatch[1] || '').trim() : '',
+        location: locMatch ? String(locMatch[1] || '').trim() : '',
+      };
+      log('received SOS activate', meta);
+      handlers.onSosActivated?.(meta);
     }
   }
 
@@ -159,8 +166,15 @@ function startPushClient(handlers = {}) {
       }
       ws = null;
     },
-    publishSos() {
-      return publish('SOS ALERT', 'SOS_ACTIVE — Emergency SOS has been activated. Open Astro CS Panel.');
+    publishSos(meta = {}) {
+      const type = String(meta?.type || '').trim();
+      const location = String(meta?.location || '').trim();
+      const parts = ['SOS_ACTIVE'];
+      if (type) parts.push(`type=${type}`);
+      // `::` terminator so location may contain spaces / slashes.
+      if (location) parts.push(`location=${location}`);
+      parts.push(':: Emergency SOS has been activated. Open Astro CS Panel.');
+      return publish('SOS ALERT', parts.join(' '));
     },
     publishClear() {
       return publish('SOS cleared', 'SOS_CLEAR — SOS lock has been cleared.', {
