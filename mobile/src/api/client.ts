@@ -11,9 +11,12 @@ import { appStorage } from '../lib/webShim';
 
 export type ApiResult<T = unknown> = {
   ok: boolean;
+  success?: boolean;
   data?: T;
   message?: string;
   status?: number;
+  /** Outer envelope token (e.g. verify-otp returns the session token at response.data.token). */
+  token?: string;
 };
 
 function pickMessage(body: unknown, fallback: string): string {
@@ -78,26 +81,44 @@ export async function secureApi<T = unknown>(
       };
     }
 
-    let data: unknown = json;
-    if (entry.decryptResponse && json && typeof json === 'object') {
-      const envelope = json as Record<string, unknown>;
-      if (typeof envelope.data === 'string') {
-        envelope.data = decryptPayload(envelope.data);
+    // Mirrors electron/secure/index.cjs execute() exactly.
+    let data = (json ?? {}) as Record<string, unknown>;
+
+    if (entry.decryptResponse && data?.data != null) {
+      try {
+        if (typeof data.data === 'string') {
+          // Match desktop decryptData — keep full envelope ({ payload: ... }).
+          data = { ...data, data: decryptPayload(data.data as string) };
+        } else if (
+          !entry.keepDataEnvelope &&
+          (data.data as Record<string, unknown>)?.payload !== undefined
+        ) {
+          data = { ...data, data: (data.data as Record<string, unknown>).payload };
+        }
+      } catch (err) {
+        if (typeof data.data === 'string') {
+          return {
+            ok: false,
+            status: res.status,
+            message: err instanceof Error ? err.message : 'Decrypt failed',
+          };
+        }
       }
     }
 
-    if (!entry.keepDataEnvelope && data && typeof data === 'object') {
-      const d = data as Record<string, unknown>;
-      const inner = d.data as Record<string, unknown> | undefined;
-      data =
-        (inner && typeof inner === 'object' && 'payload' in inner ? inner.payload : undefined) ??
-        d.data ??
-        (d as { payload?: unknown }).payload ??
-        d;
-    }
+    const inner = data?.data as Record<string, unknown> | undefined;
+    const payloadOut = entry.keepDataEnvelope
+      ? (data?.data ?? data)
+      : ((inner && typeof inner === 'object' ? inner.payload : undefined) ??
+        data?.data ??
+        data?.payload ??
+        data);
 
-    return { ok: true, status: res.status, data: data as T };
-  } catch (err) {
+    return {
+      ok: true,
+      success: data?.success !== false,
+      status: res.status,
+      message: typeof data?.message === 'string' ? data.message :
     const message =
       err instanceof Error && err.name === 'AbortError'
         ? 'Request timed out'

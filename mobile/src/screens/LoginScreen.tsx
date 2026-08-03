@@ -55,12 +55,11 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
         setError(res.message || 'OTP verification failed');
         return;
       }
+      // Desktop verifyOtp: session token lives on the OUTER envelope (response.data.token);
+      // the decrypted payload is the user object.
       const raw = res.data as Record<string, unknown> | undefined;
       const user = ((raw?.payload as AuthUser) ?? (raw as AuthUser)) || {};
-      const token =
-        (raw?.token as string) ||
-        ((raw?.data as Record<string, unknown>)?.token as string) ||
-        '';
+      const token = res.token || '';
       if (!token) {
         setError('Login succeeded but no session token was returned');
         return;
