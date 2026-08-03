@@ -10,6 +10,9 @@ const AUTH_STORAGE_KEYS = [
   'global_logout',
   'token_last_validated_at',
   'token_validation_lock',
+  'blocked_users_last_checked_at',
+  'blocked_users_validation_lock',
+  'blocked_user_ids_cache',
 ] as const;
 
 const AUTH_SESSION_KEYS = ['last_panel_path'] as const;

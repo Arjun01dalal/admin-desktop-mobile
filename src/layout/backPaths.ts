@@ -6,6 +6,27 @@ export function getBackPath(pathname: string): string | null {
   if (pathname.startsWith('/users/report/')) return '/users';
   if (pathname.startsWith('/player-activity/details')) return '/player-activity';
   if (pathname.startsWith('/game-activity/details')) return '/game-activity';
+  if (
+    pathname === '/falconRateManagement' ||
+    pathname === '/exchangeRateManagement' ||
+    pathname === '/betConstructGamesList' ||
+    pathname === '/falcon-rate-management' ||
+    pathname === '/exchange-rate-management' ||
+    pathname === '/liveMatchTotal' ||
+    pathname === '/masterLiveMatchTotal' ||
+    pathname === '/bothLiveMatchTotal' ||
+    pathname === '/bothMasterAddPage' ||
+    pathname === '/masterDashboard'
+  ) {
+    return '/dashboard';
+  }
+  if (
+    pathname === '/balance-f' ||
+    pathname === '/total-bonus-users-p' ||
+    pathname === '/registered-users'
+  ) {
+    return '/dashboard';
+  }
   if (pathname.startsWith('/coins-removal/details')) return '/coins-removal';
   if (pathname === '/coin-reports/report') return '/coins-report';
   if (pathname === '/customer-allotted') return '/customer-allotment';

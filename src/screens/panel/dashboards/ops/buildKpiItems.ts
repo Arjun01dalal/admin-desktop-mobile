@@ -6,6 +6,7 @@ export function buildKpiItems(
   mode: DashboardMode,
   bundle: OpsDashboardBundle | null,
   startDate: string,
+  endDate: string,
   today: string,
 ): KpiItem[] {
   if (mode !== 'main' || !bundle) return [];
@@ -13,11 +14,24 @@ export function buildKpiItems(
   const s = bundle.summary;
   const dw = bundle.depositWithdrawal;
   const dc = bundle.depositCount;
+  const active = bundle.activeCustomers;
 
   const liability =
     toNum(s.falconTotalBetPendingAmount) +
     toNum(s.jetfairTotalBetPendingAmount) +
     toNum(s.sattaMatkaTotalBetPendingAmount);
+
+  const todaysActiveCustomers =
+    floorNum(
+      toNum(asCount(active, 'qtech')) +
+        toNum(asCount(active, 'wco')) +
+        toNum(asCount(active, 'jetfair')) +
+        toNum(asCount(active, 'falcon')) +
+        toNum(asCount(active, 'sattaMatka')) +
+        toNum(asCount(active, 'exchange')),
+    ) || floorNum(s.totalActiveCustomersToday ?? s.todaysActiveUsers);
+
+  const dateState = { startDate, endDate };
 
   const items: KpiItem[] = [
     {
@@ -43,12 +57,14 @@ export function buildKpiItems(
       label: 'Total Users Balance',
       value: floorNum(s.totalBalanceOfUsers),
       prefix: '₹',
+      href: '/balance-f',
     },
     {
       id: 'bonusBalance',
       label: 'Total Users Bonus Balance',
       value: floorNum(s.totalBonusBalanceOfUsers),
       prefix: '₹',
+      href: '/total-bonus-users-p',
     },
     {
       id: 'totalUsers',
@@ -80,6 +96,7 @@ export function buildKpiItems(
       id: 'regAppToday',
       label: 'Total Registered Users App Today',
       value: floorNum(s.totalTodayRegisterUsersOfApp),
+      href: '/registered-users',
     },
     {
       id: 'active7d',
@@ -130,21 +147,36 @@ export function buildKpiItems(
       label: 'Deposit Count',
       value: floorNum(dc.depositCount),
     },
+  ];
+
+  if (todaysActiveCustomers > 0) {
+    items.push({
+      id: 'todaysActive',
+      label: "Today's Active Users",
+      value: todaysActiveCustomers,
+      href: '/todays-active',
+      state: dateState,
+    });
+  }
+
+  items.push(
     {
       id: 'masterData',
       label: 'Master Data',
       value: '',
       headingOnly: true,
-      href: '/master-flow',
+      href: '/masterDashboard',
+      state: { selectActiveCustomers: true },
     },
     {
       id: 'liveMatchTotal',
       label: 'Live Match Total',
       value: '',
       headingOnly: true,
-      href: '/risk-dashboard',
+      href: '/liveMatchTotal',
+      state: dateState,
     },
-  ];
+  );
 
   if (startDate !== today) {
     items.splice(3, 0, {
@@ -156,4 +188,15 @@ export function buildKpiItems(
   }
 
   return items;
+}
+
+function asCount(
+  active: Record<string, unknown>,
+  key: string,
+): number {
+  const node = active[key];
+  if (node && typeof node === 'object' && !Array.isArray(node)) {
+    return toNum((node as { count?: unknown }).count);
+  }
+  return toNum(node);
 }

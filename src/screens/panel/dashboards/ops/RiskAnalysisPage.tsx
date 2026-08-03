@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Alert, Box, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { DashboardFilterBar } from './DashboardFilterBar';
 import { KpiStatGrid } from './KpiStatGrid';
@@ -18,9 +19,26 @@ function row(label: string, value: unknown) {
  * Live Match nav tiles + Jetfair / Falcon / AAA / Master AAA cards.
  */
 export function RiskAnalysisPage() {
+  const navigate = useNavigate();
   const filters = useDashboardFilters();
   const { bundle, loading, error, reload } = useRiskDashboardData(
     filters.applied,
+  );
+
+  const dateQuery = useMemo(() => {
+    const q = new URLSearchParams({
+      startDate: filters.applied.startDate,
+      endDate: filters.applied.endDate,
+    });
+    return q.toString();
+  }, [filters.applied.endDate, filters.applied.startDate]);
+
+  const dateState = useMemo(
+    () => ({
+      startDate: filters.applied.startDate,
+      endDate: filters.applied.endDate,
+    }),
+    [filters.applied.endDate, filters.applied.startDate],
   );
 
   const navCards = useMemo<KpiItem[]>(
@@ -30,27 +48,35 @@ export function RiskAnalysisPage() {
         label: 'Live Match Total',
         value: '',
         headingOnly: true,
+        href: '/liveMatchTotal',
+        state: dateState,
       },
       {
         id: 'liveMatchMaster',
         label: 'Live Match Total (Master)',
         value: '',
         headingOnly: true,
+        href: '/masterLiveMatchTotal',
+        state: dateState,
       },
       {
         id: 'liveMatchBoth',
         label: 'Live Match Total (Master & Laxmi)',
         value: '',
         headingOnly: true,
+        href: '/bothLiveMatchTotal',
+        state: dateState,
       },
       {
         id: 'liveMatchAaa',
         label: 'Live Match Total (AAA & Master AAA)',
         value: '',
         headingOnly: true,
+        href: '/bothMasterAddPage',
+        state: dateState,
       },
     ],
-    [],
+    [dateState],
   );
 
   const platformCards = useMemo<ProviderCardModel[]>(() => {
@@ -68,6 +94,9 @@ export function RiskAnalysisPage() {
         title: 'Jetfair Platform Details',
         filters: ['All'],
         loading,
+        href: '/falconRateManagement',
+        search: `?${dateQuery}&type=jetfair`,
+        state: { ...dateState, type: 'jetfair' },
         rows: [
           row('Total Bet Amount', jetfair.payin),
           row('Total Bet Win', jetfair.payout),
@@ -81,6 +110,9 @@ export function RiskAnalysisPage() {
         title: 'Falcon Platform Details',
         filters: ['All'],
         loading,
+        href: '/falconRateManagement',
+        search: `?${dateQuery}&type=falcon`,
+        state: { ...dateState, type: 'falcon' },
         activeCustomerCount: 0,
         rows: [
           row('Total Bet Amount', falcon.payin),
@@ -98,11 +130,16 @@ export function RiskAnalysisPage() {
         title: 'AAA Exch Details',
         filters: ['All'],
         loading,
+        href: '/exchangeRateManagement',
+        search: `?${dateQuery}`,
         rows: [
           row('Total Bet Amount', aaa.totalVolume),
           row('Total Win', aaa.totalClientWin),
           row('Total Active Users', aaa.totalClient),
-          row('GGR (Without commission)', aaa.totalWinLossWithoutCommission),
+          row(
+            'GGR (Without commission)',
+            aaa.totalWinLossWithoutCommission,
+          ),
           row('Commission', aaa.totalCommission),
           row('Gross GGR', aaa.finalWinLoss),
         ],
@@ -112,6 +149,8 @@ export function RiskAnalysisPage() {
         title: 'Master AAA Book',
         filters: ['All'],
         loading,
+        href: '/masterDashboard',
+        state: dateState,
         rows: [
           row('Total Bet Amount', masterAaa.totalVolume),
           row('Total Win', masterAaa.totalClientWin),
@@ -125,7 +164,7 @@ export function RiskAnalysisPage() {
         ],
       },
     ];
-  }, [bundle, loading]);
+  }, [bundle, dateQuery, dateState, loading]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
@@ -175,7 +214,22 @@ export function RiskAnalysisPage() {
         }}
       >
         {platformCards.slice(0, 3).map((card) => (
-          <ProviderMetricCard key={card.id} card={card} />
+          <ProviderMetricCard
+            key={card.id}
+            card={card}
+            onClick={
+              card.href
+                ? () =>
+                    navigate(
+                      {
+                        pathname: card.href!,
+                        search: card.search || '',
+                      },
+                      { state: card.state },
+                    )
+                : undefined
+            }
+          />
         ))}
       </Box>
 
@@ -192,7 +246,22 @@ export function RiskAnalysisPage() {
         }}
       >
         {platformCards.slice(3).map((card) => (
-          <ProviderMetricCard key={card.id} card={card} />
+          <ProviderMetricCard
+            key={card.id}
+            card={card}
+            onClick={
+              card.href
+                ? () =>
+                    navigate(
+                      {
+                        pathname: card.href!,
+                        search: card.search || '',
+                      },
+                      { state: card.state },
+                    )
+                : undefined
+            }
+          />
         ))}
       </Box>
     </Box>

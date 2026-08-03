@@ -1,4 +1,5 @@
 import { Box } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { ProviderMetricCard } from './ProviderMetricCard';
 import type { ProviderCardModel, ProviderFilter } from './types';
 
@@ -9,6 +10,7 @@ type Props = {
 
 /** Filters provider cards by Filter By dropdown and renders the grid. */
 export function ProviderCardGrid({ cards, filterBy }: Props) {
+  const navigate = useNavigate();
   const visible = cards.filter((c) => c.filters.includes(filterBy));
 
   return (
@@ -25,7 +27,22 @@ export function ProviderCardGrid({ cards, filterBy }: Props) {
       }}
     >
       {visible.map((card) => (
-        <ProviderMetricCard key={card.id} card={card} />
+        <ProviderMetricCard
+          key={card.id}
+          card={card}
+          onClick={
+            card.href
+              ? () =>
+                  navigate(
+                    {
+                      pathname: card.href!,
+                      search: card.search || '',
+                    },
+                    { state: card.state },
+                  )
+              : undefined
+          }
+        />
       ))}
     </Box>
   );

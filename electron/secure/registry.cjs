@@ -37,6 +37,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  'auth.getAllBlockedUserIds': {
+    method: 'POST',
+    path: '/SubAdmin/get-all-blockedUserId',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
   'auth.sosFlag': {
     method: 'POST',
     path: '/SubAdmin/sos-flag',
@@ -202,6 +208,24 @@ module.exports = {
   'users.getAll': {
     method: 'POST',
     path: '/User/getAll',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'users.getAllBalance': {
+    method: 'POST',
+    path: '/User/getAllBalance',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'users.getAllBonus': {
+    method: 'POST',
+    path: '/User/getAllBonus',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'users.registeredUser': {
+    method: 'POST',
+    path: '/User/registered-user',
     encryptRequest: true,
     decryptResponse: true,
   },
@@ -1129,6 +1153,64 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  // keepDataEnvelope: page reads `.payload` like laxminarayan FalconRateManagement
+  'dashboard.jetfairByEvent': {
+    method: 'POST',
+    path: '/jetfair/jetfair-match-date-ggr-by-event',
+    encryptRequest: true,
+    decryptResponse: true,
+    keepDataEnvelope: true,
+  },
+  'dashboard.falconByEvent': {
+    method: 'POST',
+    path: '/falcon/falcon-own-ggr-by-event',
+    encryptRequest: true,
+    decryptResponse: true,
+    keepDataEnvelope: true,
+  },
+  // Live Match Total (external AAA hosts — absolute URLs)
+  'dashboard.oddsGameList': {
+    method: 'GET',
+    path: 'https://nodebackend.aaryapaar.exchange/api/v2/odds/gameList',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'dashboard.finalBookLaxmi': {
+    method: 'GET',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/os/finalBookLaxmi',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'dashboard.finalBookVip': {
+    method: 'GET',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/os/finalBookVIP',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'dashboard.finalBookBoth': {
+    method: 'GET',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/os/finalBook',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'dashboard.zehnRiskOs': {
+    method: 'GET',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/zehnRiskAnalysis?providerCode=OS_PRODUCTION',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'dashboard.zehnRiskVip': {
+    method: 'GET',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/zehnRiskAnalysis?providerCode=FairBetVip_Prod',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'dashboard.aaaGameWise': {
+    method: 'POST',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/gameWisePlusMinus',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
   // AAA zehnPL (external host — absolute URL; axios ignores baseURL)
   'dashboard.aaaZehnPl': {
     method: 'POST',
@@ -1142,6 +1224,25 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  // Master Dashboard (fairbets.vip host — laxminarayan MasterDashboard)
+  'dashboard.masterWco': {
+    method: 'POST',
+    path: 'https://fairbets.vip/api/User/wco',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'dashboard.masterFalcon': {
+    method: 'POST',
+    path: 'https://fairbets.vip/api/falcon/falcon-own-ggr',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'dashboard.masterSatta': {
+    method: 'POST',
+    path: 'https://fairbets.vip/api/User/sattaMarketOverallGGR',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'dashboard.satta': {
     method: 'POST',
     path: '/User/sattaMarketOverallGGR',
@@ -1151,6 +1252,12 @@ module.exports = {
   'dashboard.betConstruct': {
     method: 'POST',
     path: '/BetConstruct/store-bet-ggr',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'dashboard.betConstructGameWiseGgr': {
+    method: 'POST',
+    path: '/BetConstruct/game-wise-ggr',
     encryptRequest: true,
     decryptResponse: true,
   },

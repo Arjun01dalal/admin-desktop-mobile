@@ -69,31 +69,47 @@ export function OpsDashboardPage({ mode }: Props) {
 
   const kpiItems = useMemo(
     () =>
-      buildKpiItems(mode, bundle, filters.applied.startDate, todayIST()),
-    [mode, bundle, filters.applied.startDate],
+      buildKpiItems(
+        mode,
+        bundle,
+        filters.applied.startDate,
+        filters.applied.endDate,
+        todayIST(),
+      ),
+    [mode, bundle, filters.applied.startDate, filters.applied.endDate],
   );
 
   const providerCards = useMemo(
     () =>
-      buildProviderCards(mode, bundle, loading, {
-        selectedLudoGame,
-        selectedIndianDiva,
-        selectedPlutus,
-        onLudoGameChange: (value) => {
-          setSelectedLudoGame(value);
-          void reloadLudo(value);
+      buildProviderCards(
+        mode,
+        bundle,
+        loading,
+        {
+          selectedLudoGame,
+          selectedIndianDiva,
+          selectedPlutus,
+          onLudoGameChange: (value) => {
+            setSelectedLudoGame(value);
+            void reloadLudo(value);
+          },
+          onIndianDivaChange: setSelectedIndianDiva,
+          onPlutusChange: setSelectedPlutus,
+          onLudoUpdate: () => {
+            setLudoModalAction('update');
+            setLudoModalOpen(true);
+          },
+          onLudoUpdateRtp: () => {
+            setLudoModalAction('rtp');
+            setLudoModalOpen(true);
+          },
         },
-        onIndianDivaChange: setSelectedIndianDiva,
-        onPlutusChange: setSelectedPlutus,
-        onLudoUpdate: () => {
-          setLudoModalAction('update');
-          setLudoModalOpen(true);
+        {
+          startDate: filters.applied.startDate,
+          endDate: filters.applied.endDate,
+          appClientName: filters.applied.appClientName,
         },
-        onLudoUpdateRtp: () => {
-          setLudoModalAction('rtp');
-          setLudoModalOpen(true);
-        },
-      }),
+      ),
     [
       mode,
       bundle,
@@ -102,6 +118,9 @@ export function OpsDashboardPage({ mode }: Props) {
       selectedIndianDiva,
       selectedPlutus,
       reloadLudo,
+      filters.applied.startDate,
+      filters.applied.endDate,
+      filters.applied.appClientName,
     ],
   );
 

@@ -144,6 +144,10 @@ export function useOpsDashboardData(
             'activeExchange',
             d,
           ]),
+          fetchAction('dashboard.aaaZehnPl', {
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+          }).then((d) => ['aaa', d]),
         );
       }
 
@@ -160,6 +164,8 @@ export function useOpsDashboardData(
           ludoOptions = parseLudoGameOptions(value);
         } else if (key === 'activeExchange') {
           nextBundle.activeExchange = asRecord(value);
+        } else if (key === 'aaa') {
+          nextBundle.aaa = asRecord(value);
         } else if (key === 'ludo') {
           nextBundle.ludo = asRecord(value);
         } else if (key === 'qtech') {

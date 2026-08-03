@@ -109,6 +109,49 @@ export function AppShell({ onLogout }: Props) {
     if (paths.includes('/users-kyc')) {
       paths.push('/kycList');
     }
+    // Dashboard card deep-links (laxminarayan: falconRateManagement, etc.)
+    if (
+      paths.includes('/dashboard') ||
+      paths.includes('/vip-dashboard') ||
+      paths.includes('/combined-dashboard') ||
+      paths.includes('/risk-dashboard')
+    ) {
+      paths.push(
+        '/falconRateManagement',
+        '/exchangeRateManagement',
+        '/betConstructGamesList',
+        '/falcon-rate-management',
+        '/exchange-rate-management',
+        '/balance-f',
+        '/total-bonus-users-p',
+        '/registered-users',
+        '/master-flow',
+        '/masterDashboard',
+        '/game-activity',
+        '/todays-active',
+        '/new-registers',
+        '/liveMatchTotal',
+        '/masterLiveMatchTotal',
+        '/bothLiveMatchTotal',
+        '/bothMasterAddPage',
+      );
+    }
+    if (paths.includes('/caller-responsibility')) {
+      paths.push(
+        '/caller-responsibility/deposit-list',
+        '/caller-responsibility/bot-users',
+        '/caller-responsibility/details',
+      );
+    }
+    if (paths.includes('/game-activity')) {
+      paths.push('/game-activity/details');
+    }
+    if (paths.includes('/player-activity')) {
+      paths.push('/player-activity/details');
+    }
+    if (paths.includes('/leaderboard')) {
+      paths.push('/customer-count');
+    }
     return paths;
   }, [navItems]);
   const showSos = canShowSos(user);

@@ -42,15 +42,29 @@ export type GameCardState = {
   onLudoUpdateRtp?: () => void;
 };
 
+export type ProviderNavContext = {
+  startDate: string;
+  endDate: string;
+  appClientName?: string;
+};
+
 /** Build provider metric cards from loaded API bundle (shared by all 3 dashboards). */
 export function buildProviderCards(
   mode: DashboardMode,
   bundle: OpsDashboardBundle | null,
   loading: boolean,
   games?: GameCardState,
+  nav?: ProviderNavContext,
 ): ProviderCardModel[] {
   if (!bundle) return [];
 
+  const startDate = nav?.startDate || '';
+  const endDate = nav?.endDate || '';
+  const dateState = { startDate, endDate };
+  const rateSearch = (type: string) =>
+    `?${new URLSearchParams({ startDate, endDate, type }).toString()}`;
+  const rateState = (type: string) => ({ startDate, endDate, type });
+  const aaaSearch = `?${new URLSearchParams({ startDate, endDate }).toString()}`;
   const { payload: qPayload, wallet: qWallet } = qtechPayload(bundle.qtech);
   const wco = firstOf(bundle.wco);
   const falcon = asRecord(bundle.falcon);
@@ -167,6 +181,8 @@ export function buildProviderCards(
       filters: ['All', 'Casino', 'Qtech'],
       showOnVip: true,
       loading,
+      href: '/game-activity',
+      state: { ...dateState, type: 'Qtech' },
       activeCustomerCount: toNum(asRecord(active.qtech).count),
       rows: [
         row('Total Bet Amount', qPayload.totalBetAmount),
@@ -189,6 +205,8 @@ export function buildProviderCards(
       filters: ['All', 'Casino', 'BetConstruct'],
       showOnVip: false,
       loading,
+      href: '/betConstructGamesList',
+      state: dateState,
       rows: [
         row('Total Bet Amount', bc.totalBetAmount),
         row('Total Win Amount', bc.totalWinAmount),
@@ -207,6 +225,8 @@ export function buildProviderCards(
       filters: ['All', 'Casino', 'WCO'],
       showOnVip: true,
       loading,
+      href: '/game-activity',
+      state: { ...dateState, type: 'Wco' },
       activeCustomerCount: toNum(asRecord(active.wco).count),
       rows: [
         row('Total Bet Amount', wco.totalBetAmount),
@@ -294,6 +314,9 @@ export function buildProviderCards(
       filters: ['All', 'Exchange', 'Jetfair'],
       showOnVip: true,
       loading,
+      href: '/falconRateManagement',
+      search: rateSearch('jetfair'),
+      state: rateState('jetfair'),
       activeCustomerCount: toNum(asRecord(active.jetfair).count),
       rows: [
         row('Total Exchange Players', jetfair.totalPlayers ?? jetfair.players),
@@ -313,6 +336,9 @@ export function buildProviderCards(
       filters: ['All', 'Exchange', 'Falcon'],
       showOnVip: true,
       loading,
+      href: '/falconRateManagement',
+      search: rateSearch('falcon'),
+      state: rateState('falcon'),
       activeCustomerCount: toNum(asRecord(active.falcon).count),
       rows: [
         row('Payin', falcon.payin),
@@ -320,6 +346,27 @@ export function buildProviderCards(
         row('Total GGR', falcon.TotalGGR ?? falcon.totalGGR),
         row('Commission', falcon.CommissionAmount),
         row('Final GGR', falcon.final_ggr ?? falcon.finalGgr),
+      ],
+    },
+    {
+      id: 'aaa',
+      title: 'AAA Exch Details',
+      filters: ['All', 'Exchange', 'AAA Exchange'],
+      showOnVip: false,
+      loading,
+      href: '/exchangeRateManagement',
+      search: aaaSearch,
+      activeCustomerCount: toNum(asRecord(active.exchange).count),
+      rows: [
+        row('Total Bet Amount', asRecord(bundle.aaa).totalVolume),
+        row('Total Win', asRecord(bundle.aaa).totalClientWin),
+        row('Total Active Users', asRecord(bundle.aaa).totalClient),
+        row(
+          'GGR (Without commission)',
+          asRecord(bundle.aaa).totalWinLossWithoutCommission,
+        ),
+        row('Commission', asRecord(bundle.aaa).totalCommission),
+        row('Gross GGR', asRecord(bundle.aaa).finalWinLoss),
       ],
     },
     {

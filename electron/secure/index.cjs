@@ -19,11 +19,9 @@ const REGISTRY_PATH = require.resolve('./registry.cjs');
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 function getRegistry() {
-  // Vite only reloads the renderer — main-process require() stays cached.
-  // In ELECTRON_DEV, re-read registry.cjs so new actions work without a full restart.
-  if (process.env.ELECTRON_DEV === '1') {
-    delete require.cache[REGISTRY_PATH];
-  }
+  // Always re-read registry so newly added actions work without a full Electron
+  // restart (Vite only hot-reloads the renderer; main require() stays cached).
+  delete require.cache[REGISTRY_PATH];
   return require('./registry.cjs');
 }
 
@@ -420,6 +418,8 @@ async function execute(action, payload = {}, token = null) {
         .toUpperCase();
     }
 
+    const method = String(def.method || 'POST').toUpperCase();
+    const isGet = method === 'GET';
     const body = def.encryptRequest
       ? { token: encrypt(requestPayload) }
       : requestPayload;
@@ -429,10 +429,24 @@ async function execute(action, payload = {}, token = null) {
       ...(clientNameHeader ? { 'client-name': clientNameHeader } : {}),
     };
 
+    // Match laxminarayan Live Match calls: dates go in the query string for GET.
+    let url = def.path;
+    if (isGet) {
+      const entries = Object.entries(requestPayload || {}).filter(
+        ([, v]) => v != null && String(v).length > 0,
+      );
+      if (entries.length > 0) {
+        const qs = new URLSearchParams(
+          entries.map(([k, v]) => [k, String(v)]),
+        ).toString();
+        url = `${def.path}${def.path.includes('?') ? '&' : '?'}${qs}`;
+      }
+    }
+
     const response = await client().request({
-      method: def.method || 'POST',
-      url: def.path,
-      data: body,
+      method,
+      url,
+      ...(isGet ? {} : { data: body }),
       headers,
       // Per-action override for heavy reports (e.g. Funds payin MID dump).
       timeout: Number(def.timeout) > 0 ? Number(def.timeout) : 60000,
@@ -460,10 +474,19 @@ async function execute(action, payload = {}, token = null) {
       }
     }
 
-    // keepDataEnvelope: return response.data.data as-is (old AAA Exchange reads .payload next).
-    const payloadOut = def.keepDataEnvelope
-      ? (data?.data ?? data)
-      : (data?.data?.payload ?? data?.data ?? data?.payload ?? data);
+    // Arrays (Live Match finalBook) must not go through `.data` / `.payload` unwrap.
+    let payloadOut;
+    if (Array.isArray(data)) {
+      payloadOut = data;
+    } else if (def.keepDataEnvelope) {
+      payloadOut = data?.data ?? data;
+    } else if (Array.isArray(data?.data)) {
+      payloadOut = data.data;
+    } else if (Array.isArray(data?.payload)) {
+      payloadOut = data.payload;
+    } else {
+      payloadOut = data?.data?.payload ?? data?.data ?? data?.payload ?? data;
+    }
 
     return {
       ok: true,

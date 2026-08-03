@@ -18,8 +18,9 @@ import { AstroSite } from '@/screens/AstroSite';
 import { Login } from '@/screens/Login';
 import { AppShell } from '@/layout/AppShell';
 import { UpdateToast } from '@/components/UpdateToast';
+import { TokenValidator } from '@/components/TokenValidator';
+import { BlockedUserCheck } from '@/components/BlockedUserCheck';
 import { PANEL_PATHS } from '@/layout/navItems';
-import { useSessionGuard } from '@/hooks/useSessionGuard';
 import { isSosFlagEnabled } from '@/hooks/useSosFlagGuard';
 import { secureApi } from '@/api/secureClient';
 import {
@@ -327,6 +328,50 @@ const ProfitLossPage = lazyNamed(
   () => import('@/screens/panel/dashboards/pages'),
   'ProfitLossPage',
 );
+const FalconRateManagementPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/FalconRateManagementPage'),
+  'FalconRateManagementPage',
+);
+const ExchangeRateManagementPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/ExchangeRateManagementPage'),
+  'ExchangeRateManagementPage',
+);
+const BetConstructGamesListPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/BetConstructGamesListPage'),
+  'BetConstructGamesListPage',
+);
+const LiveMatchTotalLaxmiPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/LiveMatchTotalPage'),
+  'LiveMatchTotalLaxmiPage',
+);
+const LiveMatchTotalMasterPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/LiveMatchTotalPage'),
+  'LiveMatchTotalMasterPage',
+);
+const LiveMatchTotalBothPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/LiveMatchTotalPage'),
+  'LiveMatchTotalBothPage',
+);
+const BothMasterAddPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/BothMasterAddPage'),
+  'BothMasterAddPage',
+);
+const MasterDashboardPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/MasterDashboardPage'),
+  'MasterDashboardPage',
+);
+const BalanceUsersPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/DashboardUsersListPage'),
+  'BalanceUsersPage',
+);
+const BonusBalanceUsersPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/DashboardUsersListPage'),
+  'BonusBalanceUsersPage',
+);
+const RegisteredUsersAppPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/DashboardUsersListPage'),
+  'RegisteredUsersAppPage',
+);
 
 function PanelRouteFallback() {
   return (
@@ -490,10 +535,6 @@ export default function App() {
     };
   }, [inPanel, user, logout]);
 
-  useSessionGuard({
-    enabled: inPanel && Boolean(user),
-  });
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -505,6 +546,8 @@ export default function App() {
 
         {inPanel && (
           <MemoryRouter initialEntries={[panelEntry]}>
+            <TokenValidator />
+            <BlockedUserCheck />
             <Suspense fallback={<PanelRouteFallback />}>
               <Routes>
                 <Route element={<AppShell onLogout={logout} />}>
@@ -516,6 +559,56 @@ export default function App() {
                   <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/master-flow" element={<MasterFlowPage />} />
                   <Route path="/profit-loss" element={<ProfitLossPage />} />
+                  <Route
+                    path="/falconRateManagement"
+                    element={<FalconRateManagementPage />}
+                  />
+                  <Route
+                    path="/exchangeRateManagement"
+                    element={<ExchangeRateManagementPage />}
+                  />
+                  <Route
+                    path="/betConstructGamesList"
+                    element={<BetConstructGamesListPage />}
+                  />
+                  <Route
+                    path="/liveMatchTotal"
+                    element={<LiveMatchTotalLaxmiPage />}
+                  />
+                  <Route
+                    path="/masterLiveMatchTotal"
+                    element={<LiveMatchTotalMasterPage />}
+                  />
+                  <Route
+                    path="/bothLiveMatchTotal"
+                    element={<LiveMatchTotalBothPage />}
+                  />
+                  <Route
+                    path="/bothMasterAddPage"
+                    element={<BothMasterAddPage />}
+                  />
+                  <Route
+                    path="/masterDashboard"
+                    element={<MasterDashboardPage />}
+                  />
+                  {/* Aliases for older kebab paths */}
+                  <Route
+                    path="/falcon-rate-management"
+                    element={<Navigate to="/falconRateManagement" replace />}
+                  />
+                  <Route
+                    path="/exchange-rate-management"
+                    element={<Navigate to="/exchangeRateManagement" replace />}
+                  />
+                  <Route path="/balance-f" element={<BalanceUsersPage />} />
+                  <Route
+                    path="/total-bonus-users-p"
+                    element={<BonusBalanceUsersPage />}
+                  />
+                  <Route
+                    path="/registered-users"
+                    element={<RegisteredUsersAppPage />}
+                  />
                   <Route path="/house-games" element={<HouseGamesPage />} />
                   <Route path="/leaderboard" element={<LeaderboardPage />} />
                   <Route

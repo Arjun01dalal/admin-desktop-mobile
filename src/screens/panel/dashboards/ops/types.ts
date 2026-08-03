@@ -47,6 +47,11 @@ export type ProviderCardModel = {
   onSelectChange?: (value: string) => void;
   /** Footer action links (Update / Update RTP). */
   actions?: CardAction[];
+  /** Card body click → navigate (laxminarayan dashboard cards). */
+  href?: string;
+  state?: Record<string, unknown>;
+  /** Query string appended to href (e.g. `?type=jetfair&…`). */
+  search?: string;
 };
 
 export type KpiItem = {
@@ -55,6 +60,8 @@ export type KpiItem = {
   value: number | string;
   prefix?: string;
   href?: string;
+  /** Optional react-router location state when navigating via href. */
+  state?: Record<string, unknown>;
   /** Heading-only nav card (Master Data / Live Match Total). */
   headingOnly?: boolean;
 };
@@ -93,4 +100,6 @@ export type OpsDashboardBundle = {
   ludo: Record<string, unknown>;
   ludoGameOptions: SelectOption[];
   activeExchange: Record<string, unknown>;
+  /** Optional AAA zehnPL payload (main dashboard AAA card). */
+  aaa?: Record<string, unknown>;
 };
