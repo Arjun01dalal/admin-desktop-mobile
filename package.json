@@ -1,133 +1,27 @@
 {
-  "name": "astro",
-  "version": "1.0.9",
-  "description": "Astro CS Panel — Electron desktop app with secure admin login.",
-  "main": "electron/main.cjs",
-  "author": "Your Name",
-  "license": "MIT",
+  "name": "astro-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Astro platform monorepo — desktop CS panel, mobile scaffold, shared packages.",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && ELECTRON_DEV=1 electron .\"",
-    "build": "vite build",
-    "start": "npm run build && electron .",
-    "postinstall": "node scripts/patch-electron-location.cjs",
-    "patch:location": "node scripts/patch-electron-location.cjs",
-    "embed:env": "node scripts/generate-embedded-env.cjs",
-    "check:pins": "node scripts/check-cert-pins.cjs",
-    "compile:bytecode": "node scripts/compile-bytecode.cjs",
-    "compile:bytecode:win": "node scripts/compile-bytecode.cjs --for-win",
-    "dist": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder",
-    "dist:win": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --win",
-    "dist:mac": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac",
-    "dist:all": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --mac --win",
-    "release": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --publish always",
-    "release:win": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --win --publish always",
-    "release:mac": "npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac --publish always",
-    "release:all": "npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --mac --win --publish always",
-    "sos-push": "node services/sos-push/server.cjs"
+    "dev": "npm run desktop:dev",
+    "desktop:dev": "npm run dev -w @astro/desktop",
+    "desktop:build": "npm run build -w @astro/desktop",
+    "desktop:start": "npm run start -w @astro/desktop",
+    "desktop:dist": "npm run dist -w @astro/desktop",
+    "desktop:dist:win": "npm run dist:win -w @astro/desktop",
+    "desktop:dist:mac": "npm run dist:mac -w @astro/desktop",
+    "desktop:dist:all": "npm run dist:all -w @astro/desktop",
+    "desktop:release": "npm run release -w @astro/desktop",
+    "sos-push": "npm run sos-push -w @astro/desktop",
+    "mobile:start": "npm run start -w @astro/mobile",
+    "shared:typecheck": "npm run typecheck -w @astro/shared"
   },
-  "build": {
-    "appId": "com.yourcompany.astro",
-    "productName": "Astro CS Panel",
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist/**/*",
-      "electron-obf/**/*",
-      "!electron/**/*",
-      "build/icon.png",
-      "package.json"
-    ],
-    "extraMetadata": {
-      "main": "electron-obf/main.cjs"
-    },
-    "asarUnpack": [
-      "**/node_modules/geoip-lite/data/**"
-    ],
-    "icon": "build/icon.png",
-    "win": {
-      "icon": "build/icon.png",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "mac": {
-      "icon": "build/icon.png",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "universal"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "universal"
-          ]
-        }
-      ],
-      "category": "public.app-category.utilities",
-      "extendInfo": {
-        "NSLocationWhenInUseUsageDescription": "Location is required to verify admin login.",
-        "NSLocationUsageDescription": "Location is required to verify admin login."
-      }
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Arjun01dalal",
-        "repo": "admin-desktop-mobile",
-        "releaseType": "release"
-      }
-    ]
+  "engines": {
+    "node": ">=18"
   },
-  "overrides": {
-    "tar": "^7.4.3"
-  },
-  "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.0",
-    "@mui/icons-material": "^6.4.0",
-    "@mui/material": "^6.4.0",
-    "@tanstack/react-virtual": "^3.14.6",
-    "axios": "^1.7.9",
-    "bytenode": "^1.6.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "crypto-js": "^4.2.0",
-    "dotenv": "^16.4.7",
-    "electron-updater": "^6.3.9",
-    "geoip-lite": "^1.4.10",
-    "lucide-react": "^1.27.0",
-    "qrcode.react": "^4.2.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.4",
-    "react-toastify": "^10.0.6",
-    "tailwind-merge": "^3.6.0",
-    "ws": "^8.21.1",
-    "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "@types/crypto-js": "^4.2.2",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.5.4",
-    "concurrently": "^9.1.2",
-    "electron": "^34.0.0",
-    "electron-builder": "^25.1.8",
-    "postcss": "^8.5.24",
-    "tailwindcss": "^3.4.19",
-    "typescript": "^5.7.3",
-    "vite": "^6.0.7",
-    "wait-on": "^8.0.2"
-  }
+  "license": "MIT"
 }

@@ -1,0 +1,18 @@
+{
+  "name": "@astro/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Astro mobile client scaffold (React Native / Expo — not implemented yet).",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "node -e \"console.log('@astro/mobile scaffold only — add Expo/RN when ready. Use @astro/shared for shared types.')\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astro/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "license": "MIT"
+}

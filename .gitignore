@@ -10,5 +10,10 @@ release/
 *.dmg
 *.exe
 *.blockmap
-.vite/electron/env.generated.cjs
-electron-obf/
+.vite/
+**/electron/env.generated.cjs
+**/electron-obf/
+packages/*/node_modules/
+packages/*/dist/
+packages/*/release/
+packages/*/electron-obf/
