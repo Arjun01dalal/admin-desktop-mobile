@@ -3,8 +3,9 @@
  * Renderer calls named actions; never sees base URL, paths, or ENTK.
  */
 const axios = require('axios');
-const { getApiBaseUrl } = require('../config.cjs');
+const { getApiBaseUrl, useViteDevServer } = require('../config.cjs');
 const { createPinnedAgent } = require('../certPin.cjs');
+const { assertHttpsUrl, attachHttpsOnlyInterceptor } = require('../httpsOnly.cjs');
 
 // Single shared agent so pinned connections can be keep-alive pooled.
 const pinnedAgent = createPinnedAgent();
@@ -14,18 +15,31 @@ const {
   sanitizeToken,
   isSafeId,
 } = require('./bridgeSanitize.cjs');
+const { attachAxiosDevLog } = require('./devHttpLog.cjs');
 
 const REGISTRY_PATH = require.resolve('./registry.cjs');
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+/** Packaged / production: cache once. Dev (`npm run dev`) reloads so new actions apply without restart. */
+let cachedRegistry = null;
 
 function getRegistry() {
-  // Always re-read registry so newly added actions work without a full Electron
-  // restart (Vite only hot-reloads the renderer; main require() stays cached).
-  delete require.cache[REGISTRY_PATH];
-  return require('./registry.cjs');
+  const hotReload =
+    useViteDevServer || process.env.SECURE_HOT_REGISTRY === '1';
+  if (hotReload) {
+    delete require.cache[REGISTRY_PATH];
+    cachedRegistry = null;
+    return require('./registry.cjs');
+  }
+  if (!cachedRegistry) {
+    cachedRegistry = require('./registry.cjs');
+  }
+  return cachedRegistry;
 }
 
-const CDN_BASE = process.env.MOBILE_CDN_BASE || 'https://d2opi4jisa0j0o.cloudfront.net';
+const CDN_BASE = assertHttpsUrl(
+  process.env.MOBILE_CDN_BASE || 'https://d2opi4jisa0j0o.cloudfront.net',
+  { label: 'MOBILE_CDN_BASE' },
+);
 
 /** Same order/codes as src/constants/clientNames.ts (AS + code for registration URLs). */
 const APP_DETAILS = [
@@ -44,13 +58,35 @@ const APP_DETAILS = [
   { name: 'SB247 Games', key: 'sb247', code: '13' },
 ];
 
-function client() {
-  return axios.create({
-    baseURL: getApiBaseUrl(),
-    maxBodyLength: Infinity,
-    timeout: 60000,
-    httpsAgent: pinnedAgent,
-  });
+/** Shared axios for API + dialer so one interceptor covers all outbound HTTPS. */
+const http = attachHttpsOnlyInterceptor(
+  attachAxiosDevLog(
+    axios.create({
+      maxBodyLength: Infinity,
+      timeout: 60000,
+      httpsAgent: pinnedAgent,
+    }),
+    { source: 'secure' },
+  ),
+);
+
+function apiClient(action) {
+  return {
+    request: (config) =>
+      http.request({
+        ...config,
+        baseURL: getApiBaseUrl(),
+        httpsAgent: pinnedAgent,
+        metadata: { ...(config.metadata || {}), action, start: Date.now() },
+      }),
+    post: (url, data, config = {}) =>
+      http.post(url, data, {
+        ...config,
+        baseURL: getApiBaseUrl(),
+        httpsAgent: pinnedAgent,
+        metadata: { ...(config.metadata || {}), action, start: Date.now() },
+      }),
+  };
 }
 
 function buildMobileLinks(empCode = '001') {
@@ -71,16 +107,45 @@ function buildMobileLinks(empCode = '001') {
 const DIALER_SERVER_MAP = {
   '1': 'api2',
   '3': 'api',
+  // Campaign list serverId values (laxminarayan NewRegisterUsers SERVER_MAP_BY_IP)
+  '49.206.26.7': 'api2',
+  '3.200': 'api',
   default: 'api',
 };
-const ALLOWED_DIALER_PREFIXES = new Set(Object.values(DIALER_SERVER_MAP));
+const ALLOWED_DIALER_PREFIXES = new Set(['api', 'api2']);
 
 function dialerBaseUrl(serverId) {
-  const prefix = DIALER_SERVER_MAP[String(serverId)] || DIALER_SERVER_MAP.default;
+  const key = String(serverId ?? '').trim();
+  let prefix = DIALER_SERVER_MAP[key];
+  if (!prefix) {
+    if (key.startsWith('49.')) prefix = 'api2';
+    else if (key.startsWith('3.')) prefix = 'api';
+    else if (key.startsWith('1.')) prefix = 'api2';
+    else prefix = DIALER_SERVER_MAP.default;
+  }
   if (!ALLOWED_DIALER_PREFIXES.has(prefix)) {
     return null;
   }
   return `https://${prefix}.ganesha999.com/API/`;
+}
+
+/** Dialer hosts return `{ status: "success", inserted }` (not always `success: true`). */
+function isDialerSuccess(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (data.success === true || data.success === 'true' || data.success === 1) {
+    return true;
+  }
+  const status = String(data.status || '').trim().toLowerCase();
+  return status === 'success' || status === 'ok';
+}
+
+function dialerResultMessage(data, fallback) {
+  if (!data || typeof data !== 'object') return fallback;
+  if (typeof data.message === 'string' && data.message.trim()) return data.message;
+  if (isDialerSuccess(data) && data.inserted != null) {
+    return `Added to dialer (${data.inserted} inserted)`;
+  }
+  return fallback;
 }
 
 async function addToDialer(payload = {}) {
@@ -114,7 +179,7 @@ async function addToDialer(payload = {}) {
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   try {
-    const response = await axios.post(
+    const response = await http.post(
       url,
       {
         list_id: `9${numericId}`,
@@ -125,13 +190,22 @@ async function addToDialer(payload = {}) {
       {
         headers: { 'Content-Type': 'application/json' },
         timeout: 60000,
+        metadata: { action: 'users.addToDialer', start: Date.now() },
       },
     );
     const data = response?.data || {};
-    if (data.success) {
-      return { ok: true, message: data.message || 'Added to dialer', data };
+    if (isDialerSuccess(data)) {
+      return {
+        ok: true,
+        message: dialerResultMessage(data, 'Added to dialer'),
+        data,
+      };
     }
-    return { ok: false, message: data.message || 'Failed to add to dialer', data };
+    return {
+      ok: false,
+      message: dialerResultMessage(data, 'Failed to add to dialer'),
+      data,
+    };
   } catch (error) {
     return {
       ok: false,
@@ -156,8 +230,16 @@ function sanitizeDialerLead(item = {}) {
   };
 }
 
+function randomDialerListId() {
+  // Match laxminarayan NewRegisterUsers: Math.floor(10000 + Math.random() * 90000)
+  return Math.floor(10000 + Math.random() * 90000);
+}
+
 async function externalDialerBatch(payload = {}) {
-  const { campaignId, leads = [], serverId } = payload;
+  const campaignId = String(
+    payload.campaignId || payload.campaign_id || '',
+  ).trim();
+  const { leads = [], serverId } = payload;
   if (!campaignId) {
     return { ok: false, message: 'Campaign Name should not be empty' };
   }
@@ -173,22 +255,54 @@ async function externalDialerBatch(payload = {}) {
   const url = dialerBaseUrl(serverId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
+  // Prefer explicit list id; otherwise 5-digit random like web panel.
+  const rawListId = payload.listId ?? payload.list_id;
+  const listId =
+    rawListId != null && String(rawListId).trim() !== ''
+      ? Number.parseInt(String(rawListId).replace(/\D/g, '').slice(0, 12), 10) ||
+        randomDialerListId()
+      : randomDialerListId();
+
+  // Web panel uses campaign display name as list_name.
+  const listName = String(
+    payload.listName || payload.list_name || campaignId,
+  ).slice(0, 120);
+
   try {
-    const response = await axios.post(
+    const response = await http.post(
       url,
       {
-        list_id: '50999',
-        list_name: 'MULTIPLE BOT DATA',
-        campaign_id: String(campaignId).slice(0, 64),
+        list_id: listId,
+        list_name: listName,
+        campaign_id: campaignId.slice(0, 64),
         leads: safeLeads,
       },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 60000 },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 60000,
+        metadata: { action: 'callLogs.externalDialerBatch', start: Date.now() },
+      },
     );
     const data = response?.data || {};
-    if (data.success) {
-      return { ok: true, message: data.message || 'Dialer call queued', data };
+    if (isDialerSuccess(data)) {
+      return {
+        ok: true,
+        message: dialerResultMessage(
+          data,
+          `${data.inserted ?? safeLeads.length} inserted successfully.`,
+        ),
+        data: {
+          ...(data && typeof data === 'object' ? data : {}),
+          list_id: listId,
+          campaign_id: campaignId.slice(0, 64),
+        },
+      };
     }
-    return { ok: false, message: data.message || 'Dialer call failed', data };
+    return {
+      ok: false,
+      message: dialerResultMessage(data, 'Dialer call failed'),
+      data,
+    };
   } catch (error) {
     return {
       ok: false,
@@ -209,7 +323,7 @@ async function externalDialerSingle(payload = {}) {
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   try {
-    const response = await axios.post(
+    const response = await http.post(
       url,
       {
         list_id: `9${numericId}`,
@@ -227,12 +341,16 @@ async function externalDialerSingle(payload = {}) {
           }),
         ],
       },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 60000 },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 60000,
+        metadata: { action: 'callLogs.externalDialerSingle', start: Date.now() },
+      },
     );
     const data = response?.data || {};
     return {
-      ok: data.success !== false,
-      message: data.message || 'Connected to dialer',
+      ok: isDialerSuccess(data) || data.success !== false,
+      message: dialerResultMessage(data, 'Connected to dialer'),
       data,
     };
   } catch (error) {
@@ -250,10 +368,14 @@ async function processCallSummary(payload = {}) {
   }
 
   try {
-    const response = await axios.post(
+    const response = await http.post(
       'https://helper.callingbot.live/process-call',
       { call_sid: callSid },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 60000 },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 60000,
+        metadata: { action: 'callLogs.processCall', start: Date.now() },
+      },
     );
     const data = response?.data || {};
     if (data.status === 'failed') {
@@ -274,9 +396,10 @@ async function listIncomingBotCalls(payload = {}) {
     return { ok: false, message: 'since date is required' };
   }
   try {
-    const response = await axios.get('https://helper.callingbot.live/incoming-calls', {
+    const response = await http.get('https://helper.callingbot.live/incoming-calls', {
       params: { since },
       timeout: 60000,
+      metadata: { action: 'incomingBot.list', start: Date.now() },
     });
     const data = response?.data || {};
     return { ok: true, data, message: data.message };
@@ -320,12 +443,16 @@ async function uploadDiallerData(payload = {}, token = null) {
         : JSON.stringify(uploadedBy || {}).slice(0, 2000),
     );
 
-    const response = await client().post('/SubAdmin/upload-dialler-data', form, {
+    const response = await apiClient('caller.uploadDiallerData').post(
+      '/SubAdmin/upload-dialler-data',
+      form,
+      {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       maxBodyLength: Infinity,
-    });
+      },
+    );
 
     return {
       ok: true,
@@ -443,7 +570,7 @@ async function execute(action, payload = {}, token = null) {
       }
     }
 
-    const response = await client().request({
+    const response = await apiClient(action).request({
       method,
       url,
       ...(isGet ? {} : { data: body }),

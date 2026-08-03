@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { mapUsersToDialerLeads } from '@/screens/panel/users/toolbarHelpers';
+import { CAMPAIGN_LIST } from './campaignList';
 import type { NewRegistersAdmin, UserRow } from './types';
 
 const MAX_REMARK_LENGTH = 500;
@@ -36,8 +38,9 @@ export function useNewRegistersActions(
   );
 
   const addToDialer = useCallback(
-    async (campaignName: string, rows: UserRow[]) => {
-      if (!campaignName) {
+    async (campaignId: string, rows: UserRow[]) => {
+      const selectedCampaignId = String(campaignId || '').trim();
+      if (!selectedCampaignId) {
         toast.error('Campaign Name should not be empty');
         return false;
       }
@@ -46,22 +49,37 @@ export function useNewRegistersActions(
         return false;
       }
 
+      // Match web NewRegisterUsers: resolve campaign by id or name.
+      const campaign = CAMPAIGN_LIST.find(
+        (c) =>
+          c.id.trim() === selectedCampaignId ||
+          c.name.trim() === selectedCampaignId,
+      );
+      if (!campaign?.id) {
+        toast.error('Please select a valid campaign');
+        return false;
+      }
+
+      const leads = mapUsersToDialerLeads(rows).filter((l) =>
+        String(l.phone_number || '').replace(/\D/g, ''),
+      );
+      if (!leads.length) {
+        toast.error('No valid phone numbers to add to dialer');
+        return false;
+      }
+
       setDialerLoading(true);
       try {
-        // Whitelist only dialer-needed fields (data minimization).
-        const res = await secureApi('users.addToDialer', {
-          campaignName,
-          users: rows.map((row) => ({
-            _id: row._id,
-            name: row.name,
-            mobile: row.mobile,
-            city: row.city,
-            state: row.state,
-            clientName: row.clientName,
-          })),
-          extensionId: admin?.extensionId || [],
-          adminName: admin?.name || 'ADMIN',
-          serverId: admin?.serverId,
+        // Same payload shape as admin-panel-domains NewRegisterUsers.addToDialer:
+        // campaign_id = campaign.id, list_name = campaign.name, random list_id,
+        // server from campaign.serverId (49.206.26.7 → api2, 3.200 → api).
+        const res = await secureApi('callLogs.externalDialerBatch', {
+          campaignId: campaign.id,
+          campaign_id: campaign.id,
+          listName: campaign.name,
+          list_name: campaign.name,
+          leads,
+          serverId: campaign.serverId,
         });
 
         if (!res.ok) {
@@ -69,13 +87,32 @@ export function useNewRegistersActions(
           return false;
         }
 
-        toast.success(res.message || 'Added to dialer');
+        const listId =
+          res.data &&
+          typeof res.data === 'object' &&
+          'list_id' in res.data
+            ? String((res.data as { list_id?: string | number }).list_id ?? '')
+            : '';
+        const inserted =
+          res.data &&
+          typeof res.data === 'object' &&
+          'inserted' in res.data
+            ? Number((res.data as { inserted?: number }).inserted)
+            : leads.length;
+
+        toast.success(
+          res.message ||
+            `${Number.isFinite(inserted) ? inserted : leads.length} inserted successfully.`,
+        );
+        if (listId) {
+          toast.info(`Data pushed on ${listId} List ID`);
+        }
         return true;
       } finally {
         setDialerLoading(false);
       }
     },
-    [admin?.extensionId, admin?.name, admin?.serverId],
+    [],
   );
 
   return { dialerLoading, toggleBlock, addToDialer };

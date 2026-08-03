@@ -145,6 +145,7 @@ export function useCallLogsQuery(
   useEffect(() => {
     if (options?.poll === false) return;
     const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       void load({ silent: true });
     }, POLL_INTERVAL_MS);
     return () => window.clearInterval(id);

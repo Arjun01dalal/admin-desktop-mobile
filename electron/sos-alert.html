@@ -17,23 +17,33 @@
     .wrap {
       box-sizing: border-box;
       height: 100%;
-      padding: 28px 32px;
+      padding: 24px 28px;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 14px;
+      gap: 10px;
     }
     h1 {
       margin: 0;
-      font-size: 28px;
+      font-size: 26px;
       letter-spacing: 0.08em;
       font-weight: 800;
     }
     p {
       margin: 0;
-      font-size: 15px;
+      font-size: 14px;
       line-height: 1.45;
       opacity: 0.92;
+    }
+    .meta {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+    .meta span {
+      opacity: 0.75;
+      font-weight: 500;
     }
     button {
       -webkit-app-region: no-drag;
@@ -55,7 +65,9 @@
 <body>
   <div class="wrap">
     <h1>SOS ALERT</h1>
-    <p>An emergency SOS has been activated. This alert will stay until you acknowledge it.</p>
+    <p id="msg">An emergency SOS has been activated. This alert will stay until you acknowledge it.</p>
+    <p class="meta" id="byLine" hidden><span>Triggered by</span> <strong id="byName"></strong></p>
+    <p class="meta" id="locLine" hidden><span>Location</span> <strong id="locName"></strong></p>
     <button type="button" id="ack">Acknowledge</button>
   </div>
   <!-- Danger SFX from https://www.youtube.com/shorts/B7Wf5kE-YoA -->
@@ -64,6 +76,51 @@
     (function () {
       var audio = document.getElementById('danger');
       audio.volume = 1;
+
+      function applyDetails(details) {
+        details = details || {};
+        var name = String(details.blockedByName || '').trim();
+        var location = String(details.location || '').trim();
+        var message = String(details.message || '').trim();
+
+        var msgEl = document.getElementById('msg');
+        var byLine = document.getElementById('byLine');
+        var byName = document.getElementById('byName');
+        var locLine = document.getElementById('locLine');
+        var locName = document.getElementById('locName');
+
+        if (message) {
+          msgEl.textContent = message;
+        } else {
+          msgEl.textContent =
+            'An emergency SOS has been activated. This alert will stay until you acknowledge it.';
+        }
+
+        if (name) {
+          byName.textContent = name;
+          byLine.hidden = false;
+        } else {
+          byLine.hidden = true;
+        }
+
+        if (location) {
+          locName.textContent = location;
+          locLine.hidden = false;
+        } else {
+          locLine.hidden = true;
+        }
+      }
+
+      window.__sosAlertUpdate = applyDetails;
+
+      try {
+        var params = new URLSearchParams(window.location.search || '');
+        applyDetails({
+          blockedByName: params.get('blockedByName') || '',
+          location: params.get('location') || '',
+          message: params.get('message') || '',
+        });
+      } catch (e) {}
 
       function stopTone() {
         try {

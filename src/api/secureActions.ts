@@ -11,6 +11,7 @@ export const SECURE_ACTIONS = [
   'auth.getAllBlockedUserIds',
   'auth.sosFlag',
   'auth.getSosFlag',
+  'auth.getAllSosBlocks',
   'houseGames.transactions',
   'houseGames.updateBetStatus',
   'caller.depositByEmpcodeOffice',

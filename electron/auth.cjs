@@ -2,6 +2,7 @@ const CryptoJS = require('crypto-js');
 const axios = require('axios');
 const { getApiBaseUrl, getEntkValue } = require('./config.cjs');
 const { createPinnedAgent } = require('./certPin.cjs');
+const { attachHttpsOnlyInterceptor } = require('./httpsOnly.cjs');
 
 // Single shared agent so pinned connections can be keep-alive pooled.
 const pinnedAgent = createPinnedAgent();
@@ -15,13 +16,21 @@ function decrypt(cipherText) {
   return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
 }
 
+let sharedClient = null;
+
 function client() {
-  return axios.create({
-    baseURL: getApiBaseUrl(),
-    maxBodyLength: Infinity,
-    timeout: 30000,
-    httpsAgent: pinnedAgent,
-  });
+  // Shared instance — baseURL is validated HTTPS and stable for process lifetime.
+  if (!sharedClient) {
+    sharedClient = attachHttpsOnlyInterceptor(
+      axios.create({
+        baseURL: getApiBaseUrl(),
+        maxBodyLength: Infinity,
+        timeout: 30000,
+        httpsAgent: pinnedAgent,
+      }),
+    );
+  }
+  return sharedClient;
 }
 
 function authHeader(token) {

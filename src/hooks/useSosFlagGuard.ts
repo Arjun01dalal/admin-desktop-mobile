@@ -1,19 +1,54 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { secureApi } from '@/api/secureClient';
 
-const SOS_POLL_INTERVAL_MS = 10_000;
+/** Shape from `/SubAdmin/get-sos-flag` → `data.block`. */
+export type SosBlockInfo = {
+  enabled?: boolean;
+  blockedById?: string;
+  blockedByName?: string;
+  blockedAt?: string;
+  location?: string;
+  officeLocation?: string;
+  type?: string;
+};
 
 type SosFlagPayload = {
   sosEnabled?: boolean;
   enabled?: boolean;
+  block?: SosBlockInfo;
   data?: {
     sosEnabled?: boolean;
     enabled?: boolean;
+    block?: SosBlockInfo;
   };
+  payload?: SosFlagPayload;
 };
+
+/** Prefer `data.block` / `block` from get-sos-flag. */
+export function getSosBlock(payload: unknown): SosBlockInfo | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const obj = payload as SosFlagPayload & Record<string, unknown>;
+  if (obj.block && typeof obj.block === 'object') return obj.block;
+  if (obj.data?.block && typeof obj.data.block === 'object') return obj.data.block;
+  if (obj.payload && typeof obj.payload === 'object') {
+    return getSosBlock(obj.payload);
+  }
+  return null;
+}
 
 export function isSosFlagEnabled(payload: unknown): boolean {
   if (payload == null) return false;
+
+  // Canonical API shape: { block: { enabled, blockedByName, ... } }
+  const block = getSosBlock(payload);
+  if (block) {
+    return (
+      block.enabled === true ||
+      String(block.enabled).toLowerCase() === 'true' ||
+      String(block.enabled) === '1'
+    );
+  }
+
   if (typeof payload !== 'object') {
     if (payload === true || payload === 1) return true;
     if (typeof payload === 'string') {
@@ -22,12 +57,12 @@ export function isSosFlagEnabled(payload: unknown): boolean {
     }
     return false;
   }
+
   const obj = payload as SosFlagPayload & {
     sos?: boolean;
     sos_flag?: boolean;
     sosFlag?: boolean;
     flag?: boolean;
-    payload?: SosFlagPayload;
   };
   if (obj.sosEnabled === true || obj.enabled === true) return true;
   if (obj.sos === true || obj.sos_flag === true || obj.sosFlag === true || obj.flag === true) {
@@ -41,7 +76,7 @@ export function isSosFlagEnabled(payload: unknown): boolean {
 }
 
 type Options = {
-  /** When true, poll while the panel is active. */
+  /** When true, subscribe to main-process SOS state while the panel is active. */
   enabled: boolean;
   /** Live check — exempt roles stay in panel. */
   isExempt: () => boolean;
@@ -49,8 +84,9 @@ type Options = {
 };
 
 /**
- * Globally polls SubAdmin/get-sos-flag while the user is in the panel.
- * Non-exempt users are kicked when sosEnabled is true.
+ * Kicks non-exempt users when SOS is active.
+ * Subscribes to main-process `sos:state` (sosMonitor polls get-sos-flag once).
+ * `refresh()` remains for manual post-activate / unblock sync.
  */
 export function useSosFlagGuard({ enabled, isExempt, onKick }: Options): {
   sosEnabled: boolean;
@@ -64,6 +100,19 @@ export function useSosFlagGuard({ enabled, isExempt, onKick }: Options): {
   onKickRef.current = onKick;
   isExemptRef.current = isExempt;
 
+  const applyActive = useCallback((active: boolean) => {
+    setSosEnabled(active);
+    if (!active) {
+      kickedRef.current = false;
+      window.gcalc?.sosCleared?.();
+      return;
+    }
+    // Do NOT call sosActivated — main sosMonitor + push handle remote alerts.
+    if (isExemptRef.current() || kickedRef.current) return;
+    kickedRef.current = true;
+    onKickRef.current();
+  }, []);
+
   const refresh = useCallback(async () => {
     if (!enabled) return;
     if (!localStorage.getItem('token')) return;
@@ -71,25 +120,11 @@ export function useSosFlagGuard({ enabled, isExempt, onKick }: Options): {
     try {
       const res = await secureApi<SosFlagPayload>('auth.getSosFlag', {});
       if (!res.ok) return;
-
-      const active = isSosFlagEnabled(res.data);
-      setSosEnabled(active);
-
-      if (!active) {
-        kickedRef.current = false;
-        window.gcalc?.sosCleared?.();
-        return;
-      }
-
-      // Do NOT call sosActivated here — that would siren the observing panel
-      // (and the originator). Main sosMonitor + push handle remote alerts.
-      if (isExemptRef.current() || kickedRef.current) return;
-      kickedRef.current = true;
-      onKickRef.current();
+      applyActive(isSosFlagEnabled(res.data));
     } catch {
-      // Network blips — keep polling.
+      // Network blips — main-process IPC remains source of truth.
     }
-  }, [enabled]);
+  }, [enabled, applyActive]);
 
   useEffect(() => {
     if (!enabled) {
@@ -98,15 +133,24 @@ export function useSosFlagGuard({ enabled, isExempt, onKick }: Options): {
       return;
     }
 
+    let cancelled = false;
+
+    void window.gcalc?.getSosState?.().then((state) => {
+      if (!cancelled) applyActive(Boolean(state?.active));
+    });
+
+    const unsubscribe = window.gcalc?.onSosState?.((d) => {
+      if (!cancelled) applyActive(Boolean(d?.active));
+    });
+
+    // One-shot API sync if IPC state is stale (no interval — sosMonitor polls).
     void refresh();
-    const intervalId = window.setInterval(() => {
-      void refresh();
-    }, SOS_POLL_INTERVAL_MS);
 
     return () => {
-      window.clearInterval(intervalId);
+      cancelled = true;
+      unsubscribe?.();
     };
-  }, [enabled, refresh]);
+  }, [enabled, applyActive, refresh]);
 
   return { sosEnabled, setSosEnabled, refresh };
 }

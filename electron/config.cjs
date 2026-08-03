@@ -2,6 +2,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { app } = require('electron');
 const dotenv = require('dotenv');
+const { assertHttpsUrl } = require('./httpsOnly.cjs');
 
 function resolveEnvPath() {
   const candidates = [
@@ -39,13 +40,16 @@ function optionalEnv(name) {
 }
 
 module.exports = {
-  getApiBaseUrl: () => requireEnv('API_BASE_URL'),
+  getApiBaseUrl: () => assertHttpsUrl(requireEnv('API_BASE_URL'), { label: 'API_BASE_URL' }),
   getEntkValue: () => requireEnv('ENTK_VALUE'),
   /** Read-only GitHub token for private-repo auto-update checks (optional). */
   getGhUpdateToken: () => optionalEnv('GH_UPDATE_TOKEN'),
   /** ntfy topic for SOS push (optional — enables cross-device alerts). */
   getSosPushTopic: () => optionalEnv('SOS_PUSH_TOPIC'),
-  getSosPushServer: () => optionalEnv('SOS_PUSH_SERVER') || 'https://ntfy.sh',
+  getSosPushServer: () =>
+    assertHttpsUrl(optionalEnv('SOS_PUSH_SERVER') || 'https://ntfy.sh', {
+      label: 'SOS_PUSH_SERVER',
+    }),
   optionalEnv,
   // Only true when launched via `npm run dev` (Vite server running).
   useViteDevServer: process.env.ELECTRON_DEV === '1',

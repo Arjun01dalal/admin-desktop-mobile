@@ -11,20 +11,21 @@
  *   SOS_PUSH_TOPIC   — secret topic name (required to enable push)
  *   SOS_PUSH_SERVER  — default https://ntfy.sh
  */
-const { optionalEnv } = require('./config.cjs');
-
-const DEFAULT_SERVER = 'https://ntfy.sh';
+const { getSosPushTopic, getSosPushServer } = require('./config.cjs');
+const { assertHttpsUrl } = require('./httpsOnly.cjs');
 
 function getPushConfig() {
-  const topic = String(optionalEnv('SOS_PUSH_TOPIC') || '').trim();
-  const server = String(optionalEnv('SOS_PUSH_SERVER') || DEFAULT_SERVER)
-    .trim()
-    .replace(/\/$/, '');
+  const topic = String(getSosPushTopic() || '').trim();
+  const server = String(getSosPushServer()).trim().replace(/\/$/, '');
+  assertHttpsUrl(server, { label: 'SOS_PUSH_SERVER' });
   return {
     enabled: Boolean(topic),
     topic,
     server,
-    wsUrl: topic ? `${server.replace(/^http/, 'ws')}/${encodeURIComponent(topic)}/ws` : '',
+    // https:// → wss:// only (never cleartext ws://)
+    wsUrl: topic
+      ? `${server.replace(/^https:/i, 'wss:')}/${encodeURIComponent(topic)}/ws`
+      : '',
     publishUrl: topic ? `${server}/${encodeURIComponent(topic)}` : '',
   };
 }
@@ -83,10 +84,12 @@ function startPushClient(handlers = {}) {
       tags.includes('rotating_light')
     ) {
       const typeMatch = body.match(/\btype=([^\s]+)/i);
-      const locMatch = body.match(/\blocation=(.+?)(?:\s*::|\s*$)/i);
+      const locMatch = body.match(/\blocation=(.+?)(?:\s+blockedByName=|\s*::|\s*$)/i);
+      const byMatch = body.match(/\bblockedByName=(.+?)(?:\s*::|\s*$)/i);
       const meta = {
         type: typeMatch ? String(typeMatch[1] || '').trim() : '',
         location: locMatch ? String(locMatch[1] || '').trim() : '',
+        blockedByName: byMatch ? String(byMatch[1] || '').trim() : '',
       };
       log('received SOS activate', meta);
       handlers.onSosActivated?.(meta);
@@ -169,10 +172,12 @@ function startPushClient(handlers = {}) {
     publishSos(meta = {}) {
       const type = String(meta?.type || '').trim();
       const location = String(meta?.location || '').trim();
+      const blockedByName = String(meta?.blockedByName || '').trim();
       const parts = ['SOS_ACTIVE'];
       if (type) parts.push(`type=${type}`);
-      // `::` terminator so location may contain spaces / slashes.
+      // `::` terminator so location / name may contain spaces.
       if (location) parts.push(`location=${location}`);
+      if (blockedByName) parts.push(`blockedByName=${blockedByName}`);
       parts.push(':: Emergency SOS has been activated. Open Astro CS Panel.');
       return publish('SOS ALERT', parts.join(' '));
     },

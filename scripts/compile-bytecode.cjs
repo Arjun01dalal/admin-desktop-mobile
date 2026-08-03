@@ -50,6 +50,7 @@ const COMPILE = [
   'secure/registry.cjs',
   'secure/crypto.cjs',
   'secure/bridgeSanitize.cjs',
+  'secure/devHttpLog.cjs',
 ];
 const COPY_PLAIN = [
   'preload.cjs',

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { autoUpdater } = require('electron-updater');
 const { useViteDevServer, getGhUpdateToken } = require('./config.cjs');
+const { enforceSessionHttpsOnly, isBlockedCleartext } = require('./httpsOnly.cjs');
 const auth = require('./auth.cjs');
 const secureApi = require('./secure/index.cjs');
 const { startSosMonitor } = require('./sosMonitor.cjs');
@@ -184,6 +185,85 @@ function enableGeolocationPermissions() {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowGeo(permission));
 }
 
+/** Packaged builds: no DevTools / inspector for end users. */
+function allowDevTools() {
+  return Boolean(useViteDevServer) && !app.isPackaged;
+}
+
+/**
+ * Minimal app menu — never include View / Toggle Developer Tools / Inspect.
+ * Windows/Linux: no window menu bar. macOS: app menu only (About / Quit).
+ */
+function installApplicationMenu() {
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: app.name || 'Astro CS Panel',
+          submenu: [
+            { role: 'about' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit' },
+          ],
+        },
+      ]),
+    );
+    return;
+  }
+  Menu.setApplicationMenu(null);
+}
+
+function isDevtoolsShortcut(input) {
+  const key = String(input.key || '').toLowerCase();
+  if (key === 'f12') return true;
+  // Ctrl+Shift+I / J / C  or  Cmd+Option+I
+  if ((input.control || input.meta) && input.shift && (key === 'i' || key === 'j' || key === 'c')) {
+    return true;
+  }
+  if (input.meta && input.alt && key === 'i') return true;
+  return false;
+}
+
+function hardenWebContents(wc) {
+  if (!wc || wc.isDestroyed()) return;
+
+  wc.on('before-input-event', (event, input) => {
+    if (!allowDevTools() && isDevtoolsShortcut(input)) {
+      event.preventDefault();
+    }
+  });
+
+  wc.on('devtools-opened', () => {
+    if (!allowDevTools()) {
+      try {
+        wc.closeDevTools();
+      } catch {
+        // ignore
+      }
+    }
+  });
+
+  // Block cleartext HTTP navigations (Vite localhost still allowed in dev).
+  wc.on('will-navigate', (event, url) => {
+    if (isBlockedCleartext(url, { allowLocalHttp: true })) {
+      console.warn('[https-only] blocked navigation:', url);
+      event.preventDefault();
+    }
+  });
+
+  wc.setWindowOpenHandler(({ url }) => {
+    if (isBlockedCleartext(url, { allowLocalHttp: true })) {
+      console.warn('[https-only] blocked window.open:', url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: PORTRAIT_WIDTH,
@@ -193,6 +273,7 @@ function createWindow() {
     title: 'Astro CS Panel',
     icon: iconPath(),
     backgroundColor: '#1c1c1e',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -200,12 +281,13 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      // Block DevTools in packaged builds so users can't inspect the renderer.
-      devTools: !app.isPackaged,
+      // Never ship Inspect Element / DevTools to end users.
+      devTools: allowDevTools(),
     },
   });
 
   win.setMenuBarVisibility(false);
+  hardenWebContents(win.webContents);
 
   win.on('resize', () => {
     layoutSiteView();
@@ -342,9 +424,11 @@ function showSiteView() {
         nodeIntegration: false,
         sandbox: true,
         webSecurity: true,
+        devTools: allowDevTools(),
       },
     });
 
+    hardenWebContents(siteView.webContents);
     siteView.webContents.setWindowOpenHandler(() => {
       // Block popups — let the renderer open login or panel.
       hideSiteView();
@@ -354,6 +438,10 @@ function showSiteView() {
 
     siteView.webContents.on('will-navigate', (event, url) => {
       try {
+        if (isBlockedCleartext(url, { allowLocalHttp: false })) {
+          event.preventDefault();
+          return;
+        }
         const target = new URL(url);
         const home = new URL(ASTRO_SITE_URL);
         // Keep browsing on the marketing site; anything else → login/panel gate.
@@ -717,6 +805,13 @@ app.whenReady().then(() => {
     app.setAppUserModelId('com.yourcompany.astro');
   }
 
+  installApplicationMenu();
+
+  // Block DevTools / inspector on every WebContents (main + BrowserView + alerts).
+  app.on('web-contents-created', (_event, contents) => {
+    hardenWebContents(contents);
+  });
+
   // Keep SOS alive after reboot / when user "closes" the window (tray mode).
   try {
     app.setLoginItemSettings({
@@ -730,6 +825,8 @@ app.whenReady().then(() => {
   registerAppProtocol();
   setDockIcon();
   enableGeolocationPermissions();
+  // Reject cleartext HTTP for Chromium network (Vite localhost still allowed).
+  enforceSessionHttpsOnly(session.defaultSession);
   createTray();
   createWindow();
 

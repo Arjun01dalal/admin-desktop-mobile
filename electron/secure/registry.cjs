@@ -55,6 +55,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  'auth.getAllSosBlocks': {
+    method: 'POST',
+    path: '/SubAdmin/get-all-sos-blocks',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
 
   // House Games
   'houseGames.transactions': {

@@ -135,10 +135,11 @@ export function FalconRateManagementPage() {
       await load(false);
     };
     void run();
-    // laxminarayan polls every 3s so live match books stay fresh
+    // Live books — 10s is enough; skip while tab is hidden.
     const id = window.setInterval(() => {
-      if (mounted) void load(true);
-    }, 3000);
+      if (!mounted || document.visibilityState !== 'visible') return;
+      void load(true);
+    }, 10_000);
     return () => {
       mounted = false;
       window.clearInterval(id);

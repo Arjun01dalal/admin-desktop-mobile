@@ -35,6 +35,7 @@ import {
   Permissions,
 } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { createTableFiltersContext } from '@/components/createTableFiltersContext';
 import { appCodeForName } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { dateTime, formatDisplayDate } from '@/utils/dates';
@@ -132,6 +133,33 @@ function ColumnSearch({
         if (e.key === 'Enter') onSearch();
       }}
       sx={filterFieldSx}
+    />
+  );
+}
+
+type KycFiltersCtx = {
+  draftFilters: Filters;
+  setDraftField: (key: keyof Filters) => (value: string) => void;
+  search: () => void;
+};
+
+const { Provider: KycFiltersProvider, useFilters: useKycFilters } =
+  createTableFiltersContext<KycFiltersCtx>('KycFilters');
+
+function KycColumnFilter({
+  field,
+  placeholder,
+}: {
+  field: keyof Filters;
+  placeholder: string;
+}) {
+  const { draftFilters, setDraftField, search } = useKycFilters();
+  return (
+    <ColumnSearch
+      value={draftFilters[field]}
+      onChange={setDraftField(field)}
+      onSearch={search}
+      placeholder={placeholder}
     />
   );
 }
@@ -262,22 +290,22 @@ export function UsersKycPage() {
   useEffect(() => {
     if (disableNightCheck) return undefined;
 
-    const checkTime = async () => {
-      try {
-        const res = await fetch(
-          'https://timeapi.io/api/Time/current/zone?timeZone=Asia/Kolkata',
-        );
-        const data = (await res.json()) as { dateTime?: string };
-        const hour = new Date(data.dateTime || Date.now()).getHours();
-        setIsNightLockActive(hour >= 20 || hour < 10);
-      } catch {
-        const hour = new Date().getHours();
-        setIsNightLockActive(hour >= 20 || hour < 10);
-      }
+    const hourInIST = () => {
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        hour12: false,
+      }).formatToParts(new Date());
+      return Number(parts.find((p) => p.type === 'hour')?.value || 0);
     };
 
-    void checkTime();
-    const interval = window.setInterval(() => void checkTime(), 60_000);
+    const checkTime = () => {
+      const hour = hourInIST();
+      setIsNightLockActive(hour >= 20 || hour < 10);
+    };
+
+    checkTime();
+    const interval = window.setInterval(checkTime, 60_000);
     return () => window.clearInterval(interval);
   }, [disableNightCheck]);
 
@@ -734,14 +762,7 @@ export function UsersKycPage() {
       {
         id: 'name',
         label: 'Name',
-        filter: (
-          <ColumnSearch
-            value={draftFilters.name}
-            onChange={setDraftField('name')}
-            onSearch={search}
-            placeholder="Search name"
-          />
-        ),
+        filter: <KycColumnFilter field="name" placeholder="Search name" />,
         render: (row) => (
           <Typography variant="body2" fontWeight={600}>
             {display(row.name)}
@@ -751,14 +772,7 @@ export function UsersKycPage() {
       {
         id: 'dpId',
         label: 'Dp Id',
-        filter: (
-          <ColumnSearch
-            value={draftFilters.dpId}
-            onChange={setDraftField('dpId')}
-            onSearch={search}
-            placeholder="Search dp id"
-          />
-        ),
+        filter: <KycColumnFilter field="dpId" placeholder="Search dp id" />,
         render: (row) => row._id || '—',
       },
       {
@@ -789,26 +803,14 @@ export function UsersKycPage() {
       {
         id: 'mobile',
         label: 'Mobile',
-        filter: (
-          <ColumnSearch
-            value={draftFilters.mobile}
-            onChange={setDraftField('mobile')}
-            onSearch={search}
-            placeholder="Search mobile"
-          />
-        ),
+        filter: <KycColumnFilter field="mobile" placeholder="Search mobile" />,
         render: (row) => maskMobile(row.mobile, canShowMobile),
       },
       {
         id: 'aadhaar',
         label: 'Aadhar',
         filter: (
-          <ColumnSearch
-            value={draftFilters.aadhaarNumber}
-            onChange={setDraftField('aadhaarNumber')}
-            onSearch={search}
-            placeholder="Search aadhar"
-          />
+          <KycColumnFilter field="aadhaarNumber" placeholder="Search aadhar" />
         ),
         render: (row) => display(row.aadhaarNumber),
       },
@@ -816,12 +818,7 @@ export function UsersKycPage() {
         id: 'account',
         label: 'Account',
         filter: (
-          <ColumnSearch
-            value={draftFilters.accountNumber}
-            onChange={setDraftField('accountNumber')}
-            onSearch={search}
-            placeholder="Search account"
-          />
+          <KycColumnFilter field="accountNumber" placeholder="Search account" />
         ),
         render: (row) => display(row.accountNumber),
       },
@@ -944,9 +941,6 @@ export function UsersKycPage() {
       },
     ],
     [
-      draftFilters,
-      search,
-      setDraftField,
       canShowMobile,
       page,
       pageSize,
@@ -960,6 +954,11 @@ export function UsersKycPage() {
       isNightLockActive,
       appClientName,
     ],
+  );
+
+  const filtersCtx = useMemo<KycFiltersCtx>(
+    () => ({ draftFilters, setDraftField, search }),
+    [draftFilters, setDraftField, search],
   );
 
   if (!canViewKyc) {
@@ -976,6 +975,7 @@ export function UsersKycPage() {
   }
 
   return (
+    <KycFiltersProvider value={filtersCtx}>
     <Box>
       <Typography variant="h5" fontWeight={700} mb={2}>
         KYC
@@ -1421,5 +1421,6 @@ export function UsersKycPage() {
         </DialogActions>
       </Dialog>
     </Box>
+    </KycFiltersProvider>
   );
 }

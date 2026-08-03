@@ -18,5 +18,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Strip console.* / debugger from production renderer bundles.
+    esbuild: {
+      drop: ['console', 'debugger'],
+    },
   },
 });

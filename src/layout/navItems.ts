@@ -130,6 +130,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.login_logout_report,
   },
   {
+    id: 'sosBlockedUsers',
+    label: 'SOS Blocked Users',
+    path: '/sos-blocked-users',
+    permission: Permissions.sos_blocked_users,
+  },
+  {
     id: 'checkersReport',
     label: 'Checkers Report',
     path: '/checkers-report',

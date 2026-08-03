@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
 import { secureApi } from '@/api/secureClient';
 import { notifySessionExpired } from '@/utils/session';
 
@@ -124,7 +123,6 @@ async function fetchBlockedIds(): Promise<string[]> {
  * admin id appears in `/SubAdmin/get-all-blockedUserId`.
  */
 export function useBlockedUserCheck(): void {
-  const location = useLocation();
   const logoutTriggered = useRef(false);
 
   const handleLogout = useCallback(() => {
@@ -178,11 +176,22 @@ export function useBlockedUserCheck(): void {
     void checkBlockedUser();
 
     const intervalId = window.setInterval(() => {
-      void checkBlockedUser();
+      if (document.visibilityState === 'visible') {
+        void checkBlockedUser();
+      }
     }, CHECK_INTERVAL);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void checkBlockedUser();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [location.pathname, checkBlockedUser]);
+    // Mount once while panel router is alive — do not reset on every route change.
+  }, [checkBlockedUser]);
 }

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
 import { secureApi } from '@/api/secureClient';
 import { isJwtExpired, notifySessionExpired } from '@/utils/session';
 
@@ -73,7 +72,6 @@ async function checkSession(userId: string): Promise<SessionStatus> {
  * check-token-blacklisted on an interval, tab focus, and cross-tab token clear.
  */
 export function useTokenValidator(): void {
-  const location = useLocation();
   const logoutTriggered = useRef(false);
 
   const handleLogout = useCallback((reason?: string) => {
@@ -137,7 +135,9 @@ export function useTokenValidator(): void {
     void validateToken();
 
     const intervalId = window.setInterval(() => {
-      void validateToken();
+      if (document.visibilityState === 'visible') {
+        void validateToken();
+      }
     }, TOKEN_CHECK_INTERVAL);
 
     const onVisibility = () => {
@@ -160,5 +160,6 @@ export function useTokenValidator(): void {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('storage', onStorage);
     };
-  }, [location.pathname, validateToken, handleLogout]);
+    // Mount once while panel router is alive — do not reset on every route change.
+  }, [validateToken, handleLogout]);
 }

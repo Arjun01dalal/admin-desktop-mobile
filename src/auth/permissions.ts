@@ -19,6 +19,8 @@ export const Permissions = {
   new_registrations: 'new_registrations',
   Login_Report: 'Login_Report',
   login_logout_report: 'login_logout_report',
+  /** Show SOS Blocked Users page in side nav. */
+  sos_blocked_users: 'sos_blocked_users',
   Checkers_Report: 'Checkers_Report',
   sheet_downlaod_report: 'sheet_downlaod_report',
   coin_report: 'coin_report',

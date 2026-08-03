@@ -104,6 +104,7 @@ export type GCalcApi = {
     self?: boolean;
     type?: string;
     location?: string;
+    blockedByName?: string;
   }) => void;
   /** Clear local SOS alert (main process). */
   sosCleared: () => void;
@@ -113,6 +114,25 @@ export type GCalcApi = {
   getSosState: () => Promise<{ active?: boolean }>;
   /** Subscribe to main-process SOS state changes. Returns unsubscribe. */
   onSosState: (cb: (d: { active?: boolean }) => void) => () => void;
+  /**
+   * Dev: main-process HTTP request logs (secure API / dialer).
+   * Shows in DevTools Console — Network tab cannot see main-process traffic.
+   */
+  onSecureHttpLog: (
+    cb: (d: {
+      at?: string;
+      source?: string;
+      action?: string;
+      method?: string;
+      url?: string;
+      status?: number;
+      ok?: boolean;
+      ms?: number;
+      request?: unknown;
+      response?: unknown;
+      error?: string;
+    }) => void,
+  ) => () => void;
 };
 
 declare global {

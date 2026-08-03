@@ -21,8 +21,6 @@ import { UpdateToast } from '@/components/UpdateToast';
 import { TokenValidator } from '@/components/TokenValidator';
 import { BlockedUserCheck } from '@/components/BlockedUserCheck';
 import { PANEL_PATHS } from '@/layout/navItems';
-import { isSosFlagEnabled } from '@/hooks/useSosFlagGuard';
-import { secureApi } from '@/api/secureClient';
 import {
   clearAuthStorage,
   isJwtExpired,
@@ -124,6 +122,10 @@ const CheckersReportPage = lazyNamed(
 const AllUserLoginReportPage = lazyNamed(
   () => import('@/screens/panel/AllUserLoginReportPage'),
   'AllUserLoginReportPage',
+);
+const SosBlockedUsersPage = lazyNamed(
+  () => import('@/screens/panel/SosBlockedUsersPage'),
+  'SosBlockedUsersPage',
 );
 const LoginReportPage = lazyNamed(
   () => import('@/screens/panel/LoginReportPage'),
@@ -488,6 +490,7 @@ export default function App() {
     };
 
     // Main process keeps SOS after logout (token cleared in renderer).
+    // No API poll here — sosMonitor is the sole get-sos-flag poller.
     void window.gcalc?.getSosState?.().then((state) => {
       if (!cancelled && state?.active) {
         sosBlocksLoginRef.current = true;
@@ -495,27 +498,12 @@ export default function App() {
     });
 
     const unsubscribe = window.gcalc?.onSosState?.((d) => {
-      sosBlocksLoginRef.current = Boolean(d?.active);
+      if (!cancelled) apply(Boolean(d?.active));
     });
 
-    const poll = async () => {
-      if (!localStorage.getItem('token')) return;
-      try {
-        const res = await secureApi('auth.getSosFlag', {});
-        if (cancelled || !res.ok) return;
-        apply(isSosFlagEnabled(res.data));
-      } catch {
-        // ignore
-      }
-    };
-    void poll();
-    const id = window.setInterval(() => {
-      void poll();
-    }, 10_000);
     return () => {
       cancelled = true;
       unsubscribe?.();
-      window.clearInterval(id);
     };
   }, [screen]);
 
@@ -668,6 +656,10 @@ export default function App() {
                   <Route
                     path="/all-user-login-report"
                     element={<AllUserLoginReportPage />}
+                  />
+                  <Route
+                    path="/sos-blocked-users"
+                    element={<SosBlockedUsersPage />}
                   />
                   <Route path="/checkers-report" element={<CheckersReportPage />} />
                   <Route

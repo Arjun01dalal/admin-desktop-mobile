@@ -1,40 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
-import { secureApi } from '@/api/secureClient';
-import { isSosFlagEnabled } from '@/hooks/useSosFlagGuard';
 
 type Props = {
   onOpenLogin: () => void;
 };
 
-const SOS_POLL_MS = 10_000;
-
 /**
  * Under the Electron BrowserView (admin.astrothirdeye.com).
  * Bottom bar: Login to main panel only when sosEnabled is false.
  *
- * Prefer main-process SOS state — after a SOS kick the renderer token is
+ * Uses main-process SOS state only — after a SOS kick the renderer token is
  * cleared, so get-sos-flag alone cannot hide the Login button.
  */
 export function AstroSite({ onOpenLogin }: Props) {
   const [sosEnabled, setSosEnabled] = useState(false);
   const [sosReady, setSosReady] = useState(false);
-
-  const refreshSosFromApi = useCallback(async () => {
-    // get-sos-flag needs a Bearer token — skip when logged out.
-    if (!localStorage.getItem('token')) return;
-    try {
-      const res = await secureApi('auth.getSosFlag', {});
-      if (res.ok) {
-        const active = isSosFlagEnabled(res.data);
-        setSosEnabled(active);
-        // Observing only — never re-trigger originator-style sosActivated.
-        if (!active) window.gcalc?.sosCleared?.();
-      }
-    } catch {
-      // Keep last known value on blips.
-    }
-  }, []);
 
   useEffect(() => {
     window.gcalc?.showSite?.();
@@ -70,14 +50,6 @@ export function AstroSite({ onOpenLogin }: Props) {
       unsubscribe?.();
     };
   }, []);
-
-  useEffect(() => {
-    void refreshSosFromApi();
-    const id = window.setInterval(() => {
-      void refreshSosFromApi();
-    }, SOS_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [refreshSosFromApi]);
 
   const showLogin = sosReady && !sosEnabled;
 

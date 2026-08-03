@@ -26,18 +26,29 @@ const ROOT = path.join(__dirname, '..', '..');
 const envPath = path.join(ROOT, '.env');
 if (fs.existsSync(envPath)) dotenv.config({ path: envPath });
 
-const API_BASE = String(process.env.API_BASE_URL || '').replace(/\/$/, '');
-const TOKEN = String(process.env.SOS_SERVICE_TOKEN || '').trim();
-const TOPIC = String(process.env.SOS_PUSH_TOPIC || '').trim();
-const SERVER = String(process.env.SOS_PUSH_SERVER || 'https://ntfy.sh').replace(/\/$/, '');
-const POLL_MS = Math.max(2000, Number(process.env.SOS_PUSH_POLL_MS || 3000));
+function requireHttps(raw, label) {
+  const s = String(raw || '').trim().replace(/\/$/, '');
+  if (!s) die(`Missing ${label}`);
+  let u;
+  try {
+    u = new URL(s);
+  } catch {
+    die(`Invalid ${label}`);
+  }
+  if (u.protocol !== 'https:') die(`${label} must use HTTPS`);
+  return s;
+}
 
 function die(msg) {
   console.error('[sos-push]', msg);
   process.exit(1);
 }
 
-if (!API_BASE) die('Missing API_BASE_URL');
+const API_BASE = requireHttps(process.env.API_BASE_URL, 'API_BASE_URL');
+const TOKEN = String(process.env.SOS_SERVICE_TOKEN || '').trim();
+const TOPIC = String(process.env.SOS_PUSH_TOPIC || '').trim();
+const SERVER = requireHttps(process.env.SOS_PUSH_SERVER || 'https://ntfy.sh', 'SOS_PUSH_SERVER');
+const POLL_MS = Math.max(2000, Number(process.env.SOS_PUSH_POLL_MS || 3000));
 if (!TOKEN) die('Missing SOS_SERVICE_TOKEN (Bearer token for get-sos-flag)');
 if (!TOPIC) die('Missing SOS_PUSH_TOPIC');
 
@@ -47,6 +58,10 @@ function isSosFlagEnabled(payload) {
     return payload === true || payload === 1 || String(payload).toLowerCase() === 'true';
   }
   const obj = payload;
+  // Canonical get-sos-flag: { block: { enabled, blockedByName, ... } }
+  if (obj.block && typeof obj.block === 'object') {
+    return obj.block.enabled === true || String(obj.block.enabled).toLowerCase() === 'true';
+  }
   if (obj.sosEnabled === true || obj.enabled === true || obj.sos === true) return true;
   if (obj.data && typeof obj.data === 'object') return isSosFlagEnabled(obj.data);
   return false;

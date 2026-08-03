@@ -214,6 +214,7 @@ export function AppShell({ onLogout }: Props) {
         silent: true,
         type: String(built.payload.type || ''),
         location: String(built.payload.location || ''),
+        blockedByName: String(user?.name || user?.mobile || ''),
       });
       if (!sosExempt) {
         onLogout();

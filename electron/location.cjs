@@ -4,26 +4,26 @@
  */
 const axios = require('axios');
 const geoip = require('geoip-lite');
+const { attachHttpsOnlyInterceptor } = require('./httpsOnly.cjs');
+
+const http = attachHttpsOnlyInterceptor(axios.create({ timeout: 8000 }));
 
 async function resolvePublicIp() {
   const attempts = [
     async () => {
-      const { data } = await axios.get('https://api.ipify.org?format=json', {
-        timeout: 8000,
+      const { data } = await http.get('https://api.ipify.org?format=json', {
         validateStatus: (s) => s === 200,
       });
       return data?.ip;
     },
     async () => {
-      const { data } = await axios.get('https://api64.ipify.org?format=json', {
-        timeout: 8000,
+      const { data } = await http.get('https://api64.ipify.org?format=json', {
         validateStatus: (s) => s === 200,
       });
       return data?.ip;
     },
     async () => {
-      const { data } = await axios.get('https://ifconfig.me/ip', {
-        timeout: 8000,
+      const { data } = await http.get('https://ifconfig.me/ip', {
         responseType: 'text',
         transformResponse: [(v) => v],
         validateStatus: (s) => s === 200,

@@ -90,4 +90,16 @@ contextBridge.exposeInMainWorld('gcalc', {
       ipcRenderer.removeListener('sos:state', handler);
     };
   },
+  /**
+   * Dev only (`npm run dev`) — main-process HTTP logs.
+   * Disabled in packaged builds; Network tab cannot see main-process traffic anyway.
+   */
+  onSecureHttpLog: (cb) => {
+    if (typeof cb !== 'function') return () => {};
+    const handler = (_e, d) => cb(d);
+    ipcRenderer.on('secure:dev-http-log', handler);
+    return () => {
+      ipcRenderer.removeListener('secure:dev-http-log', handler);
+    };
+  },
 });

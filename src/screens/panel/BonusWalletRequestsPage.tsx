@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent } from 'react';
 import {
   Box,
   Button,
@@ -16,6 +15,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { createTableFiltersContext } from '@/components/createTableFiltersContext';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import {
   formatAmount,
@@ -57,6 +57,51 @@ type Summary = {
   walletBalance: number;
   pendingCount: number;
 };
+
+type BonusFiltersCtx = {
+  draft: ColumnFilters;
+  setDraftField: (key: keyof ColumnFilters) => (value: string) => void;
+  commitQuery: () => void;
+};
+
+const { Provider: BonusFiltersProvider, useFilters: useBonusFilters } =
+  createTableFiltersContext<BonusFiltersCtx>('BonusWalletFilters');
+
+function BonusNameFilter() {
+  const { draft, setDraftField, commitQuery } = useBonusFilters();
+  return (
+    <TableSearchBar
+      value={draft.name}
+      onChange={(e) => setDraftField('name')(e.target.value)}
+      onSearch={() => commitQuery()}
+      placeholder="User name"
+    />
+  );
+}
+
+function BonusTxnFilter() {
+  const { draft, setDraftField, commitQuery } = useBonusFilters();
+  return (
+    <TableSearchBar
+      value={draft.transactionId}
+      onChange={(e) => setDraftField('transactionId')(e.target.value)}
+      onSearch={() => commitQuery()}
+      placeholder="Transaction id"
+    />
+  );
+}
+
+function BonusMobileFilter() {
+  const { draft, setDraftField, commitQuery } = useBonusFilters();
+  return (
+    <TableSearchBar
+      value={draft.mobile}
+      onChange={(e) => setDraftField('mobile')(e.target.value)}
+      onSearch={() => commitQuery()}
+      placeholder="Mobile"
+    />
+  );
+}
 
 const EMPTY_FILTERS: ColumnFilters = {
   name: '',
@@ -168,7 +213,7 @@ export function BonusWalletRequestsPage() {
     unpack,
     autoDeps: [page, itemsPerPage, query],
     errorMessage: 'Failed to load bonus wallet requests',
-    cacheTtlMs: 0,
+    cacheTtlMs: 30_000,
   });
 
   const loadSummary = useCallback(async () => {
@@ -243,10 +288,6 @@ export function BonusWalletRequestsPage() {
     [],
   );
 
-  const onDraftChange =
-    (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
-      setDraftField(key)(e.target.value);
-
   const handleAction = useCallback(
     async (row: BonusRow, actionStatus: 'approve' | 'reject' | 'remove') => {
       if (!row._id || !row.userId) {
@@ -291,27 +332,13 @@ export function BonusWalletRequestsPage() {
       {
         id: 'name',
         label: 'User Name',
-        filter: (
-          <TableSearchBar
-            value={draft.name}
-            onChange={onDraftChange('name')}
-            onSearch={() => commitQuery()}
-            placeholder="User name"
-          />
-        ),
+        filter: <BonusNameFilter />,
         render: (row) => display(row.name),
       },
       {
         id: 'transactionId',
         label: 'Transaction Id',
-        filter: (
-          <TableSearchBar
-            value={draft.transactionId}
-            onChange={onDraftChange('transactionId')}
-            onSearch={() => commitQuery()}
-            placeholder="Transaction id"
-          />
-        ),
+        filter: <BonusTxnFilter />,
         render: (row) => display(row._id),
       },
       {
@@ -322,14 +349,7 @@ export function BonusWalletRequestsPage() {
       {
         id: 'mobile',
         label: 'Mobile',
-        filter: (
-          <TableSearchBar
-            value={draft.mobile}
-            onChange={onDraftChange('mobile')}
-            onSearch={() => commitQuery()}
-            placeholder="Mobile"
-          />
-        ),
+        filter: <BonusMobileFilter />,
         render: (row) => maskMobile(row.mobile, canShowMobile),
       },
       {
@@ -394,15 +414,19 @@ export function BonusWalletRequestsPage() {
     [
       page,
       itemsPerPage,
-      draft,
       canShowMobile,
-      commitQuery,
       actingId,
       handleAction,
     ],
   );
 
+  const filtersCtx = useMemo<BonusFiltersCtx>(
+    () => ({ draft, setDraftField, commitQuery: () => commitQuery() }),
+    [draft, setDraftField, commitQuery],
+  );
+
   return (
+    <BonusFiltersProvider value={filtersCtx}>
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
       <Typography variant="h5" fontWeight={700} mb={1.5}>
         Bonus Wallet Requests
@@ -555,7 +579,6 @@ export function BonusWalletRequestsPage() {
         emptyMessage="No bonus wallet requests found"
         stickyHeader
         dense
-        virtualize={false}
         minWidth={1400}
         maxHeight="calc(100vh - 340px)"
       />
@@ -573,5 +596,6 @@ export function BonusWalletRequestsPage() {
         />
       </Stack>
     </Box>
+    </BonusFiltersProvider>
   );
 }
