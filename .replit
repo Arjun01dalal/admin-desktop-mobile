@@ -9,3 +9,9 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000
+
+[workflows]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
