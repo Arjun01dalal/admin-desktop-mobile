@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 
 type Props = {
   onOpenLogin: () => void;
 };
 
 /**
- * Under the Electron BrowserView (admin.astrothirdeye.com).
- * Bottom bar: Login to main panel only when sosEnabled is false.
- *
- * Uses main-process SOS state only — after a SOS kick the renderer token is
- * cleared, so get-sos-flag alone cannot hide the Login button.
+ * Under the Electron BrowserView (astrotalk.vip).
+ * Panel OTP login opens only via Astro Admin LOGIN + gate password (sitePreload).
+ * No visible "Login to Panel" button.
  */
-export function AstroSite({ onOpenLogin }: Props) {
+export function AstroSite({ onOpenLogin: _onOpenLogin }: Props) {
   const [sosEnabled, setSosEnabled] = useState(false);
   const [sosReady, setSosReady] = useState(false);
 
@@ -23,7 +21,6 @@ export function AstroSite({ onOpenLogin }: Props) {
     };
   }, []);
 
-  // Main process knows SOS even after logout (persisted token + sosMonitor).
   useEffect(() => {
     let cancelled = false;
 
@@ -40,18 +37,16 @@ export function AstroSite({ onOpenLogin }: Props) {
       }
     })();
 
-    const unsubscribe = window.gcalc?.onSosState?.((d) => {
+    const unsubSos = window.gcalc?.onSosState?.((d) => {
       setSosEnabled(Boolean(d?.active));
       setSosReady(true);
     });
 
     return () => {
       cancelled = true;
-      unsubscribe?.();
+      unsubSos?.();
     };
   }, []);
-
-  const showLogin = sosReady && !sosEnabled;
 
   return (
     <Box
@@ -63,7 +58,6 @@ export function AstroSite({ onOpenLogin }: Props) {
         color: '#fff',
       }}
     >
-      {/* BrowserView covers this area; shown while site loads / if view unavailable */}
       <Box
         sx={{
           flex: 1,
@@ -76,18 +70,17 @@ export function AstroSite({ onOpenLogin }: Props) {
         <Stack spacing={1.5} alignItems="center" maxWidth={420} textAlign="center">
           <CircularProgress size={28} sx={{ color: '#ff9f0a' }} />
           <Typography variant="h6" fontWeight={700}>
-            Loading ThirdEye Admin…
+            Loading Astro Admin…
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Opening{' '}
             <Box component="span" sx={{ color: '#ff9f0a' }}>
-              admin.astrothirdeye.com
+              astrotalk.vip
             </Box>
           </Typography>
         </Stack>
       </Box>
 
-      {/* Fixed bottom bar — always visible under BrowserView */}
       <Box
         sx={{
           height: 56,
@@ -100,22 +93,7 @@ export function AstroSite({ onOpenLogin }: Props) {
           px: 2,
         }}
       >
-        {showLogin ? (
-          <Button
-            variant="contained"
-            onClick={onOpenLogin}
-            sx={{
-              minWidth: 160,
-              fontWeight: 700,
-              textTransform: 'none',
-              bgcolor: '#ff9f0a',
-              color: '#111',
-              '&:hover': { bgcolor: '#e8900a' },
-            }}
-          >
-            Login to Panel
-          </Button>
-        ) : sosReady && sosEnabled ? (
+        {sosReady && sosEnabled ? (
           <Typography variant="body2" color="error.light" fontWeight={700}>
             SOS active — login disabled
           </Typography>

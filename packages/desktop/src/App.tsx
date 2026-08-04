@@ -480,10 +480,21 @@ export default function App() {
 
   useEffect(() => {
     window.gcalc?.onRequestLogin?.(() => {
-      // When SOS is active, do not open panel login from the site shell.
-      if (sosBlocksLoginRef.current) return;
+      // SOS on → password gate must not open the OTP login window.
+      if (sosBlocksLoginRef.current) {
+        toast.error('SOS is active — panel login is disabled.');
+        return;
+      }
       goLoginRef.current();
     });
+
+    const unsubBlocked = window.gcalc?.onLoginBlockedSos?.(() => {
+      toast.error('SOS is active — panel login is disabled.');
+    });
+
+    return () => {
+      unsubBlocked?.();
+    };
   }, []);
 
   // Keep SOS gate in sync while viewing the embedded admin site.

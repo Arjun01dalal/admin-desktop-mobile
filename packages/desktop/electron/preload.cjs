@@ -21,6 +21,24 @@ contextBridge.exposeInMainWorld('gcalc', {
     ipcRenderer.on('astro:request-login', () => cb());
   },
 
+  onLoginBlockedSos: (cb) => {
+    if (typeof cb !== 'function') return () => {};
+    const handler = () => cb();
+    ipcRenderer.on('astro:login-blocked-sos', handler);
+    return () => {
+      ipcRenderer.removeListener('astro:login-blocked-sos', handler);
+    };
+  },
+
+  onPanelGate: (cb) => {
+    if (typeof cb !== 'function') return () => {};
+    const handler = (_e, d) => cb(d);
+    ipcRenderer.on('astro:panel-gate', handler);
+    return () => {
+      ipcRenderer.removeListener('astro:panel-gate', handler);
+    };
+  },
+
   sendOtp: (payload) => safeInvoke('auth:send-otp', payload),
   verifyOtp: (payload) => safeInvoke('auth:verify-otp', payload),
   getAddress: (payload) => safeInvoke('auth:get-address', payload),

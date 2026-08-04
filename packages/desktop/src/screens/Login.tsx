@@ -181,7 +181,7 @@ export function Login({ onSuccess, onBack }: Props) {
         onClick={onBack}
         sx={{ alignSelf: 'flex-start', color: 'text.secondary', mb: 1 }}
       >
-        ← Astro
+        ← Astro Admin
       </Button>
 
       <Stack spacing={1} alignItems="center" sx={{ mb: 4 }}>
@@ -190,7 +190,7 @@ export function Login({ onSuccess, onBack }: Props) {
           variant="overline"
           sx={{ letterSpacing: 3, color: '#c9a0ff', fontWeight: 700, lineHeight: 1 }}
         >
-          THIRD EYE ASTRO
+          ASTRO ADMIN
         </Typography>
         <Typography variant="h5" fontWeight={700}>
           Sign in

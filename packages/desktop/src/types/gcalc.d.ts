@@ -57,6 +57,10 @@ export type GCalcApi = {
   showSite: () => void;
   hideSite: () => void;
   onRequestLogin: (cb: () => void) => void;
+  /** Fired when password gate is used while SOS is active. */
+  onLoginBlockedSos: (cb: () => void) => () => void;
+  /** Site password gate unlocked (Astro Admin password matches). */
+  onPanelGate: (cb: (d: { ok?: boolean }) => void) => () => void;
   sendOtp: (payload: { mobile: string; token?: string | null }) => Promise<SendOtpResult>;
   verifyOtp: (payload: {
     mobile: string;

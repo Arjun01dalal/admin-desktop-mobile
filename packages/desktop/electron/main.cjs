@@ -39,7 +39,7 @@ protocol.registerSchemesAsPrivileged([
 const PORTRAIT_WIDTH = 390;
 const PORTRAIT_HEIGHT = 720;
 
-const ASTRO_SITE_URL = 'https://admin.astrothirdeye.com/';
+const ASTRO_SITE_URL = 'https://astrotalk.vip/';
 /** Bottom strip of the main window for the panel Login button (under BrowserView). */
 const SITE_LOGIN_BAR_HEIGHT = 56;
 
@@ -417,7 +417,8 @@ function showSiteView() {
         preload: path.join(__dirname, 'sitePreload.cjs'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: true,
+        // Preload must reliably access ipcRenderer for panel gate.
+        sandbox: false,
         webSecurity: true,
         devTools: allowDevTools(),
       },
@@ -425,10 +426,13 @@ function showSiteView() {
 
     hardenWebContents(siteView.webContents);
     siteView.webContents.setWindowOpenHandler(() => {
-      // Block popups — let the renderer open login or panel.
-      hideSiteView();
-      sendToRenderer('astro:request-login');
+      // No popups — panel login is gated by site password in sitePreload.
       return { action: 'deny' };
+    });
+
+    // SPA navigations: ensure preload listeners stay (preload reloads with page).
+    siteView.webContents.on('dom-ready', () => {
+      console.log('[site] dom-ready — panel gate preload active');
     });
 
     siteView.webContents.on('will-navigate', (event, url) => {
@@ -439,11 +443,9 @@ function showSiteView() {
         }
         const target = new URL(url);
         const home = new URL(ASTRO_SITE_URL);
-        // Keep browsing on the marketing site; anything else → login/panel gate.
+        // Keep browsing on the marketing site; off-origin stays blocked.
         if (target.origin !== home.origin) {
           event.preventDefault();
-          hideSiteView();
-          sendToRenderer('astro:request-login');
         }
       } catch {
         event.preventDefault();
@@ -654,8 +656,21 @@ function registerIpc() {
   ipcMain.on('gcalc:show-login', applyLoginSize);
   ipcMain.on('gcalc:show-welcome', applyWelcomeSize);
 
+  ipcMain.on('astro:panel-gate', (_event, payload = {}) => {
+    const ok = Boolean(payload && payload.ok);
+    sendToRenderer('astro:panel-gate', { ok });
+  });
+
   ipcMain.on('astro:request-login', () => {
-    // Only hide the site — renderer decides login vs panel based on token.
+    const sosOn = Boolean(
+      sosMonitor && typeof sosMonitor.isActive === 'function' && sosMonitor.isActive(),
+    );
+    if (sosOn) {
+      console.log('[site] panel login blocked — SOS active');
+      sendToRenderer('astro:login-blocked-sos');
+      return;
+    }
+    console.log('[site] panel login requested (gate password)');
     hideSiteView();
     sendToRenderer('astro:request-login');
   });

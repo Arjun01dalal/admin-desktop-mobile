@@ -12,7 +12,7 @@ export function AstroLogo({ size = 72, showGlow = true }: Props) {
     <Box
       component="img"
       src={astroLogo}
-      alt="Astro CS Panel"
+      alt="Astro Admin"
       sx={{
         width: size,
         height: size,
