@@ -74,10 +74,8 @@ function fmt2(value: unknown): string {
 }
 
 function maskMobile(value: unknown, canShow: boolean): string {
-  const s = String(value ?? '');
-  if (!s) return '—';
-  if (canShow) return s;
-  return s.length > 4 ? `${'X'.repeat(Math.max(0, s.length - 4))}${s.slice(-4)}` : 'XXXX';
+  if (!value) return '—';
+  return canShow ? String(value) : '**********';
 }
 
 /** Columns shown in the list; the bottom sheet shows all of them. */
@@ -96,11 +94,14 @@ export function MasterFlowScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<MasterFlowRow | null>(null);
+  const genRef = React.useRef(0);
 
   const load = useCallback(async () => {
+    const gen = ++genRef.current;
     setLoading(true);
     try {
       const res = await secureApi(actionFor(selectType), { startDate, endDate });
+      if (gen !== genRef.current) return; // stale response — a newer request superseded it
       if (!res.ok || res.success === false) {
         setError(res.message || 'Failed to load master flow');
         setRows([]);
@@ -109,7 +110,7 @@ export function MasterFlowScreen() {
       setRows(asRows(res.data));
       setError('');
     } finally {
-      setLoading(false);
+      if (gen === genRef.current) setLoading(false);
     }
   }, [selectType, startDate, endDate]);
 
