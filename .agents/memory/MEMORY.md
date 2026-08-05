@@ -1,2 +1,3 @@
 - [Package firewall workarounds](package-firewall.md) — Replit's npm firewall blocked tar@6.2.1; fixed via package.json `overrides` pinning tar ^7. Electron itself cannot run here (no display server).
+- [Monorepo layout](monorepo-layout.md) — repo is now an npm-workspaces monorepo (packages/desktop|shared|mobile); browser preview redirects to astrotalk.vip since panel needs the Electron bridge.
 - [Cert pinning](cert-pinning.md) — API HTTPS calls pin SPKI SHA-256 (leaf + Sectigo intermediate backup) via electron/certPin.cjs; only laxminarayan.live is pinned.
