@@ -9,6 +9,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
@@ -19,6 +20,7 @@ import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type Kind = 'balance' | 'bonus' | 'registered';
 
@@ -77,6 +79,29 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [totalBalance, setTotalBalance] = useState(0);
+  const [selected, setSelected] = useState<UserRow | null>(null);
+
+  const sheetFields = useMemo<SheetField[]>(() => {
+    if (!selected) return [];
+    const fields: SheetField[] = [
+      { label: 'Name', value: display(selected.name) },
+      { label: 'DP ID', value: display(selected._id) },
+      { label: 'Mobile', value: maskMobile(selected.mobile, canShowMobile) },
+      { label: 'App', value: appCodeForName(selected.clientName) },
+      { label: 'Balance', value: floorNum(selected.balance ?? 0).toLocaleString('en-IN') },
+    ];
+    if (kind === 'bonus') {
+      fields.push({
+        label: 'Bonus',
+        value: floorNum(selected.bonusBalance ?? 0).toLocaleString('en-IN'),
+      });
+    }
+    fields.push(
+      { label: 'City', value: display(selected.city) },
+      { label: 'State', value: display(selected.state) },
+    );
+    return fields;
+  }, [selected, canShowMobile, kind]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -173,15 +198,15 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
           <Text style={[styles.cell, styles.cellNum, styles.headText]}>
             {kind === 'bonus' ? 'Bonus' : 'Balance'}
           </Text>
-          <Text style={[styles.cell, styles.cellCity, styles.headText]}>City</Text>
-          <Text style={[styles.cell, styles.cellCity, styles.headText]}>State</Text>
         </View>
+        <Text style={styles.hint}>Tap a row to see all details</Text>
       </View>
     ),
     [meta.title, startDate, endDate, draftStart, draftEnd, loading, appClientName, searchField, searchDraft, pageSize, totalBalance, error, kind],
   );
 
   return (
+    <>
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.content}
@@ -194,7 +219,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       renderItem={({ item, index }) => {
         const value = kind === 'bonus' ? item.bonusBalance : item.balance;
         return (
-          <View style={styles.row}>
+          <TouchableOpacity style={styles.row} onPress={() => setSelected(item)}>
             <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * pageSize + index + 1}</Text>
             <Text style={[styles.cell, styles.cellName]} numberOfLines={1}>
               {display(item.name)}
@@ -208,13 +233,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
             <Text style={[styles.cell, styles.cellNum]}>
               {floorNum(value ?? 0).toLocaleString('en-IN')}
             </Text>
-            <Text style={[styles.cell, styles.cellCity]} numberOfLines={1}>
-              {display(item.city)}
-            </Text>
-            <Text style={[styles.cell, styles.cellCity]} numberOfLines={1}>
-              {display(item.state)}
-            </Text>
-          </View>
+          </TouchableOpacity>
         );
       }}
       ListEmptyComponent={
@@ -244,6 +263,13 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         </View>
       }
     />
+    <RowDetailSheet
+      visible={selected !== null}
+      title={selected ? display(selected.name) : ''}
+      fields={sheetFields}
+      onClose={() => setSelected(null)}
+    />
+    </>
   );
 }
 
@@ -276,7 +302,7 @@ const styles = StyleSheet.create({
   cellName: { flex: 1.4 },
   cellMobile: { flex: 1.3 },
   cellApp: { width: 44, textAlign: 'center' },
-  cellCity: { flex: 1 },
+  hint: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: spacing(1) },
   cellNum: { flex: 1, textAlign: 'right', fontWeight: '700' },
   empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
   pager: {

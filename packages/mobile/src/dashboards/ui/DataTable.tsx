@@ -36,6 +36,10 @@ type Props<Row> = {
   emptyMessage?: string;
   /** Optional pinned footer row (e.g. totals). */
   footer?: { label: string; cells: Record<string, string> };
+  /** Makes whole rows tappable (e.g. open a detail sheet). */
+  onRowPress?: (row: Row, index: number) => void;
+  /** Hint text under the table. */
+  hint?: string;
 };
 
 export function DataTable<Row>({
@@ -45,6 +49,8 @@ export function DataTable<Row>({
   loading,
   emptyMessage = 'No data',
   footer,
+  onRowPress,
+  hint,
 }: Props<Row>) {
   return (
     <View style={styles.card}>
@@ -86,9 +92,8 @@ export function DataTable<Row>({
           ) : rows.length === 0 ? (
             <Text style={styles.empty}>{emptyMessage}</Text>
           ) : (
-            rows.map((row, index) => (
-              <View key={keyFor(row, index)} style={styles.row}>
-                {columns.map((col) => {
+            rows.map((row, index) => {
+              const cells = columns.map((col) => {
                   const value = col.render(row, index);
                   const color = col.color?.(row);
                   const textStyle = [
@@ -115,9 +120,24 @@ export function DataTable<Row>({
                       {value}
                     </Text>
                   );
-                })}
-              </View>
-            ))
+                });
+              if (onRowPress) {
+                return (
+                  <TouchableOpacity
+                    key={keyFor(row, index)}
+                    style={styles.row}
+                    onPress={() => onRowPress(row, index)}
+                  >
+                    {cells}
+                  </TouchableOpacity>
+                );
+              }
+              return (
+                <View key={keyFor(row, index)} style={styles.row}>
+                  {cells}
+                </View>
+              );
+            })
           )}
 
           {footer && rows.length > 0 ? (
@@ -139,7 +159,7 @@ export function DataTable<Row>({
           ) : null}
         </View>
       </ScrollView>
-      <Text style={styles.hint}>Swipe sideways to see all columns →</Text>
+      <Text style={styles.hint}>{hint ?? 'Swipe sideways to see all columns →'}</Text>
     </View>
   );
 }

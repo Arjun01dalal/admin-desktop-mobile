@@ -21,6 +21,10 @@ import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+
+/** Columns kept in the list; everything else shows in the bottom sheet. */
+const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance']);
 
 type Row = {
   _id?: string;
@@ -74,6 +78,7 @@ export function TodaysActiveScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [appVersions, setAppVersions] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Row | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -246,11 +251,30 @@ export function TodaysActiveScreen() {
       ) : null}
 
       <DataTable
-        columns={columns}
+        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
         loading={loading}
         emptyMessage="No active users found"
+        onRowPress={(row) => setSelected(row)}
+        hint="Tap a row to see all details"
+      />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? display(selected.name) : ''}
+        fields={
+          selected
+            ? columns
+                .filter((c) => c.key !== 'idx')
+                .map<SheetField>((c) => ({
+                  label: c.label,
+                  value: c.render(selected, 0),
+                  color: c.color?.(selected),
+                }))
+            : []
+        }
+        onClose={() => setSelected(null)}
       />
 
       <View style={styles.pager}>

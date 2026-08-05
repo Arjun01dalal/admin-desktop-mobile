@@ -33,6 +33,10 @@ import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+
+/** Columns kept in the list; everything else shows in the bottom sheet. */
+const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance', 'created']);
 
 /** Mirror of desktop NewRegistersPage isNewRegistersCaller — caller roles must not see contact columns. */
 function isNewRegistersCaller(): boolean {
@@ -121,6 +125,7 @@ export function NewRegistersScreen() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
+  const [selected, setSelected] = useState<Row | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -311,11 +316,30 @@ export function NewRegistersScreen() {
       ) : null}
 
       <DataTable
-        columns={columns}
+        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
         loading={loading}
         emptyMessage="No users found"
+        onRowPress={(row) => setSelected(row)}
+        hint="Tap a row to see all details"
+      />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? display(selected.name) : ''}
+        fields={
+          selected
+            ? columns
+                .filter((c) => c.key !== 'idx')
+                .map<SheetField>((c) => ({
+                  label: c.label,
+                  value: c.render(selected, 0),
+                  color: c.color?.(selected),
+                }))
+            : []
+        }
+        onClose={() => setSelected(null)}
       />
 
       <View style={styles.pager}>
