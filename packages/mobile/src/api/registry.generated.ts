@@ -228,7 +228,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'dashboard.activeExchangeUpdate': {"method":"POST","path":"/change-percentage/active-exchange-providers-update","encryptRequest":false,"decryptResponse":false},
   'dashboard.appDeposit': {"method":"POST","path":"/transaction/app-deposit","encryptRequest":true,"decryptResponse":true},
   'analytics.userBalance': {"method":"POST","path":"/change-percentage/get-user-balance","encryptRequest":true,"decryptResponse":true},
-  'analytics.userAnalytics': {"method":"POST","path":"/User/analytics","encryptRequest":true,"decryptResponse":true},
+  'analytics.userAnalytics': {"method":"POST","path":"/User/analytics","encryptRequest":false,"decryptResponse":true},
   'profitLoss.depositWithdrawal': {"method":"POST","path":"/transaction/deposit-withdrawal","encryptRequest":true,"decryptResponse":true},
   'profitLoss.list': {"method":"POST","path":"/User/getProfitLoss","encryptRequest":true,"decryptResponse":true},
   'masterFlow.masters': {"method":"POST","path":"/SubAdmin/masters-aaa","encryptRequest":false,"decryptResponse":false},
