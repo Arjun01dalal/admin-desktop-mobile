@@ -15,7 +15,13 @@ import {
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
 
-export type SheetField = { label: string; value: string; color?: string };
+export type SheetField = {
+  label: string;
+  value: string;
+  color?: string;
+  /** Renders the value as a colored pill (e.g. call status badge). */
+  badgeColor?: string;
+};
 
 export type SheetAction = {
   label: string;
@@ -90,9 +96,15 @@ export function RowDetailSheet({ visible, title, fields, onClose, action, action
             {fields.map((f) => (
               <View key={f.label} style={styles.fieldRow}>
                 <Text style={styles.label}>{f.label}</Text>
-                <Text style={[styles.value, f.color ? { color: f.color } : null]} selectable>
-                  {f.value || '—'}
-                </Text>
+                {f.badgeColor ? (
+                  <View style={[styles.valueBadge, { backgroundColor: f.badgeColor }]}>
+                    <Text style={styles.valueBadgeText}>{f.value || '—'}</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.value, f.color ? { color: f.color } : null]} selectable>
+                    {f.value || '—'}
+                  </Text>
+                )}
               </View>
             ))}
             {action ? (
@@ -180,6 +192,12 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+  valueBadge: {
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1),
+  },
+  valueBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   singleActionBtn: {
     marginTop: spacing(4),
     backgroundColor: colors.primary,

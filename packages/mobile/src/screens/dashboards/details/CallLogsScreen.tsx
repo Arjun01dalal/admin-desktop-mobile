@@ -877,11 +877,18 @@ export function CallLogsScreen() {
         title={selected ? String(selected.row.client_name || 'Call Details') : ''}
         fields={
           selected
-            ? columns.map<SheetField>((c) => ({
-                label: c.label.replace(' ✎', ''),
-                value: c.render(selected.row, selected.index),
-                color: c.color?.(selected.row),
-              }))
+            ? columns
+                .filter((c) => c.key !== 'sr' && c.key !== 'name')
+                .map<SheetField>((c) => {
+                  const value = c.render(selected.row, selected.index);
+                  const sub = c.subtext?.(selected.row);
+                  return {
+                    label: c.label.replace(' ✎', ''),
+                    value: sub ? `${value} · ${sub}` : value,
+                    color: c.color?.(selected.row),
+                    badgeColor: c.badge?.(selected.row),
+                  };
+                })
             : []
         }
         actions={sheetActions}
