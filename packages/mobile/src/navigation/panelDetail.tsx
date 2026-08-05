@@ -12,6 +12,7 @@ import { DashboardUsersListScreen } from '../screens/dashboards/details/Dashboar
 import { TodaysActiveScreen } from '../screens/dashboards/details/TodaysActiveScreen';
 import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersScreen';
 import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
+import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/PlayerActivityDetailsScreen';
 import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameActivityDetailsScreen';
 import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstructGamesScreen';
 
@@ -96,6 +97,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/game-activity',
     title: 'Games Activity',
     Component: GameActivityScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/player-activity/details',
+    title: 'Player Activity Details',
+    Component: PlayerActivityDetailsScreen as PanelDetailRoute['Component'],
   },
   {
     path: '/game-activity/details',

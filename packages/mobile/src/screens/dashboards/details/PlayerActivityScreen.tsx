@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import {
@@ -46,6 +46,7 @@ function cleanLabel(label: string): string {
 }
 
 export function PlayerActivityScreen() {
+  const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
@@ -92,6 +93,16 @@ export function PlayerActivityScreen() {
     setSort((prev) => nextSortConfig(prev, key));
   }, []);
 
+  const openUser = useCallback(
+    (row: ActivityRow) => {
+      navigation.navigate('/player-activity/details', {
+        row: JSON.stringify(row),
+        isQtech: isQtech ? '1' : '',
+      });
+    },
+    [navigation, isQtech],
+  );
+
   const columns = useMemo<DataTableColumn<ActivityRow>[]>(() => {
     const sortable = (key: SortKey, label: string) => ({
       label: `${label} ${sortArrow(sort, key)}`,
@@ -99,7 +110,13 @@ export function PlayerActivityScreen() {
     });
     return [
       { key: 'idx', label: '#', width: 36, render: (_r, i) => String(i + 1) },
-      { key: 'userId', label: 'UserId', width: 150, render: (r) => userIdOf(r) || '—' },
+      {
+        key: 'userId',
+        label: 'UserId',
+        width: 150,
+        render: (r) => userIdOf(r) || '—',
+        onCellPress: openUser,
+      },
       {
         key: 'betAmount',
         width: 100,
@@ -158,7 +175,7 @@ export function PlayerActivityScreen() {
         ...sortable('rollbackAmount', 'Rollback'),
       },
     ];
-  }, [sort, toggleSort]);
+  }, [sort, toggleSort, openUser]);
 
   const footer = useMemo(() => {
     const sum = (key: SortKey) => sorted.reduce((acc, r) => acc + getMetric(r, key), 0);
@@ -230,7 +247,7 @@ export function PlayerActivityScreen() {
         loading={loading}
         footer={footer}
         onRowPress={(row) => setSelected(row)}
-        hint="Tap a row to see all details"
+        hint="Tap a row for all details · Tap a UserId for its providers"
       />
 
       <RowDetailSheet
