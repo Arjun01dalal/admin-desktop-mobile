@@ -218,7 +218,9 @@ function maskMobile(value: unknown, canShow: boolean): string {
 
 export function CallLogsScreen() {
   const isFocused = useIsFocused();
-  const admin = getStoredUser<Record<string, unknown>>();
+  // Read the stored user once — getStoredUser returns a fresh object each call,
+  // which would otherwise recreate `load` every render and refetch in a loop.
+  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
   const isCaller = isCallLogsCaller(admin);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
   const assignedBots = useMemo(() => getAssignedBotIds(admin as never), [admin]);
