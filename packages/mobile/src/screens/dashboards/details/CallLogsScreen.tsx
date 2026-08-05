@@ -634,20 +634,20 @@ export function CallLogsScreen() {
     return cols;
   }, [rowOffset, isCaller, canShowMobile, openComment]);
 
-  const summaryColumns = useMemo<DataTableColumn<BotSummaryRow>[]>(
-    () => [
-      { key: 'botId', label: 'Bot', width: 50, render: (r) => String(r.botId) },
-      { key: 'state', label: 'State', width: 110, render: (r) => r.state },
-      { key: 'completed', label: 'Completed', width: 80, align: 'right', render: (r) => String(r.completed), color: () => colors.success },
-      { key: 'noAnswer', label: 'No-Answer', width: 80, align: 'right', render: (r) => String(r.noAnswer), color: () => colors.destructive },
-      { key: 'inProgress', label: 'In-Progress', width: 85, align: 'right', render: (r) => String(r.inProgress) },
-      { key: 'failed', label: 'Failed', width: 60, align: 'right', render: (r) => String(r.failed) },
-      { key: 'busy', label: 'Busy', width: 55, align: 'right', render: (r) => String(r.busy) },
-      { key: 'queued', label: 'Queued', width: 65, align: 'right', render: (r) => String(r.queued) },
-      { key: 'deleted', label: 'Deleted', width: 65, align: 'right', render: (r) => String(r.deleted) },
-    ],
-    [],
-  );
+  /** Mobile-friendly bot summary: one card per bot with status count chips. */
+  const botCardStats = useCallback((r: BotSummaryRow) => {
+    const all: Array<{ label: string; value: number; color?: string }> = [
+      { label: 'Completed', value: r.completed, color: colors.success },
+      { label: 'No-Answer', value: r.noAnswer, color: colors.destructive },
+      { label: 'In-Progress', value: r.inProgress, color: colors.primary },
+      { label: 'Failed', value: r.failed },
+      { label: 'Busy', value: r.busy },
+      { label: 'Queued', value: r.queued },
+      { label: 'Deleted', value: r.deleted },
+    ];
+    // Always show the two headline stats; hide zero-count minor ones to reduce noise.
+    return all.filter((s, i) => i < 2 || s.value > 0);
+  }, []);
 
   const textFilters: Array<{ label: string; value: string; set: (v: string) => void; keyboard?: 'phone-pad' | 'number-pad' }> = [
     { label: 'Mobile No', value: mobNo, set: setMobNo, keyboard: 'phone-pad' },
@@ -793,12 +793,30 @@ export function CallLogsScreen() {
           {!isCaller && summaryRows.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>Bot Status</Text>
-              <DataTable
-                columns={summaryColumns}
-                rows={summaryRows}
-                keyFor={(r) => String(r.botId)}
-                emptyMessage="No bot data"
-              />
+              <View style={styles.botGrid}>
+                {summaryRows.map((r) => (
+                  <View key={String(r.botId)} style={styles.botCard}>
+                    <View style={styles.botCardHeader}>
+                      <Text style={styles.botCardTitle}>Bot {r.botId}</Text>
+                      {r.state !== '-' ? (
+                        <Text style={styles.botCardState} numberOfLines={1}>
+                          {r.state}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.botChipRow}>
+                      {botCardStats(r).map((s) => (
+                        <View key={s.label} style={styles.botChip}>
+                          <Text style={[styles.botChipValue, s.color ? { color: s.color } : null]}>
+                            {s.value}
+                          </Text>
+                          <Text style={styles.botChipLabel}>{s.label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
             </>
           )}
 
@@ -1062,6 +1080,38 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(10),
     gap: spacing(2),
   },
+  botGrid: { gap: spacing(2) },
+  botCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+  },
+  botCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+  },
+  botCardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700' },
+  botCardState: { color: colors.muted, fontSize: 12, flexShrink: 1 },
+  botChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(2),
+  },
+  botChip: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1.5),
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  botChipValue: { color: colors.foreground, fontSize: 15, fontWeight: '700' },
+  botChipLabel: { color: colors.muted, fontSize: 10, marginTop: 2 },
   loadingText: { color: colors.muted, fontSize: 13 },
   pagerRow: {
     flexDirection: 'row',
