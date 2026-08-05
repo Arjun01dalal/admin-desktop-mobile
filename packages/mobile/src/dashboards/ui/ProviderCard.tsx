@@ -71,6 +71,16 @@ export function ProviderCard({ card }: { card: ProviderCardModel }) {
           </View>
         ))}
       </View>
+
+      {card.actions && card.actions.length > 0 && (
+        <View style={styles.actionsRow}>
+          {card.actions.map((action) => (
+            <TouchableOpacity key={action.label} onPress={action.onClick}>
+              <Text style={styles.actionLink}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -123,4 +133,13 @@ const styles = StyleSheet.create({
   rowLabel: { color: colors.muted, fontSize: 13, flexShrink: 1 },
   rowValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   negative: { color: colors.destructive },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing(4),
+    marginTop: spacing(2),
+    paddingTop: spacing(2),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  actionLink: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 });

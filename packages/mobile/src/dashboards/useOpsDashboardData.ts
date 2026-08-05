@@ -199,5 +199,14 @@ export function useOpsDashboardData(
     void load();
   }, [load]);
 
-  return { bundle, loading, error, reload: load, reloadLudo };
+  const reloadActiveExchange = useCallback(async () => {
+    const mainGen = genRef.current;
+    const data = await fetchAction('dashboard.activeExchangeGet', {});
+    if (mainGen !== genRef.current) return;
+    setBundle((prev) =>
+      prev ? { ...prev, activeExchange: asRecord(data) } : prev,
+    );
+  }, []);
+
+  return { bundle, loading, error, reload: load, reloadLudo, reloadActiveExchange };
 }

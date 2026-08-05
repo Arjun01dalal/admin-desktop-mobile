@@ -18,8 +18,13 @@ import { buildProviderCards } from '../../dashboards/buildProviderCards';
 import { VIP_CLIENT_NAMES } from '../../dashboards/constants';
 import type { DashboardFilters, DashboardMode, ProviderFilter } from '../../dashboards/types';
 import { useOpsDashboardData } from '../../dashboards/useOpsDashboardData';
+import { ActiveExchangePanel } from '../../dashboards/ui/ActiveExchangePanel';
 import { FilterBar } from '../../dashboards/ui/FilterBar';
 import { KpiGrid } from '../../dashboards/ui/KpiGrid';
+import {
+  LudoDetailsModal,
+  type LudoModalAction,
+} from '../../dashboards/ui/LudoDetailsModal';
 import { ProviderCard } from '../../dashboards/ui/ProviderCard';
 import { todayIST } from '../../utils/dates';
 
@@ -66,14 +71,19 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
     setApplied({ startDate: d, endDate: d, appClientName: '', filterBy: 'All' });
   }, []);
 
-  const { bundle, loading, error, reload, reloadLudo } = useOpsDashboardData(
-    mode,
-    applied,
-  );
+  const { bundle, loading, error, reload, reloadLudo, reloadActiveExchange } =
+    useOpsDashboardData(mode, applied);
 
   const [selectedLudoGame, setSelectedLudoGame] = useState('All');
   const [selectedIndianDiva, setSelectedIndianDiva] = useState('All');
   const [selectedPlutus, setSelectedPlutus] = useState('All');
+  const [ludoModalOpen, setLudoModalOpen] = useState(false);
+  const [ludoModalAction, setLudoModalAction] = useState<LudoModalAction>(null);
+
+  const ludoGameIds = useMemo(
+    () => (bundle?.ludoGameOptions || []).map((o) => o.value),
+    [bundle?.ludoGameOptions],
+  );
 
   const appOptions =
     mode === 'vip' ? VIP_CLIENT_NAMES : (CLIENT_NAMES as readonly string[]);
@@ -99,6 +109,14 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
           },
           onIndianDivaChange: setSelectedIndianDiva,
           onPlutusChange: setSelectedPlutus,
+          onLudoUpdate: () => {
+            setLudoModalAction('update');
+            setLudoModalOpen(true);
+          },
+          onLudoUpdateRtp: () => {
+            setLudoModalAction('rtp');
+            setLudoModalOpen(true);
+          },
         },
         {
           startDate: applied.startDate,
@@ -172,11 +190,11 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
         </View>
       ) : null}
 
-      {mode === 'main' && activeExchangeName ? (
-        <View style={styles.exchangeBox}>
-          <Text style={styles.exchangeLabel}>Active Exchange</Text>
-          <Text style={styles.exchangeValue}>{activeExchangeName}</Text>
-        </View>
+      {mode === 'main' ? (
+        <ActiveExchangePanel
+          activeExchangeName={activeExchangeName}
+          onUpdated={() => void reloadActiveExchange()}
+        />
       ) : null}
 
       <KpiGrid items={kpiItems} />
@@ -188,6 +206,17 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
       {!loading && bundle && visibleCards.length === 0 ? (
         <Text style={styles.empty}>No providers match the current filter.</Text>
       ) : null}
+
+      <LudoDetailsModal
+        open={ludoModalOpen}
+        action={ludoModalAction}
+        existingGameIds={ludoGameIds}
+        onClose={() => {
+          setLudoModalOpen(false);
+          setLudoModalAction(null);
+        }}
+        onGameIdsUpdated={() => void reload()}
+      />
     </ScrollView>
   );
 }
@@ -206,18 +235,5 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
-  exchangeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  exchangeLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  exchangeValue: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
 });
