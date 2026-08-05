@@ -1,6 +1,6 @@
 {
   "name": "@astro/desktop",
-  "version": "1.0.9",
+  "version": "1.0.0",
   "description": "Astro CS Panel \u2014 Electron desktop app with secure admin login.",
   "main": "electron/main.cjs",
   "author": "Your Name",
@@ -28,6 +28,7 @@
   "build": {
     "appId": "com.yourcompany.astro",
     "productName": "Astro CS Panel",
+    "electronVersion": "34.5.8",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -37,7 +38,8 @@
       "electron-obf/**/*",
       "!electron/**/*",
       "build/icon.png",
-      "package.json"
+      "package.json",
+      "!**/node_modules/@astro/shared/**"
     ],
     "extraMetadata": {
       "main": "electron-obf/main.cjs"
@@ -92,7 +94,6 @@
     "tar": "^7.4.3"
   },
   "dependencies": {
-    "@astro/shared": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^6.4.0",
@@ -117,13 +118,14 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@astro/shared": "*",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.5.4",
     "concurrently": "^9.1.2",
-    "electron": "^34.0.0",
+    "electron": "34.5.8",
     "electron-builder": "^25.1.8",
     "postcss": "^8.5.24",
     "tailwindcss": "^3.4.19",

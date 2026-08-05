@@ -7,16 +7,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-const plist = path.join(
-  __dirname,
-  '..',
-  'node_modules',
-  'electron',
-  'dist',
-  'Electron.app',
-  'Contents',
-  'Info.plist',
-);
+function resolveElectronPlist() {
+  const candidates = [
+    path.join(__dirname, '..', 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'Info.plist'),
+    path.join(__dirname, '..', '..', '..', 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'Info.plist'),
+  ];
+  try {
+    const pkgDir = path.dirname(require.resolve('electron/package.json', { paths: [path.join(__dirname, '..')] }));
+    candidates.unshift(path.join(pkgDir, 'dist', 'Electron.app', 'Contents', 'Info.plist'));
+  } catch {
+    // fall through to path candidates
+  }
+  return candidates.find((p) => fs.existsSync(p)) || candidates[0];
+}
+
+const plist = resolveElectronPlist();
 
 const MESSAGE = 'Location is required to verify admin login.';
 

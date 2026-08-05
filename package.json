@@ -16,6 +16,9 @@
     "desktop:dist:mac": "npm run dist:mac -w @astro/desktop",
     "desktop:dist:all": "npm run dist:all -w @astro/desktop",
     "desktop:release": "npm run release -w @astro/desktop",
+    "desktop:release:win": "npm run release:win -w @astro/desktop",
+    "desktop:release:mac": "npm run release:mac -w @astro/desktop",
+    "desktop:release:all": "npm run release:all -w @astro/desktop",
     "sos-push": "npm run sos-push -w @astro/desktop",
     "mobile:start": "npm run start -w @astro/mobile",
     "shared:typecheck": "npm run typecheck -w @astro/shared"
