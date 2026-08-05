@@ -88,6 +88,17 @@ function calculateTeamWiseTotals(obj1: unknown[], obj2: unknown[]): MatchTotals[
   return result;
 }
 
+function unpackList(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    if (Array.isArray(obj.data)) return obj.data;
+    if (Array.isArray(obj.payload)) return obj.payload;
+    if (Array.isArray(obj.result)) return obj.result;
+  }
+  return [];
+}
+
 function Row({ label, value }: { label: string; value: number }) {
   return (
     <Box display="flex" justifyContent="space-between" mb={1}>
@@ -120,8 +131,8 @@ export function BothMasterAddPage() {
           secureApi('dashboard.zehnRiskVip', {}),
         ]);
         if (!mounted) return;
-        const data1 = Array.isArray(res1.data) ? res1.data : [];
-        const data2 = Array.isArray(res2.data) ? res2.data : [];
+        const data1 = unpackList(res1.data);
+        const data2 = unpackList(res2.data);
         setCommonData(calculateTeamWiseTotals(data1, data2));
       } finally {
         if (mounted) setLoading(false);
