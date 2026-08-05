@@ -20,7 +20,7 @@ import { secureApi } from '../../../api/client';
 import { colors, radius, spacing } from '../../../theme';
 import { monthStartIST, todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
-import { DetailFilterBar } from './DetailFilterBar';
+import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type TxnRow = {
@@ -86,6 +86,19 @@ const TEXT_FILTER_FIELDS: { key: keyof FiltersState; placeholder: string; numeri
   { key: 'roundCapacity', placeholder: 'Round Capacity', numeric: true },
   { key: 'minAmount', placeholder: 'Min Amount', numeric: true },
   { key: 'maxAmount', placeholder: 'Max Amount', numeric: true },
+];
+
+/** Search-bar field options (sent as desktop filter keys). */
+const SEARCH_BAR_FIELDS: readonly SearchFieldOption[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'userId', label: 'User ID' },
+  { key: 'txnId', label: 'Txn ID' },
+  { key: 'refTxnId', label: 'Ref Txn ID' },
+  { key: 'roundId', label: 'Round ID' },
+  { key: 'sessionId', label: 'Session ID' },
+  { key: 'gameId', label: 'Game ID' },
+  { key: 'operatorId', label: 'Operator ID' },
+  { key: 'currency', label: 'Currency' },
 ];
 
 const TYPE_OPTIONS = ['', 'bet', 'win', 'refund'];
@@ -186,6 +199,8 @@ export function HouseGamesScreen() {
   const [draftFilters, setDraftFilters] = useState<FiltersState>(INITIAL_FILTERS);
   const [filters, setFilters] = useState<FiltersState>(INITIAL_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchField, setSearchField] = useState('name');
+  const [searchDraft, setSearchDraft] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [pageNo, setPageNo] = useState(1);
   const [rows, setRows] = useState<TxnRow[]>([]);
@@ -247,6 +262,18 @@ export function HouseGamesScreen() {
     setFilters(draftFilters);
   }, [draftStart, draftEnd, draftFilters]);
 
+  /** Search bar submit: put the text into the chosen field (clearing other search-bar fields). */
+  const submitSearch = useCallback(() => {
+    const next = { ...draftFilters };
+    for (const f of SEARCH_BAR_FIELDS) (next as Record<string, unknown>)[f.key] = '';
+    (next as Record<string, unknown>)[searchField] = searchDraft.trim();
+    setDraftFilters(next);
+    setFilters(next);
+    setPageNo(1);
+    setStartDate(draftStart);
+    setEndDate(draftEnd);
+  }, [draftFilters, searchField, searchDraft, draftStart, draftEnd]);
+
   const rowOffset = (pageNo - 1) * itemsPerPage;
 
   const columns = useMemo<DataTableColumn<TxnRow>[]>(
@@ -306,6 +333,12 @@ export function HouseGamesScreen() {
           onStartDateChange={setDraftStart}
           onEndDateChange={setDraftEnd}
           onApply={applyAll}
+          searchFields={SEARCH_BAR_FIELDS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          searchText={searchDraft}
+          onSearchTextChange={setSearchDraft}
+          onSearchSubmit={submitSearch}
         />
       </View>
 
