@@ -60,6 +60,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
+  const hideContact = hasPermission('contact_visibility_none');
 
   const [draftStart, setDraftStart] = useState(initialStart);
   const [draftEnd, setDraftEnd] = useState(initialEnd);
@@ -100,8 +101,42 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       { label: 'City', value: display(selected.city) },
       { label: 'State', value: display(selected.state) },
     );
+    // Show any remaining data the API returned so the sheet never drops fields.
+    const known = new Set([
+      '_id',
+      'name',
+      'mobile',
+      'balance',
+      'bonusBalance',
+      'clientName',
+      'city',
+      'state',
+      '__v',
+      'password',
+      'token',
+    ]);
+    const contactKeys = new Set([
+      'email',
+      'accountNumber',
+      'aadharNumber',
+      'aadhaarNumber',
+      'aadharAddress',
+      'ifsc',
+      'bankName',
+      'userBankName',
+    ]);
+    for (const [key, value] of Object.entries(selected)) {
+      if (known.has(key)) continue;
+      if (hideContact && contactKeys.has(key)) continue;
+      if (value === null || value === undefined || value === '') continue;
+      if (typeof value === 'object') continue;
+      const label = key
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/^./, (c) => c.toUpperCase());
+      fields.push({ label, value: String(value) });
+    }
     return fields;
-  }, [selected, canShowMobile, kind]);
+  }, [selected, canShowMobile, hideContact, kind]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -212,6 +247,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       style={styles.screen}
       contentContainerStyle={styles.content}
       data={rows}
+      showsVerticalScrollIndicator={false}
       keyExtractor={(item, i) => item._id ?? String(i)}
       ListHeaderComponent={header}
       refreshControl={

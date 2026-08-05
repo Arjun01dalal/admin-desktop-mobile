@@ -41,7 +41,11 @@ export function RowDetailSheet({ visible, title, fields, onClose }: Props) {
               <Text style={styles.close}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: spacing(8) }}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={{ paddingBottom: spacing(8) }}
+            showsVerticalScrollIndicator={false}
+          >
             {fields.map((f) => (
               <View key={f.label} style={styles.fieldRow}>
                 <Text style={styles.label}>{f.label}</Text>

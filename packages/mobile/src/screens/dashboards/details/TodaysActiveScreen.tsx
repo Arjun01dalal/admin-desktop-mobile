@@ -234,6 +234,7 @@ export function TodaysActiveScreen() {
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
