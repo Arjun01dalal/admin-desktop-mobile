@@ -6,10 +6,14 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -29,6 +33,7 @@ type LeaderboardRow = {
   activeUserCount?: number;
   customerDepositAmt?: number;
   city?: string;
+  plainPassword?: string;
 };
 
 const CITY_TOTALS = ['nagpur', 'dubai', 'bangluru', 'pune', 'mysuru'] as const;
@@ -53,7 +58,7 @@ function fmtINR(value: unknown): string {
 }
 
 /** Columns shown in the list; the bottom sheet shows all of them. */
-const MAIN_KEYS = new Set(['rank', 'name', 'deposit']);
+const MAIN_KEYS = new Set(['rank', 'name', 'city', 'deposit']);
 
 export function LeaderboardScreen() {
   const isFocused = useIsFocused();
@@ -66,6 +71,10 @@ export function LeaderboardScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: LeaderboardRow; rank: number } | null>(null);
+  const [cityEdit, setCityEdit] = useState<LeaderboardRow | null>(null);
+  const [cityDraft, setCityDraft] = useState('');
+  const [citySaving, setCitySaving] = useState(false);
+  const [cityError, setCityError] = useState('');
   const genRef = React.useRef(0);
 
   const load = useCallback(async () => {
@@ -107,12 +116,45 @@ export function LeaderboardScreen() {
     [rows],
   );
 
+  const openCityEdit = useCallback((row: LeaderboardRow) => {
+    setCityEdit(row);
+    setCityDraft(String(row.city || ''));
+    setCityError('');
+  }, []);
+
+  const saveCity = useCallback(async () => {
+    if (!cityEdit?._id) return;
+    setCitySaving(true);
+    try {
+      const res = await secureApi('ops.updateCity', {
+        _id: cityEdit._id,
+        city: cityDraft.trim(),
+      });
+      if (!res.ok || res.success === false) {
+        setCityError(res.message || 'Failed to update city');
+        return;
+      }
+      setCityEdit(null);
+      setSelected(null);
+      void load();
+    } finally {
+      setCitySaving(false);
+    }
+  }, [cityEdit, cityDraft, load]);
+
   const columns = useMemo<DataTableColumn<IndexedRow>[]>(
     () => [
       { key: 'rank', label: 'Rank', width: 50, render: (r) => String(r.__rank) },
       { key: 'name', label: 'Caller Name', width: 140, render: (r) => String(r.name || '—') },
-      { key: 'city', label: 'City', width: 100, render: (r) => String(r.city || '—') },
+      {
+        key: 'city',
+        label: 'City ✎',
+        width: 110,
+        render: (r) => `${r.city || '—'} ✎`,
+        onCellPress: (r) => openCityEdit(r),
+      },
       { key: 'email', label: 'Email', width: 180, render: (r) => String(r.email || '—') },
+      { key: 'password', label: 'Password', width: 120, render: (r) => String(r.plainPassword || '—') },
       {
         key: 'customerCount',
         label: 'Customer Count',
@@ -212,6 +254,52 @@ export function LeaderboardScreen() {
         }
         onClose={() => setSelected(null)}
       />
+
+      {/* City edit modal (desktop: pencil icon next to City) */}
+      <Modal
+        visible={cityEdit !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCityEdit(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              Edit City — {cityEdit ? String(cityEdit.name || '') : ''}
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={cityDraft}
+              onChangeText={setCityDraft}
+              placeholder="City"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoFocus
+            />
+            {cityError ? <Text style={styles.modalError}>{cityError}</Text> : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setCityEdit(null)}
+                disabled={citySaving}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSave, citySaving && { opacity: 0.6 }]}
+                onPress={() => void saveCity()}
+                disabled={citySaving || !cityDraft.trim()}
+              >
+                {citySaving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -242,4 +330,48 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing(6),
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(4),
+    gap: spacing(3),
+  },
+  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    color: colors.foreground,
+    fontSize: 14,
+    backgroundColor: colors.background,
+  },
+  modalError: { color: colors.destructive, fontSize: 12 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2) },
+  modalCancel: {
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(2),
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalCancelText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
+  modalSave: {
+    paddingHorizontal: spacing(5),
+    paddingVertical: spacing(2),
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  modalSaveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
