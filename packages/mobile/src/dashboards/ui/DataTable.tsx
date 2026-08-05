@@ -22,6 +22,10 @@ export type DataTableColumn<Row> = {
   render: (row: Row, index: number) => string;
   /** Optional value color (e.g. red for negative GGR). */
   color?: (row: Row) => string | undefined;
+  /** Renders the cell as a colored pill (web-style status badge). Returns the badge background. */
+  badge?: (row: Row) => string | undefined;
+  /** Optional second line under the value (e.g. call duration / "Recording"). */
+  subtext?: (row: Row) => string | undefined;
   /** Makes the cell tappable (e.g. provider drill-down). */
   onCellPress?: (row: Row) => void;
   /** Makes the header tappable (sorting). */
@@ -108,12 +112,30 @@ export function DataTable<Row>({
               const cells = columns.map((col) => {
                   const value = col.render(row, index);
                   const color = col.color?.(row);
+                  const badgeBg = col.badge?.(row);
+                  const sub = col.subtext?.(row);
                   const textStyle = [
                     styles.cell,
                     { width: col.width },
                     col.align === 'right' && styles.right,
                     color ? { color, fontWeight: '700' as const } : null,
                   ];
+                  if (badgeBg) {
+                    return (
+                      <View key={col.key} style={[styles.badgeCell, { width: col.width }]}>
+                        <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+                          <Text style={styles.badgeText} numberOfLines={1}>
+                            {value}
+                          </Text>
+                          {sub ? (
+                            <Text style={styles.badgeSub} numberOfLines={1}>
+                              {sub}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  }
                   if (col.onCellPress) {
                     return (
                       <TouchableOpacity
@@ -193,6 +215,16 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headRow: { borderBottomColor: colors.primary },
+  badgeCell: { paddingHorizontal: spacing(0.5) },
+  badge: {
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  badgeSub: { color: '#fff', fontSize: 10, opacity: 0.9 },
   filterRow: { paddingVertical: spacing(1) },
   filterCell: { paddingHorizontal: spacing(0.5) },
   footerRow: { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.primary },

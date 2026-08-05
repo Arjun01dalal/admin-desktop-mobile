@@ -565,12 +565,16 @@ export function CallLogsScreen() {
       {
         key: 'status',
         label: 'Status',
-        width: 110,
-        render: (r) => {
+        width: 120,
+        render: (r) => formatStatusLabel(r),
+        badge: (r) => statusColor(r),
+        subtext: (r) => {
+          const parts: string[] = [];
           const dur = toMinSec(r.call_duration);
-          return dur ? `${formatStatusLabel(r)} · ${dur}` : formatStatusLabel(r);
+          if (dur) parts.push(dur);
+          if (r.recording_url) parts.push('Recording');
+          return parts.join(' · ') || undefined;
         },
-        color: (r) => statusColor(r),
       },
     );
     if (!isCaller) {
