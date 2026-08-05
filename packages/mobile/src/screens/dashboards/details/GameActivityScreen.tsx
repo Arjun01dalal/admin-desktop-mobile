@@ -1,12 +1,11 @@
 /**
- * Game Activity — port of desktop GameActivityPage (simplified for mobile).
+ * Game Activity — full-column port of desktop GameActivityPage.
  * game.wcoStats / game.qtechStats with startDate/endDate. Route param `type`
- * ('Qtech' | 'Wco') preselects (and locks) the provider source.
- * Rows: Provider, Bet Count, Bet Amount, Win Amount, Profit (GGR), GGR.
+ * ('Qtech' | 'Wco') preselects (and locks) the provider source. Tapping a
+ * provider name opens the per-game breakdown (GameActivityDetailsScreen).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,50 +13,34 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
+import {
+  gameCount,
+  getMetric,
+  nextSortConfig,
+  normalizeActivityList,
+  providerLabel,
+  rollbackCount,
+  sortActivityRows,
+  sortArrow,
+  winCount,
+  type ActivityRow,
+  type SortConfig,
+  type SortKey,
+} from '../../../dashboards/activityUtils';
+import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 
-type Row = Record<string, unknown>;
-
-function totalsOf(item: Row): Row {
-  return (item.totals || {}) as Row;
-}
-function getMetric(item: Row, key: string): number {
-  const t = totalsOf(item);
-  switch (key) {
-    case 'betAmount':
-      return Number(item.totalBetAmount ?? t.betAmount ?? 0);
-    case 'betCount':
-      return Number(item.betCount ?? t.betCount ?? 0);
-    case 'winAmount':
-      return Number(item.totalWinAmount ?? t.winAmount ?? 0);
-    case 'ggr': {
-      const hasFlat = item.totalBetAmount != null || item.totalWinAmount != null;
-      if (hasFlat) return Number(item.totalBetAmount ?? 0) - Number(item.totalWinAmount ?? 0);
-      return Number(t.betAmount ?? 0) - Number(t.winAmount ?? 0);
-    }
-    default:
-      return 0;
-  }
-}
-function providerLabel(item: Row): string {
-  return String(item.provider || item.providerName || item.name || '-');
-}
-function normalizeList(payload: unknown): Row[] {
-  if (Array.isArray(payload)) return payload as Row[];
-  if (payload && typeof payload === 'object') {
-    const obj = payload as { items?: Row[]; payload?: Row[] };
-    if (Array.isArray(obj.items)) return obj.items;
-    if (Array.isArray(obj.payload)) return obj.payload;
-  }
-  return [];
+function fmt(n: number): string {
+  return floorNum(n).toLocaleString('en-IN');
 }
 
 export function GameActivityScreen() {
+  const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
@@ -70,7 +53,8 @@ export function GameActivityScreen() {
   const [isQtech, setIsQtech] = useState(params.type === 'Qtech');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<ActivityRow[]>([]);
+  const [sort, setSort] = useState<SortConfig | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,7 +67,7 @@ export function GameActivityScreen() {
         setRows([]);
         return;
       }
-      setRows(normalizeList(res.data));
+      setRows(normalizeActivityList(res.data));
     } finally {
       setLoading(false);
     }
@@ -93,17 +77,124 @@ export function GameActivityScreen() {
     void load();
   }, [load]);
 
-  const totals = useMemo(() => {
-    return rows.reduce<{ bet: number; win: number; ggr: number }>(
-      (acc, r) => {
-        acc.bet += getMetric(r, 'betAmount');
-        acc.win += getMetric(r, 'winAmount');
-        acc.ggr += getMetric(r, 'ggr');
-        return acc;
+  const sorted = useMemo(() => sortActivityRows(rows, sort), [rows, sort]);
+
+  const toggleSort = useCallback((key: SortKey) => {
+    setSort((prev) => nextSortConfig(prev, key));
+  }, []);
+
+  const openProvider = useCallback(
+    (row: ActivityRow) => {
+      navigation.navigate('/game-activity/details', {
+        row: JSON.stringify(row),
+        isQtech: isQtech ? '1' : '',
+      });
+    },
+    [navigation, isQtech],
+  );
+
+  const columns = useMemo<DataTableColumn<ActivityRow>[]>(() => {
+    const sortable = (key: SortKey, label: string) => ({
+      label: `${label} ${sortArrow(sort, key)}`,
+      onHeaderPress: () => toggleSort(key),
+    });
+    const cols: DataTableColumn<ActivityRow>[] = [
+      { key: 'idx', label: '#', width: 36, render: (_r, i) => String(i + 1) },
+      {
+        key: 'provider',
+        label: 'Provider',
+        width: 130,
+        render: (r) => providerLabel(r),
+        onCellPress: openProvider,
       },
-      { bet: 0, win: 0, ggr: 0 },
+      { key: 'gameCount', label: 'Game Count', width: 80, align: 'right', render: (r) => String(gameCount(r)) },
+    ];
+    if (isQtech) {
+      cols.push({
+        key: 'licenseFeePercent',
+        width: 100,
+        align: 'right',
+        render: (r) => String(getMetric(r, 'licenseFeePercent')),
+        ...sortable('licenseFeePercent', 'License Fee %'),
+      });
+    }
+    cols.push(
+      {
+        key: 'betAmount',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(getMetric(r, 'betAmount')),
+        ...sortable('betAmount', 'Bet Amount'),
+      },
+      { key: 'betCount', label: 'Bet Count', width: 80, align: 'right', render: (r) => fmt(getMetric(r, 'betCount')) },
+      {
+        key: 'commissionAmount',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(getMetric(r, 'commissionAmount')),
+        ...sortable('commissionAmount', 'Commission'),
+      },
+      {
+        key: 'commissionCount',
+        label: 'Comm. Count',
+        width: 90,
+        align: 'right',
+        render: (r) => fmt(getMetric(r, 'commissionCount')),
+      },
+      {
+        key: 'rtp',
+        width: 70,
+        align: 'right',
+        render: (r) => String(getMetric(r, 'rtp')),
+        ...sortable('rtp', 'RTP'),
+      },
+      {
+        key: 'ggr',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(getMetric(r, 'ggr')),
+        color: (r) => (getMetric(r, 'ggr') < 0 ? colors.destructive : colors.success),
+        ...sortable('ggr', 'GGR'),
+      },
+      {
+        key: 'winAmount',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(getMetric(r, 'winAmount')),
+        ...sortable('winAmount', 'Win'),
+      },
+      { key: 'winCount', label: 'Win Count', width: 80, align: 'right', render: (r) => fmt(winCount(r)) },
+      {
+        key: 'rollbackCount',
+        label: 'Rollback Count',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(rollbackCount(r)),
+      },
+      {
+        key: 'totalRollbackAmount',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(getMetric(r, 'totalRollbackAmount')),
+        ...sortable('totalRollbackAmount', 'Rollback'),
+      },
     );
-  }, [rows]);
+    return cols;
+  }, [sort, toggleSort, openProvider, isQtech]);
+
+  const footer = useMemo(() => {
+    const sum = (key: SortKey) => sorted.reduce((acc, r) => acc + getMetric(r, key), 0);
+    const ggr = sum('ggr');
+    return {
+      label: 'Total',
+      cells: {
+        betAmount: fmt(sum('betAmount')),
+        winAmount: fmt(sum('winAmount')),
+        ggr: fmt(ggr),
+        commissionAmount: fmt(sum('commissionAmount')),
+      },
+    };
+  }, [sorted]);
 
   return (
     <ScrollView
@@ -115,7 +206,7 @@ export function GameActivityScreen() {
     >
       <Text style={styles.title}>Games Activity</Text>
       <Text style={styles.sub}>
-        {startDate} → {endDate}
+        {startDate} → {endDate} · Tap a provider to see its games
       </Text>
 
       <DetailFilterBar
@@ -132,18 +223,18 @@ export function GameActivityScreen() {
 
       {!lockedSource ? (
         <View style={styles.toggleRow}>
-          <TouchableOpacity
-            style={[styles.chip, !isQtech && styles.chipActive]}
-            onPress={() => setIsQtech(false)}
-          >
-            <Text style={[styles.chipText, !isQtech && styles.chipTextActive]}>Wco</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.chip, isQtech && styles.chipActive]}
-            onPress={() => setIsQtech(true)}
-          >
-            <Text style={[styles.chipText, isQtech && styles.chipTextActive]}>Qtech</Text>
-          </TouchableOpacity>
+          {(['Wco', 'Qtech'] as const).map((label) => {
+            const active = label === 'Qtech' ? isQtech : !isQtech;
+            return (
+              <TouchableOpacity
+                key={label}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => setIsQtech(label === 'Qtech')}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       ) : (
         <Text style={styles.lockedLabel}>Provider: {isQtech ? 'Qtech' : 'Wco'}</Text>
@@ -155,67 +246,13 @@ export function GameActivityScreen() {
         </View>
       ) : null}
 
-      <View style={styles.card}>
-        <View style={[styles.row, styles.headRow]}>
-          <Text style={[styles.cell, styles.cellProvider, styles.headText]}>Provider</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>Bet Cnt</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>Bet Amt</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>Win Amt</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>GGR</Text>
-        </View>
-
-        {loading && rows.length === 0 ? (
-          <ActivityIndicator style={{ marginVertical: spacing(6) }} color={colors.primary} />
-        ) : rows.length === 0 ? (
-          <Text style={styles.empty}>No data</Text>
-        ) : (
-          rows.map((r, i) => {
-            const ggr = getMetric(r, 'ggr');
-            return (
-              <View key={String(r.providerId || providerLabel(r) || i)} style={styles.row}>
-                <Text style={[styles.cell, styles.cellProvider]} numberOfLines={1}>
-                  {providerLabel(r)}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum]}>
-                  {getMetric(r, 'betCount').toLocaleString('en-IN')}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum]}>
-                  {floorNum(getMetric(r, 'betAmount')).toLocaleString('en-IN')}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum]}>
-                  {floorNum(getMetric(r, 'winAmount')).toLocaleString('en-IN')}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum, ggr < 0 ? styles.neg : styles.pos]}>
-                  {floorNum(ggr).toLocaleString('en-IN')}
-                </Text>
-              </View>
-            );
-          })
-        )}
-
-        {rows.length > 0 ? (
-          <View style={[styles.row, styles.totalRow]}>
-            <Text style={[styles.cell, styles.cellProvider, styles.headText]}>Total</Text>
-            <Text style={[styles.cell, styles.cellNum, styles.headText]}>—</Text>
-            <Text style={[styles.cell, styles.cellNum, styles.headText]}>
-              {floorNum(totals.bet).toLocaleString('en-IN')}
-            </Text>
-            <Text style={[styles.cell, styles.cellNum, styles.headText]}>
-              {floorNum(totals.win).toLocaleString('en-IN')}
-            </Text>
-            <Text
-              style={[
-                styles.cell,
-                styles.cellNum,
-                styles.headText,
-                totals.ggr < 0 ? styles.neg : styles.pos,
-              ]}
-            >
-              {floorNum(totals.ggr).toLocaleString('en-IN')}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      <DataTable
+        columns={columns}
+        rows={sorted}
+        keyFor={(r, i) => String(r.providerId || providerLabel(r) || i)}
+        loading={loading}
+        footer={footer}
+      />
     </ScrollView>
   );
 }
@@ -247,28 +284,4 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing(2),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  headRow: { borderBottomColor: colors.primary },
-  totalRow: { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.primary },
-  headText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
-  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1) },
-  cellProvider: { flex: 1.6 },
-  cellNum: { flex: 1, textAlign: 'right' },
-  pos: { color: colors.success, fontWeight: '700' },
-  neg: { color: colors.destructive, fontWeight: '700' },
-  empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(6) },
 });

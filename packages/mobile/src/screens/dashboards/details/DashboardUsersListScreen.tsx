@@ -173,6 +173,8 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
           <Text style={[styles.cell, styles.cellNum, styles.headText]}>
             {kind === 'bonus' ? 'Bonus' : 'Balance'}
           </Text>
+          <Text style={[styles.cell, styles.cellCity, styles.headText]}>City</Text>
+          <Text style={[styles.cell, styles.cellCity, styles.headText]}>State</Text>
         </View>
       </View>
     ),
@@ -205,6 +207,12 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
             </Text>
             <Text style={[styles.cell, styles.cellNum]}>
               {floorNum(value ?? 0).toLocaleString('en-IN')}
+            </Text>
+            <Text style={[styles.cell, styles.cellCity]} numberOfLines={1}>
+              {display(item.city)}
+            </Text>
+            <Text style={[styles.cell, styles.cellCity]} numberOfLines={1}>
+              {display(item.state)}
             </Text>
           </View>
         );
@@ -268,6 +276,7 @@ const styles = StyleSheet.create({
   cellName: { flex: 1.4 },
   cellMobile: { flex: 1.3 },
   cellApp: { width: 44, textAlign: 'center' },
+  cellCity: { flex: 1 },
   cellNum: { flex: 1, textAlign: 'right', fontWeight: '700' },
   empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
   pager: {

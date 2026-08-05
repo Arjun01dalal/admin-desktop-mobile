@@ -1,0 +1,177 @@
+/**
+ * Horizontally scrollable data table showing every desktop column.
+ * Columns use fixed widths; the whole table (header + rows) scrolls sideways
+ * together. Intended for page-sized data (≤ ~50 rows per page).
+ */
+import React from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { colors, radius, spacing } from '../../theme';
+
+export type DataTableColumn<Row> = {
+  key: string;
+  label: string;
+  width: number;
+  align?: 'left' | 'right';
+  render: (row: Row, index: number) => string;
+  /** Optional value color (e.g. red for negative GGR). */
+  color?: (row: Row) => string | undefined;
+  /** Makes the cell tappable (e.g. provider drill-down). */
+  onCellPress?: (row: Row) => void;
+  /** Makes the header tappable (sorting). */
+  onHeaderPress?: () => void;
+};
+
+type Props<Row> = {
+  columns: DataTableColumn<Row>[];
+  rows: Row[];
+  keyFor: (row: Row, index: number) => string;
+  loading?: boolean;
+  emptyMessage?: string;
+  /** Optional pinned footer row (e.g. totals). */
+  footer?: { label: string; cells: Record<string, string> };
+};
+
+export function DataTable<Row>({
+  columns,
+  rows,
+  keyFor,
+  loading,
+  emptyMessage = 'No data',
+  footer,
+}: Props<Row>) {
+  return (
+    <View style={styles.card}>
+      <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View>
+          <View style={[styles.row, styles.headRow]}>
+            {columns.map((col) =>
+              col.onHeaderPress ? (
+                <TouchableOpacity
+                  key={col.key}
+                  onPress={col.onHeaderPress}
+                  style={{ width: col.width }}
+                >
+                  <Text
+                    style={[styles.headText, col.align === 'right' && styles.right]}
+                    numberOfLines={2}
+                  >
+                    {col.label}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Text
+                  key={col.key}
+                  style={[
+                    styles.headText,
+                    { width: col.width },
+                    col.align === 'right' && styles.right,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {col.label}
+                </Text>
+              ),
+            )}
+          </View>
+
+          {loading && rows.length === 0 ? (
+            <ActivityIndicator style={styles.spinner} color={colors.primary} />
+          ) : rows.length === 0 ? (
+            <Text style={styles.empty}>{emptyMessage}</Text>
+          ) : (
+            rows.map((row, index) => (
+              <View key={keyFor(row, index)} style={styles.row}>
+                {columns.map((col) => {
+                  const value = col.render(row, index);
+                  const color = col.color?.(row);
+                  const textStyle = [
+                    styles.cell,
+                    { width: col.width },
+                    col.align === 'right' && styles.right,
+                    color ? { color, fontWeight: '700' as const } : null,
+                  ];
+                  if (col.onCellPress) {
+                    return (
+                      <TouchableOpacity
+                        key={col.key}
+                        onPress={() => col.onCellPress?.(row)}
+                        style={{ width: col.width }}
+                      >
+                        <Text style={[textStyle, styles.link, { width: undefined }]} numberOfLines={2}>
+                          {value}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  return (
+                    <Text key={col.key} style={textStyle} numberOfLines={2}>
+                      {value}
+                    </Text>
+                  );
+                })}
+              </View>
+            ))
+          )}
+
+          {footer && rows.length > 0 ? (
+            <View style={[styles.row, styles.footerRow]}>
+              {columns.map((col, i) => (
+                <Text
+                  key={col.key}
+                  style={[
+                    styles.headText,
+                    { width: col.width },
+                    col.align === 'right' && styles.right,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {i === 0 ? footer.label : footer.cells[col.key] ?? ''}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
+      <Text style={styles.hint}>Swipe sideways to see all columns →</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3),
+    marginTop: spacing(3),
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing(2),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  headRow: { borderBottomColor: colors.primary },
+  footerRow: { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.primary },
+  headText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
+    paddingHorizontal: spacing(1),
+  },
+  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1) },
+  right: { textAlign: 'right' },
+  link: { color: colors.primary, textDecorationLine: 'underline' },
+  spinner: { marginVertical: spacing(6) },
+  empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(6) },
+  hint: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: spacing(2) },
+});

@@ -1,14 +1,13 @@
 /**
- * New Registers — simplified port of desktop NewRegistersPage.
+ * New Registers — full-column port of desktop NewRegistersPage.
  * Calls users.getAll with { itemsPerPage, pageNo, startDate, endDate, filter }.
- * The 15+ advanced column filters are intentionally omitted; a paged list of
- * Name / Mobile / App / City-State / created date is shown.
+ * Every desktop column is shown in a sideways-scrolling table; contact
+ * columns are hidden for restricted roles like on desktop.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -16,9 +15,22 @@ import {
 import { useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
+import { floorNum } from '../../../dashboards/mergeMetrics';
+import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import {
+  formatAadharAddress,
+  nestedDpId,
+  nestedName,
+  pickAadharNumber,
+  pickAccountNumber,
+  pickAppName,
+  pickLastActivity,
+  pickPlayIn,
+  pickUserBankName,
+} from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
-import { todayIST } from '../../../utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
 
 type Row = {
@@ -51,13 +63,6 @@ function maskMobile(value: unknown, canShow: boolean): string {
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
-}
-function formatDate(value: unknown): string {
-  if (!value) return '—';
-  const d = new Date(String(value));
-  if (Number.isNaN(d.getTime())) return String(value);
-  const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
-  return ist.toISOString().slice(0, 10);
 }
 
 export function NewRegistersScreen() {
@@ -127,123 +132,172 @@ export function NewRegistersScreen() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
 
-  const header = useMemo(
-    () => (
-      <View>
-        <Text style={styles.title}>New Registers</Text>
-        <Text style={styles.sub}>
-          {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
-        </Text>
-        <DetailFilterBar
-          startDate={draftStart}
-          endDate={draftEnd}
-          loading={loading}
-          onStartDateChange={setDraftStart}
-          onEndDateChange={setDraftEnd}
-          onApply={() => {
-            setStartDate(draftStart);
-            setEndDate(draftEnd);
-            setPage(1);
-          }}
-          appClientName={appClientName}
-          onAppChange={(v) => {
-            setAppClientName(v);
-            setPage(1);
-          }}
-          pageSize={pageSize}
-          onPageSizeChange={(v) => {
-            setPageSize(v);
-            setPage(1);
-          }}
-          searchField={searchField}
-          onSearchFieldChange={setSearchField}
-          searchText={searchDraft}
-          onSearchTextChange={setSearchDraft}
-          onSearchSubmit={() => {
-            setAppliedSearch({ field: searchField, text: searchDraft });
-            setPage(1);
-          }}
-        />
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-        <View style={[styles.row, styles.headRow]}>
-          <Text style={[styles.cell, styles.cellIndex, styles.headText]}>#</Text>
-          <Text style={[styles.cell, styles.cellName, styles.headText]}>Name</Text>
-          {!hideContact ? (
-            <Text style={[styles.cell, styles.cellMobile, styles.headText]}>Mobile</Text>
-          ) : null}
-          <Text style={[styles.cell, styles.cellApp, styles.headText]}>App</Text>
-          <Text style={[styles.cell, styles.cellCity, styles.headText]}>City/State</Text>
-          <Text style={[styles.cell, styles.cellDate, styles.headText]}>Created</Text>
-        </View>
-      </View>
-    ),
-    [startDate, endDate, draftStart, draftEnd, loading, appClientName, searchField, searchDraft, pageSize, total, error, hideContact],
-  );
+  const columns = useMemo<DataTableColumn<Row>[]>(() => {
+    const cols: DataTableColumn<Row>[] = [
+      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      { key: 'name', label: 'Name', width: 120, render: (r) => display(r.name) },
+      { key: 'dpId', label: 'DP ID', width: 150, render: (r) => display(r._id) },
+      {
+        key: 'userComesFrom',
+        label: 'User Comes From',
+        width: 110,
+        render: (r) => String(r.userComesFrom || 'Company'),
+      },
+      {
+        key: 'balance',
+        label: 'Balance',
+        width: 80,
+        align: 'right',
+        render: (r) => floorNum(r.balance ?? 0).toLocaleString('en-IN'),
+      },
+      { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => pickLastActivity(r) },
+    ];
+    if (!hideContact) {
+      cols.push({ key: 'userBankName', label: 'User Bank Name', width: 130, render: (r) => pickUserBankName(r) });
+    }
+    cols.push(
+      { key: 'appName', label: 'App Code', width: 70, render: (r) => appCodeForName(pickAppName(r)) },
+      { key: 'playIn', label: 'In', width: 90, render: (r) => pickPlayIn(r) },
+      {
+        key: 'encryptedDpId',
+        label: 'User Encrypted Dp Id',
+        width: 150,
+        render: (r) => String(r.encryptedUserName || '-'),
+      },
+    );
+    if (!hideContact) {
+      cols.push(
+        { key: 'mobile', label: 'Mobile Phone', width: 100, render: (r) => maskMobile(r.mobile, canShowMobile) },
+        { key: 'kyc', label: 'Kyc', width: 70, render: (r) => (r.kyc === true ? 'Done' : 'Not Done') },
+        { key: 'accountNumber', label: 'Account Number', width: 130, render: (r) => pickAccountNumber(r) },
+        { key: 'aadharNumber', label: 'Aadhar Number', width: 120, render: (r) => pickAadharNumber(r) },
+        { key: 'email', label: 'Email', width: 160, render: (r) => (canShowMobile ? display(r.email) : '**********') },
+      );
+    }
+    cols.push(
+      { key: 'city', label: 'City', width: 100, render: (r) => display(r.city) },
+      { key: 'state', label: 'State', width: 110, render: (r) => display(r.state) },
+    );
+    if (!hideContact) {
+      cols.push(
+        { key: 'previousCallerName', label: 'Previous Caller Name', width: 130, render: (r) => nestedName(r.previousCaller) },
+        { key: 'previousCallerDpId', label: 'Previous Caller Dp_ID', width: 150, render: (r) => nestedDpId(r.previousCaller) },
+      );
+    }
+    cols.push({ key: 'empCode', label: 'Employee Code', width: 100, render: (r) => String(r.empCode || '-') });
+    if (!hideContact) {
+      cols.push(
+        { key: 'currentCaller', label: 'Current Caller', width: 120, render: (r) => nestedName(r.currentCaller) },
+        { key: 'referredCode', label: 'Referred Referral Code', width: 140, render: (r) => String(r.referredCode || '-') },
+        { key: 'referralCode', label: 'Referral Code', width: 110, render: (r) => String(r.referralCodeUser || '-') },
+      );
+    }
+    cols.push(
+      { key: 'deviceType', label: 'Device Type', width: 90, render: (r) => String(r.deviceType || '-') },
+      { key: 'playerAppVersion', label: 'User App Version', width: 110, render: (r) => String(r.currentAppVersion || '-') },
+      {
+        key: 'created',
+        label: 'Created',
+        width: 90,
+        render: (r) => formatDisplayDate(r.createdOn || r.createdAt) || '-',
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        width: 80,
+        render: (r) => formatDisplayTime(r.createdOn || r.createdAt) || '-',
+      },
+      {
+        key: 'bonusBalance',
+        label: 'Free Points Bonus',
+        width: 110,
+        align: 'right',
+        render: (r) => floorNum(r.bonusWalletBalance ?? 0).toLocaleString('en-IN'),
+      },
+    );
+    if (!hideContact) {
+      cols.push(
+        { key: 'blockReason', label: 'Block User Reason', width: 140, render: (r) => String(r.blockUserReason || '-') },
+        { key: 'aadharAddress', label: 'Aadhar Address', width: 220, render: (r) => formatAadharAddress(r) },
+      );
+    }
+    return cols;
+  }, [page, pageSize, hideContact, canShowMobile]);
 
   return (
-    <FlatList
+    <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
-      data={rows}
-      keyExtractor={(item, i) => item._id ?? String(i)}
-      ListHeaderComponent={header}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
-      renderItem={({ item, index }) => (
-        <View style={styles.row}>
-          <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * pageSize + index + 1}</Text>
-          <Text style={[styles.cell, styles.cellName]} numberOfLines={1}>
-            {display(item.name)}
-          </Text>
-          {!hideContact ? (
-            <Text style={[styles.cell, styles.cellMobile]} numberOfLines={1}>
-              {maskMobile(item.mobile, canShowMobile)}
-            </Text>
-          ) : null}
-          <Text style={[styles.cell, styles.cellApp]} numberOfLines={1}>
-            {appCodeForName(item.clientName)}
-          </Text>
-          <Text style={[styles.cell, styles.cellCity]} numberOfLines={1}>
-            {display(item.city)}
-            {item.state ? `, ${item.state}` : ''}
-          </Text>
-          <Text style={[styles.cell, styles.cellDate]} numberOfLines={1}>
-            {formatDate(item.createdOn ?? item.createdAt)}
-          </Text>
+    >
+      <Text style={styles.title}>New Registers</Text>
+      <Text style={styles.sub}>
+        {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
+      </Text>
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+          setPage(1);
+        }}
+        appClientName={appClientName}
+        onAppChange={(v) => {
+          setAppClientName(v);
+          setPage(1);
+        }}
+        pageSize={pageSize}
+        onPageSizeChange={(v) => {
+          setPageSize(v);
+          setPage(1);
+        }}
+        searchField={searchField}
+        onSearchFieldChange={setSearchField}
+        searchText={searchDraft}
+        onSearchTextChange={setSearchDraft}
+        onSearchSubmit={() => {
+          setAppliedSearch({ field: searchField, text: searchDraft });
+          setPage(1);
+        }}
+      />
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
-      )}
-      ListEmptyComponent={
-        loading ? (
-          <ActivityIndicator style={{ marginTop: spacing(6) }} color={colors.primary} />
-        ) : (
-          <Text style={styles.empty}>No new registers found</Text>
-        )
-      }
-      ListFooterComponent={
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-            onPress={() => page > 1 && setPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {page} / {totalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-            onPress={() => page < totalPages && setPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
-      }
-    />
+      ) : null}
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r._id ?? i)}
+        loading={loading}
+        emptyMessage="No users found"
+      />
+
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+          onPress={() => page > 1 && setPage((p) => p - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {page} / {totalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+          onPress={() => page < totalPages && setPage((p) => p + 1)}
+        >
+          Next ›
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -261,23 +315,6 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing(2),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  headRow: { marginTop: spacing(3), borderBottomColor: colors.primary },
-  headText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
-  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1) },
-  cellIndex: { width: 30 },
-  cellName: { flex: 1.3 },
-  cellMobile: { flex: 1.2 },
-  cellApp: { width: 40, textAlign: 'center' },
-  cellCity: { flex: 1.3 },
-  cellDate: { flex: 1, textAlign: 'right' },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

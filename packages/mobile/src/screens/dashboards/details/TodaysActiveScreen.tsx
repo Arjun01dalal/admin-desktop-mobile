@@ -1,13 +1,12 @@
 /**
- * Todays Active — port of desktop TodaysActivePage (simplified for mobile).
- * ops.activeCustomers with startDate/endDate route params. Advanced column
- * filters are omitted; a paged list of the core columns is shown.
+ * Todays Active — full-column port of desktop TodaysActivePage.
+ * ops.activeCustomers with startDate/endDate route params. Shows every
+ * desktop column in a sideways-scrolling table.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -16,9 +15,11 @@ import { useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
+import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { pickLastActivity } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
-import { todayIST } from '../../../utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
 
 type Row = {
@@ -72,6 +73,7 @@ export function TodaysActiveScreen() {
   const [rows, setRows] = useState<Row[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [appVersions, setAppVersions] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,123 +108,169 @@ export function TodaysActiveScreen() {
     void load();
   }, [load]);
 
-  const header = useMemo(
-    () => (
-      <View>
-        <Text style={styles.title}>Todays Active</Text>
-        <Text style={styles.sub}>
-          {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
-        </Text>
-        <DetailFilterBar
-          startDate={draftStart}
-          endDate={draftEnd}
-          loading={loading}
-          onStartDateChange={setDraftStart}
-          onEndDateChange={setDraftEnd}
-          onApply={() => {
-            setStartDate(draftStart);
-            setEndDate(draftEnd);
-            setPage(1);
-          }}
-          appClientName={appClientName}
-          onAppChange={(v) => {
-            setAppClientName(v);
-            setPage(1);
-          }}
-          pageSize={pageSize}
-          onPageSizeChange={(v) => {
-            setPageSize(v);
-            setPage(1);
-          }}
-          searchField={searchField}
-          onSearchFieldChange={setSearchField}
-          searchText={searchDraft}
-          onSearchTextChange={setSearchDraft}
-          onSearchSubmit={() => {
-            setAppliedSearch({ field: searchField, text: searchDraft });
-            setPage(1);
-          }}
-        />
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-        <View style={[styles.row, styles.headRow]}>
-          <Text style={[styles.cell, styles.cellIndex, styles.headText]}>#</Text>
-          <Text style={[styles.cell, styles.cellName, styles.headText]}>Name</Text>
-          {!hideContact ? (
-            <Text style={[styles.cell, styles.cellMobile, styles.headText]}>Mobile</Text>
-          ) : null}
-          <Text style={[styles.cell, styles.cellApp, styles.headText]}>App</Text>
-          <Text style={[styles.cell, styles.cellCity, styles.headText]}>City/State</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>Balance</Text>
-        </View>
-      </View>
-    ),
-    [startDate, endDate, draftStart, draftEnd, loading, appClientName, searchField, searchDraft, pageSize, total, error, hideContact],
-  );
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await secureApi('users.appVersions', {});
+      if (cancelled || !res.ok) return;
+      const data = res.data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const map: Record<string, string> = {};
+        for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+          if (v != null) map[k] = String(v);
+        }
+        setAppVersions(map);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const columns = useMemo<DataTableColumn<Row>[]>(() => {
+    const cols: DataTableColumn<Row>[] = [
+      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      { key: 'name', label: 'Name', width: 120, render: (r) => display(r.name) },
+      { key: 'dpId', label: 'Dp Id', width: 150, render: (r) => display(r._id) },
+    ];
+    if (!hideContact) {
+      cols.push({
+        key: 'mobile',
+        label: 'Mobile',
+        width: 100,
+        render: (r) => maskMobile(r.mobile, canShowMobile),
+      });
+    }
+    cols.push(
+      { key: 'appName', label: 'App Code', width: 70, render: (r) => appCodeForName(r.clientName) },
+      { key: 'playIn', label: 'In', width: 90, render: (r) => display(r.played) },
+    );
+    if (!hideContact) {
+      cols.push(
+        { key: 'account', label: 'Account', width: 120, render: (r) => display(r.accountNumber) },
+        { key: 'aadhar', label: 'Aadhar', width: 110, render: (r) => display(r.aadhaarNumber) },
+        {
+          key: 'email',
+          label: 'Email',
+          width: 160,
+          render: (r) => (canShowMobile ? display(r.email) : '**********'),
+        },
+      );
+    }
+    cols.push(
+      { key: 'city', label: 'City', width: 100, render: (r) => display(r.city) },
+      { key: 'state', label: 'State', width: 110, render: (r) => display(r.state) },
+      { key: 'device', label: 'Device', width: 80, render: (r) => display(r.deviceType) },
+      {
+        key: 'balance',
+        label: 'Balance',
+        width: 80,
+        align: 'right',
+        render: (r) => floorNum(r.balance ?? 0).toLocaleString('en-IN'),
+      },
+      {
+        key: 'playerAppVersion',
+        label: 'User App Version',
+        width: 110,
+        render: (r) => display(r.currentAppVersion),
+      },
+      {
+        key: 'appVersion',
+        label: 'App Version',
+        width: 90,
+        render: (r) => display(appVersions[r.clientName || '']),
+      },
+      { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => pickLastActivity(r) },
+      {
+        key: 'date',
+        label: 'Date',
+        width: 90,
+        render: (r) => (r.createdOn ? formatDisplayDate(r.createdOn) : '—'),
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        width: 80,
+        render: (r) => (r.createdOn ? formatDisplayTime(r.createdOn) : '—'),
+      },
+    );
+    return cols;
+  }, [page, pageSize, hideContact, canShowMobile, appVersions]);
 
   return (
-    <FlatList
+    <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
-      data={rows}
-      keyExtractor={(item, i) => item._id ?? String(i)}
-      ListHeaderComponent={header}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
-      renderItem={({ item, index }) => (
-        <View style={styles.row}>
-          <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * pageSize + index + 1}</Text>
-          <Text style={[styles.cell, styles.cellName]} numberOfLines={1}>
-            {display(item.name)}
-          </Text>
-          {!hideContact ? (
-            <Text style={[styles.cell, styles.cellMobile]} numberOfLines={1}>
-              {maskMobile(item.mobile, canShowMobile)}
-            </Text>
-          ) : null}
-          <Text style={[styles.cell, styles.cellApp]} numberOfLines={1}>
-            {appCodeForName(item.clientName)}
-          </Text>
-          <Text style={[styles.cell, styles.cellCity]} numberOfLines={1}>
-            {display(item.city)}
-            {item.state ? `, ${item.state}` : ''}
-          </Text>
-          <Text style={[styles.cell, styles.cellNum]}>
-            {floorNum(item.balance ?? 0).toLocaleString('en-IN')}
-          </Text>
+    >
+      <Text style={styles.title}>Todays Active</Text>
+      <Text style={styles.sub}>
+        {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
+      </Text>
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+          setPage(1);
+        }}
+        appClientName={appClientName}
+        onAppChange={(v) => {
+          setAppClientName(v);
+          setPage(1);
+        }}
+        pageSize={pageSize}
+        onPageSizeChange={(v) => {
+          setPageSize(v);
+          setPage(1);
+        }}
+        searchField={searchField}
+        onSearchFieldChange={setSearchField}
+        searchText={searchDraft}
+        onSearchTextChange={setSearchDraft}
+        onSearchSubmit={() => {
+          setAppliedSearch({ field: searchField, text: searchDraft });
+          setPage(1);
+        }}
+      />
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
-      )}
-      ListEmptyComponent={
-        loading ? (
-          <ActivityIndicator style={{ marginTop: spacing(6) }} color={colors.primary} />
-        ) : (
-          <Text style={styles.empty}>No active users found</Text>
-        )
-      }
-      ListFooterComponent={
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-            onPress={() => page > 1 && setPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {page} / {totalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-            onPress={() => page < totalPages && setPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
-      }
-    />
+      ) : null}
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r._id ?? i)}
+        loading={loading}
+        emptyMessage="No active users found"
+      />
+
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+          onPress={() => page > 1 && setPage((p) => p - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {page} / {totalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+          onPress={() => page < totalPages && setPage((p) => p + 1)}
+        >
+          Next ›
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -240,23 +288,6 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing(2),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  headRow: { marginTop: spacing(3), borderBottomColor: colors.primary },
-  headText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
-  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1) },
-  cellIndex: { width: 30 },
-  cellName: { flex: 1.3 },
-  cellMobile: { flex: 1.2 },
-  cellApp: { width: 40, textAlign: 'center' },
-  cellCity: { flex: 1.3 },
-  cellNum: { flex: 0.9, textAlign: 'right', fontWeight: '700' },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

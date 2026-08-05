@@ -5,7 +5,6 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
+import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -39,6 +39,31 @@ function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
 }
+
+function fmt(value: unknown): string {
+  return floorNum(value).toLocaleString('en-IN');
+}
+
+/** Full desktop column set (BetConstructGamesListPage). */
+const columns: DataTableColumn<GameRow>[] = [
+  { key: 'idx', label: '#', width: 36, render: (_r, i) => String(i + 1) },
+  { key: 'gameId', label: 'Game Id', width: 140, render: (r) => display(r.gameId) },
+  { key: 'totalBetAmount', label: 'Total Bet Amount', width: 110, align: 'right', render: (r) => fmt(r.totalBetAmount) },
+  { key: 'totalBets', label: 'No of Bets', width: 80, align: 'right', render: (r) => fmt(r.totalBets) },
+  { key: 'totalWinningAmount', label: 'Total Winning Amount', width: 120, align: 'right', render: (r) => fmt(r.totalWinningAmount) },
+  { key: 'totalWinningBets', label: 'No of Wins', width: 80, align: 'right', render: (r) => fmt(r.totalWinningBets) },
+  { key: 'totalCommission', label: 'Total Commission', width: 110, align: 'right', render: (r) => fmt(r.totalCommission) },
+  { key: 'totalUsers', label: 'Total Users', width: 85, align: 'right', render: (r) => fmt(r.totalUsers) },
+  {
+    key: 'ggr',
+    label: 'GGR',
+    width: 100,
+    align: 'right',
+    render: (r) => fmt(r.ggr),
+    color: (r) => (toNum(r.ggr) < 0 ? colors.destructive : colors.success),
+  },
+  { key: 'rtp', label: 'RTP', width: 70, align: 'right', render: (r) => fmt(r.rtp) },
+];
 
 export function BetConstructGamesScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
@@ -147,46 +172,13 @@ export function BetConstructGamesScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <View style={[styles.row, styles.headRow]}>
-          <Text style={[styles.cell, styles.cellIndex, styles.headText]}>#</Text>
-          <Text style={[styles.cell, styles.cellGame, styles.headText]}>Game</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>Bet</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>Win</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>Comm</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>GGR</Text>
-        </View>
-
-        {loading && rows.length === 0 ? (
-          <ActivityIndicator style={{ marginVertical: spacing(6) }} color={colors.primary} />
-        ) : rows.length === 0 ? (
-          <Text style={styles.empty}>No BetConstruct game data</Text>
-        ) : (
-          rows.map((r, i) => {
-            const ggr = toNum(r.ggr);
-            return (
-              <View key={String(r.gameId ?? i)} style={styles.row}>
-                <Text style={[styles.cell, styles.cellIndex]}>{i + 1}</Text>
-                <Text style={[styles.cell, styles.cellGame]} numberOfLines={1}>
-                  {display(r.gameId)}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum]}>
-                  {floorNum(r.totalBetAmount).toLocaleString('en-IN')}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum]}>
-                  {floorNum(r.totalWinningAmount).toLocaleString('en-IN')}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum]}>
-                  {floorNum(r.totalCommission).toLocaleString('en-IN')}
-                </Text>
-                <Text style={[styles.cell, styles.cellNum, ggr < 0 ? styles.neg : styles.pos]}>
-                  {floorNum(r.ggr).toLocaleString('en-IN')}
-                </Text>
-              </View>
-            );
-          })
-        )}
-      </View>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r.gameId ?? i)}
+        loading={loading}
+        emptyMessage="No BetConstruct game data"
+      />
     </ScrollView>
   );
 }
