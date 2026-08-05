@@ -179,12 +179,17 @@ export function useOpsDashboardData(
     }
   }, [mode, filters]);
 
+  const ludoGenRef = useRef(0);
   const reloadLudo = useCallback(
     async (gameId: string) => {
+      const mainGen = genRef.current;
+      const ludoGen = ++ludoGenRef.current;
       const ludo = await loadLudo(gameId, {
         startDate: filters.startDate,
         endDate: filters.endDate,
       });
+      // Drop the response if a newer Ludo request or a full reload started since.
+      if (ludoGen !== ludoGenRef.current || mainGen !== genRef.current) return;
       setBundle((prev) => (prev ? { ...prev, ludo } : prev));
     },
     [filters.startDate, filters.endDate, loadLudo],
