@@ -52,14 +52,30 @@ export async function secureApi<T = unknown>(
 
     const body = entry.encryptRequest ? { token: encryptPayload(rest) } : rest;
 
+    const isGet = entry.method === 'GET';
+    // Registry paths may be absolute (other backends, e.g. Live Match book/odds).
+    let url = /^https?:\/\//i.test(entry.path)
+      ? entry.path
+      : `${getApiBaseUrl()}${entry.path}`;
+    // Match desktop: GET payload goes in the query string (e.g. startDate/endDate).
+    if (isGet) {
+      const entries = Object.entries(rest || {}).filter(
+        ([, v]) => v != null && String(v).length > 0,
+      );
+      if (entries.length > 0) {
+        const qs = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
+        url = `${url}${url.includes('?') ? '&' : '?'}${qs}`;
+      }
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 60_000);
     let res: Response;
     try {
-      res = await fetch(`${getApiBaseUrl()}${entry.path}`, {
+      res = await fetch(url, {
         method: entry.method,
         headers,
-        body: entry.method === 'GET' ? undefined : JSON.stringify(body),
+        body: isGet ? undefined : JSON.stringify(body),
         signal: controller.signal,
       });
     } finally {
