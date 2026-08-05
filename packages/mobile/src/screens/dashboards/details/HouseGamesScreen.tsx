@@ -50,7 +50,7 @@ type TxnRow = {
   updatedAt?: string;
 };
 
-const ITEMS_PER_PAGE = 50;
+const ITEMS_PER_PAGE_OPTIONS = [50, 100, 200, 500];
 
 /** Same shape as desktop INITIAL_FILTERS. */
 const INITIAL_FILTERS = {
@@ -173,9 +173,6 @@ function isBotValue(row: TxnRow): string {
   return '-';
 }
 
-/** Columns shown in the list; the bottom sheet shows all of them. */
-const MAIN_KEYS = new Set(['name', 'amount', 'status', 'created']);
-
 export function HouseGamesScreen() {
   const isFocused = useIsFocused();
 
@@ -186,6 +183,7 @@ export function HouseGamesScreen() {
   const [draftFilters, setDraftFilters] = useState<FiltersState>(INITIAL_FILTERS);
   const [filters, setFilters] = useState<FiltersState>(INITIAL_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
   const [pageNo, setPageNo] = useState(1);
   const [rows, setRows] = useState<TxnRow[]>([]);
   const [totalCount, setTotalCount] = useState<number | null>(null);
@@ -202,7 +200,7 @@ export function HouseGamesScreen() {
     try {
       const payload: Record<string, unknown> = {
         pageNo,
-        itemsPerPage: ITEMS_PER_PAGE,
+        itemsPerPage,
         startDate,
         endDate,
       };
@@ -222,12 +220,12 @@ export function HouseGamesScreen() {
       setTotalCount(count);
       setTotalAmount(pickNumber(data, ['totals.totalAmount', 'data.totals.totalAmount']));
       const pages = pickNumber(data, ['totalPages', 'data.totalPages']);
-      setTotalPages(pages ?? (count !== null ? Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)) : 1));
+      setTotalPages(pages ?? (count !== null ? Math.max(1, Math.ceil(count / itemsPerPage)) : 1));
       setError('');
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [pageNo, startDate, endDate, filters]);
+  }, [pageNo, itemsPerPage, startDate, endDate, filters]);
 
   useEffect(() => {
     if (isFocused) void load();
@@ -246,8 +244,11 @@ export function HouseGamesScreen() {
     setFilters(draftFilters);
   }, [draftStart, draftEnd, draftFilters]);
 
+  const rowOffset = (pageNo - 1) * itemsPerPage;
+
   const columns = useMemo<DataTableColumn<TxnRow>[]>(
     () => [
+      { key: 'sr', label: 'SR.No', width: 60, render: (_r, i) => String(i + 1 + rowOffset) },
       { key: 'name', label: 'Name', width: 130, render: (r) => String(r.name || '-') },
       { key: 'userId', label: 'User ID', width: 130, render: (r) => String(r.userId || '-') },
       { key: 'txnId', label: 'Transaction ID', width: 160, render: (r) => String(r.txnId || r.transactionId || '-') },
@@ -264,9 +265,9 @@ export function HouseGamesScreen() {
       { key: 'roundCapacity', label: 'Round Capacity', width: 110, align: 'right', render: (r) => String(r.roundCapacity ?? '-') },
       { key: 'isBot', label: 'Is Bot', width: 80, render: (r) => isBotValue(r) },
       { key: 'player', label: 'Player Identity', width: 160, render: (r) => playerIdentity(r) },
-      { key: 'created', label: 'Created', width: 150, render: (r) => fmtDate(r) },
+      { key: 'created', label: 'Created At', width: 150, render: (r) => fmtDate(r) },
     ],
-    [],
+    [rowOffset],
   );
 
   const activeFilterCount = useMemo(
@@ -388,20 +389,36 @@ export function HouseGamesScreen() {
         </View>
       )}
 
-      {/* Totals summary */}
+      {/* Items per page (desktop: 50/100/200/500) */}
+      <View style={styles.chipGroupRow}>
+        <Text style={styles.chipGroupLabel}>Rows</Text>
+        {ITEMS_PER_PAGE_OPTIONS.map((opt) => {
+          const active = itemsPerPage === opt;
+          return (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => {
+                setItemsPerPage(opt);
+                setPageNo(1);
+              }}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Totals line (matches desktop "Total Count / Total Amount") */}
       {(totalCount !== null || totalAmount !== null) && (
-        <View style={styles.totalsRow}>
+        <View style={styles.totalsLine}>
           {totalCount !== null && (
-            <View style={styles.totalCard}>
-              <Text style={styles.totalLabel}>Total Transactions</Text>
-              <Text style={styles.totalValue}>{totalCount.toLocaleString('en-IN')}</Text>
-            </View>
+            <Text style={styles.totalsText}>Total Count: {totalCount.toLocaleString('en-IN')}</Text>
           )}
           {totalAmount !== null && (
-            <View style={styles.totalCard}>
-              <Text style={styles.totalLabel}>Total Amount</Text>
-              <Text style={styles.totalValue}>{fmt2(totalAmount)}</Text>
-            </View>
+            <Text style={styles.totalsText}>
+              Total Amount: {Math.round(Number(totalAmount) || 0).toLocaleString('en-IN')}
+            </Text>
           )}
         </View>
       )}
@@ -413,7 +430,7 @@ export function HouseGamesScreen() {
       ) : null}
 
       <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
+        columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id || r.txnId || i)}
         emptyMessage={loading ? 'Loading…' : 'No Data Found'}
@@ -521,18 +538,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   applyBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  totalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginBottom: spacing(3) },
-  totalCard: {
-    flexGrow: 1,
-    minWidth: 140,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
+  totalsLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(4),
+    marginBottom: spacing(3),
   },
-  totalLabel: { color: colors.muted, fontSize: 12 },
-  totalValue: { color: colors.foreground, fontSize: 18, fontWeight: '700', marginTop: spacing(1) },
+  totalsText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
