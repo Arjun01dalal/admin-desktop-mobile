@@ -44,7 +44,14 @@ export async function secureApi<T = unknown>(
 
     // _clientName -> client-name header (mirrors desktop behaviour)
     const { _clientName, ...rest } = payload ?? {};
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      // The API's firewall may block non-browser user agents (mobile fetch
+      // defaults to okhttp/CFNetwork); present a browser-like UA instead.
+      'User-Agent':
+        'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+    };
     if (token) headers.Authorization = `Bearer ${token}`;
     if (typeof _clientName === 'string' && _clientName.trim()) {
       headers['client-name'] = _clientName.trim().toUpperCase();
