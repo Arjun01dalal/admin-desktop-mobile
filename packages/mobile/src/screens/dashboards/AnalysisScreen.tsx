@@ -107,7 +107,7 @@ export function AnalysisScreen() {
     setLoading(true);
     try {
       const res = await secureApi('analytics.userAnalytics', {});
-      if (!res.ok) {
+      if (!res.ok || res.success === false) {
         setError(res.message || 'Failed to load analytics');
         return;
       }
@@ -185,6 +185,15 @@ export function AnalysisScreen() {
                 />
               </View>
             ))}
+            {/* Deeper nesting: show as formatted JSON so nothing is silently dropped. */}
+            {sub.nested.map(([nKey, nObj]) => (
+              <View key={`${key}-${nKey}`} style={styles.tableBlock}>
+                <Text style={styles.tableTitle}>{labelize(nKey)}</Text>
+                <View style={styles.jsonBox}>
+                  <Text style={styles.jsonText}>{JSON.stringify(nObj, null, 2)}</Text>
+                </View>
+              </View>
+            ))}
           </View>
         );
       })}
@@ -254,6 +263,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   tableBlock: { marginTop: spacing(2) },
+  jsonBox: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+  },
+  jsonText: { color: colors.muted, fontSize: 11, fontFamily: 'monospace' },
   tableTitle: {
     color: colors.foreground,
     fontSize: 13,
