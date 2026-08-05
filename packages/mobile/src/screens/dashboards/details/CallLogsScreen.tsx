@@ -4,11 +4,16 @@
  * Filters: date range, per-page, Mobile/DP ID/Call ID/State/Bot ID inputs,
  * status chips and comment chips. Non-callers see the bot status table and
  * can add comments (callLogs.updateCallData) by tapping the Comment cell.
- * Desktop-only actions (bot call / dialer / upload / pause) are not ported.
+ * Row actions (from the row detail sheet): Bot Call (callLogs.addToBotDialer),
+ * End Call (callLogs.updateCallData), View Summary (direct POST to the
+ * process-call helper, same endpoint the desktop bridge uses) and opening the
+ * recording URL. Connect Dialer needs the desktop external-dialer bridge and
+ * is shown as a desktop-only note instead.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -28,7 +33,7 @@ import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { formatDdMmYyyy, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type CallLogRow = Record<string, unknown> & {
   call_sid?: string;
@@ -46,6 +51,12 @@ type CallLogRow = Record<string, unknown> & {
   commented_by?: string;
   deleted_by?: string;
   deleted_at?: string;
+  recording_url?: string;
+  last_played_date?: string;
+  language?: string;
+  city?: string;
+  email?: string;
+  reason?: string;
 };
 
 const PAGE_SIZES = [50, 100, 200, 500];
@@ -209,6 +220,40 @@ function buildBotSummaryRows(summary: Record<string, unknown> | null): BotSummar
   });
 }
 
+/** Port of desktop mapRowToDialSetting (callLogs/utils.ts). */
+function mapRowToDialSetting(item: CallLogRow): Record<string, unknown> {
+  const lastPlayed = item.last_played_date
+    ? new Date(String(item.last_played_date))
+        .toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        .toLowerCase()
+    : undefined;
+  const raw: Record<string, unknown> = {
+    phone_number: item.phone_number,
+    app_name: item.app_name,
+    last_played_date: lastPlayed,
+    language: item.language ?? 'hindi',
+    client_name: item.client_name,
+    id: item.caller_user_id,
+    state: item.state,
+    city: item.city,
+    email: item.email,
+    reason: item.reason ?? 'User List',
+    botId: item.bot_id ?? 1,
+  };
+  return Object.fromEntries(
+    Object.entries(raw).filter(([, v]) => v !== undefined && v !== null && v !== ''),
+  );
+}
+
+type SummaryFlag = {
+  level?: string;
+  flag?: string;
+  required?: string;
+  value?: string;
+  detected?: string;
+  reason?: string;
+  types?: string[];
+};
 function maskMobile(value: unknown, canShow: boolean): string {
   if (value === undefined || value === null || value === '') return '—';
   return canShow ? String(value) : '**********';
@@ -250,6 +295,9 @@ export function CallLogsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: CallLogRow; index: number } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMsg, setActionMsg] = useState('');
+  const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
 
   // Comment modal
   const [commentRow, setCommentRow] = useState<CallLogRow | null>(null);
@@ -381,6 +429,116 @@ export function CallLogsScreen() {
       setCommentSaving(false);
     }
   }, [commentRow, commentChoice, commentText, admin, load]);
+
+  /* ---------- row actions (ported from desktop useCallLogsActions) ---------- */
+
+  const botCall = useCallback(
+    async (row: CallLogRow) => {
+      setActionLoading(true);
+      setActionMsg('');
+      try {
+        const res = await secureApi('callLogs.addToBotDialer', {
+          userId: String((admin as { _id?: string } | null)?._id || ''),
+          created_by: String((admin as { name?: string } | null)?.name || ''),
+          dialout_settings: [mapRowToDialSetting(row)],
+        });
+        if (!res.ok || res.success === false) {
+          setActionMsg(res.message || 'Bot call failed');
+          return;
+        }
+        setActionMsg(res.message || 'Bot call queued');
+        setSelected(null);
+        void load();
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [admin, load],
+  );
+
+  const endCall = useCallback(
+    async (row: CallLogRow) => {
+      setActionLoading(true);
+      setActionMsg('');
+      try {
+        const res = await secureApi('callLogs.updateCallData', {
+          call_sid: String(row.call_sid || ''),
+          status: 'no-answer',
+          commented_by: String((admin as { name?: string } | null)?.name || ''),
+        });
+        if (!res.ok || res.success === false) {
+          setActionMsg(res.message || 'Failed to end call');
+          return;
+        }
+        setActionMsg('Call ended');
+        setSelected(null);
+        void load();
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [admin, load],
+  );
+
+  const openRecording = useCallback((row: CallLogRow) => {
+    const url = String(row.recording_url || '');
+    if (!url) return;
+    Linking.openURL(url).catch(() => setActionMsg('Could not open recording URL'));
+  }, []);
+
+  const viewSummary = useCallback(async (row: CallLogRow) => {
+    setActionLoading(true);
+    setActionMsg('');
+    try {
+      const res = await processCallSummary(String(row.call_sid || ''));
+      if (!res.ok) {
+        setActionMsg(res.message || 'Analysis is in progress.');
+        return;
+      }
+      setSummaryData(res.data || null);
+    } finally {
+      setActionLoading(false);
+    }
+  }, []);
+
+  /** Action buttons for the selected row — mirrors the desktop Action column. */
+  const sheetActions = useMemo<SheetAction[]>(() => {
+    if (!selected) return [];
+    const row = selected.row;
+    const status = String(row.status || '');
+    const actions: SheetAction[] = [];
+    if (status !== 'queued' && status !== 'deleted') {
+      if (status === 'in-progress') {
+        actions.push({
+          label: actionLoading ? 'Ending…' : 'End Call',
+          tone: 'warning',
+          disabled: actionLoading,
+          onPress: () => void endCall(row),
+        });
+      } else {
+        actions.push({
+          label: actionLoading ? 'Calling…' : 'Bot Call',
+          tone: 'primary',
+          disabled: actionLoading,
+          onPress: () => void botCall(row),
+        });
+      }
+    }
+    if (!isCaller && status === 'completed' && row.recording_url) {
+      actions.push(
+        {
+          label: actionLoading ? 'Loading…' : 'View Summary',
+          disabled: actionLoading,
+          onPress: () => void viewSummary(row),
+        },
+        {
+          label: 'Play Recording',
+          onPress: () => openRecording(row),
+        },
+      );
+    }
+    return actions;
+  }, [selected, actionLoading, isCaller, botCall, endCall, openRecording, viewSummary]);
 
   const rowOffset = (page - 1) * pageSize;
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
@@ -616,6 +774,15 @@ export function CallLogsScreen() {
         </View>
       ) : null}
 
+      {actionMsg ? (
+        <View style={styles.actionMsgBox}>
+          <Text style={styles.actionMsgText}>{actionMsg}</Text>
+          <TouchableOpacity onPress={() => setActionMsg('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.actionMsgClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -686,8 +853,42 @@ export function CallLogsScreen() {
               }))
             : []
         }
+        actions={sheetActions}
+        note={
+          selected ? 'Connect Dialer is available on the desktop app only.' : undefined
+        }
         onClose={() => setSelected(null)}
       />
+
+      {/* Call summary modal (View Summary) */}
+      <Modal visible={summaryData !== null} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Call Summary</Text>
+            <ScrollView style={styles.summaryScroll} showsVerticalScrollIndicator={false}>
+              {buildSummaryRows(summaryData).map((r) => (
+                <View key={r.title} style={styles.summaryRow}>
+                  <Text style={styles.summaryTitle}>{r.title}</Text>
+                  <Text style={styles.summaryValue} selectable>
+                    {r.value}
+                  </Text>
+                  {r.reason && r.reason !== '-' ? (
+                    <Text style={styles.summaryReason}>{r.reason}</Text>
+                  ) : null}
+                </View>
+              ))}
+              {buildSummaryRows(summaryData).length === 0 ? (
+                <Text style={styles.summaryValue}>No summary available.</Text>
+              ) : null}
+            </ScrollView>
+            <View style={styles.filterActions}>
+              <TouchableOpacity style={styles.clearBtn} onPress={() => setSummaryData(null)}>
+                <Text style={styles.clearBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Comment modal */}
       <Modal visible={commentRow !== null} transparent animationType="fade">
@@ -841,6 +1042,20 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  actionMsgBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginTop: spacing(3),
+  },
+  actionMsgText: { color: colors.foreground, fontSize: 13, flex: 1 },
+  actionMsgClose: { color: colors.muted, fontSize: 14 },
   loadingBox: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -884,4 +1099,86 @@ const styles = StyleSheet.create({
   modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
   modalSub: { color: colors.muted, fontSize: 12 },
   modalChips: { maxHeight: 220 },
+  summaryScroll: { maxHeight: 420 },
+  summaryRow: {
+    paddingVertical: spacing(2),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: spacing(0.5),
+  },
+  summaryTitle: { color: colors.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  summaryValue: { color: colors.foreground, fontSize: 13 },
+  summaryReason: { color: colors.muted, fontSize: 12, fontStyle: 'italic' },
 });
+
+/** Port of desktop buildSummaryRows (IncomingBotCallPage.tsx). */
+function buildSummaryRows(summaryData: CallSummaryData | null): Array<{ title: string; value: string; reason: string }> {
+  const raw = summaryData?.data?.analysis ?? summaryData?.data;
+  if (!raw || typeof raw !== 'object') return [];
+  const data = raw as Record<string, unknown>;
+  const flag = (k: string) => (data[k] || {}) as SummaryFlag;
+  const priority = flag('priority');
+  const threat = flag('threat');
+  const humanIntervention = flag('human_intervention');
+  const satisfaction = flag('satisfaction');
+  const frustration = flag('frustration');
+  const nuisance = flag('nuisance');
+  const repeatedComplaint = flag('repeated_complaint');
+  const piiDetails = flag('pii_details');
+  const rows = [
+    { title: 'Summary', value: data.summary, reason: '-' },
+    { title: 'Transcript', value: summaryData?.data?.transcript || data.transcript, reason: '-' },
+    { title: 'Priority', value: priority.level, reason: priority.reason },
+    { title: 'Threat', value: threat.flag, reason: threat.reason || 'N/A' },
+    { title: 'Human Intervention', value: humanIntervention.required, reason: humanIntervention.reason },
+    { title: 'Frustration', value: frustration.level, reason: frustration.reason },
+    { title: 'Satisfaction', value: satisfaction.value, reason: satisfaction.reason || 'N/A' },
+    { title: 'Nuisance', value: nuisance.value, reason: nuisance.reason },
+    { title: 'Repeated Complaint', value: repeatedComplaint.value, reason: repeatedComplaint.reason },
+    { title: 'PII Details', value: piiDetails.detected, reason: piiDetails.types?.join(', ') },
+    { title: 'Next Best Action', value: data.next_best_action, reason: '' },
+  ];
+  return rows.map((r) => ({
+    title: r.title,
+    value: r.value == null || r.value === '' ? '—' : String(r.value),
+    reason: r.reason == null || r.reason === '' ? '' : String(r.reason),
+  }));
+}
+
+type CallSummaryData = {
+  status?: string;
+  message?: string;
+  data?: { transcript?: string; analysis?: Record<string, unknown>; [key: string]: unknown };
+};
+
+/**
+ * Mirror of desktop electron/secure processCallSummary: plain HTTPS POST to the
+ * calling-bot helper (no auth/encryption), so it works without the Electron bridge.
+ */
+async function processCallSummary(callSid: string): Promise<{ ok: boolean; message?: string; data?: CallSummaryData }> {
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(callSid)) {
+    return { ok: false, message: 'Invalid call_sid' };
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000);
+    let res: Response;
+    try {
+      res = await fetch('https://helper.callingbot.live/process-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ call_sid: callSid }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    const data = (await res.json().catch(() => ({}))) as CallSummaryData;
+    if (!res.ok || data.status === 'failed') {
+      return { ok: false, message: data.message || 'Analysis failed', data };
+    }
+    return { ok: true, data, message: data.message };
+  } catch {
+    return { ok: false, message: 'Analysis is in progress.' };
+  }
+}
