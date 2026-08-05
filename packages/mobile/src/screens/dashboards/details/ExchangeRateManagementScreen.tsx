@@ -16,13 +16,18 @@ import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 type GameRow = Record<string, unknown>;
 
 export function ExchangeRateManagementScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate = (params.startDate as string) || todayIST();
-  const endDate = (params.endDate as string) || todayIST();
+  const initialStart = (params.startDate as string) || todayIST();
+  const initialEnd = (params.endDate as string) || todayIST();
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +80,18 @@ export function ExchangeRateManagementScreen() {
       <Text style={styles.description}>
         {startDate} → {endDate}
       </Text>
+
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+        }}
+      />
 
       {error ? (
         <View style={styles.errorBox}>

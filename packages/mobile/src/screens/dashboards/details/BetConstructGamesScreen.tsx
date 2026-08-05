@@ -17,6 +17,7 @@ import { colors, radius, spacing } from '../../../theme';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 type GameRow = {
   gameId?: string;
@@ -41,8 +42,12 @@ function display(value: unknown): string {
 
 export function BetConstructGamesScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate = typeof params.startDate === 'string' ? params.startDate : todayIST();
-  const endDate = typeof params.endDate === 'string' ? params.endDate : todayIST();
+  const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
+  const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +99,18 @@ export function BetConstructGamesScreen() {
       <Text style={styles.sub}>
         {startDate} → {endDate}
       </Text>
+
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+        }}
+      />
 
       {error ? (
         <View style={styles.errorBox}>

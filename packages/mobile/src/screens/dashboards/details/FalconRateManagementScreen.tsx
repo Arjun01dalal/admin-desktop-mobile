@@ -15,6 +15,7 @@ import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 type EventRow = Record<string, unknown>;
 
@@ -96,8 +97,12 @@ function formatValue(key: string, value: unknown): string {
 
 export function FalconRateManagementScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate = (params.startDate as string) || todayIST();
-  const endDate = (params.endDate as string) || todayIST();
+  const initialStart = (params.startDate as string) || todayIST();
+  const initialEnd = (params.endDate as string) || todayIST();
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
   // Match desktop: only exact `jetfair` uses jetfair API; else falcon.
   const type = String(params.type ?? 'jetfair').toLowerCase();
   const isJetfair = type === 'jetfair';
@@ -155,6 +160,18 @@ export function FalconRateManagementScreen() {
       <Text style={styles.description}>
         {startDate} → {endDate}
       </Text>
+
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+        }}
+      />
 
       {error ? (
         <View style={styles.errorBox}>

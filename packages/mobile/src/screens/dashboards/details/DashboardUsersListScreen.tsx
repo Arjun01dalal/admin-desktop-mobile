@@ -18,6 +18,7 @@ import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 type Kind = 'balance' | 'bonus' | 'registered';
 
@@ -54,10 +55,16 @@ function display(value: unknown): string {
 export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   const meta = META[kind];
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate = typeof params.startDate === 'string' ? params.startDate : todayIST();
-  const endDate = typeof params.endDate === 'string' ? params.endDate : todayIST();
+  const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
+  const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
 
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
+  const [appClientName, setAppClientName] = useState('');
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,9 +79,9 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       const payload: Record<string, unknown> = {
         startDate,
         endDate,
-        itemsPerPage: PAGE_SIZE,
+        itemsPerPage: pageSize,
         pageNo: page,
-        filter: {},
+        filter: appClientName ? { clientName: appClientName } : {},
       };
       if (meta.decreasing) payload.decreasing = true;
 
@@ -98,7 +105,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
     } finally {
       setLoading(false);
     }
-  }, [endDate, meta.action, meta.decreasing, page, startDate]);
+  }, [appClientName, endDate, meta.action, meta.decreasing, page, pageSize, startDate]);
 
   useEffect(() => {
     void load();
@@ -111,6 +118,28 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         <Text style={styles.sub}>
           {startDate} → {endDate}
         </Text>
+        <DetailFilterBar
+          startDate={draftStart}
+          endDate={draftEnd}
+          loading={loading}
+          onStartDateChange={setDraftStart}
+          onEndDateChange={setDraftEnd}
+          onApply={() => {
+            setStartDate(draftStart);
+            setEndDate(draftEnd);
+            setPage(1);
+          }}
+          appClientName={appClientName}
+          onAppChange={(v) => {
+            setAppClientName(v);
+            setPage(1);
+          }}
+          pageSize={pageSize}
+          onPageSizeChange={(v) => {
+            setPageSize(v);
+            setPage(1);
+          }}
+        />
         {totalBalance > 0 ? (
           <Text style={styles.total}>Total: ₹{totalBalance.toLocaleString('en-IN')}</Text>
         ) : null}
@@ -130,7 +159,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         </View>
       </View>
     ),
-    [meta.title, startDate, endDate, totalBalance, error, kind],
+    [meta.title, startDate, endDate, draftStart, draftEnd, loading, appClientName, pageSize, totalBalance, error, kind],
   );
 
   return (
@@ -147,7 +176,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         const value = kind === 'bonus' ? item.bonusBalance : item.balance;
         return (
           <View style={styles.row}>
-            <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * PAGE_SIZE + index + 1}</Text>
+            <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * pageSize + index + 1}</Text>
             <Text style={[styles.cell, styles.cellName]} numberOfLines={1}>
               {display(item.name)}
             </Text>

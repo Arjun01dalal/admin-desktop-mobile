@@ -19,6 +19,7 @@ import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 type Row = Record<string, unknown>;
 
@@ -58,8 +59,12 @@ function normalizeList(payload: unknown): Row[] {
 
 export function GameActivityScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate = typeof params.startDate === 'string' ? params.startDate : todayIST();
-  const endDate = typeof params.endDate === 'string' ? params.endDate : todayIST();
+  const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
+  const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
   const lockedSource = typeof params.type === 'string' && params.type;
 
   const [isQtech, setIsQtech] = useState(params.type === 'Qtech');
@@ -112,6 +117,18 @@ export function GameActivityScreen() {
       <Text style={styles.sub}>
         {startDate} → {endDate}
       </Text>
+
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+        }}
+      />
 
       {!lockedSource ? (
         <View style={styles.toggleRow}>

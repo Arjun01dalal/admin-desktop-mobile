@@ -19,6 +19,7 @@ import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 type Row = {
   _id?: string;
@@ -48,11 +49,17 @@ function display(value: unknown): string {
 
 export function TodaysActiveScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate = typeof params.startDate === 'string' ? params.startDate : todayIST();
-  const endDate = typeof params.endDate === 'string' ? params.endDate : todayIST();
+  const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
+  const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
 
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
+  const [appClientName, setAppClientName] = useState('');
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +72,10 @@ export function TodaysActiveScreen() {
     setError(null);
     try {
       const res = await secureApi('ops.activeCustomers', {
-        itemsPerPage: PAGE_SIZE,
+        itemsPerPage: pageSize,
         pageNo: page,
         ...(startDate && endDate ? { startDate, endDate } : {}),
-        filter: {},
+        filter: appClientName ? { clientName: appClientName } : {},
       });
       if (!res.ok) {
         setError(res.message || 'Failed to load todays active users');
@@ -84,7 +91,7 @@ export function TodaysActiveScreen() {
     } finally {
       setLoading(false);
     }
-  }, [endDate, page, startDate]);
+  }, [appClientName, endDate, page, pageSize, startDate]);
 
   useEffect(() => {
     void load();
@@ -97,6 +104,28 @@ export function TodaysActiveScreen() {
         <Text style={styles.sub}>
           {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
         </Text>
+        <DetailFilterBar
+          startDate={draftStart}
+          endDate={draftEnd}
+          loading={loading}
+          onStartDateChange={setDraftStart}
+          onEndDateChange={setDraftEnd}
+          onApply={() => {
+            setStartDate(draftStart);
+            setEndDate(draftEnd);
+            setPage(1);
+          }}
+          appClientName={appClientName}
+          onAppChange={(v) => {
+            setAppClientName(v);
+            setPage(1);
+          }}
+          pageSize={pageSize}
+          onPageSizeChange={(v) => {
+            setPageSize(v);
+            setPage(1);
+          }}
+        />
         {error ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
@@ -114,7 +143,7 @@ export function TodaysActiveScreen() {
         </View>
       </View>
     ),
-    [startDate, endDate, total, error, hideContact],
+    [startDate, endDate, draftStart, draftEnd, loading, appClientName, pageSize, total, error, hideContact],
   );
 
   return (
@@ -129,7 +158,7 @@ export function TodaysActiveScreen() {
       }
       renderItem={({ item, index }) => (
         <View style={styles.row}>
-          <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * PAGE_SIZE + index + 1}</Text>
+          <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * pageSize + index + 1}</Text>
           <Text style={[styles.cell, styles.cellName]} numberOfLines={1}>
             {display(item.name)}
           </Text>

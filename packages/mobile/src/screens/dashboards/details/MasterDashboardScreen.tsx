@@ -18,6 +18,7 @@ import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
 import type { ProviderCardModel } from '../../../dashboards/types';
 import { ProviderCard } from '../../../dashboards/ui/ProviderCard';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -45,8 +46,12 @@ type MasterBundle = {
 
 export function MasterDashboardScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate = (params.startDate as string) || todayIST();
-  const endDate = (params.endDate as string) || todayIST();
+  const initialStart = (params.startDate as string) || todayIST();
+  const initialEnd = (params.endDate as string) || todayIST();
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
 
   const [bundle, setBundle] = useState<MasterBundle | null>(null);
   const [loading, setLoading] = useState(false);
@@ -182,6 +187,18 @@ export function MasterDashboardScreen() {
       <Text style={styles.dates}>
         {startDate} → {endDate}
       </Text>
+
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+        }}
+      />
 
       {error ? (
         <View style={styles.errorBox}>
