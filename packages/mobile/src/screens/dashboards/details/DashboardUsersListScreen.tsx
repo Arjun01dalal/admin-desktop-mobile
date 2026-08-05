@@ -126,6 +126,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         return;
       }
       const paged = asPaged<UserRow>(res.data);
+      setSelected(null);
       setRows(paged.rows);
       setTotalPages(Math.max(1, paged.totalPages || 1));
 

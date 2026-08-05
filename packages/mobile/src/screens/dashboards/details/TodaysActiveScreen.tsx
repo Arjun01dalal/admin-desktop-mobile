@@ -101,6 +101,7 @@ export function TodaysActiveScreen() {
       const raw = res.data as
         | { user?: Row[]; totalPages?: number; count?: number }
         | undefined;
+      setSelected(null);
       setRows(Array.isArray(raw?.user) ? raw!.user! : []);
       setTotalPages(Math.max(1, Number(raw?.totalPages ?? 1) || 1));
       setTotal(Number(raw?.count ?? 0) || 0);

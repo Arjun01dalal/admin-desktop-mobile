@@ -154,6 +154,7 @@ export function NewRegistersScreen() {
       const list: Row[] = Array.isArray(res.data)
         ? (res.data as Row[])
         : nested.items || nested.users || data.items || data.users || [];
+      setSelected(null);
       setRows(list);
       setTotal(
         Number(nested.total ?? nested.count ?? data.total ?? data.count ?? 0) || list.length,
