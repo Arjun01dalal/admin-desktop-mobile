@@ -80,12 +80,15 @@ export function useAuth(): AuthState {
   return ctx;
 }
 
+/** Mirrors desktop AddressInfo — the API's verify-otp expects `address` to be an OBJECT. */
+export type AddressInfo = Record<string, unknown>;
+
 export type OtpLocation = {
   lat: string;
   long: string;
   state: string;
   city: string;
-  address: string;
+  address: AddressInfo;
 };
 
 /** Get device location + reverse-geocoded address (uses API getAddress like desktop). */
@@ -100,31 +103,32 @@ export async function resolveLocation(): Promise<OtpLocation> {
 
   let state = '';
   let city = '';
-  let address = '';
+  let address: AddressInfo = {};
   try {
     const places = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
     const p = places[0];
     if (p) {
       state = p.region ?? '';
       city = p.city ?? p.district ?? '';
-      address = [p.name, p.street, p.city, p.region, p.postalCode]
-        .filter(Boolean)
-        .join(', ');
     }
   } catch {
     /* fall through to API address resolution */
   }
 
-  if (!state || !city) {
-    const res = await secureApi<{ state?: string; city?: string; address?: string }>(
-      'auth.getAddress',
-      { lat, lng },
-    );
-    if (res.ok && res.data) {
-      state = state || res.data.state || '';
-      city = city || res.data.city || '';
-      address = address || res.data.address || '';
+  // Desktop sends the getAddress API result object as `address` — the API
+  // rejects string addresses ("address must be of type object").
+  try {
+    const res = await secureApi<Record<string, unknown>>('auth.getAddress', { lat, lng });
+    if (res.ok && res.data && typeof res.data === 'object') {
+      address = res.data as AddressInfo;
+      state = state || (address.state as string) || '';
+      city = city || (address.city as string) || '';
     }
+  } catch {
+    /* keep local geocode values */
+  }
+  if (!address || Object.keys(address).length === 0) {
+    address = { state, city, source: 'device' };
   }
 
   return { lat: String(lat), long: String(lng), state, city, address };

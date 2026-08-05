@@ -48,7 +48,16 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
       const loc = await resolveLocation();
       const res = await secureApi<{ token?: string; payload?: AuthUser } & AuthUser>(
         'auth.verifyOtp',
-        { mobile, otp, state: loc.state, city: loc.city, lat: loc.lat, long: loc.long, address: loc.address },
+        {
+          mobile,
+          // Desktop sends OTP as an integer.
+          otp: parseInt(otp, 10),
+          state: loc.state || 'Madhya Pradesh',
+          city: loc.city || 'Jabalpur',
+          lat: loc.lat,
+          long: loc.long,
+          address: loc.address,
+        },
         null,
       );
       if (!res.ok) {
