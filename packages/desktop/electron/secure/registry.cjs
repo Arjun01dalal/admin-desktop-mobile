@@ -1333,6 +1333,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'analytics.userAnalytics': {
+    method: 'POST',
+    path: '/User/analytics',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'profitLoss.depositWithdrawal': {
     method: 'POST',
     path: '/transaction/deposit-withdrawal',

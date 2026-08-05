@@ -16,6 +16,7 @@ import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { OpsDashboardScreen } from '../screens/dashboards/OpsDashboardScreen';
 import { RiskAnalysisScreen } from '../screens/dashboards/RiskAnalysisScreen';
+import { AnalysisScreen } from '../screens/dashboards/AnalysisScreen';
 import { colors } from '../theme';
 
 const Drawer = createDrawerNavigator();
@@ -30,6 +31,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/vip-dashboard': (() => <OpsDashboardScreen mode="vip" />) as AnyScreen,
   '/combined-dashboard': (() => <OpsDashboardScreen mode="combined" />) as AnyScreen,
   '/risk-dashboard': RiskAnalysisScreen as AnyScreen,
+  '/analytics': AnalysisScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {
