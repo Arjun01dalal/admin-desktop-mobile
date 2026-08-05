@@ -18,7 +18,7 @@ import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
-import { DetailFilterBar } from './DetailFilterBar';
+import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
 
 type Kind = 'balance' | 'bonus' | 'registered';
 
@@ -64,6 +64,12 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [appClientName, setAppClientName] = useState('');
+  const [searchField, setSearchField] = useState<SearchFieldKey>('name');
+  const [searchDraft, setSearchDraft] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState<{ field: SearchFieldKey; text: string }>({
+    field: 'name',
+    text: '',
+  });
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -76,12 +82,15 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
     setLoading(true);
     setError(null);
     try {
+      const filter: Record<string, unknown> = {};
+      if (appClientName) filter.clientName = appClientName;
+      if (appliedSearch.text.trim()) filter[appliedSearch.field] = appliedSearch.text.trim();
       const payload: Record<string, unknown> = {
         startDate,
         endDate,
         itemsPerPage: pageSize,
         pageNo: page,
-        filter: appClientName ? { clientName: appClientName } : {},
+        filter,
       };
       if (meta.decreasing) payload.decreasing = true;
 
@@ -105,7 +114,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
     } finally {
       setLoading(false);
     }
-  }, [appClientName, endDate, meta.action, meta.decreasing, page, pageSize, startDate]);
+  }, [appClientName, appliedSearch, endDate, meta.action, meta.decreasing, page, pageSize, startDate]);
 
   useEffect(() => {
     void load();
@@ -139,6 +148,14 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
             setPageSize(v);
             setPage(1);
           }}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          searchText={searchDraft}
+          onSearchTextChange={setSearchDraft}
+          onSearchSubmit={() => {
+            setAppliedSearch({ field: searchField, text: searchDraft });
+            setPage(1);
+          }}
         />
         {totalBalance > 0 ? (
           <Text style={styles.total}>Total: ₹{totalBalance.toLocaleString('en-IN')}</Text>
@@ -159,7 +176,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         </View>
       </View>
     ),
-    [meta.title, startDate, endDate, draftStart, draftEnd, loading, appClientName, pageSize, totalBalance, error, kind],
+    [meta.title, startDate, endDate, draftStart, draftEnd, loading, appClientName, searchField, searchDraft, pageSize, totalBalance, error, kind],
   );
 
   return (

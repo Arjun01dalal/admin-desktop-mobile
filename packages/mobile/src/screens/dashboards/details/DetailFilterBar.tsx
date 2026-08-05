@@ -22,6 +22,14 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /** Mirrors desktop ITEMS_PER_PAGE_OPTIONS (subset that makes sense on mobile). */
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200] as const;
 
+/** Search fields mirroring desktop's per-column text filters (mobile subset). */
+export const SEARCH_FIELDS = [
+  { key: 'name', label: 'Name' },
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'city', label: 'City' },
+] as const;
+export type SearchFieldKey = (typeof SEARCH_FIELDS)[number]['key'];
+
 type Props = {
   startDate: string;
   endDate: string;
@@ -35,6 +43,12 @@ type Props = {
   /** When provided, renders per-page chips. */
   pageSize?: number;
   onPageSizeChange?: (v: number) => void;
+  /** When provided, renders the search row (field chips + text input + Search). */
+  searchField?: SearchFieldKey;
+  onSearchFieldChange?: (v: SearchFieldKey) => void;
+  searchText?: string;
+  onSearchTextChange?: (v: string) => void;
+  onSearchSubmit?: () => void;
 };
 
 function Chip({
@@ -69,6 +83,11 @@ export function DetailFilterBar(props: Props) {
     onAppChange,
     pageSize,
     onPageSizeChange,
+    searchField,
+    onSearchFieldChange,
+    searchText,
+    onSearchTextChange,
+    onSearchSubmit,
   } = props;
 
   const datesValid = DATE_RE.test(startDate) && DATE_RE.test(endDate);
@@ -112,6 +131,43 @@ export function DetailFilterBar(props: Props) {
           )}
         </TouchableOpacity>
       </View>
+
+      {onSearchTextChange && onSearchSubmit ? (
+        <View style={styles.searchWrap}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Search by</Text>
+            {SEARCH_FIELDS.map((f) => (
+              <Chip
+                key={f.key}
+                label={f.label}
+                active={searchField === f.key}
+                onPress={() => onSearchFieldChange?.(f.key)}
+              />
+            ))}
+          </View>
+          <View style={styles.searchRow}>
+            <TextInput
+              style={[styles.dateInput, styles.searchInput]}
+              value={searchText ?? ''}
+              onChangeText={onSearchTextChange}
+              onSubmitEditing={onSearchSubmit}
+              returnKeyType="search"
+              placeholder={`Search ${searchField ?? 'name'}…`}
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
+            />
+            <TouchableOpacity
+              style={[styles.applyBtn, loading && styles.btnDisabled]}
+              onPress={onSearchSubmit}
+              disabled={loading}
+            >
+              <Text style={styles.applyText}>Search</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
 
       {onAppChange ? (
         <ScrollView
@@ -185,7 +241,10 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   applyText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  row: { gap: spacing(2), alignItems: 'center' },
+  row: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
+  searchWrap: { gap: spacing(2) },
+  searchRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
+  searchInput: { flex: 1 },
   rowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   chip: {
     paddingHorizontal: spacing(3),

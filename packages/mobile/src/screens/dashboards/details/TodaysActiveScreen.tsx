@@ -19,7 +19,7 @@ import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
-import { DetailFilterBar } from './DetailFilterBar';
+import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
 
 type Row = {
   _id?: string;
@@ -59,6 +59,12 @@ export function TodaysActiveScreen() {
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [appClientName, setAppClientName] = useState('');
+  const [searchField, setSearchField] = useState<SearchFieldKey>('name');
+  const [searchDraft, setSearchDraft] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState<{ field: SearchFieldKey; text: string }>({
+    field: 'name',
+    text: '',
+  });
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -71,11 +77,14 @@ export function TodaysActiveScreen() {
     setLoading(true);
     setError(null);
     try {
+      const filter: Record<string, unknown> = {};
+      if (appClientName) filter.clientName = appClientName;
+      if (appliedSearch.text.trim()) filter[appliedSearch.field] = appliedSearch.text.trim();
       const res = await secureApi('ops.activeCustomers', {
         itemsPerPage: pageSize,
         pageNo: page,
         ...(startDate && endDate ? { startDate, endDate } : {}),
-        filter: appClientName ? { clientName: appClientName } : {},
+        filter,
       });
       if (!res.ok) {
         setError(res.message || 'Failed to load todays active users');
@@ -91,7 +100,7 @@ export function TodaysActiveScreen() {
     } finally {
       setLoading(false);
     }
-  }, [appClientName, endDate, page, pageSize, startDate]);
+  }, [appClientName, appliedSearch, endDate, page, pageSize, startDate]);
 
   useEffect(() => {
     void load();
@@ -125,6 +134,14 @@ export function TodaysActiveScreen() {
             setPageSize(v);
             setPage(1);
           }}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          searchText={searchDraft}
+          onSearchTextChange={setSearchDraft}
+          onSearchSubmit={() => {
+            setAppliedSearch({ field: searchField, text: searchDraft });
+            setPage(1);
+          }}
         />
         {error ? (
           <View style={styles.errorBox}>
@@ -143,7 +160,7 @@ export function TodaysActiveScreen() {
         </View>
       </View>
     ),
-    [startDate, endDate, draftStart, draftEnd, loading, appClientName, pageSize, total, error, hideContact],
+    [startDate, endDate, draftStart, draftEnd, loading, appClientName, searchField, searchDraft, pageSize, total, error, hideContact],
   );
 
   return (
