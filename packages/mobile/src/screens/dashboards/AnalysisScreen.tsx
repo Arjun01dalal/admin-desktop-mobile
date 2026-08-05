@@ -4,13 +4,14 @@
  * structure: title, error/empty states, pull-to-refresh, stat cards for
  * scalar fields and tables for arrays of objects.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -97,16 +98,40 @@ function StatGrid({ stats }: { stats: Array<[string, unknown]> }) {
   );
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function currentMonthIST(): { year: number; month: number } {
+  const now = new Date(Date.now() + 5.5 * 3600 * 1000);
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+}
+
 export function AnalysisScreen() {
   const isFocused = useIsFocused();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState<Row | null>(null);
+  const [ym, setYm] = useState(currentMonthIST);
+
+  /** Year & Month value sent to the API, e.g. "2026-08" (matches the web UI's month input). */
+  const dateParam = useMemo(
+    () => `${ym.year}-${String(ym.month).padStart(2, '0')}`,
+    [ym],
+  );
+
+  const shiftMonth = useCallback((delta: number) => {
+    setYm((prev) => {
+      const idx = prev.year * 12 + (prev.month - 1) + delta;
+      return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await secureApi('analytics.userAnalytics', {});
+      const res = await secureApi('analytics.userAnalytics', { date: dateParam });
       if (!res.ok || res.success === false) {
         setError(res.message || 'Failed to load analytics');
         return;
@@ -123,7 +148,7 @@ export function AnalysisScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateParam]);
 
   useEffect(() => {
     if (isFocused) void load();
@@ -147,6 +172,27 @@ export function AnalysisScreen() {
       }
     >
       <Text style={styles.title}>Analytics</Text>
+
+      {/* Year & Month picker (same input the web UI uses) */}
+      <View style={styles.monthBar}>
+        <TouchableOpacity
+          style={styles.monthBtn}
+          onPress={() => shiftMonth(-1)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.monthBtnText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.monthLabel}>
+          {MONTH_NAMES[ym.month - 1]} {ym.year}
+        </Text>
+        <TouchableOpacity
+          style={styles.monthBtn}
+          onPress={() => shiftMonth(1)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.monthBtnText}>›</Text>
+        </TouchableOpacity>
+      </View>
 
       {error ? (
         <View style={styles.errorBox}>
@@ -223,6 +269,24 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   loading: { paddingVertical: spacing(8), alignItems: 'center' },
+  monthBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1.5),
+    marginBottom: spacing(3),
+  },
+  monthBtn: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1),
+  },
+  monthBtnText: { color: colors.primary, fontSize: 20, fontWeight: '700' },
+  monthLabel: { color: colors.foreground, fontSize: 15, fontWeight: '700' },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
