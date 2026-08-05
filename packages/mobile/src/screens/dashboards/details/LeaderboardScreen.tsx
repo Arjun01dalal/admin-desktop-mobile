@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { colors, radius, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
@@ -62,6 +62,7 @@ const MAIN_KEYS = new Set(['rank', 'name', 'city', 'deposit']);
 
 export function LeaderboardScreen() {
   const isFocused = useIsFocused();
+  const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -253,6 +254,21 @@ export function LeaderboardScreen() {
             : []
         }
         onClose={() => setSelected(null)}
+        action={
+          selected?.row._id
+            ? {
+                label: `View Customers (${selected.row.customerCount ?? 0})`,
+                onPress: () => {
+                  const row = selected.row;
+                  setSelected(null);
+                  navigation.navigate('/leaderboardCustomerCount', {
+                    id: row._id,
+                    name: row.name || '',
+                  });
+                },
+              }
+            : undefined
+        }
       />
 
       {/* City edit modal (desktop: pencil icon next to City) */}

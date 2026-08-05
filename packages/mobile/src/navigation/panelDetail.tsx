@@ -15,6 +15,7 @@ import { GameActivityScreen } from '../screens/dashboards/details/GameActivitySc
 import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/PlayerActivityDetailsScreen';
 import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameActivityDetailsScreen';
 import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstructGamesScreen';
+import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
 
 export type PanelDetailParams = Record<string, unknown>;
 
@@ -112,6 +113,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/betConstructGamesList',
     title: 'BetConstruct Games',
     Component: BetConstructGamesScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/leaderboardCustomerCount',
+    title: 'Caller Customers',
+    Component: LeaderboardCustomerListScreen as PanelDetailRoute['Component'],
   },
 ];
 

@@ -17,14 +17,18 @@ import { colors, radius, spacing } from '../../../theme';
 
 export type SheetField = { label: string; value: string; color?: string };
 
+/** Optional action button rendered at the bottom of the sheet (e.g. drill-downs). */
+export type SheetAction = { label: string; onPress: () => void };
+
 type Props = {
   visible: boolean;
   title: string;
   fields: SheetField[];
   onClose: () => void;
+  action?: SheetAction;
 };
 
-export function RowDetailSheet({ visible, title, fields, onClose }: Props) {
+export function RowDetailSheet({ visible, title, fields, onClose, action }: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -54,6 +58,11 @@ export function RowDetailSheet({ visible, title, fields, onClose }: Props) {
                 </Text>
               </View>
             ))}
+            {action ? (
+              <TouchableOpacity style={styles.actionBtn} onPress={action.onPress}>
+                <Text style={styles.actionText}>{action.label}</Text>
+              </TouchableOpacity>
+            ) : null}
           </ScrollView>
         </View>
       </View>
@@ -109,4 +118,12 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+  actionBtn: {
+    marginTop: spacing(4),
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(3),
+    alignItems: 'center',
+  },
+  actionText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
 });
