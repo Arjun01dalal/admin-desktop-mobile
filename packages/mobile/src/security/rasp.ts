@@ -33,6 +33,8 @@ export type ThreatHandler = (kind: ThreatKind) => void;
  * fire on every launch. `isProd: false` (dev) relaxes signing checks so the
  * app is testable in Expo dev builds.
  */
+export const RASP_IS_PROD = process.env.EXPO_PUBLIC_RASP_PROD === '1';
+
 export const raspConfig = {
   androidConfig: {
     packageName: process.env.EXPO_PUBLIC_ANDROID_PACKAGE ?? 'com.astro.admin',
@@ -40,14 +42,16 @@ export const raspConfig = {
       .split(',')
       .map((s: string) => s.trim())
       .filter(Boolean),
-    supportedStores: [] as string[],
+    supportedAlternativeStores: [] as string[],
   },
   iosConfig: {
-    appBundleIds: [process.env.EXPO_PUBLIC_IOS_BUNDLE_ID ?? 'com.astro.admin'],
-    teamId: process.env.EXPO_PUBLIC_IOS_TEAM_ID ?? '',
+    appBundleId: process.env.EXPO_PUBLIC_IOS_BUNDLE_ID ?? 'com.astro.admin',
+    appTeamId: process.env.EXPO_PUBLIC_IOS_TEAM_ID ?? '',
   },
   watcherMail: process.env.EXPO_PUBLIC_RASP_MAIL ?? 'security@astro.local',
-  isProd: process.env.EXPO_PUBLIC_RASP_PROD === '1',
+  isProd: RASP_IS_PROD,
+  // Terminate the app if the native protection layer is bypassed/hooked.
+  killOnBypass: RASP_IS_PROD,
 };
 
 export function isRaspSupported(): boolean {

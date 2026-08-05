@@ -1,19 +1,20 @@
 /**
- * useSecurity — wires all runtime protections into one hook:
- *  - screenshot / screen-recording block for the whole session
- *  - freeRASP: root/jailbreak, hooking, emulator, debugger, tamper, system VPN
- *  - NetInfo fallback VPN detection (belt-and-braces on Android)
+ * useSecurity — aggregates all runtime protections:
+ *  - screenshot / screen-recording block for the whole app session
+ *  - freeRASP (native): root/jailbreak, hooking, emulator, debugger, tamper, VPN
+ *  - NetInfo VPN source (native): independent, toggle-able VPN signal
  *
- * On web preview everything degrades to a no-op so the UI still renders.
+ * On web everything degrades to a no-op so the UI still renders.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
-import { enableScreenshotBlock } from './screenshot';
-import { raspConfig, isRaspSupported, type ThreatKind } from './rasp';
+import { enableScreenshotBlock, disableScreenshotBlock } from './screenshot';
+import { useRaspThreats } from './raspGuard';
+import type { ThreatKind } from './rasp';
 
 export type SecurityStatus = {
   threats: ThreatKind[];
-  /** True when a blocking threat (root/hook/tamper/VPN) is active. */
+  /** True when a blocking threat (root/hook/tamper/emulator/VPN) is active. */
   blocked: boolean;
 };
 
@@ -25,92 +26,57 @@ const BLOCKING: ThreatKind[] = [
   'systemVPN',
 ];
 
-export function useSecurity(): SecurityStatus {
-  const [threats, setThreats] = useState<ThreatKind[]>([]);
-  const raised = useRef<Set<ThreatKind>>(new Set());
+/** Independent NetInfo VPN detector (native only). Toggles on/off with the network. */
+function useNetInfoVpn(): boolean {
+  const [vpn, setVpn] = useState(false);
 
-  const raise = (kind: ThreatKind) => {
-    if (raised.current.has(kind)) return;
-    raised.current.add(kind);
-    setThreats(Array.from(raised.current));
-  };
-  const clear = (kind: ThreatKind) => {
-    if (!raised.current.delete(kind)) return;
-    setThreats(Array.from(raised.current));
-  };
-
-  // Screenshot block — enable now and re-assert on every foreground.
   useEffect(() => {
-    void enableScreenshotBlock();
-    const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void enableScreenshotBlock();
-    });
-    return () => sub.remove();
-  }, []);
-
-  // freeRASP — dynamically required so web bundling never pulls native code.
-  useEffect(() => {
-    if (!isRaspSupported()) return;
+    if (Platform.OS === 'web') return;
+    let unsubscribe: (() => void) | undefined;
     let cancelled = false;
     void (async () => {
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const mod = require('freerasp-react-native');
-        const talsec = mod.default ?? mod;
-        if (cancelled) return;
-        const actions = {
-          privilegedAccess: () => raise('privilegedAccess'),
-          hooks: () => raise('hooks'),
-          debug: () => raise('debug'),
-          simulator: () => raise('simulator'),
-          appIntegrity: () => raise('appIntegrity'),
-          unofficialStore: () => raise('unofficialStore'),
-          deviceBinding: () => raise('deviceBinding'),
-          secureHardwareNotAvailable: () => {},
-          systemVPN: () => raise('systemVPN'),
-          passcode: () => {},
-          obfuscationIssues: () => raise('obfuscationIssues'),
-          devMode: () => raise('devMode'),
-          adbEnabled: () => raise('adbEnabled'),
-          screenshot: () => raise('screenshot'),
-          screenRecording: () => raise('screenRecording'),
-        };
-        if (typeof talsec.start === 'function') {
-          await talsec.start(raspConfig, actions);
-        } else if (typeof talsec.addToSecurityReport === 'function') {
-          await talsec.start(raspConfig, actions);
-        }
-      } catch {
-        /* RASP unavailable (e.g. Expo Go) — fail open in dev, closed in prod build */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // NetInfo VPN fallback (Android exposes vpn via connection type on some devices).
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    let sub: { (): void } | undefined;
-    void (async () => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const NetInfo = require('@react-native-community/netinfo').default;
-        sub = NetInfo.addEventListener((state: any) => {
-          const isVpn =
-            state?.type === 'vpn' ||
-            state?.details?.subtype === 'VPN' ||
-            state?.details?.isConnectionExpensive === undefined && state?.type === 'other' && state?.isInternetReachable && Platform.OS === 'ios';
-          if (isVpn) raise('systemVPN');
-          else clear('systemVPN');
+        if (cancelled) return;
+        unsubscribe = NetInfo.addEventListener((state: { type?: string }) => {
+          // Only Android reliably reports a dedicated 'vpn' connection type.
+          // iOS VPN detection is left to freeRASP to avoid false positives.
+          setVpn(state?.type === 'vpn');
         });
       } catch {
         /* NetInfo unavailable */
       }
     })();
-    return () => sub?.();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
+
+  return vpn;
+}
+
+export function useSecurity(): SecurityStatus {
+  // Screenshot block — app-wide policy; enable now, re-assert on foreground,
+  // and release on unmount.
+  useEffect(() => {
+    void enableScreenshotBlock();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void enableScreenshotBlock();
+    });
+    return () => {
+      sub.remove();
+      void disableScreenshotBlock();
+    };
+  }, []);
+
+  const { threats: raspThreats } = useRaspThreats();
+  const netVpn = useNetInfoVpn();
+
+  const threats = netVpn && !raspThreats.includes('systemVPN')
+    ? [...raspThreats, 'systemVPN' as ThreatKind]
+    : raspThreats;
 
   const blocked = threats.some((t) => BLOCKING.includes(t));
   return { threats, blocked };

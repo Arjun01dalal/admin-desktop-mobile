@@ -50,9 +50,11 @@ export function useLiveLocation(enabled: boolean): {
         setDenied(true);
         return;
       }
+      if (cancelled) return;
       setDenied(false);
       await read();
-      watcher.current = await Location.watchPositionAsync(
+      if (cancelled) return;
+      const sub = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.Balanced, timeInterval: 30000, distanceInterval: 25 },
         (pos) => {
           if (cancelled) return;
@@ -64,6 +66,12 @@ export function useLiveLocation(enabled: boolean): {
           });
         },
       );
+      // If cleanup ran while awaiting, remove the just-created watcher.
+      if (cancelled) {
+        sub.remove();
+        return;
+      }
+      watcher.current = sub;
     })();
 
     const appSub = AppState.addEventListener('change', (s) => {

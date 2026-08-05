@@ -13,5 +13,8 @@ The user's repo (remote `arjun` = Arjun01dalal/admin-desktop-mobile, mirrored to
 **How to apply:** After every `git pull` from arjun/main, check the override survives, `npm install` at repo root, and restart the workflow.
 
 ## Single-React rule for packages/mobile
-The mobile app (Expo/RN) needs React 19; desktop needs React 18. In npm workspaces both hoist to root, and `react-native-web` (hoisted to root) then pulls React 18 → web crashes with "Objects are not valid as a React child" / "Cannot read properties of undefined (reading 'ReactCurrentDispatcher')".
-**Fix:** `packages/mobile/metro.config.js` has a `resolver.resolveRequest` that forces `react`, `react-dom`, `react-native` **and their subpaths** (e.g. react-dom/client) to resolve from `packages/mobile/node_modules`. Never remove it. Env values for mobile come from `packages/mobile/.env` (gitignored) via `node packages/mobile/scripts/gen-env.cjs`.
+The mobile app (Expo/RN) needs React 19 while desktop needs React 18; in npm workspaces both hoist to root, and `react-native-web` (root) then pulls React 18 → web crashes ("Objects are not valid as a React child" / "ReactCurrentDispatcher" undefined).
+**Why:** two React copies in one bundle. **How to apply:** the mobile Metro config force-resolves react/react-dom/react-native (and subpaths) to mobile's own node_modules; if you ever bump RN/React versions, re-verify both web and native bundles still start.
+
+## freeRASP SDK contract (native security)
+freerasp-react-native v4 uses the `useFreeRasp(config, actions)` hook (there is no `start()`), and config fields are singular iOS `appBundleId`/`appTeamId` + Android `supportedAlternativeStores`. Native-only code must live in `*.native.ts` files with a no-op default sibling so web bundling never pulls the native module. Root/hook/tamper threats should be sticky (never un-flagged); VPN can toggle.
