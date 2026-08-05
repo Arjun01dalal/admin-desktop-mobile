@@ -34,9 +34,18 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+
+/** Columns kept in the list; everything else shows in the bottom sheet. */
+const MAIN_KEYS = new Set(['idx', 'provider', 'betAmount', 'ggr']);
 
 function fmt(n: number): string {
   return floorNum(n).toLocaleString('en-IN');
+}
+
+/** Strip sort arrows from column labels for the detail sheet. */
+function cleanLabel(label: string): string {
+  return label.replace(/[⬍⬆⬇]/g, '').trim();
 }
 
 export function GameActivityScreen() {
@@ -55,6 +64,7 @@ export function GameActivityScreen() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ActivityRow[]>([]);
   const [sort, setSort] = useState<SortConfig | null>(null);
+  const [selected, setSelected] = useState<ActivityRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -247,11 +257,30 @@ export function GameActivityScreen() {
       ) : null}
 
       <DataTable
-        columns={columns}
+        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
         rows={sorted}
         keyFor={(r, i) => String(r.providerId || providerLabel(r) || i)}
         loading={loading}
         footer={footer}
+        onRowPress={(row) => setSelected(row)}
+        hint="Tap a row to see all details · Tap a provider name for its games"
+      />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? providerLabel(selected) : ''}
+        fields={
+          selected
+            ? columns
+                .filter((c) => c.key !== 'idx')
+                .map<SheetField>((c) => ({
+                  label: cleanLabel(c.label),
+                  value: c.render(selected, 0),
+                  color: c.color?.(selected),
+                }))
+            : []
+        }
+        onClose={() => setSelected(null)}
       />
     </ScrollView>
   );

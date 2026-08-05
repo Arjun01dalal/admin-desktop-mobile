@@ -18,6 +18,10 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+
+/** Columns kept in the list; everything else shows in the bottom sheet. */
+const MAIN_KEYS = new Set(['idx', 'gameId', 'totalBetAmount', 'ggr']);
 
 type GameRow = {
   gameId?: string;
@@ -78,6 +82,7 @@ export function BetConstructGamesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<GameRow[]>([]);
   const [summary, setSummary] = useState<Summary>({});
+  const [selected, setSelected] = useState<GameRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -173,11 +178,30 @@ export function BetConstructGamesScreen() {
       </View>
 
       <DataTable
-        columns={columns}
+        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
         rows={rows}
         keyFor={(r, i) => String(r.gameId ?? i)}
         loading={loading}
         emptyMessage="No BetConstruct game data"
+        onRowPress={(row) => setSelected(row)}
+        hint="Tap a row to see all details"
+      />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? display(selected.gameId) : ''}
+        fields={
+          selected
+            ? columns
+                .filter((c) => c.key !== 'idx')
+                .map<SheetField>((c) => ({
+                  label: c.label,
+                  value: c.render(selected, 0),
+                  color: c.color?.(selected),
+                }))
+            : []
+        }
+        onClose={() => setSelected(null)}
       />
     </ScrollView>
   );

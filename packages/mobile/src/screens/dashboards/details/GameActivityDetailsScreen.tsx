@@ -3,15 +3,19 @@
  * Port of desktop GameActivityDetailsPage. Receives the provider row
  * (JSON-encoded) and isQtech flag as route params from GameActivityScreen.
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { providerLabel, type ActivityRow } from '../../../dashboards/activityUtils';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type GameRow = Record<string, unknown>;
+
+/** Columns kept in the list; everything else shows in the bottom sheet. */
+const MAIN_KEYS = new Set(['idx', 'gameName', 'betAmount', 'winAmount']);
 
 function gameName(game: GameRow): string {
   return String(game.Name || game.name || game.gameId || '-');
@@ -26,6 +30,7 @@ function fmt(value: unknown): string {
 export function GameActivityDetailsScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const isQtech = Boolean(params.isQtech);
+  const [selected, setSelected] = useState<GameRow | null>(null);
 
   const provider = useMemo<ActivityRow | null>(() => {
     if (typeof params.row !== 'string') return null;
@@ -105,10 +110,29 @@ export function GameActivityDetailsScreen() {
       <Text style={styles.title}>{providerLabel(provider)} — Games</Text>
 
       <DataTable
-        columns={columns}
+        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
         rows={games}
         keyFor={(r, i) => String(r.gameId || r.Name || i)}
         emptyMessage="No games for this provider"
+        onRowPress={(row) => setSelected(row)}
+        hint="Tap a row to see all details"
+      />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? gameName(selected) : ''}
+        fields={
+          selected
+            ? columns
+                .filter((c) => c.key !== 'idx')
+                .map<SheetField>((c) => ({
+                  label: c.label,
+                  value: c.render(selected, 0),
+                  color: c.color?.(selected),
+                }))
+            : []
+        }
+        onClose={() => setSelected(null)}
       />
     </ScrollView>
   );
