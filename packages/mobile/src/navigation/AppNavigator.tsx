@@ -12,13 +12,21 @@ import { canAccessNavItem } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
+import { OpsDashboardScreen } from '../screens/dashboards/OpsDashboardScreen';
+import { RiskAnalysisScreen } from '../screens/dashboards/RiskAnalysisScreen';
 import { colors } from '../theme';
 
 const Drawer = createDrawerNavigator();
 
+type AnyScreen = React.ComponentType<Record<string, unknown>>;
+
 /** Map desktop route paths to implemented mobile screens. Unlisted paths get a placeholder. */
-const IMPLEMENTED: Record<string, React.ComponentType<Record<string, unknown>>> = {
-  '/welcome': WelcomeScreen as React.ComponentType<Record<string, unknown>>,
+const IMPLEMENTED: Record<string, AnyScreen> = {
+  '/welcome': WelcomeScreen as AnyScreen,
+  '/dashboard': (() => <OpsDashboardScreen mode="main" />) as AnyScreen,
+  '/vip-dashboard': (() => <OpsDashboardScreen mode="vip" />) as AnyScreen,
+  '/combined-dashboard': (() => <OpsDashboardScreen mode="combined" />) as AnyScreen,
+  '/risk-dashboard': RiskAnalysisScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {

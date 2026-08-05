@@ -1,0 +1,223 @@
+/**
+ * Shared shell for Dashboard / VIP Dashboard / Combined Dashboard.
+ * Port of desktop OpsDashboardPage — mode changes title, app list,
+ * KPI visibility, and provider card subset.
+ */
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { CLIENT_NAMES } from '@astro/shared';
+import { colors, spacing } from '../../theme';
+import { buildKpiItems } from '../../dashboards/buildKpiItems';
+import { buildProviderCards } from '../../dashboards/buildProviderCards';
+import { VIP_CLIENT_NAMES } from '../../dashboards/constants';
+import type { DashboardFilters, DashboardMode, ProviderFilter } from '../../dashboards/types';
+import { useOpsDashboardData } from '../../dashboards/useOpsDashboardData';
+import { FilterBar } from '../../dashboards/ui/FilterBar';
+import { KpiGrid } from '../../dashboards/ui/KpiGrid';
+import { ProviderCard } from '../../dashboards/ui/ProviderCard';
+import { todayIST } from '../../utils/dates';
+
+const TITLES: Record<DashboardMode, { title: string; description: string }> = {
+  main: {
+    title: 'Dashboard',
+    description: 'Ops KPIs and provider GGR for the selected date range.',
+  },
+  vip: {
+    title: 'VIP Dashboard',
+    description: 'VIP provider performance (Fairbets VIP apps).',
+  },
+  combined: {
+    title: 'Combined Dashboard',
+    description: 'Aggregated provider metrics across platforms.',
+  },
+};
+
+export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
+  const meta = TITLES[mode];
+
+  const t = todayIST();
+  const [startDate, setStartDate] = useState(t);
+  const [endDate, setEndDate] = useState(t);
+  const [appClientName, setAppClientName] = useState('');
+  const [filterBy, setFilterBy] = useState<ProviderFilter>('All');
+  const [applied, setApplied] = useState<DashboardFilters>({
+    startDate: t,
+    endDate: t,
+    appClientName: '',
+    filterBy: 'All',
+  });
+
+  const apply = useCallback(
+    () => setApplied({ startDate, endDate, appClientName, filterBy }),
+    [startDate, endDate, appClientName, filterBy],
+  );
+  const clearAll = useCallback(() => {
+    const d = todayIST();
+    setStartDate(d);
+    setEndDate(d);
+    setAppClientName('');
+    setFilterBy('All');
+    setApplied({ startDate: d, endDate: d, appClientName: '', filterBy: 'All' });
+  }, []);
+
+  const { bundle, loading, error, reload, reloadLudo } = useOpsDashboardData(
+    mode,
+    applied,
+  );
+
+  const [selectedLudoGame, setSelectedLudoGame] = useState('All');
+  const [selectedIndianDiva, setSelectedIndianDiva] = useState('All');
+  const [selectedPlutus, setSelectedPlutus] = useState('All');
+
+  const appOptions =
+    mode === 'vip' ? VIP_CLIENT_NAMES : (CLIENT_NAMES as readonly string[]);
+
+  const kpiItems = useMemo(
+    () => buildKpiItems(mode, bundle, applied.startDate, applied.endDate, todayIST()),
+    [mode, bundle, applied.startDate, applied.endDate],
+  );
+
+  const providerCards = useMemo(
+    () =>
+      buildProviderCards(
+        mode,
+        bundle,
+        loading,
+        {
+          selectedLudoGame,
+          selectedIndianDiva,
+          selectedPlutus,
+          onLudoGameChange: (value) => {
+            setSelectedLudoGame(value);
+            void reloadLudo(value);
+          },
+          onIndianDivaChange: setSelectedIndianDiva,
+          onPlutusChange: setSelectedPlutus,
+        },
+        {
+          startDate: applied.startDate,
+          endDate: applied.endDate,
+          appClientName: applied.appClientName,
+        },
+      ),
+    [
+      mode,
+      bundle,
+      loading,
+      selectedLudoGame,
+      selectedIndianDiva,
+      selectedPlutus,
+      reloadLudo,
+      applied.startDate,
+      applied.endDate,
+      applied.appClientName,
+    ],
+  );
+
+  const visibleCards = useMemo(
+    () =>
+      providerCards.filter((card) => {
+        if (applied.filterBy !== 'All' && !card.filters.includes(applied.filterBy)) {
+          return false;
+        }
+        if (mode === 'vip' && card.showOnVip === false) return false;
+        return true;
+      }),
+    [providerCards, applied.filterBy, mode],
+  );
+
+  const activeExchangeName = String(bundle?.activeExchange?.activeExchange ?? '');
+
+  return (
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void reload()}
+          tintColor={colors.primary}
+        />
+      }
+    >
+      <Text style={styles.title}>{meta.title}</Text>
+      <Text style={styles.description}>{meta.description}</Text>
+
+      <FilterBar
+        startDate={startDate}
+        endDate={endDate}
+        appClientName={appClientName}
+        filterBy={filterBy}
+        appOptions={appOptions}
+        showProviderFilter
+        loading={loading}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onAppChange={setAppClientName}
+        onFilterByChange={setFilterBy}
+        onApply={apply}
+        onAllData={clearAll}
+        onRefresh={() => void reload()}
+      />
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      {mode === 'main' && activeExchangeName ? (
+        <View style={styles.exchangeBox}>
+          <Text style={styles.exchangeLabel}>Active Exchange</Text>
+          <Text style={styles.exchangeValue}>{activeExchangeName}</Text>
+        </View>
+      ) : null}
+
+      <KpiGrid items={kpiItems} />
+
+      {visibleCards.map((card) => (
+        <ProviderCard key={card.id} card={card} />
+      ))}
+
+      {!loading && bundle && visibleCards.length === 0 ? (
+        <Text style={styles.empty}>No providers match the current filter.</Text>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing(4), paddingBottom: spacing(10) },
+  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+  description: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
+  errorBox: {
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: colors.destructive,
+    borderRadius: 10,
+    padding: spacing(3),
+    marginBottom: spacing(3),
+  },
+  errorText: { color: colors.destructive, fontSize: 13 },
+  exchangeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: spacing(3),
+    marginBottom: spacing(3),
+  },
+  exchangeLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  exchangeValue: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
+});
