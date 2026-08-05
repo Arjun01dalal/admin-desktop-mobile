@@ -287,6 +287,7 @@ export function CallLogsScreen() {
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [commentFilter, setCommentFilter] = useState('All');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [botStatusOpen, setBotStatusOpen] = useState(false);
   const [applyTick, setApplyTick] = useState(0);
 
   const [rows, setRows] = useState<CallLogRow[]>([]);
@@ -645,8 +646,7 @@ export function CallLogsScreen() {
       { label: 'Queued', value: r.queued },
       { label: 'Deleted', value: r.deleted },
     ];
-    // Always show the two headline stats; hide zero-count minor ones to reduce noise.
-    return all.filter((s, i) => i < 2 || s.value > 0);
+    return all;
   }, []);
 
   const textFilters: Array<{ label: string; value: string; set: (v: string) => void; keyboard?: 'phone-pad' | 'number-pad' }> = [
@@ -792,7 +792,15 @@ export function CallLogsScreen() {
         <>
           {!isCaller && summaryRows.length > 0 && (
             <>
-              <Text style={styles.sectionTitle}>Bot Status</Text>
+              <TouchableOpacity
+                style={styles.collapseHeader}
+                onPress={() => setBotStatusOpen((o) => !o)}
+              >
+                <Text style={styles.collapseTitle}>
+                  Bot Status ({summaryRows.length}) {botStatusOpen ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+              {botStatusOpen && (
               <View style={styles.botGrid}>
                 {summaryRows.map((r) => (
                   <View key={String(r.botId)} style={styles.botCard}>
@@ -817,6 +825,7 @@ export function CallLogsScreen() {
                   </View>
                 ))}
               </View>
+              )}
             </>
           )}
 
