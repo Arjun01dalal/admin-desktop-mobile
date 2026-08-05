@@ -111,16 +111,16 @@ export function TodaysActiveScreen() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const res = await secureApi('users.appVersions', {});
+      const res = await secureApi<{ clientName?: string; version?: string }[]>(
+        'users.appVersions',
+        {},
+      );
       if (cancelled || !res.ok) return;
-      const data = res.data;
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        const map: Record<string, string> = {};
-        for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
-          if (v != null) map[k] = String(v);
-        }
-        setAppVersions(map);
+      const map: Record<string, string> = {};
+      for (const item of Array.isArray(res.data) ? res.data : []) {
+        if (item?.clientName) map[item.clientName] = String(item.version ?? '');
       }
+      setAppVersions(map);
     })();
     return () => {
       cancelled = true;

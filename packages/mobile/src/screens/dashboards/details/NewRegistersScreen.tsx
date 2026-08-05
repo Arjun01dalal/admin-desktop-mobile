@@ -29,9 +29,21 @@ import {
   pickUserBankName,
 } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
-import { hasPermission } from '../../../auth/permissions';
+import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
+import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
+
+/** Mirror of desktop NewRegistersPage isNewRegistersCaller — caller roles must not see contact columns. */
+function isNewRegistersCaller(): boolean {
+  const id = String(getRoleId() || '');
+  if (id && CALLER_ROLE_IDS.has(id)) return true;
+  const name = String(getRoleName() || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  return name === 'caller' || name === 'caller_new';
+}
 
 type Row = {
   _id?: string;
@@ -70,12 +82,32 @@ export function NewRegistersScreen() {
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
-  const hideContact = hasPermission('contact_visibility_none');
+  const hideContact = hasPermission('contact_visibility_none') || isNewRegistersCaller();
 
   const [draftStart, setDraftStart] = useState(initialStart);
   const [draftEnd, setDraftEnd] = useState(initialEnd);
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
+  const [appVersions, setAppVersions] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await secureApi<{ clientName?: string; version?: string }[]>(
+        'users.appVersions',
+        {},
+      );
+      if (cancelled || !res.ok) return;
+      const map: Record<string, string> = {};
+      for (const item of Array.isArray(res.data) ? res.data : []) {
+        if (item?.clientName) map[item.clientName] = String(item.version ?? '');
+      }
+      setAppVersions(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [appClientName, setAppClientName] = useState('');
   const [searchField, setSearchField] = useState<SearchFieldKey>('name');
   const [searchDraft, setSearchDraft] = useState('');
@@ -196,6 +228,12 @@ export function NewRegistersScreen() {
       { key: 'deviceType', label: 'Device Type', width: 90, render: (r) => String(r.deviceType || '-') },
       { key: 'playerAppVersion', label: 'User App Version', width: 110, render: (r) => String(r.currentAppVersion || '-') },
       {
+        key: 'appVersion',
+        label: 'App Version',
+        width: 90,
+        render: (r) => display(appVersions[String(pickAppName(r) || '')]),
+      },
+      {
         key: 'created',
         label: 'Created',
         width: 90,
@@ -222,7 +260,7 @@ export function NewRegistersScreen() {
       );
     }
     return cols;
-  }, [page, pageSize, hideContact, canShowMobile]);
+  }, [page, pageSize, hideContact, canShowMobile, appVersions]);
 
   return (
     <ScrollView
