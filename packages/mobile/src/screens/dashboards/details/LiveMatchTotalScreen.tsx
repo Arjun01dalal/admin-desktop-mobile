@@ -26,6 +26,7 @@ import { useIsFocused, useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import type { SecureAction } from '../../../api/registry.generated';
 import { toNum } from '../../../dashboards/mergeMetrics';
+import { LiveStreamModal } from '../../../dashboards/ui/LiveStreamModal';
 import { colors, radius, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 
@@ -254,6 +255,8 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   );
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
+  const [streamId, setStreamId] = useState('');
+  const [streamOpen, setStreamOpen] = useState(false);
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -385,7 +388,22 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
             ];
             return (
               <View style={styles.card} key={cardKey}>
-                <Text style={styles.matchName}>{match.matchName}</Text>
+                <View style={styles.matchHeader}>
+                  <Text style={styles.matchName}>{match.matchName}</Text>
+                  {match.code ? (
+                    <TouchableOpacity
+                      style={styles.liveTvBtn}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => {
+                        setStreamId(String(match.code || ''));
+                        setStreamOpen(true);
+                      }}
+                    >
+                      <Text style={styles.liveTvText}>📺 Live</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
 
                 {/* Live odds 1 / X / 2 */}
                 <View style={styles.oddsWrap}>
@@ -507,6 +525,12 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
           })}
         </View>
       ))}
+
+      <LiveStreamModal
+        open={streamOpen}
+        onClose={() => setStreamOpen(false)}
+        streamId={streamId}
+      />
     </ScrollView>
   );
 }
@@ -556,16 +580,27 @@ const styles = StyleSheet.create({
     padding: spacing(3.5),
     marginBottom: spacing(3),
   },
+  matchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    marginBottom: spacing(3),
+    paddingHorizontal: spacing(2),
+  },
   matchName: {
     color: colors.foreground,
     fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
-    backgroundColor: colors.surfaceAlt,
     paddingVertical: spacing(2),
-    borderRadius: radius.sm,
-    marginBottom: spacing(3),
+    flex: 1,
   },
+  liveTvBtn: {
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: spacing(1),
+  },
+  liveTvText: { color: colors.destructive, fontSize: 12, fontWeight: '800' },
   oddsWrap: { flexDirection: 'row', gap: spacing(1), marginBottom: spacing(3) },
   oddsGroup: { flex: 1 },
   oddsLabel: {
