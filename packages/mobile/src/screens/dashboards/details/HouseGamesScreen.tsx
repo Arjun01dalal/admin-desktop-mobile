@@ -298,17 +298,19 @@ export function HouseGamesScreen() {
         {startDate} → {endDate} · Tap a row to see all details
       </Text>
 
-      <DetailFilterBar
-        startDate={draftStart}
-        endDate={draftEnd}
-        loading={loading}
-        onStartDateChange={setDraftStart}
-        onEndDateChange={setDraftEnd}
-        onApply={applyAll}
-      />
+      <View style={styles.dateBarWrap}>
+        <DetailFilterBar
+          startDate={draftStart}
+          endDate={draftEnd}
+          loading={loading}
+          onStartDateChange={setDraftStart}
+          onEndDateChange={setDraftEnd}
+          onApply={applyAll}
+        />
+      </View>
 
       {/* Items per page (desktop: 50/100/200/500) */}
-      <View style={styles.chipGroupRow}>
+      <View style={[styles.chipGroupRow, styles.rowsSelector]}>
         <Text style={styles.chipGroupLabel}>Rows</Text>
         {ITEMS_PER_PAGE_OPTIONS.map((opt) => {
           const active = itemsPerPage === opt;
@@ -514,6 +516,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     backgroundColor: colors.background,
   },
+  dateBarWrap: { marginTop: spacing(3) },
+  rowsSelector: { marginTop: spacing(3), marginBottom: spacing(3) },
   chipGroupRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing(2) },
   chipGroupLabel: { color: colors.muted, fontSize: 12, width: 44 },
   chip: {
