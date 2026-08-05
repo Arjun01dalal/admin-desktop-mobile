@@ -52,6 +52,15 @@ export function GameActivityDetailsScreen() {
     }
   }, [params.row]);
 
+  // Reset refreshed data when navigating to a different provider row.
+  const routeRow = typeof params.row === 'string' ? params.row : '';
+  const lastRowRef = React.useRef(routeRow);
+  if (lastRowRef.current !== routeRow) {
+    lastRowRef.current = routeRow;
+    if (refreshed) setRefreshed(null);
+    if (selected) setSelected(null);
+  }
+
   const provider = refreshed ?? paramProvider;
 
   /** Pull-to-refresh: refetch the activity list and pick this provider's fresh row. */
@@ -62,10 +71,19 @@ export function GameActivityDetailsScreen() {
       const action = isQtech ? 'game.qtechStats' : 'game.wcoStats';
       const res = await secureApi(action, { startDate, endDate });
       if (!res.ok) return;
-      const label = providerLabel(refreshed ?? paramProvider);
-      const match = normalizeActivityList(res.data).find(
-        (r) => providerLabel(r) === label,
-      );
+      const rows = normalizeActivityList(res.data);
+      // Match by stable provider id when available; fall back to label.
+      const id = paramProvider.providerId != null ? String(paramProvider.providerId) : '';
+      let match: ActivityRow | undefined;
+      if (id) {
+        match = rows.find((r) => r.providerId != null && String(r.providerId) === id);
+      }
+      if (!match) {
+        const label = providerLabel(paramProvider);
+        const byLabel = rows.filter((r) => providerLabel(r) === label);
+        // Only accept an unambiguous label match.
+        if (byLabel.length === 1) match = byLabel[0];
+      }
       if (match) {
         setRefreshed(match);
         setSelected(null);
@@ -73,7 +91,7 @@ export function GameActivityDetailsScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [paramProvider, refreshed, isQtech, startDate, endDate]);
+  }, [paramProvider, isQtech, startDate, endDate]);
 
   const games = useMemo<GameRow[]>(
     () => (Array.isArray(provider?.games) ? (provider!.games as GameRow[]) : []),
