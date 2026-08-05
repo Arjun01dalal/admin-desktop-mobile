@@ -26,6 +26,8 @@ export type DataTableColumn<Row> = {
   onCellPress?: (row: Row) => void;
   /** Makes the header tappable (sorting). */
   onHeaderPress?: () => void;
+  /** Optional per-column filter control shown in a row under the header. */
+  filter?: React.ReactNode;
 };
 
 type Props<Row> = {
@@ -86,6 +88,16 @@ export function DataTable<Row>({
               ),
             )}
           </View>
+
+          {columns.some((c) => c.filter != null) ? (
+            <View style={[styles.row, styles.filterRow]}>
+              {columns.map((col) => (
+                <View key={col.key} style={[styles.filterCell, { width: col.width }]}>
+                  {col.filter ?? null}
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           {loading && rows.length === 0 ? (
             <ActivityIndicator style={styles.spinner} color={colors.primary} />
@@ -181,6 +193,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headRow: { borderBottomColor: colors.primary },
+  filterRow: { paddingVertical: spacing(1) },
+  filterCell: { paddingHorizontal: spacing(0.5) },
   footerRow: { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.primary },
   headText: {
     color: colors.primary,
