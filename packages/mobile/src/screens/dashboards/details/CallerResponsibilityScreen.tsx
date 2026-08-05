@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -347,7 +348,14 @@ export function CallerResponsibilityScreen() {
         </View>
       ) : null}
 
-      {showTotalDeposit && (
+      {loading ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading data…</Text>
+        </View>
+      ) : null}
+
+      {!loading && showTotalDeposit && (
         <>
           <Text style={styles.sectionTitle}>Summary</Text>
           <View style={styles.summaryGrid}>
@@ -361,7 +369,7 @@ export function CallerResponsibilityScreen() {
         </>
       )}
 
-      {showTotalDeposit && showLocation && (
+      {!loading && showTotalDeposit && showLocation && (
         <>
           <Text style={styles.sectionTitle}>By Office Location</Text>
           <DataTable
@@ -373,15 +381,19 @@ export function CallerResponsibilityScreen() {
         </>
       )}
 
-      <Text style={styles.sectionTitle}>Caller Data</Text>
-      <DataTable
-        columns={callerColumns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={callerRows}
-        keyFor={(r, i) => String(r.empCode || r._id || i)}
-        emptyMessage={loading ? 'Loading…' : 'No caller data'}
-        onRowPress={(row) => setSelected({ row, index: callerRows.indexOf(row) })}
-        hint="Tap a row to see all details"
-      />
+      {!loading && (
+        <>
+          <Text style={styles.sectionTitle}>Caller Data</Text>
+          <DataTable
+            columns={callerColumns.filter((c) => MAIN_KEYS.has(c.key))}
+            rows={callerRows}
+            keyFor={(r, i) => String(r.empCode || r._id || i)}
+            emptyMessage="No caller data"
+            onRowPress={(row) => setSelected({ row, index: callerRows.indexOf(row) })}
+            hint="Tap a row to see all details"
+          />
+        </>
+      )}
 
       <RowDetailSheet
         visible={selected !== null}
@@ -442,6 +454,16 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { color: colors.muted, fontSize: 11 },
   summaryValue: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginTop: spacing(1) },
+  loadingBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing(10),
+    gap: spacing(2),
+  },
+  loadingText: {
+    color: colors.muted,
+    fontSize: 13,
+  },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
