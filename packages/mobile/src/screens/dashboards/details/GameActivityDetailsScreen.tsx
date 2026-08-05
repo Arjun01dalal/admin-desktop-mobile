@@ -3,13 +3,19 @@
  * Port of desktop GameActivityDetailsPage. Receives the provider row
  * (JSON-encoded) and isQtech flag as route params from GameActivityScreen.
  */
-import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
-import { providerLabel, type ActivityRow } from '../../../dashboards/activityUtils';
+import {
+  normalizeActivityList,
+  providerLabel,
+  type ActivityRow,
+} from '../../../dashboards/activityUtils';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { secureApi } from '../../../api/client';
+import { todayIST } from '../../../utils/dates';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type GameRow = Record<string, unknown>;
@@ -30,9 +36,13 @@ function fmt(value: unknown): string {
 export function GameActivityDetailsScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const isQtech = Boolean(params.isQtech);
+  const startDate = typeof params.startDate === 'string' ? params.startDate : todayIST();
+  const endDate = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const [selected, setSelected] = useState<GameRow | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshed, setRefreshed] = useState<ActivityRow | null>(null);
 
-  const provider = useMemo<ActivityRow | null>(() => {
+  const paramProvider = useMemo<ActivityRow | null>(() => {
     if (typeof params.row !== 'string') return null;
     try {
       const parsed = JSON.parse(params.row);
@@ -41,6 +51,29 @@ export function GameActivityDetailsScreen() {
       return null;
     }
   }, [params.row]);
+
+  const provider = refreshed ?? paramProvider;
+
+  /** Pull-to-refresh: refetch the activity list and pick this provider's fresh row. */
+  const refresh = useCallback(async () => {
+    if (!paramProvider) return;
+    setRefreshing(true);
+    try {
+      const action = isQtech ? 'game.qtechStats' : 'game.wcoStats';
+      const res = await secureApi(action, { startDate, endDate });
+      if (!res.ok) return;
+      const label = providerLabel(refreshed ?? paramProvider);
+      const match = normalizeActivityList(res.data).find(
+        (r) => providerLabel(r) === label,
+      );
+      if (match) {
+        setRefreshed(match);
+        setSelected(null);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [paramProvider, refreshed, isQtech, startDate, endDate]);
 
   const games = useMemo<GameRow[]>(
     () => (Array.isArray(provider?.games) ? (provider!.games as GameRow[]) : []),
@@ -106,7 +139,18 @@ export function GameActivityDetailsScreen() {
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <Text style={styles.title}>{providerLabel(provider)} — Games</Text>
 
       <DataTable

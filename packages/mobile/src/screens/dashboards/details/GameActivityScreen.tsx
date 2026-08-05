@@ -98,9 +98,11 @@ export function GameActivityScreen() {
       navigation.navigate('/game-activity/details', {
         row: JSON.stringify(row),
         isQtech: isQtech ? '1' : '',
+        startDate,
+        endDate,
       });
     },
-    [navigation, isQtech],
+    [navigation, isQtech, startDate, endDate],
   );
 
   const columns = useMemo<DataTableColumn<ActivityRow>[]>(() => {
