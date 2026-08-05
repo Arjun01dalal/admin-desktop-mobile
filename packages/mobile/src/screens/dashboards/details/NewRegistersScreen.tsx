@@ -32,11 +32,43 @@ import { secureApi } from '../../../api/client';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
+import {
+  DetailFilterBar,
+  type SearchFieldKey,
+  type SearchFieldOption,
+} from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
 const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance', 'created']);
+
+/** Search fields mirroring desktop NewRegistersPage per-column filters (filter keys match).
+ *  Contact-identifier fields are withheld for restricted roles like the desktop column filters. */
+function newRegistersSearchFields(hideContact: boolean): readonly SearchFieldOption[] {
+  const fields: SearchFieldOption[] = [
+    { key: 'name', label: 'Name' },
+    { key: '_id', label: 'Dp Id' },
+    { key: 'userComesFrom', label: 'User Comes From' },
+    { key: 'balance', label: 'Balance' },
+    { key: 'played', label: 'In (E/C/S)' },
+  ];
+  if (!hideContact) {
+    fields.push(
+      { key: 'mobile', label: 'Mobile' },
+      { key: 'accountNumber', label: 'Account' },
+      { key: 'aadhaarNumber', label: 'Aadhar' },
+      { key: 'email', label: 'Email' },
+    );
+  }
+  fields.push({ key: 'city', label: 'City' }, { key: 'state', label: 'State' });
+  if (!hideContact) {
+    fields.push(
+      { key: 'referredCode', label: 'Referred Code' },
+      { key: 'referralCodeUser', label: 'Referral Code' },
+    );
+  }
+  return fields;
+}
 
 /** Mirror of desktop NewRegistersPage isNewRegistersCaller — caller roles must not see contact columns. */
 function isNewRegistersCaller(): boolean {
@@ -133,7 +165,16 @@ export function NewRegistersScreen() {
     try {
       const filter: Record<string, unknown> = {};
       if (appClientName) filter.clientName = appClientName;
-      if (appliedSearch.text.trim()) filter[appliedSearch.field] = appliedSearch.text.trim();
+      const text = appliedSearch.text.trim();
+      if (text) {
+        if (appliedSearch.field === 'balance') {
+          // Desktop sends balance as a number; keep a valid 0, drop non-numeric input.
+          const num = Number(text);
+          if (Number.isFinite(num)) filter.balance = num;
+        } else {
+          filter[appliedSearch.field] = text;
+        }
+      }
       const res = await secureApi<Response>('users.getAll', {
         itemsPerPage: pageSize,
         pageNo: page,
@@ -301,6 +342,7 @@ export function NewRegistersScreen() {
           setPageSize(v);
           setPage(1);
         }}
+        searchFields={newRegistersSearchFields(hideContact)}
         searchField={searchField}
         onSearchFieldChange={setSearchField}
         searchText={searchDraft}

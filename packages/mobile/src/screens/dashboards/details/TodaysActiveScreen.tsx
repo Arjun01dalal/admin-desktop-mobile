@@ -20,11 +20,38 @@ import { pickLastActivity } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
+import {
+  DetailFilterBar,
+  type SearchFieldKey,
+  type SearchFieldOption,
+} from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
 const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance']);
+
+/** Search fields mirroring desktop TodaysActivePage per-column filters (filter keys match).
+ *  Contact-identifier fields are withheld for restricted roles like the desktop column filters. */
+function todaysActiveSearchFields(hideContact: boolean): readonly SearchFieldOption[] {
+  const fields: SearchFieldOption[] = [
+    { key: 'name', label: 'Name' },
+    { key: '_id', label: 'Dp Id' },
+  ];
+  if (!hideContact) {
+    fields.push(
+      { key: 'mobile', label: 'Mobile' },
+      { key: 'accountNumber', label: 'Account' },
+      { key: 'aadhaarNumber', label: 'Aadhar' },
+      { key: 'email', label: 'Email' },
+    );
+  }
+  fields.push(
+    { key: 'city', label: 'City' },
+    { key: 'state', label: 'State' },
+    { key: 'played', label: 'In (E/C/S)' },
+  );
+  return fields;
+}
 
 type Row = {
   _id?: string;
@@ -236,6 +263,7 @@ export function TodaysActiveScreen() {
           setPageSize(v);
           setPage(1);
         }}
+        searchFields={todaysActiveSearchFields(hideContact)}
         searchField={searchField}
         onSearchFieldChange={setSearchField}
         searchText={searchDraft}

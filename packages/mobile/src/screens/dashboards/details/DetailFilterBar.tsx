@@ -22,13 +22,16 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /** Mirrors desktop ITEMS_PER_PAGE_OPTIONS (subset that makes sense on mobile). */
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200] as const;
 
-/** Search fields mirroring desktop's per-column text filters (mobile subset). */
-export const SEARCH_FIELDS = [
+/** One search field option; `key` is sent as the server-side filter key (mirrors desktop). */
+export type SearchFieldOption = { key: string; label: string };
+export type SearchFieldKey = string;
+
+/** Default search fields (used by screens without a desktop per-column filter set). */
+export const SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'name', label: 'Name' },
   { key: 'mobile', label: 'Mobile' },
   { key: 'city', label: 'City' },
-] as const;
-export type SearchFieldKey = (typeof SEARCH_FIELDS)[number]['key'];
+];
 
 type Props = {
   startDate: string;
@@ -43,6 +46,8 @@ type Props = {
   /** When provided, renders per-page chips. */
   pageSize?: number;
   onPageSizeChange?: (v: number) => void;
+  /** Per-screen search field set (defaults to SEARCH_FIELDS). */
+  searchFields?: readonly SearchFieldOption[];
   /** When provided, renders the search row (field chips + text input + Search). */
   searchField?: SearchFieldKey;
   onSearchFieldChange?: (v: SearchFieldKey) => void;
@@ -83,6 +88,7 @@ export function DetailFilterBar(props: Props) {
     onAppChange,
     pageSize,
     onPageSizeChange,
+    searchFields = SEARCH_FIELDS,
     searchField,
     onSearchFieldChange,
     searchText,
@@ -134,9 +140,13 @@ export function DetailFilterBar(props: Props) {
 
       {onSearchTextChange && onSearchSubmit ? (
         <View style={styles.searchWrap}>
-          <View style={styles.row}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+          >
             <Text style={styles.rowLabel}>Search by</Text>
-            {SEARCH_FIELDS.map((f) => (
+            {searchFields.map((f) => (
               <Chip
                 key={f.key}
                 label={f.label}
@@ -144,7 +154,7 @@ export function DetailFilterBar(props: Props) {
                 onPress={() => onSearchFieldChange?.(f.key)}
               />
             ))}
-          </View>
+          </ScrollView>
           <View style={styles.searchRow}>
             <TextInput
               style={[styles.dateInput, styles.searchInput]}
@@ -152,7 +162,9 @@ export function DetailFilterBar(props: Props) {
               onChangeText={onSearchTextChange}
               onSubmitEditing={onSearchSubmit}
               returnKeyType="search"
-              placeholder={`Search ${searchField ?? 'name'}…`}
+              placeholder={`Search ${
+                searchFields.find((f) => f.key === searchField)?.label ?? 'name'
+              }…`}
               placeholderTextColor={colors.muted}
               autoCapitalize="none"
               autoCorrect={false}
