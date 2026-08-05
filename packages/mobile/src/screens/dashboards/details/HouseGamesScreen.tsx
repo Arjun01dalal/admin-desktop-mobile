@@ -73,6 +73,21 @@ const INITIAL_FILTERS = {
 };
 type FiltersState = typeof INITIAL_FILTERS;
 
+const TEXT_FILTER_FIELDS: { key: keyof FiltersState; placeholder: string; numeric?: boolean }[] = [
+  { key: 'name', placeholder: 'Name' },
+  { key: 'userId', placeholder: 'User ID' },
+  { key: 'txnId', placeholder: 'Txn ID' },
+  { key: 'refTxnId', placeholder: 'Ref Txn ID' },
+  { key: 'roundId', placeholder: 'Round ID' },
+  { key: 'sessionId', placeholder: 'Session ID' },
+  { key: 'gameId', placeholder: 'Game ID' },
+  { key: 'operatorId', placeholder: 'Operator ID' },
+  { key: 'currency', placeholder: 'Currency' },
+  { key: 'roundCapacity', placeholder: 'Round Capacity', numeric: true },
+  { key: 'minAmount', placeholder: 'Min Amount', numeric: true },
+  { key: 'maxAmount', placeholder: 'Max Amount', numeric: true },
+];
+
 const TYPE_OPTIONS = ['', 'bet', 'win', 'refund'];
 const STATUS_OPTIONS = ['', 'W', 'L'];
 
@@ -167,6 +182,7 @@ export function HouseGamesScreen() {
   const [endDate, setEndDate] = useState(todayIST());
   const [draftFilters, setDraftFilters] = useState<FiltersState>(INITIAL_FILTERS);
   const [filters, setFilters] = useState<FiltersState>(INITIAL_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [pageNo, setPageNo] = useState(1);
   const [rows, setRows] = useState<TxnRow[]>([]);
@@ -230,95 +246,28 @@ export function HouseGamesScreen() {
 
   const rowOffset = (pageNo - 1) * itemsPerPage;
 
-  /** Small text input rendered under a column heading (desktop-style column filter). */
-  const textFilter = useCallback(
-    (key: keyof FiltersState, numeric = false) => (
-      <TextInput
-        style={styles.colFilter}
-        placeholder="Search"
-        placeholderTextColor={colors.muted}
-        value={String(draftFilters[key] ?? '')}
-        keyboardType={numeric ? 'numeric' : 'default'}
-        autoCapitalize="none"
-        onChangeText={(t) => setDraft(key, t as never)}
-        onSubmitEditing={applyAll}
-        returnKeyType="search"
-      />
-    ),
-    [draftFilters, setDraft, applyAll],
-  );
-
-  /** Chip that cycles through select options (desktop dropdown equivalent). */
-  const cycleFilter = useCallback(
-    (key: 'type' | 'status', options: string[]) => {
-      const current = draftFilters[key];
-      const next = options[(options.indexOf(current) + 1) % options.length];
-      return (
-        <TouchableOpacity
-          style={[styles.colChip, current !== '' && styles.colChipActive]}
-          onPress={() => setDraft(key, next)}
-        >
-          <Text style={[styles.colChipText, current !== '' && styles.colChipTextActive]}>
-            {current === '' ? 'All ▾' : `${current} ▾`}
-          </Text>
-        </TouchableOpacity>
-      );
-    },
-    [draftFilters, setDraft],
-  );
-
-  /** Checkbox-style toggle (desktop Is Bot / Human checkboxes). */
-  const toggleFilter = useCallback(
-    (key: 'isBot' | 'human', label: string) => {
-      const on = draftFilters[key] === true;
-      return (
-        <TouchableOpacity
-          style={[styles.colChip, on && styles.colChipActive]}
-          onPress={() => setDraft(key, on ? null : true)}
-        >
-          <Text style={[styles.colChipText, on && styles.colChipTextActive]}>
-            {on ? '☑' : '☐'} {label}
-          </Text>
-        </TouchableOpacity>
-      );
-    },
-    [draftFilters, setDraft],
-  );
-
   const columns = useMemo<DataTableColumn<TxnRow>[]>(
     () => [
       { key: 'sr', label: 'SR.No', width: 60, render: (_r, i) => String(i + 1 + rowOffset) },
-      { key: 'name', label: 'Name', width: 130, render: (r) => String(r.name || '-'), filter: textFilter('name') },
-      { key: 'userId', label: 'User ID', width: 130, render: (r) => String(r.userId || '-'), filter: textFilter('userId') },
-      { key: 'txnId', label: 'Transaction ID', width: 160, render: (r) => String(r.txnId || r.transactionId || '-'), filter: textFilter('txnId') },
-      { key: 'refTxnId', label: 'Ref Txn ID', width: 160, render: (r) => String(r.refTxnId || '-'), filter: textFilter('refTxnId') },
-      { key: 'roundId', label: 'Round ID', width: 140, render: (r) => String(r.roundId || '-'), filter: textFilter('roundId') },
-      { key: 'sessionId', label: 'Session ID', width: 140, render: (r) => String(r.sessionId || '-'), filter: textFilter('sessionId') },
-      { key: 'gameId', label: 'Game ID', width: 110, render: (r) => String(r.gameId || '-'), filter: textFilter('gameId') },
-      { key: 'operatorId', label: 'Operator ID', width: 110, render: (r) => String(r.operatorId || '-'), filter: textFilter('operatorId') },
-      { key: 'type', label: 'Type', width: 90, render: (r) => String(r.type || '-'), filter: cycleFilter('type', TYPE_OPTIONS) },
-      { key: 'status', label: 'Status', width: 90, render: (r) => String(r.status || '-'), filter: cycleFilter('status', STATUS_OPTIONS) },
-      { key: 'currency', label: 'Currency', width: 90, render: (r) => String(r.currency || '-'), filter: textFilter('currency') },
-      {
-        key: 'amount',
-        label: 'Amount',
-        width: 110,
-        align: 'right',
-        render: (r) => fmt2(r.amount),
-        filter: (
-          <View style={styles.amountFilter}>
-            {textFilter('minAmount', true)}
-            {textFilter('maxAmount', true)}
-          </View>
-        ),
-      },
+      { key: 'name', label: 'Name', width: 130, render: (r) => String(r.name || '-') },
+      { key: 'userId', label: 'User ID', width: 130, render: (r) => String(r.userId || '-') },
+      { key: 'txnId', label: 'Transaction ID', width: 160, render: (r) => String(r.txnId || r.transactionId || '-') },
+      { key: 'refTxnId', label: 'Ref Txn ID', width: 160, render: (r) => String(r.refTxnId || '-') },
+      { key: 'roundId', label: 'Round ID', width: 140, render: (r) => String(r.roundId || '-') },
+      { key: 'sessionId', label: 'Session ID', width: 140, render: (r) => String(r.sessionId || '-') },
+      { key: 'gameId', label: 'Game ID', width: 110, render: (r) => String(r.gameId || '-') },
+      { key: 'operatorId', label: 'Operator ID', width: 110, render: (r) => String(r.operatorId || '-') },
+      { key: 'type', label: 'Type', width: 90, render: (r) => String(r.type || '-') },
+      { key: 'status', label: 'Status', width: 90, render: (r) => String(r.status || '-') },
+      { key: 'currency', label: 'Currency', width: 90, render: (r) => String(r.currency || '-') },
+      { key: 'amount', label: 'Amount', width: 110, align: 'right', render: (r) => fmt2(r.amount) },
       { key: 'winingPoint', label: 'Winning Point', width: 110, align: 'right', render: (r) => fmt2(r.winingPoint) },
-      { key: 'roundCapacity', label: 'Round Capacity', width: 110, align: 'right', render: (r) => String(r.roundCapacity ?? '-'), filter: textFilter('roundCapacity', true) },
-      { key: 'isBot', label: 'Is Bot', width: 90, render: (r) => isBotValue(r), filter: toggleFilter('isBot', 'Bot') },
-      { key: 'player', label: 'Player Identity', width: 160, render: (r) => playerIdentity(r), filter: toggleFilter('human', 'Human') },
+      { key: 'roundCapacity', label: 'Round Capacity', width: 110, align: 'right', render: (r) => String(r.roundCapacity ?? '-') },
+      { key: 'isBot', label: 'Is Bot', width: 90, render: (r) => isBotValue(r) },
+      { key: 'player', label: 'Player Identity', width: 160, render: (r) => playerIdentity(r) },
       { key: 'created', label: 'Created At', width: 150, render: (r) => fmtDate(r) },
     ],
-    [rowOffset, textFilter, cycleFilter, toggleFilter],
+    [rowOffset],
   );
 
   const activeFilterCount = useMemo(
@@ -375,18 +324,92 @@ export function HouseGamesScreen() {
         })}
       </View>
 
-      {/* Filter actions: filters live under each column heading in the table */}
-      <View style={styles.filterActions}>
-        <Text style={styles.filterHint}>
-          Filter boxes are under each column heading{activeFilterCount ? ` · ${activeFilterCount} active` : ''}
+      {/* Collapsible search filters (same payload as desktop) */}
+      <TouchableOpacity
+        style={styles.filterToggle}
+        onPress={() => setShowFilters((v) => !v)}
+        accessibilityRole="button"
+      >
+        <Text style={styles.filterToggleText}>
+          {showFilters ? 'Hide Search ▲' : `Search Filters ▼${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
         </Text>
-        <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} accessibilityRole="button">
-          <Text style={styles.clearBtnText}>Clear</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.applyBtn} onPress={applyAll} accessibilityRole="button">
-          <Text style={styles.applyBtnText}>Search</Text>
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
+
+      {showFilters && (
+        <View style={styles.filterPanel}>
+          <View style={styles.filterGrid}>
+            {TEXT_FILTER_FIELDS.map((f) => (
+              <TextInput
+                key={f.key}
+                style={styles.filterInput}
+                placeholder={f.placeholder}
+                placeholderTextColor={colors.muted}
+                value={String(draftFilters[f.key] ?? '')}
+                keyboardType={f.numeric ? 'numeric' : 'default'}
+                autoCapitalize="none"
+                onChangeText={(t) => setDraft(f.key, t as never)}
+                returnKeyType="search"
+                onSubmitEditing={applyAll}
+              />
+            ))}
+          </View>
+
+          <View style={styles.chipGroupRow}>
+            <Text style={styles.chipGroupLabel}>Type</Text>
+            {TYPE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt || 'all'}
+                style={[styles.chip, draftFilters.type === opt && styles.chipActive]}
+                onPress={() => setDraft('type', opt)}
+              >
+                <Text style={[styles.chipText, draftFilters.type === opt && styles.chipTextActive]}>
+                  {opt || 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.chipGroupRow}>
+            <Text style={styles.chipGroupLabel}>Status</Text>
+            {STATUS_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt || 'all'}
+                style={[styles.chip, draftFilters.status === opt && styles.chipActive]}
+                onPress={() => setDraft('status', opt)}
+              >
+                <Text style={[styles.chipText, draftFilters.status === opt && styles.chipTextActive]}>
+                  {opt || 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.chipGroupRow}>
+            {(['isBot', 'human'] as const).map((key) => {
+              const on = draftFilters[key] === true;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.chip, on && styles.chipActive]}
+                  onPress={() => setDraft(key, on ? null : true)}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                    {key === 'isBot' ? 'Is Bot' : 'Human'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.filterActions}>
+            <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} accessibilityRole="button">
+              <Text style={styles.clearBtnText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.applyBtn} onPress={applyAll} accessibilityRole="button">
+              <Text style={styles.applyBtnText}>Search</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Totals line (matches desktop "Total Count / Total Amount") */}
       {(totalCount !== null || totalAmount !== null) && (
@@ -463,31 +486,31 @@ const styles = StyleSheet.create({
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  colFilter: {
+  filterToggle: { marginBottom: spacing(3) },
+  filterToggleText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  filterPanel: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: spacing(1),
-    color: colors.foreground,
-    fontSize: 11,
-    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(3),
+    gap: spacing(2),
+  },
+  filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
+  filterInput: {
     flexGrow: 1,
-  },
-  amountFilter: { gap: spacing(1) },
-  colChip: {
+    flexBasis: '45%',
+    minWidth: 130,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: spacing(1),
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(2),
+    color: colors.foreground,
+    fontSize: 13,
     backgroundColor: colors.background,
-    alignItems: 'center',
   },
-  colChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  colChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  colChipTextActive: { color: '#fff' },
-  filterHint: { color: colors.muted, fontSize: 11, flex: 1, alignSelf: 'center' },
   chipGroupRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing(2) },
   chipGroupLabel: { color: colors.muted, fontSize: 12, width: 44 },
   chip: {
