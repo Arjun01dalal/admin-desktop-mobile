@@ -5,6 +5,12 @@ import { registerRootComponent } from 'expo';
 // "Exception in HostFunction" during module load ("App entry not found").
 // These breadcrumbs pinpoint which module throws — remove once diagnosed.
 console.log('[boot] index start');
+// Hermes has no crypto.getRandomValues — crypto-js AES needs it for secure
+// random (throws "Native crypto module could not be used..."). Polyfill on
+// native; browsers already provide it.
+const { Platform } = require('react-native');
+if (Platform.OS !== 'web') require('react-native-get-random-values');
+console.log('[boot] crypto polyfill ok');
 require('react-native-gesture-handler');
 console.log('[boot] gesture-handler ok');
 require('react-native-safe-area-context');
