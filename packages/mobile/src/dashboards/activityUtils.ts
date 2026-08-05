@@ -55,6 +55,10 @@ export function getMetric(item: ActivityRow, key: SortKey | string): number {
   }
 }
 
+export function userIdOf(item: ActivityRow): string {
+  return String(item.userId || item._id || '');
+}
+
 export function providerLabel(item: ActivityRow): string {
   return String(item.provider || item.providerName || item.name || '-');
 }

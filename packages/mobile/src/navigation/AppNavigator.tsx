@@ -22,6 +22,9 @@ import { HouseGamesScreen } from '../screens/dashboards/details/HouseGamesScreen
 import { LeaderboardScreen } from '../screens/dashboards/details/LeaderboardScreen';
 import { ProfitLossScreen } from '../screens/dashboards/details/ProfitLossScreen';
 import { CallerResponsibilityScreen } from '../screens/dashboards/details/CallerResponsibilityScreen';
+import { PlayerActivityScreen } from '../screens/dashboards/details/PlayerActivityScreen';
+import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
+import { CallLogsScreen } from '../screens/dashboards/details/CallLogsScreen';
 import { colors } from '../theme';
 
 const Drawer = createDrawerNavigator();
@@ -42,6 +45,9 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/leaderboard': LeaderboardScreen as AnyScreen,
   '/profit-loss': ProfitLossScreen as AnyScreen,
   '/caller-responsibility': CallerResponsibilityScreen as AnyScreen,
+  '/player-activity': PlayerActivityScreen as AnyScreen,
+  '/game-activity': GameActivityScreen as AnyScreen,
+  '/call-logs': CallLogsScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {

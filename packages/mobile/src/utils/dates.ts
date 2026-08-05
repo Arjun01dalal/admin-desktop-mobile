@@ -10,6 +10,13 @@ export function daysAgoIST(days: number): string {
 }
 
 /** Coerce API date values (ISO string, ms, unix seconds, Mongo {$date}) to Date. */
+/** ISO `YYYY-MM-DD` → `DD/MM/YYYY` (call-logs API date format). */
+export function formatDdMmYyyy(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-');
+  if (!y || !m || !d) return isoDate;
+  return `${d}/${m}/${y}`;
+}
+
 export function coerceDate(value: unknown): Date | null {
   if (value == null || value === '') return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
