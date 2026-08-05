@@ -194,18 +194,15 @@ export function GameActivityScreen() {
     return cols;
   }, [sort, toggleSort, openProvider, isQtech]);
 
-  const footer = useMemo(() => {
+  const totals = useMemo(() => {
     const sum = (key: SortKey) => sorted.reduce((acc, r) => acc + getMetric(r, key), 0);
     const ggr = sum('ggr');
-    return {
-      label: 'Total',
-      cells: {
-        betAmount: fmt(sum('betAmount')),
-        winAmount: fmt(sum('winAmount')),
-        ggr: fmt(ggr),
-        commissionAmount: fmt(sum('commissionAmount')),
-      },
-    };
+    return [
+      { label: 'Bet Amount', value: fmt(sum('betAmount')) },
+      { label: 'Win Amount', value: fmt(sum('winAmount')) },
+      { label: 'GGR', value: fmt(ggr), color: ggr < 0 ? colors.destructive : colors.success },
+      { label: 'Commission', value: fmt(sum('commissionAmount')) },
+    ];
   }, [sorted]);
 
   return (
@@ -258,12 +255,21 @@ export function GameActivityScreen() {
         </View>
       ) : null}
 
+      {/* Totals on top */}
+      <View style={styles.totalsGrid}>
+        {totals.map((t) => (
+          <View key={t.label} style={styles.totalsCard}>
+            <Text style={styles.totalsLabel}>{t.label}</Text>
+            <Text style={[styles.totalsValue, t.color ? { color: t.color } : null]}>{t.value}</Text>
+          </View>
+        ))}
+      </View>
+
       <DataTable
         columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
         rows={sorted}
         keyFor={(r, i) => String(r.providerId || providerLabel(r) || i)}
         loading={loading}
-        footer={footer}
         onRowPress={(row) => setSelected(row)}
         hint="Tap a row to see all details · Tap a provider name for its games"
       />
@@ -315,4 +321,22 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  totalsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(3),
+    marginBottom: spacing(1),
+  },
+  totalsCard: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+  },
+  totalsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  totalsValue: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginTop: spacing(1) },
 });
