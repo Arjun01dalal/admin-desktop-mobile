@@ -10,13 +10,16 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { CLIENT_NAMES } from '@astro/shared';
 import { colors, spacing } from '../../theme';
 import { floorNum, toNum } from '../../dashboards/mergeMetrics';
-import type { ProviderCardModel, ProviderFilter } from '../../dashboards/types';
+import type { KpiItem, ProviderCardModel, ProviderFilter } from '../../dashboards/types';
 import { useRiskDashboardData, type RiskFilters } from '../../dashboards/useRiskDashboardData';
 import { FilterBar } from '../../dashboards/ui/FilterBar';
+import { KpiGrid } from '../../dashboards/ui/KpiGrid';
 import { ProviderCard } from '../../dashboards/ui/ProviderCard';
+import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
 import { todayIST } from '../../utils/dates';
 
 function row(label: string, value: unknown) {
@@ -24,6 +27,9 @@ function row(label: string, value: unknown) {
 }
 
 export function RiskAnalysisScreen() {
+  const navigation = useNavigation<{
+    navigate: (name: string, params?: Record<string, unknown>) => void;
+  }>();
   const t = todayIST();
   const [startDate, setStartDate] = useState(t);
   const [endDate, setEndDate] = useState(t);
@@ -49,6 +55,57 @@ export function RiskAnalysisScreen() {
 
   const { bundle, loading, error, reload } = useRiskDashboardData(applied);
 
+  const dateState = useMemo(
+    () => ({ startDate: applied.startDate, endDate: applied.endDate }),
+    [applied.startDate, applied.endDate],
+  );
+  const dateQuery = useMemo(
+    () =>
+      new URLSearchParams({
+        startDate: applied.startDate,
+        endDate: applied.endDate,
+      }).toString(),
+    [applied.startDate, applied.endDate],
+  );
+
+  const navCards = useMemo<KpiItem[]>(
+    () => [
+      {
+        id: 'liveMatch',
+        label: 'Live Match Total',
+        value: '',
+        headingOnly: true,
+        href: '/liveMatchTotal',
+        state: dateState,
+      },
+      {
+        id: 'liveMatchMaster',
+        label: 'Live Match Total (Master)',
+        value: '',
+        headingOnly: true,
+        href: '/masterLiveMatchTotal',
+        state: dateState,
+      },
+      {
+        id: 'liveMatchBoth',
+        label: 'Live Match Total (Master & Laxmi)',
+        value: '',
+        headingOnly: true,
+        href: '/bothLiveMatchTotal',
+        state: dateState,
+      },
+      {
+        id: 'liveMatchAaa',
+        label: 'Live Match Total (AAA & Master AAA)',
+        value: '',
+        headingOnly: true,
+        href: '/bothMasterAddPage',
+        state: dateState,
+      },
+    ],
+    [dateState],
+  );
+
   const platformCards = useMemo<ProviderCardModel[]>(() => {
     const jetfair = bundle?.jetfair ?? {};
     const falcon = bundle?.falcon ?? {};
@@ -64,6 +121,9 @@ export function RiskAnalysisScreen() {
         title: 'Jetfair Platform Details',
         filters: ['All'],
         loading,
+        href: '/falconRateManagement',
+        search: `?${dateQuery}&type=jetfair`,
+        state: { ...dateState, type: 'jetfair' },
         rows: [
           row('Total Bet Amount', jetfair.payin),
           row('Total Bet Win', jetfair.payout),
@@ -77,6 +137,9 @@ export function RiskAnalysisScreen() {
         title: 'Falcon Platform Details',
         filters: ['All'],
         loading,
+        href: '/falconRateManagement',
+        search: `?${dateQuery}&type=falcon`,
+        state: { ...dateState, type: 'falcon' },
         rows: [
           row('Total Bet Amount', falcon.payin),
           row('Total Win Amount', falcon.payout),
@@ -90,6 +153,8 @@ export function RiskAnalysisScreen() {
         title: 'AAA Exch Details',
         filters: ['All'],
         loading,
+        href: '/exchangeRateManagement',
+        search: `?${dateQuery}`,
         rows: [
           row('Total Bet Amount', aaa.totalVolume),
           row('Total Win', aaa.totalClientWin),
@@ -104,6 +169,8 @@ export function RiskAnalysisScreen() {
         title: 'Master AAA Book',
         filters: ['All'],
         loading,
+        href: '/masterDashboard',
+        state: dateState,
         rows: [
           row('Total Bet Amount', masterAaa.totalVolume),
           row('Total Win', masterAaa.totalClientWin),
@@ -154,8 +221,29 @@ export function RiskAnalysisScreen() {
         </View>
       ) : null}
 
+      <KpiGrid
+        items={navCards}
+        isItemTappable={(item) => canOpenPanelPath(item.href)}
+        onItemPress={(item) =>
+          openPanelTarget(navigation, { href: item.href, state: item.state })
+        }
+      />
+
       {platformCards.map((card) => (
-        <ProviderCard key={card.id} card={card} />
+        <ProviderCard
+          key={card.id}
+          card={card}
+          onPress={
+            canOpenPanelPath(card.href)
+              ? () =>
+                  openPanelTarget(navigation, {
+                    href: card.href,
+                    state: card.state,
+                    search: card.search,
+                  })
+              : undefined
+          }
+        />
       ))}
     </ScrollView>
   );

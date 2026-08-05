@@ -27,6 +27,8 @@ import {
 } from '../../dashboards/ui/LudoDetailsModal';
 import { ProviderCard } from '../../dashboards/ui/ProviderCard';
 import { todayIST } from '../../utils/dates';
+import { useNavigation } from '@react-navigation/native';
+import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
 
 const TITLES: Record<DashboardMode, { title: string; description: string }> = {
   main: {
@@ -45,6 +47,9 @@ const TITLES: Record<DashboardMode, { title: string; description: string }> = {
 
 export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
   const meta = TITLES[mode];
+  const navigation = useNavigation<{
+    navigate: (name: string, params?: Record<string, unknown>) => void;
+  }>();
 
   const t = todayIST();
   const [startDate, setStartDate] = useState(t);
@@ -197,10 +202,29 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
         />
       ) : null}
 
-      <KpiGrid items={kpiItems} />
+      <KpiGrid
+        items={kpiItems}
+        isItemTappable={(item) => canOpenPanelPath(item.href)}
+        onItemPress={(item) =>
+          openPanelTarget(navigation, { href: item.href, state: item.state })
+        }
+      />
 
       {visibleCards.map((card) => (
-        <ProviderCard key={card.id} card={card} />
+        <ProviderCard
+          key={card.id}
+          card={card}
+          onPress={
+            canOpenPanelPath(card.href)
+              ? () =>
+                  openPanelTarget(navigation, {
+                    href: card.href,
+                    state: card.state,
+                    search: card.search,
+                  })
+              : undefined
+          }
+        />
       ))}
 
       {!loading && bundle && visibleCards.length === 0 ? (

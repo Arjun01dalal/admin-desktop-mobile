@@ -6,8 +6,10 @@ import {
   DrawerItem,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
 import { NAV_ITEMS, type NavItem } from './navItems';
+import { PANEL_DETAIL_ROUTES } from './panelDetail';
 import { canAccessNavItem } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
@@ -17,6 +19,7 @@ import { RiskAnalysisScreen } from '../screens/dashboards/RiskAnalysisScreen';
 import { colors } from '../theme';
 
 const Drawer = createDrawerNavigator();
+const RootStack = createNativeStackNavigator();
 
 type AnyScreen = React.ComponentType<Record<string, unknown>>;
 
@@ -58,29 +61,9 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   );
 }
 
-export function AppNavigator() {
-  const { user } = useAuth();
-
-  const items = useMemo(
-    () => NAV_ITEMS.filter((item) => canAccessNavItem(item)),
-    [user],
-  );
-
+function PanelDrawer({ items }: { items: NavItem[] }) {
   return (
-    <NavigationContainer
-      theme={{
-        ...DarkTheme,
-        colors: {
-          ...DarkTheme.colors,
-          background: colors.background,
-          card: colors.surface,
-          text: colors.foreground,
-          primary: colors.primary,
-          border: colors.border,
-        },
-      }}
-    >
-      <Drawer.Navigator
+    <Drawer.Navigator
         initialRouteName="welcome"
         drawerContent={(props) => <CustomDrawer {...props} items={items} />}
         screenOptions={{
@@ -104,6 +87,52 @@ export function AppNavigator() {
           );
         })}
       </Drawer.Navigator>
+  );
+}
+
+export function AppNavigator() {
+  const { user } = useAuth();
+
+  const items = useMemo(
+    () => NAV_ITEMS.filter((item) => canAccessNavItem(item)),
+    [user],
+  );
+
+  return (
+    <NavigationContainer
+      theme={{
+        ...DarkTheme,
+        colors: {
+          ...DarkTheme.colors,
+          background: colors.background,
+          card: colors.surface,
+          text: colors.foreground,
+          primary: colors.primary,
+          border: colors.border,
+        },
+      }}
+    >
+      <RootStack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.foreground,
+          headerTitleStyle: { fontWeight: '600' },
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <RootStack.Screen name="panel" options={{ headerShown: false }}>
+          {() => <PanelDrawer items={items} />}
+        </RootStack.Screen>
+        {PANEL_DETAIL_ROUTES.map((route) => (
+          <RootStack.Screen
+            key={route.path}
+            name={route.path}
+            options={{ title: route.title }}
+          >
+            {() => <route.Component />}
+          </RootStack.Screen>
+        ))}
+      </RootStack.Navigator>
     </NavigationContainer>
   );
 }

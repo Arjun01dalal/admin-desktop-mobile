@@ -15,11 +15,25 @@ function formatValue(v: number | string): string {
   return typeof v === 'number' ? v.toLocaleString('en-IN') : String(v);
 }
 
-export function ProviderCard({ card }: { card: ProviderCardModel }) {
+export function ProviderCard({
+  card,
+  onPress,
+}: {
+  card: ProviderCardModel;
+  /** When provided, the card body becomes tappable (drill-in navigation). */
+  onPress?: () => void;
+}) {
+  const Wrapper: React.ElementType = onPress ? TouchableOpacity : View;
   return (
-    <View style={styles.card}>
+    <Wrapper
+      style={styles.card}
+      {...(onPress
+        ? { onPress, activeOpacity: 0.75, accessibilityRole: 'button' as const }
+        : {})}
+    >
       <View style={styles.headerRow}>
         <Text style={styles.title}>{card.title}</Text>
+        {onPress ? <Text style={styles.chevron}>›</Text> : null}
         {card.loading ? <ActivityIndicator size="small" color={colors.primary} /> : null}
       </View>
       {typeof card.activeCustomerCount === 'number' && card.activeCustomerCount > 0 && (
@@ -81,7 +95,7 @@ export function ProviderCard({ card }: { card: ProviderCardModel }) {
           ))}
         </View>
       )}
-    </View>
+    </Wrapper>
   );
 }
 
@@ -101,6 +115,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   title: { color: colors.primary, fontSize: 15, fontWeight: '700', flex: 1 },
+  chevron: { color: colors.muted, fontSize: 20, fontWeight: '700', marginRight: spacing(1) },
   badge: {
     alignSelf: 'flex-start',
     backgroundColor: colors.surfaceAlt,
