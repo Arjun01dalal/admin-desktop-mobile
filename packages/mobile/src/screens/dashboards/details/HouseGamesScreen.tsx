@@ -173,6 +173,9 @@ function isBotValue(row: TxnRow): string {
   return '-';
 }
 
+/** Columns shown in the list; tapping a row opens a sheet with every column. */
+const MAIN_KEYS = new Set(['sr', 'name', 'amount', 'status', 'created']);
+
 export function HouseGamesScreen() {
   const isFocused = useIsFocused();
 
@@ -432,7 +435,7 @@ export function HouseGamesScreen() {
       ) : null}
 
       <DataTable
-        columns={columns}
+        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
         rows={rows}
         keyFor={(r, i) => String(r._id || r.txnId || i)}
         emptyMessage={loading ? 'Loading…' : 'No Data Found'}
