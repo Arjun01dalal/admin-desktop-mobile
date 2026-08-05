@@ -1,8 +1,9 @@
 /**
  * House Games — transactions list (Ludo admin).
  * Port of desktop HouseGamesPage with the mobile screen structure:
- * date filter, paginated DataTable with main columns, bottom sheet
- * with every column, pull-to-refresh.
+ * date filter, collapsible column filters (same filter payload as
+ * desktop), paginated DataTable with main columns, bottom sheet with
+ * every column, pull-to-refresh.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -10,13 +11,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { colors, radius, spacing } from '../../../theme';
-import { todayIST } from '../../../utils/dates';
+import { monthStartIST, todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
@@ -37,15 +39,79 @@ type TxnRow = {
   currency?: string;
   amount?: number;
   winingPoint?: number;
-  roundCapacity?: number;
-  isBot?: boolean;
-  bot?: boolean;
+  roundCapacity?: number | string;
+  isBot?: boolean | string | number;
+  bot?: unknown;
+  playerIdentity?: { bot?: unknown; real?: unknown };
+  playerIdentityBot?: unknown;
+  playerIdentityReal?: unknown;
   createdAt?: string;
   createdOn?: string;
   updatedAt?: string;
 };
 
 const ITEMS_PER_PAGE = 50;
+
+/** Same shape as desktop INITIAL_FILTERS. */
+const INITIAL_FILTERS = {
+  userId: '',
+  txnId: '',
+  refTxnId: '',
+  roundId: '',
+  sessionId: '',
+  gameId: '',
+  operatorId: '',
+  type: '',
+  status: '',
+  name: '',
+  currency: '',
+  roundCapacity: '',
+  isBot: null as boolean | null,
+  human: null as boolean | null,
+  minAmount: '',
+  maxAmount: '',
+};
+type FiltersState = typeof INITIAL_FILTERS;
+
+const TEXT_FILTER_FIELDS: { key: keyof FiltersState; placeholder: string; numeric?: boolean }[] = [
+  { key: 'name', placeholder: 'Name' },
+  { key: 'userId', placeholder: 'User ID' },
+  { key: 'txnId', placeholder: 'Txn ID' },
+  { key: 'refTxnId', placeholder: 'Ref Txn ID' },
+  { key: 'roundId', placeholder: 'Round ID' },
+  { key: 'sessionId', placeholder: 'Session ID' },
+  { key: 'gameId', placeholder: 'Game ID' },
+  { key: 'operatorId', placeholder: 'Operator ID' },
+  { key: 'currency', placeholder: 'Currency' },
+  { key: 'roundCapacity', placeholder: 'Round Capacity', numeric: true },
+  { key: 'minAmount', placeholder: 'Min Amount', numeric: true },
+  { key: 'maxAmount', placeholder: 'Max Amount', numeric: true },
+];
+
+const TYPE_OPTIONS = ['', 'bet', 'win', 'refund'];
+const STATUS_OPTIONS = ['', 'W', 'L'];
+
+const NUMERIC_FILTER_KEYS = new Set(['roundCapacity', 'minAmount', 'maxAmount']);
+
+/** Mirrors desktop buildFilterPayload (txnId also sent as transactionId). */
+function buildFilterPayload(filters: FiltersState): Record<string, unknown> {
+  const filter: Record<string, unknown> = {};
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === '' || value === null) return;
+    if (key === 'isBot' || key === 'human') {
+      filter[key] = value;
+      return;
+    }
+    if (NUMERIC_FILTER_KEYS.has(key)) {
+      const num = Number(value);
+      if (!Number.isNaN(num)) filter[key] = num;
+      return;
+    }
+    filter[key] = value;
+  });
+  if (filter.txnId) filter.transactionId = filter.txnId;
+  return filter;
+}
 
 /** Mirrors desktop useHouseGamesQuery row unwrapping. */
 function asRows(raw: unknown): TxnRow[] {
@@ -82,11 +148,29 @@ function fmt2(value: unknown): string {
 
 function fmtDate(row: TxnRow): string {
   const raw = row.createdAt || row.createdOn || row.updatedAt;
-  if (!raw) return '—';
+  if (!raw) return '-';
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return String(raw);
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} - ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Mirrors desktop getPlayerIdentity. */
+function playerIdentity(row: TxnRow): string {
+  if (row.playerIdentity) {
+    return `Bot: ${row.playerIdentity.bot ?? '-'}, Real: ${row.playerIdentity.real ?? '-'}`;
+  }
+  if (row.playerIdentityBot !== undefined || row.playerIdentityReal !== undefined) {
+    return `Bot: ${row.playerIdentityBot ?? '-'}, Real: ${row.playerIdentityReal ?? '-'}`;
+  }
+  return '-';
+}
+
+/** Mirrors desktop getIsBotValue. */
+function isBotValue(row: TxnRow): string {
+  if (row.isBot !== undefined) return String(row.isBot);
+  if (row.bot !== undefined) return String(row.bot);
+  return '-';
 }
 
 /** Columns shown in the list; the bottom sheet shows all of them. */
@@ -95,10 +179,13 @@ const MAIN_KEYS = new Set(['name', 'amount', 'status', 'created']);
 export function HouseGamesScreen() {
   const isFocused = useIsFocused();
 
-  const [draftStart, setDraftStart] = useState(todayIST());
+  const [draftStart, setDraftStart] = useState(monthStartIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
-  const [startDate, setStartDate] = useState(todayIST());
+  const [startDate, setStartDate] = useState(monthStartIST());
   const [endDate, setEndDate] = useState(todayIST());
+  const [draftFilters, setDraftFilters] = useState<FiltersState>(INITIAL_FILTERS);
+  const [filters, setFilters] = useState<FiltersState>(INITIAL_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const [pageNo, setPageNo] = useState(1);
   const [rows, setRows] = useState<TxnRow[]>([]);
   const [totalCount, setTotalCount] = useState<number | null>(null);
@@ -113,13 +200,16 @@ export function HouseGamesScreen() {
     const gen = ++genRef.current;
     setLoading(true);
     try {
-      const res = await secureApi('houseGames.transactions', {
+      const payload: Record<string, unknown> = {
         pageNo,
         itemsPerPage: ITEMS_PER_PAGE,
         startDate,
         endDate,
-        filter: {},
-      });
+      };
+      const filter = buildFilterPayload(filters);
+      if (Object.keys(filter).length > 0) payload.filter = filter;
+
+      const res = await secureApi('houseGames.transactions', payload);
       if (gen !== genRef.current) return; // stale response
       if (!res.ok || res.success === false) {
         setError(res.message || 'Failed to load house games');
@@ -137,32 +227,51 @@ export function HouseGamesScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [pageNo, startDate, endDate]);
+  }, [pageNo, startDate, endDate, filters]);
 
   useEffect(() => {
     if (isFocused) void load();
   }, [isFocused, load]);
 
+  const setDraft = useCallback(
+    <K extends keyof FiltersState>(key: K, value: FiltersState[K]) =>
+      setDraftFilters((f) => ({ ...f, [key]: value })),
+    [],
+  );
+
+  const applyAll = useCallback(() => {
+    setPageNo(1);
+    setStartDate(draftStart);
+    setEndDate(draftEnd);
+    setFilters(draftFilters);
+  }, [draftStart, draftEnd, draftFilters]);
+
   const columns = useMemo<DataTableColumn<TxnRow>[]>(
     () => [
-      { key: 'name', label: 'Name', width: 130, render: (r) => String(r.name || '—') },
-      { key: 'userId', label: 'User ID', width: 130, render: (r) => String(r.userId || '—') },
-      { key: 'txnId', label: 'Transaction ID', width: 160, render: (r) => String(r.txnId || r.transactionId || '—') },
-      { key: 'refTxnId', label: 'Ref Txn ID', width: 160, render: (r) => String(r.refTxnId || '—') },
-      { key: 'roundId', label: 'Round ID', width: 140, render: (r) => String(r.roundId || '—') },
-      { key: 'sessionId', label: 'Session ID', width: 140, render: (r) => String(r.sessionId || '—') },
-      { key: 'gameId', label: 'Game ID', width: 110, render: (r) => String(r.gameId || '—') },
-      { key: 'operatorId', label: 'Operator ID', width: 110, render: (r) => String(r.operatorId || '—') },
-      { key: 'type', label: 'Type', width: 90, render: (r) => String(r.type || '—') },
-      { key: 'status', label: 'Status', width: 90, render: (r) => String(r.status || '—') },
-      { key: 'currency', label: 'Currency', width: 80, render: (r) => String(r.currency || '—') },
+      { key: 'name', label: 'Name', width: 130, render: (r) => String(r.name || '-') },
+      { key: 'userId', label: 'User ID', width: 130, render: (r) => String(r.userId || '-') },
+      { key: 'txnId', label: 'Transaction ID', width: 160, render: (r) => String(r.txnId || r.transactionId || '-') },
+      { key: 'refTxnId', label: 'Ref Txn ID', width: 160, render: (r) => String(r.refTxnId || '-') },
+      { key: 'roundId', label: 'Round ID', width: 140, render: (r) => String(r.roundId || '-') },
+      { key: 'sessionId', label: 'Session ID', width: 140, render: (r) => String(r.sessionId || '-') },
+      { key: 'gameId', label: 'Game ID', width: 110, render: (r) => String(r.gameId || '-') },
+      { key: 'operatorId', label: 'Operator ID', width: 110, render: (r) => String(r.operatorId || '-') },
+      { key: 'type', label: 'Type', width: 90, render: (r) => String(r.type || '-') },
+      { key: 'status', label: 'Status', width: 90, render: (r) => String(r.status || '-') },
+      { key: 'currency', label: 'Currency', width: 80, render: (r) => String(r.currency || '-') },
       { key: 'amount', label: 'Amount', width: 90, align: 'right', render: (r) => fmt2(r.amount) },
       { key: 'winingPoint', label: 'Winning Point', width: 110, align: 'right', render: (r) => fmt2(r.winingPoint) },
-      { key: 'roundCapacity', label: 'Round Capacity', width: 110, align: 'right', render: (r) => String(r.roundCapacity ?? '—') },
-      { key: 'isBot', label: 'Is Bot', width: 70, render: (r) => ((r.isBot ?? r.bot) ? 'Yes' : 'No') },
+      { key: 'roundCapacity', label: 'Round Capacity', width: 110, align: 'right', render: (r) => String(r.roundCapacity ?? '-') },
+      { key: 'isBot', label: 'Is Bot', width: 80, render: (r) => isBotValue(r) },
+      { key: 'player', label: 'Player Identity', width: 160, render: (r) => playerIdentity(r) },
       { key: 'created', label: 'Created', width: 150, render: (r) => fmtDate(r) },
     ],
     [],
+  );
+
+  const activeFilterCount = useMemo(
+    () => Object.keys(buildFilterPayload(filters)).filter((k) => k !== 'transactionId').length,
+    [filters],
   );
 
   return (
@@ -185,12 +294,99 @@ export function HouseGamesScreen() {
         loading={loading}
         onStartDateChange={setDraftStart}
         onEndDateChange={setDraftEnd}
-        onApply={() => {
-          setPageNo(1);
-          setStartDate(draftStart);
-          setEndDate(draftEnd);
-        }}
+        onApply={applyAll}
       />
+
+      {/* Collapsible column filters (same payload as desktop) */}
+      <TouchableOpacity
+        style={styles.filterToggle}
+        onPress={() => setShowFilters((v) => !v)}
+        accessibilityRole="button"
+      >
+        <Text style={styles.filterToggleText}>
+          {showFilters ? 'Hide Filters ▲' : `Filters ▼${activeFilterCount ? ` (${activeFilterCount})` : ''}`}
+        </Text>
+      </TouchableOpacity>
+
+      {showFilters && (
+        <View style={styles.filterPanel}>
+          <View style={styles.filterGrid}>
+            {TEXT_FILTER_FIELDS.map((f) => (
+              <TextInput
+                key={f.key}
+                style={styles.filterInput}
+                placeholder={f.placeholder}
+                placeholderTextColor={colors.muted}
+                value={String(draftFilters[f.key] ?? '')}
+                keyboardType={f.numeric ? 'numeric' : 'default'}
+                autoCapitalize="none"
+                onChangeText={(t) => setDraft(f.key, t as never)}
+              />
+            ))}
+          </View>
+
+          {/* Type / Status */}
+          <View style={styles.chipGroupRow}>
+            <Text style={styles.chipGroupLabel}>Type</Text>
+            {TYPE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt || 'all'}
+                style={[styles.chip, draftFilters.type === opt && styles.chipActive]}
+                onPress={() => setDraft('type', opt)}
+              >
+                <Text style={[styles.chipText, draftFilters.type === opt && styles.chipTextActive]}>
+                  {opt || 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.chipGroupRow}>
+            <Text style={styles.chipGroupLabel}>Status</Text>
+            {STATUS_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt || 'all'}
+                style={[styles.chip, draftFilters.status === opt && styles.chipActive]}
+                onPress={() => setDraft('status', opt)}
+              >
+                <Text style={[styles.chipText, draftFilters.status === opt && styles.chipTextActive]}>
+                  {opt || 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Bot / Human toggles (null = off, true = on, like desktop checkboxes) */}
+          <View style={styles.chipGroupRow}>
+            {(['isBot', 'human'] as const).map((key) => {
+              const on = draftFilters[key] === true;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.chip, on && styles.chipActive]}
+                  onPress={() => setDraft(key, on ? null : true)}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                    {key === 'isBot' ? 'Is Bot' : 'Human'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.filterActions}>
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={() => setDraftFilters(INITIAL_FILTERS)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.clearBtnText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.applyBtn} onPress={applyAll} accessibilityRole="button">
+              <Text style={styles.applyBtnText}>Search</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Totals summary */}
       {(totalCount !== null || totalAmount !== null) && (
@@ -271,6 +467,60 @@ const styles = StyleSheet.create({
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
+  filterToggle: { marginBottom: spacing(3) },
+  filterToggleText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  filterPanel: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(3),
+    gap: spacing(2),
+  },
+  filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
+  filterInput: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 130,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(2),
+    color: colors.foreground,
+    fontSize: 13,
+    backgroundColor: colors.background,
+  },
+  chipGroupRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing(2) },
+  chipGroupLabel: { color: colors.muted, fontSize: 12, width: 44 },
+  chip: {
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1),
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: '#fff' },
+  filterActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2) },
+  clearBtn: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  clearBtnText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
+  applyBtn: {
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(1.5),
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  applyBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   totalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginBottom: spacing(3) },
   totalCard: {
     flexGrow: 1,

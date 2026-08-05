@@ -29,7 +29,6 @@ type LeaderboardRow = {
   activeUserCount?: number;
   customerDepositAmt?: number;
   city?: string;
-  plainPassword?: string;
 };
 
 const CITY_TOTALS = ['nagpur', 'dubai', 'bangluru', 'pune', 'mysuru'] as const;
@@ -114,7 +113,6 @@ export function LeaderboardScreen() {
       { key: 'name', label: 'Caller Name', width: 140, render: (r) => String(r.name || '—') },
       { key: 'city', label: 'City', width: 100, render: (r) => String(r.city || '—') },
       { key: 'email', label: 'Email', width: 180, render: (r) => String(r.email || '—') },
-      { key: 'password', label: 'Password', width: 120, render: (r) => String(r.plainPassword || '—') },
       {
         key: 'customerCount',
         label: 'Customer Count',
