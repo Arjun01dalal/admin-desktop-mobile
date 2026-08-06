@@ -11,7 +11,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   Share,
@@ -275,7 +277,10 @@ export function SocialMediaScreen() {
       />
 
       <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
-        <View style={styles.backdrop}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <TouchableWithoutFeedback onPress={() => !submitting && setFormOpen(false)}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
@@ -319,7 +324,7 @@ export function SocialMediaScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
