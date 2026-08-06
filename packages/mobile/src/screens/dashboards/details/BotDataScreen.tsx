@@ -43,8 +43,14 @@ const USER_TYPES = [
 
 const PLAYED_OPTIONS = ['C', 'E', 'S'] as const;
 
-/** Mirrors desktop BOT_ID_OPTIONS (callLogs/constants). */
-const BOT_ID_OPTIONS = Array.from({ length: 150 }, (_, i) => String(i + 1));
+/** Allowed BOT IDs (user-provided allowlist). */
+const BOT_ID_OPTIONS = [
+  '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+  '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
+  '21', '22', '23', '24', '31', '33', '34', '39', '46', '47',
+  '55', '56', '63', '64', '65', '69', '73', '74', '84', '85',
+  '86', '92', '97', '104', '105', '106', '114', '126',
+];
 
 /** Mirrors desktop INDIA_STATES (users/constants). */
 const INDIA_STATES = [
