@@ -125,14 +125,14 @@ export function AllUserLoginReportScreen() {
       {
         key: 'loginCount',
         label: 'Login Count',
-        width: 90,
-        align: 'right',
+        width: 110,
+        align: 'left',
         render: (r) => String(getActionStats(r.actionHistory, 'login').count),
       },
       {
         key: 'lastLogin',
         label: 'Last Login Time',
-        width: 160,
+        width: 175,
         render: (r) => formatTs(getActionStats(r.actionHistory, 'login').last?.timestamp),
       },
       {
