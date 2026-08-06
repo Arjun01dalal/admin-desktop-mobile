@@ -25,6 +25,8 @@ import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { CAMPAIGN_LIST } from '../../../utils/campaignList';
+import { addToDialerBatch } from '../../../utils/externalDialer';
 
 type BotPerfRow = {
   _id: string;
@@ -53,7 +55,7 @@ const TYPE_OPTIONS = [
 const PAGE_SIZES = [10, 25, 50, 100, 200, 500] as const;
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
-const MAIN_KEYS = new Set(['sr', 'name', 'botId', 'balance']);
+const MAIN_KEYS = new Set(['sel', 'sr', 'name', 'botId', 'balance']);
 
 function formatBalance(value: unknown): string {
   const n = typeof value === 'number' ? value : Number(value);
@@ -101,6 +103,13 @@ export function BotPerformanceScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: BotPerfRow; index: number } | null>(null);
+
+  // Add to Dialer (same external dialer API the web panel uses)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [campaignId, setCampaignId] = useState('');
+  const [campaignOpen, setCampaignOpen] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [dialerMsg, setDialerMsg] = useState('');
 
   const genRef = React.useRef(0);
   // Text filters are read at load time (like desktop: applied on Apply).
@@ -183,8 +192,70 @@ export function BotPerformanceScreen() {
 
   const rowOffset = (page - 1) * pageSize;
 
+  const toggleSelect = useCallback((row: BotPerfRow) => {
+    const id = String(row._id || '');
+    if (!id) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(String(r._id)));
+
+  const toggleAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (rows.length > 0 && rows.every((r) => prev.has(String(r._id)))) return new Set();
+      return new Set(rows.map((r) => String(r._id)).filter(Boolean));
+    });
+  }, [rows]);
+
+  const addToDialer = useCallback(async () => {
+    setDialerMsg('');
+    if (!campaignId) {
+      setDialerMsg('Campaign should not be empty');
+      return;
+    }
+    const chosen = rows.filter((r) => selectedIds.has(String(r._id)));
+    if (!chosen.length) {
+      setDialerMsg('Select at least one user');
+      return;
+    }
+    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
+    setPushing(true);
+    try {
+      const res = await addToDialerBatch({
+        campaignId,
+        serverId: campaign?.serverId,
+        leads: chosen.map((r) => ({
+          _id: r._id,
+          name: r.name || r.client_name,
+          mobile: r.mobile || r.phone_number,
+          city: r.city,
+          state: r.state,
+          clientName: r.clientName,
+        })),
+      });
+      setDialerMsg(res.message);
+      if (res.ok) setSelectedIds(new Set());
+    } finally {
+      setPushing(false);
+    }
+  }, [campaignId, rows, selectedIds]);
+
   const columns = useMemo<DataTableColumn<BotPerfRow>[]>(
     () => [
+      {
+        key: 'sel',
+        label: allSelected ? '☑' : '☐',
+        width: 36,
+        render: (r) => (selectedIds.has(String(r._id)) ? '☑' : '☐'),
+        color: (r) => (selectedIds.has(String(r._id)) ? colors.primary : colors.muted),
+        onCellPress: toggleSelect,
+        onHeaderPress: toggleAll,
+      },
       { key: 'sr', label: '#', width: 46, render: (_r, i) => String(rowOffset + i + 1) },
       { key: 'name', label: 'Name', width: 120, render: (r) => display(r.name || r.client_name) },
       { key: 'dpId', label: 'DP ID', width: 180, render: (r) => display(r._id) },
@@ -209,7 +280,7 @@ export function BotPerformanceScreen() {
       { key: 'createdAt', label: 'Created At', width: 110, render: (r) => formatDisplayDate(r.createdOn) || '—' },
       { key: 'lastActivity', label: 'Last Activity', width: 110, render: (r) => formatDisplayDate(r.activeUser) || '—' },
     ],
-    [rowOffset, canShowMobile],
+    [rowOffset, canShowMobile, allSelected, selectedIds, toggleSelect, toggleAll],
   );
 
   const textFilters: Array<{ label: string; value: string; set: (v: string) => void; keyboard?: 'phone-pad' | 'number-pad' | 'numeric' }> = [
@@ -304,6 +375,48 @@ export function BotPerformanceScreen() {
         </View>
       ) : null}
 
+      {/* Add to Dialer */}
+      <TouchableOpacity style={styles.collapseHeader} onPress={() => setCampaignOpen((o) => !o)}>
+        <Text style={styles.collapseTitle}>
+          Add to Dialer{campaignId ? ` · ${campaignId}` : ''}
+          {selectedIds.size ? ` · ${selectedIds.size} selected` : ''} {campaignOpen ? '▲' : '▼'}
+        </Text>
+      </TouchableOpacity>
+      {campaignOpen && (
+        <View style={styles.filterCard}>
+          <Text style={styles.filterLabel}>Campaign</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+            {CAMPAIGN_LIST.map((c) => {
+              const id = c.id.trim();
+              return (
+                <TouchableOpacity
+                  key={id}
+                  style={[styles.chip, campaignId === id && styles.chipActive]}
+                  onPress={() => setCampaignId(campaignId === id ? '' : id)}
+                >
+                  <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
+                    {id} · {c.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.dialerHint}>
+            Tick rows in the table (tap the ☐ cell), pick a campaign, then push.
+          </Text>
+          <TouchableOpacity
+            style={[styles.searchBtn, (pushing || !selectedIds.size || !campaignId) && styles.btnDisabled]}
+            onPress={() => void addToDialer()}
+            disabled={pushing || !selectedIds.size || !campaignId}
+          >
+            <Text style={styles.searchBtnText}>
+              {pushing ? 'Adding…' : `Add ${selectedIds.size || ''} to Dialer`}
+            </Text>
+          </TouchableOpacity>
+          {dialerMsg ? <Text style={styles.dialerMsg}>{dialerMsg}</Text> : null}
+        </View>
+      )}
+
       {loading && rows.length === 0 ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -351,14 +464,13 @@ export function BotPerformanceScreen() {
         fields={
           selected
             ? columns
-                .filter((c) => c.key !== 'sr' && c.key !== 'name')
+                .filter((c) => c.key !== 'sel' && c.key !== 'sr' && c.key !== 'name')
                 .map<SheetField>((c) => ({
                   label: c.label,
                   value: c.render(selected.row, selected.index),
                 }))
             : []
         }
-        note="Add to Dialer is available on the desktop app only."
         onClose={() => setSelected(null)}
       />
     </ScrollView>
@@ -420,6 +532,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   filterBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(1) },
+  btnDisabled: { opacity: 0.5 },
+  dialerHint: { color: colors.muted, fontSize: 11, marginTop: spacing(2), marginBottom: spacing(2) },
+  dialerMsg: { color: colors.foreground, fontSize: 12, marginTop: spacing(2), textAlign: 'center' },
   searchBtn: {
     flex: 1,
     backgroundColor: colors.primary,
