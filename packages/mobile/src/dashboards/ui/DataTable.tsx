@@ -61,9 +61,21 @@ export function DataTable<Row>({
   rowBg,
   hint,
 }: Props<Row>) {
+  // Only enable horizontal scrolling when the table is actually wider than the
+  // card. When everything fits (e.g. a 1-2 column list), a live horizontal
+  // ScrollView eats taps — any tiny finger movement cancels the row press,
+  // making rows feel randomly untappable.
+  const [containerW, setContainerW] = React.useState(0);
+  const [contentW, setContentW] = React.useState(0);
+  const needsHScroll = contentW > containerW + 1;
   return (
-    <View style={styles.card}>
-      <ScrollView horizontal showsHorizontalScrollIndicator>
+    <View style={styles.card} onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator
+        scrollEnabled={needsHScroll}
+        onContentSizeChange={(w) => setContentW(w)}
+      >
         <View>
           <View style={[styles.row, styles.headRow]}>
             {columns.map((col) =>
@@ -201,7 +213,7 @@ export function DataTable<Row>({
           ) : null}
         </View>
       </ScrollView>
-      <Text style={styles.hint}>{hint ?? 'Swipe sideways to see all columns →'}</Text>
+      <Text style={styles.hint}>{hint ?? (needsHScroll ? 'Swipe sideways to see all columns →' : '')}</Text>
     </View>
   );
 }
