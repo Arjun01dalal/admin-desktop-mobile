@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import {
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -43,9 +44,20 @@ type Props = {
   actions?: SheetAction[];
   /** Optional muted note rendered under the actions (e.g. desktop-only features). */
   note?: string;
+  /** Optional image shown at the top of the sheet (e.g. game artwork). */
+  imageUri?: string;
 };
 
-export function RowDetailSheet({ visible, title, fields, onClose, action, actions, note }: Props) {
+export function RowDetailSheet({
+  visible,
+  title,
+  fields,
+  onClose,
+  action,
+  actions,
+  note,
+  imageUri,
+}: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -67,6 +79,9 @@ export function RowDetailSheet({ visible, title, fields, onClose, action, action
             contentContainerStyle={{ paddingBottom: spacing(8) }}
             showsVerticalScrollIndicator={false}
           >
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
+            ) : null}
             {actions && actions.length > 0 ? (
               <View style={styles.actionsRow}>
                 {actions.map((a) => (
@@ -162,6 +177,13 @@ const styles = StyleSheet.create({
   title: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1 },
   close: { color: colors.muted, fontSize: 18, paddingHorizontal: spacing(2) },
   scroll: { marginTop: spacing(1) },
+  image: {
+    width: '100%',
+    height: 150,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    marginTop: spacing(2),
+  },
   actionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

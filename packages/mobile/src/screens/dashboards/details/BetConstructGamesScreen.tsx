@@ -38,6 +38,7 @@ type Row = {
   ratingCount?: number | string;
   status?: boolean;
   updatedOn?: string;
+  images?: Array<{ url?: string }>;
   [key: string]: unknown;
 };
 
@@ -93,7 +94,9 @@ export function BetConstructGamesScreen() {
       setSheetRow(null);
       setRows(list);
       setTotal(count);
-      setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE) || 1));
+      // If the server's count is unreliable, keep Next enabled while pages come back full.
+      const pages = Math.max(1, Math.ceil(count / PAGE_SIZE) || 1);
+      setTotalPages(list.length === PAGE_SIZE ? Math.max(pages, page + 1) : pages);
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
@@ -237,6 +240,9 @@ export function BetConstructGamesScreen() {
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.Name || sheetRow.name) : ''}
+        imageUri={
+          sheetRow?.images?.[2]?.url || sheetRow?.images?.find((im) => im?.url)?.url || undefined
+        }
         fields={
           sheetRow
             ? columns
