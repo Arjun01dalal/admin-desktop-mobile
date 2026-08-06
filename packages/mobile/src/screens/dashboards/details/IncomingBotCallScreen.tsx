@@ -149,6 +149,7 @@ export function IncomingBotCallScreen() {
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
 
   const genRef = useRef(0);
+  const summaryGenRef = useRef(0);
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -210,6 +211,7 @@ export function IncomingBotCallScreen() {
   }, [rows, appliedFrom, appliedTo, appliedSid]);
 
   const openSummary = useCallback(async (call: IncomingCall) => {
+    const gen = ++summaryGenRef.current;
     setSummaryOpen(true);
     setSummaryData(null);
     setSummaryLoading(true);
@@ -225,6 +227,7 @@ export function IncomingBotCallScreen() {
           status?: string;
           message?: string;
         };
+        if (gen !== summaryGenRef.current) return;
         if (!resp.ok || data?.status === 'failed') {
           Alert.alert(data?.message || 'Analysis is in progress.');
           setSummaryOpen(false);
@@ -232,13 +235,20 @@ export function IncomingBotCallScreen() {
         }
         setSummaryData(data || null);
       } catch {
+        if (gen !== summaryGenRef.current) return;
         Alert.alert('Analysis is in progress.');
         setSummaryOpen(false);
         return;
       }
     } finally {
-      setSummaryLoading(false);
+      if (gen === summaryGenRef.current) setSummaryLoading(false);
     }
+  }, []);
+
+  const closeSummary = useCallback(() => {
+    summaryGenRef.current += 1; // invalidate any in-flight summary fetch
+    setSummaryOpen(false);
+    setSummaryLoading(false);
   }, []);
 
   const summaryRows = useMemo(() => buildSummaryRows(summaryData), [summaryData]);
@@ -377,17 +387,17 @@ export function IncomingBotCallScreen() {
         visible={summaryOpen}
         transparent
         animationType="slide"
-        onRequestClose={() => setSummaryOpen(false)}
+        onRequestClose={closeSummary}
       >
         <View style={styles.backdrop}>
-          <TouchableWithoutFeedback onPress={() => setSummaryOpen(false)}>
+          <TouchableWithoutFeedback onPress={closeSummary}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
           <View style={styles.summarySheet}>
             <View style={styles.summaryHeader}>
               <Text style={styles.summaryTitle}>Call Summary</Text>
               <TouchableOpacity
-                onPress={() => setSummaryOpen(false)}
+                onPress={closeSummary}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Text style={styles.close}>✕</Text>
