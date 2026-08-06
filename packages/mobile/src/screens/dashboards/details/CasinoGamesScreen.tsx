@@ -1,10 +1,13 @@
 /**
- * BetConstruct Games — port of desktop BetConstructGamesPage.
- * ops.betConstructGetAll { pageNo, itemPerPage, status:true, Name? }; parses
- * data.games + data.count. Row tap opens a detail modal. Image upload stays desktop-only.
+ * Casino Games — port of desktop CasinoGamesPage (list + status toggle).
+ * ops.casinoGetConfig -> activeCasinoProvider (QTECH/WACS); ops.casinoGetData
+ * { pageNo, itemsPerPage, Filters }. Row tap opens a detail modal with an
+ * Enable/Disable action (ops.casinoEditGame). Provider switching, Mirai and
+ * Table ID management stay desktop-only.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,126 +19,150 @@ import {
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
-import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type Row = {
   _id?: string;
   Name?: string;
   name?: string;
-  category?: string;
-  allowedCurrencies?: string[];
-  subCategory?: string;
   gameId?: string | number;
-  providerName?: string;
-  provider?: { name?: string; id?: string | number };
-  rating?: number | string;
-  ratingCount?: number | string;
+  Game_Code?: string | number;
+  tableId?: string | number;
+  providerId?: string | number;
+  category?: string;
   status?: boolean;
-  updatedOn?: string;
   [key: string]: unknown;
 };
 
+type Provider = 'QTECH' | 'WACS';
+
 const PAGE_SIZE = 25;
-const MAIN_KEYS = new Set(['idx', 'name', 'category', 'status']);
+const MAIN_KEYS = new Set(['idx', 'name', 'gameId', 'status']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
 }
 
-export function BetConstructGamesScreen() {
+function asProvider(value: unknown): Provider {
+  return value === 'WACS' ? 'WACS' : 'QTECH';
+}
+
+export function CasinoGamesScreen() {
+  const [provider, setProvider] = useState<Provider>('QTECH');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
-  const [searchDraft, setSearchDraft] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
+  const [nameDraft, setNameDraft] = useState('');
+  const [idDraft, setIdDraft] = useState('');
+  const [applied, setApplied] = useState<{ name: string; id: string }>({ name: '', id: '' });
   const [sheetRow, setSheetRow] = useState<Row | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const genRef = useRef(0);
+
+  // Active provider from config (desktop reads res.data.activeCasinoProvider).
+  useEffect(() => {
+    void (async () => {
+      const res = await secureApi<{ activeCasinoProvider?: string }>('ops.casinoGetConfig', {});
+      if (res.ok) setProvider(asProvider(res.data?.activeCasinoProvider));
+    })();
+  }, []);
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
     setLoading(true);
     setError(null);
     try {
-      const payload: Record<string, unknown> = {
+      const filters: Record<string, unknown> = {};
+      if (applied.name.trim()) filters.Name = applied.name.trim();
+      if (applied.id.trim()) {
+        if (provider === 'QTECH') filters.gameId = applied.id.trim();
+        else filters.Game_Code = applied.id.trim();
+      }
+      const res = await secureApi<unknown>('ops.casinoGetData', {
         pageNo: page,
-        itemPerPage: PAGE_SIZE,
-        status: true,
-      };
-      const name = appliedSearch.trim();
-      if (name) payload.Name = name;
-      const res = await secureApi<unknown>('ops.betConstructGetAll', payload);
+        itemsPerPage: PAGE_SIZE,
+        Filters: filters,
+      });
       if (gen !== genRef.current) return;
       if (!res.ok) {
-        setError(res.message || 'Failed to load BetConstruct games');
+        setError(res.message || 'Failed to load casino games');
         setRows([]);
         setTotalPages(1);
-        setTotal(0);
         return;
       }
-      const data = (res.data || {}) as { games?: Row[]; count?: number };
-      const count = Number(data.count) || 0;
+      const data = (res.data || {}) as { items?: Row[]; totalPages?: number };
       setSheetRow(null);
-      setRows(Array.isArray(data.games) ? data.games : []);
-      setTotal(count);
-      setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
+      setRows(Array.isArray(data.items) ? data.items : []);
+      setTotalPages(Math.max(1, Number(data.totalPages) || 1));
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [page, appliedSearch]);
+  }, [page, applied, provider]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  const toggleStatus = useCallback(
+    (row: Row) => {
+      const next = !row.status;
+      Alert.alert(
+        next ? 'Enable game' : 'Disable game',
+        `${next ? 'Enable' : 'Disable'} ${row.Name || row.name || 'this game'}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: next ? 'Enable' : 'Disable',
+            style: next ? 'default' : 'destructive',
+            onPress: () => {
+              void (async () => {
+                setTogglingId(String(row._id || ''));
+                try {
+                  const res = await secureApi<unknown>('ops.casinoEditGame', {
+                    gameId: row.gameId ?? row._id,
+                    _id: row._id,
+                    status: next,
+                  });
+                  if (res.ok) {
+                    setSheetRow(null);
+                    void load();
+                  } else {
+                    setError(res.message || 'Failed to update game status');
+                  }
+                } finally {
+                  setTogglingId(null);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [load],
+  );
+
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
-      { key: 'name', label: 'Name', width: 160, render: (r) => display(r.Name || r.name) },
+      { key: 'id', label: 'ID', width: 150, render: (r) => display(r._id) },
+      { key: 'name', label: 'Game Name', width: 150, render: (r) => display(r.Name || r.name) },
+      {
+        key: 'gameId',
+        label: provider === 'QTECH' ? 'Game ID' : 'Game Code',
+        width: 110,
+        render: (r) => display(provider === 'QTECH' ? r.gameId : (r.Game_Code ?? r.gameId)),
+      },
+      ...(provider === 'QTECH'
+        ? [{ key: 'tableId', label: 'Table ID', width: 100, render: (r: Row) => display(r.tableId) }]
+        : []),
+      { key: 'providerId', label: 'Provider ID', width: 100, render: (r) => display(r.providerId) },
       { key: 'category', label: 'Category', width: 110, render: (r) => display(r.category) },
-      {
-        key: 'currency',
-        label: 'Allowed Currency',
-        width: 130,
-        render: (r) => (Array.isArray(r.allowedCurrencies) ? r.allowedCurrencies.join(', ') : '—'),
-      },
-      { key: 'subCategory', label: 'Sub Category', width: 110, render: (r) => display(r.subCategory) },
-      { key: 'gameId', label: 'Game Id', width: 110, render: (r) => display(r.gameId) },
-      {
-        key: 'providerName',
-        label: 'Provider Name',
-        width: 130,
-        render: (r) => display(r.providerName || r.provider?.name),
-      },
-      {
-        key: 'providerDetails',
-        label: 'Provider Details',
-        width: 150,
-        render: (r) =>
-          r.provider ? `${display(r.provider.name)} / ${display(r.provider.id)}` : '—',
-      },
-      { key: 'rating', label: 'Rating', width: 70, align: 'center', render: (r) => display(r.rating) },
-      {
-        key: 'ratingCount',
-        label: 'Rating Count',
-        width: 100,
-        align: 'center',
-        render: (r) => display(r.ratingCount),
-      },
       { key: 'status', label: 'Status', width: 80, render: (r) => (r.status ? 'Active' : 'Inactive') },
-      {
-        key: 'updatedOn',
-        label: 'Updated On',
-        width: 150,
-        render: (r) =>
-          r.updatedOn ? `${formatDisplayDate(r.updatedOn)} ${formatDisplayTime(r.updatedOn)}` : '—',
-      },
     ],
-    [page],
+    [page, provider],
   );
 
   return (
@@ -147,20 +174,24 @@ export function BetConstructGamesScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>BetConstruct Games</Text>
-      <Text style={styles.sub}>Total: {total.toLocaleString('en-IN')}</Text>
+      <Text style={styles.title}>Casino Games</Text>
+      <Text style={styles.sub}>Active Provider: {provider}</Text>
 
       <View style={styles.searchRow}>
         <TextInput
           style={styles.searchInput}
-          value={searchDraft}
-          onChangeText={setSearchDraft}
-          onSubmitEditing={() => {
-            setAppliedSearch(searchDraft);
-            setPage(1);
-          }}
-          returnKeyType="search"
-          placeholder="Search by game name…"
+          value={nameDraft}
+          onChangeText={setNameDraft}
+          placeholder="Game name…"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TextInput
+          style={styles.searchInput}
+          value={idDraft}
+          onChangeText={setIdDraft}
+          placeholder={provider === 'QTECH' ? 'Game ID…' : 'Game Code…'}
           placeholderTextColor={colors.muted}
           autoCapitalize="none"
           autoCorrect={false}
@@ -169,7 +200,7 @@ export function BetConstructGamesScreen() {
           style={[styles.searchBtn, loading && styles.btnDisabled]}
           disabled={loading}
           onPress={() => {
-            setAppliedSearch(searchDraft);
+            setApplied({ name: nameDraft, id: idDraft });
             setPage(1);
           }}
         >
@@ -203,7 +234,19 @@ export function BetConstructGamesScreen() {
                 .map<SheetField>((c) => ({ label: c.label, value: c.render(sheetRow, 0) }))
             : []
         }
-        note="Image upload is available on the desktop panel."
+        actions={
+          sheetRow
+            ? [
+                {
+                  label: sheetRow.status ? 'Disable game' : 'Enable game',
+                  tone: sheetRow.status ? 'warning' : 'primary',
+                  disabled: togglingId === String(sheetRow._id || ''),
+                  onPress: () => toggleStatus(sheetRow),
+                },
+              ]
+            : []
+        }
+        note="Provider switching, Mirai and Table ID management are available on the desktop panel."
         onClose={() => setSheetRow(null)}
       />
 

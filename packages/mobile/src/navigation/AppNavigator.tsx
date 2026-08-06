@@ -36,6 +36,12 @@ import { PointsReportScreen } from '../screens/dashboards/details/PointsReportSc
 import { CoinRemovalListScreen } from '../screens/dashboards/details/CoinRemovalListScreen';
 import { CustomerAllotmentScreen } from '../screens/dashboards/details/CustomerAllotmentScreen';
 import { NonPerformingUserScreen } from '../screens/dashboards/details/NonPerformingUserScreen';
+import { TodaysActiveScreen } from '../screens/dashboards/details/TodaysActiveScreen';
+import { FeedbackScreen } from '../screens/dashboards/details/FeedbackScreen';
+import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstructGamesScreen';
+import { CasinoGamesScreen } from '../screens/dashboards/details/CasinoGamesScreen';
+import { CasinoSwitchScreen } from '../screens/dashboards/details/CasinoSwitchScreen';
+import { TopGamesScreen } from '../screens/dashboards/details/TopGamesScreen';
 import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
 import { colors } from '../theme';
 
@@ -71,6 +77,12 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/coins-removal': CoinRemovalListScreen as AnyScreen,
   '/customer-allotment': CustomerAllotmentScreen as AnyScreen,
   '/non_performing_user': NonPerformingUserScreen as AnyScreen,
+  '/todays-active': TodaysActiveScreen as AnyScreen,
+  '/feedback': FeedbackScreen as AnyScreen,
+  '/betConstruct-lists': BetConstructGamesScreen as AnyScreen,
+  '/casino-lists': CasinoGamesScreen as AnyScreen,
+  '/dynamic-casino-switching': CasinoSwitchScreen as AnyScreen,
+  '/top-games': TopGamesScreen as AnyScreen,
   '/botPerformance': BotPerformanceScreen as AnyScreen,
 };
 
