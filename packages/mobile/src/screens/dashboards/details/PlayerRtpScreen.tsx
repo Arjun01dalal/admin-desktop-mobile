@@ -230,11 +230,12 @@ export function PlayerRtpScreen() {
   const IDX_W = 34;
   const fit = (weight: number, totalWeight: number) =>
     Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
-  // Qtech main columns: userId(3) gameCount(1.2) totalAmount(3.4) winPct(2.4)
+  // Qtech main columns: userId(3) gameCount(1.2) totalAmount(3.1) gap totalWinPct(2.4)
+  const GAP_W = 12;
   const qtechW = {
     userId: fit(3, 10),
     gameCount: fit(1.2, 10),
-    totalAmount: fit(3.4, 10),
+    totalAmount: fit(3.1, 10) - GAP_W,
     winPct: fit(2.4, 10),
   };
   // Exchange main columns: userId(3) amount(2.5) name(3) winLoss(2.5)
@@ -268,6 +269,8 @@ export function PlayerRtpScreen() {
         render: (r) => String(r.games?.length || 0),
       },
       { key: 'totalAmount', label: 'Amount', width: qtechW.totalAmount, align: 'right', render: (r) => formatAmount(r.combined?.totalAmount ?? 0) },
+      // Spacer between Amount and Win % so the badge doesn't touch the numbers.
+      { key: 'gap', label: '', width: GAP_W, render: () => '' },
       { key: 'totalBets', label: 'Total Bets', width: 100, align: 'right', render: (r) => display(r.combined?.totalBets ?? 0) },
       { key: 'totalWins', label: 'Total Wins', width: 100, align: 'right', render: (r) => display(r.combined?.totalWins ?? 0) },
       { key: 'winAmount', label: 'Total Wins Amount', width: 130, align: 'right', render: (r) => formatAmount(r.combined?.winAmount ?? 0) },
@@ -430,7 +433,7 @@ export function PlayerRtpScreen() {
       ) : isQtech ? (
         <DataTable
           columns={qtechColumns.filter((c) =>
-            ['idx', 'userId', 'gameCount', 'totalAmount', 'winPct'].includes(c.key),
+            ['idx', 'userId', 'gameCount', 'totalAmount', 'gap', 'winPct'].includes(c.key),
           )}
           rows={rows as QtechRow[]}
           keyFor={(r, i) => String(r.userId || i)}
