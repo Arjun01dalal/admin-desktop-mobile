@@ -76,6 +76,7 @@ export function PointsReportScreen() {
   const [rows, setRows] = useState<Row[]>([]);
   // Drill-down: selected sub-admin (desktop navigates to /coin-reports/report).
   const [detailRow, setDetailRow] = useState<Row | null>(null);
+  const [sheetRow, setSheetRow] = useState<Row | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<Doc | null>(null);
   // Edit coin limit.
   const [coinDraft, setCoinDraft] = useState('');
@@ -105,6 +106,7 @@ export function PointsReportScreen() {
           ? ((raw as { payload?: Row[] }).payload as Row[])
           : [];
       setDetailRow(null);
+      setSheetRow(null);
       setSelectedDoc(null);
       setRows(list);
     } finally {
@@ -318,8 +320,28 @@ export function PointsReportScreen() {
         keyFor={(r, i) => String(r._id || i)}
         loading={loading}
         emptyMessage="No data available"
-        onRowPress={(row) => setDetailRow(row)}
-        hint="Tap a row to open its coin documents"
+        onRowPress={(row) => setSheetRow(row)}
+        hint="Tap a row to see all details"
+      />
+
+      <RowDetailSheet
+        visible={sheetRow !== null}
+        title={sheetRow ? display(sheetRow.subadminName) : ''}
+        fields={
+          sheetRow
+            ? columns.map<SheetField>((c) => ({ label: c.label, value: c.render(sheetRow, 0) }))
+            : []
+        }
+        actions={[
+          {
+            label: 'Open coin documents',
+            onPress: () => {
+              if (sheetRow) setDetailRow(sheetRow);
+              setSheetRow(null);
+            },
+          },
+        ]}
+        onClose={() => setSheetRow(null)}
       />
     </ScrollView>
   );
