@@ -34,6 +34,8 @@ type Row = {
   category?: string;
   Category_ID?: string;
   status?: boolean;
+  images?: Array<{ url?: string }>;
+  Thumbnail?: string;
   [key: string]: unknown;
 };
 
@@ -124,9 +126,9 @@ export function CasinoGamesScreen() {
               void (async () => {
                 setTogglingId(String(row._id || ''));
                 try {
+                  // Server schema rejects extra keys ("_id is not allowed") — send only gameId + status.
                   const res = await secureApi<unknown>('ops.casinoEditGame', {
                     gameId: row.gameId ?? row._id,
-                    _id: row._id,
                     status: next,
                   });
                   if (res.ok) {
@@ -240,6 +242,9 @@ export function CasinoGamesScreen() {
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.Name || sheetRow.name) : ''}
+        imageUri={
+          sheetRow?.images?.[0]?.url || sheetRow?.images?.[1]?.url || sheetRow?.Thumbnail || undefined
+        }
         fields={
           sheetRow
             ? columns
