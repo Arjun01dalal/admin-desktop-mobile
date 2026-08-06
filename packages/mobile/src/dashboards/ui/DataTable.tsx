@@ -44,6 +44,8 @@ type Props<Row> = {
   footer?: { label: string; cells: Record<string, string> };
   /** Makes whole rows tappable (e.g. open a detail sheet). */
   onRowPress?: (row: Row, index: number) => void;
+  /** Optional per-row background color (e.g. highlight risky rows). */
+  rowBg?: (row: Row) => string | undefined;
   /** Hint text under the table. */
   hint?: string;
 };
@@ -56,6 +58,7 @@ export function DataTable<Row>({
   emptyMessage = 'No data',
   footer,
   onRowPress,
+  rowBg,
   hint,
 }: Props<Row>) {
   return (
@@ -157,11 +160,13 @@ export function DataTable<Row>({
                     </Text>
                   );
                 });
+              const bg = rowBg?.(row);
+              const rowStyle = [styles.row, bg ? { backgroundColor: bg } : null];
               if (onRowPress) {
                 return (
                   <TouchableOpacity
                     key={keyFor(row, index)}
-                    style={styles.row}
+                    style={rowStyle}
                     onPress={() => onRowPress(row, index)}
                   >
                     {cells}
@@ -169,7 +174,7 @@ export function DataTable<Row>({
                 );
               }
               return (
-                <View key={keyFor(row, index)} style={styles.row}>
+                <View key={keyFor(row, index)} style={rowStyle}>
                   {cells}
                 </View>
               );

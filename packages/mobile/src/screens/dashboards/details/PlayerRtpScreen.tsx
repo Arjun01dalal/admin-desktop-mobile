@@ -152,6 +152,14 @@ function winPctBadge(winPercentage: number | undefined): string | undefined {
   return undefined;
 }
 
+/** Translucent row background by win% (desktop rowBgSx parity). */
+function winPctRowBg(winPercentage: number | undefined): string | undefined {
+  const pct = Number(winPercentage) || 0;
+  if (pct > 85) return 'rgba(220,38,38,0.18)';
+  if (pct > 70) return 'rgba(245,158,11,0.15)';
+  return undefined;
+}
+
 export function PlayerRtpScreen() {
   const [type, setType] = useState<RtpType>('Qtech');
   const [draftStart, setDraftStart] = useState(todayIST());
@@ -222,12 +230,12 @@ export function PlayerRtpScreen() {
   const IDX_W = 34;
   const fit = (weight: number, totalWeight: number) =>
     Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
-  // Qtech main columns: userId(3) gameCount(2) totalAmount(3) winPct(2)
+  // Qtech main columns: userId(3) gameCount(1.2) totalAmount(3.4) winPct(2.4)
   const qtechW = {
     userId: fit(3, 10),
-    gameCount: fit(2, 10),
-    totalAmount: fit(3, 10),
-    winPct: fit(2, 10),
+    gameCount: fit(1.2, 10),
+    totalAmount: fit(3.4, 10),
+    winPct: fit(2.4, 10),
   };
   // Exchange main columns: userId(3) amount(2.5) name(3) winLoss(2.5)
   const exchW = {
@@ -429,6 +437,7 @@ export function PlayerRtpScreen() {
           loading={loading}
           emptyMessage="No RTP data found"
           onRowPress={(row) => setSheetRow(row)}
+          rowBg={(row) => winPctRowBg(row.combined?.winPercentage)}
           hint="Tap a row to see all games"
         />
       ) : (
