@@ -69,12 +69,12 @@ export function CheckersReportScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'name', label: 'Name', width: 160, render: (r) => r.name },
-      { key: 'checkBy', label: 'Check By', width: 100, align: 'right', render: (r) => String(r.checkBy) },
+      { key: 'name', label: 'Name', width: 180, render: (r) => r.name },
+      { key: 'checkBy', label: 'Check By', width: 120, align: 'right', render: (r) => String(r.checkBy) },
       {
         key: 'crossCheckBy',
         label: 'Cross Check By',
-        width: 120,
+        width: 140,
         align: 'right',
         render: (r) => String(r.crossCheckBy),
       },
