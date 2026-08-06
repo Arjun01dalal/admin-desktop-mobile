@@ -30,6 +30,7 @@ import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
+import { CoinPermissionScreen } from './CoinPermissionScreen';
 
 type Responsibility = { _id: string; Enum?: string; Name?: string; Group?: string };
 type Role = { _id: string; Name?: string; Responsibilities?: string[] };
@@ -45,6 +46,8 @@ export function RolesResponsibilitiesScreen() {
   const canEdit = hasPermission(Permissions.Edit_Role, user);
   const canDelete = hasPermission(Permissions.Delete_Role, user);
   const canAdd = hasPermission(Permissions.add_new_role_responsibility, user);
+  // Web panel gates the Coin Permission button on this dedicated responsibility.
+  const canCoinPerm = hasPermission('Add_Coin_Permission', user);
 
   const [roles, setRoles] = useState<Role[]>([]);
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
@@ -54,6 +57,7 @@ export function RolesResponsibilitiesScreen() {
   // Full-page drill-down instead of a modal: view a role, or edit it.
   const [pageRole, setPageRole] = useState<Role | null>(null);
   const [pageMode, setPageMode] = useState<'view' | 'edit' | null>(null);
+  const [coinPermOpen, setCoinPermOpen] = useState(false);
 
   // Add Role (clone) form
   const [cloneOpen, setCloneOpen] = useState(false);
@@ -64,6 +68,8 @@ export function RolesResponsibilitiesScreen() {
   const [respOpen, setRespOpen] = useState(false);
   const [respName, setRespName] = useState('');
   const [respGroup, setRespGroup] = useState('');
+  const [respRoleName, setRespRoleName] = useState('');
+  const [respMobile, setRespMobile] = useState('');
 
   // Edit Role form (rendered as its own page)
   const [editId, setEditId] = useState('');
@@ -151,6 +157,8 @@ export function RolesResponsibilitiesScreen() {
     try {
       const payload: Record<string, unknown> = { Name: respName.trim() };
       if (respGroup.trim()) payload.Group = respGroup.trim();
+      if (respRoleName.trim()) payload.Role_Name = respRoleName.trim();
+      if (respMobile.trim()) payload.SubAdmin_Mobile = respMobile.trim();
       const res = await secureApi<unknown>('responsibilities.add', payload);
       if (!res.ok) {
         Alert.alert(res.message || 'Failed to add responsibility');
@@ -159,11 +167,13 @@ export function RolesResponsibilitiesScreen() {
       setRespOpen(false);
       setRespName('');
       setRespGroup('');
+      setRespRoleName('');
+      setRespMobile('');
       void load();
     } finally {
       setSubmitting(false);
     }
-  }, [respName, respGroup, load]);
+  }, [respName, respGroup, respRoleName, respMobile, load]);
 
   const openEdit = useCallback((role: Role) => {
     setEditId(role._id);
@@ -256,6 +266,11 @@ export function RolesResponsibilitiesScreen() {
         <Text style={styles.noPermText}>You do not have permission to view this page.</Text>
       </View>
     );
+  }
+
+  // ---------- Coin Permission page ----------
+  if (coinPermOpen) {
+    return <CoinPermissionScreen onBack={() => setCoinPermOpen(false)} />;
   }
 
   // ---------- Edit Role page ----------
@@ -386,28 +401,37 @@ export function RolesResponsibilitiesScreen() {
         <Text style={styles.title}>Roles & Responsibilities</Text>
       </View>
 
-      {canAdd ? (
+      {canAdd || canCoinPerm ? (
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.headBtn}
-            onPress={() => {
-              setCloneName('');
-              setCloneRefId('');
-              setCloneOpen(true);
-            }}
-          >
-            <Text style={styles.headBtnText}>＋ Add Role</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headBtn}
-            onPress={() => {
-              setRespName('');
-              setRespGroup('');
-              setRespOpen(true);
-            }}
-          >
-            <Text style={styles.headBtnText}>＋ Add Responsibility</Text>
-          </TouchableOpacity>
+          {canCoinPerm ? (
+            <TouchableOpacity style={styles.headBtn} onPress={() => setCoinPermOpen(true)}>
+              <Text style={styles.headBtnText}>Coin Permission</Text>
+            </TouchableOpacity>
+          ) : null}
+          {canAdd ? (
+            <>
+              <TouchableOpacity
+                style={styles.headBtn}
+                onPress={() => {
+                  setCloneName('');
+                  setCloneRefId('');
+                  setCloneOpen(true);
+                }}
+              >
+                <Text style={styles.headBtnText}>＋ Add Role</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headBtn}
+                onPress={() => {
+                  setRespName('');
+                  setRespGroup('');
+                  setRespOpen(true);
+                }}
+              >
+                <Text style={styles.headBtnText}>＋ Add Responsibility</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
         </View>
       ) : null}
 
@@ -515,6 +539,23 @@ export function RolesResponsibilitiesScreen() {
               onChangeText={setRespGroup}
               placeholder="Group"
               placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.fieldLabel}>Role Name (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={respRoleName}
+              onChangeText={setRespRoleName}
+              placeholder="Role Name"
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.fieldLabel}>Mobile Number (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={respMobile}
+              onChangeText={setRespMobile}
+              placeholder="Mobile Number"
+              placeholderTextColor={colors.muted}
+              keyboardType="phone-pad"
             />
             <View style={styles.formActions}>
               <TouchableOpacity

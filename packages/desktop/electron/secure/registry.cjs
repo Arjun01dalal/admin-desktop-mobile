@@ -1583,6 +1583,26 @@ module.exports = {
     decryptResponse: true,
   },
 
+  // Coin Permission page (Add_Roles_And_Responsibilities in the web panel)
+  'subadmin.updateCoinRoles': {
+    method: 'POST',
+    path: '/SubAdmin/update-coin-roles',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'subadmin.removeCoinPermission': {
+    method: 'POST',
+    path: '/SubAdmin/removeCoin',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'subadmin.updateAppHeads': {
+    method: 'POST',
+    path: '/SubAdmin/update-app-heads',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+
   // Casino Switch
   'casinoSwitch.list': {
     method: 'POST',
