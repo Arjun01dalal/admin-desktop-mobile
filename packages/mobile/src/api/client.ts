@@ -76,7 +76,12 @@ export async function secureApi<T = unknown>(
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 60_000);
+    // Honor per-action registry timeouts (e.g. Funds reports use 180s); default 60s.
+    const timeoutMs =
+      typeof (entry as { timeout?: unknown }).timeout === 'number'
+        ? ((entry as { timeout: number }).timeout)
+        : 60_000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res: Response;
     try {
       res = await fetch(url, {
