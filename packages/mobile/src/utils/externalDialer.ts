@@ -61,6 +61,53 @@ function randomDialerListId(): number {
   return Math.floor(10000 + Math.random() * 90000);
 }
 
+/**
+ * Single-lead push — port of desktop externalDialerSingle (CallingBtn "Call").
+ * Uses the admin's numeric extension ID as the campaign and `9<ext>` as list id.
+ */
+export async function singleCallToDialer(args: {
+  lead: DialerLeadSource;
+  extensionId?: string[] | string;
+  adminName?: string;
+  serverId?: unknown;
+}): Promise<{ ok: boolean; message: string }> {
+  const ids = Array.isArray(args.extensionId)
+    ? args.extensionId.map(String)
+    : typeof args.extensionId === 'string' && args.extensionId.trim()
+      ? [args.extensionId.trim()]
+      : [];
+  const numericId = ids.find((val) => /^\d+$/.test(val));
+  if (!numericId) return { ok: false, message: 'Dialer extension ID not found for this admin' };
+
+  const url = dialerBaseUrl(args.serverId);
+  if (!url) return { ok: false, message: 'Invalid dialer server' };
+
+  const lead = toLead(args.lead);
+  if (!lead.phone_number) return { ok: false, message: 'No valid phone number' };
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        list_id: `9${numericId}`,
+        list_name: `${String(args.adminName || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
+        campaign_id: numericId,
+        leads: [lead],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    const ok = isDialerSuccess(data) || (data != null && data.success !== false);
+    return { ok, message: String(data?.message || (ok ? 'Connected to dialer' : 'Connect dialer failed')) };
+  } catch {
+    return { ok: false, message: 'Could not reach the dialer server' };
+  }
+}
+
 export async function addToDialerBatch(args: {
   campaignId: string;
   serverId?: string;

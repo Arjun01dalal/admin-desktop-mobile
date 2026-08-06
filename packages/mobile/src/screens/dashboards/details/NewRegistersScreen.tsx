@@ -32,7 +32,7 @@ import {
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import { CAMPAIGN_LIST } from '../../../utils/campaignList';
-import { addToDialerBatch } from '../../../utils/externalDialer';
+import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -41,7 +41,7 @@ import {
   type SearchFieldKey,
   type SearchFieldOption,
 } from './DetailFilterBar';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
 const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance', 'created']);
@@ -179,6 +179,8 @@ export function NewRegistersScreen() {
   const [dialerOpen, setDialerOpen] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [dialerMsg, setDialerMsg] = useState('');
+  const [calling, setCalling] = useState(false);
+  const [callMsg, setCallMsg] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -281,6 +283,33 @@ export function NewRegistersScreen() {
   }, [load]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+
+  // Single Call — same as the web panel's per-row Call button (CallingBtn).
+  const singleCall = useCallback(
+    async (row: Row) => {
+      setCallMsg('');
+      setCalling(true);
+      try {
+        const res = await singleCallToDialer({
+          lead: {
+            _id: String(row._id || ''),
+            name: row.name,
+            mobile: row.mobile,
+            city: row.city,
+            state: row.state,
+            clientName: row.clientName,
+          },
+          extensionId: admin?.extensionId as string[] | string | undefined,
+          adminName: typeof admin?.name === 'string' ? admin.name : 'ADMIN',
+          serverId: admin?.serverId,
+        });
+        setCallMsg(res.message);
+      } finally {
+        setCalling(false);
+      }
+    },
+    [admin],
+  );
 
   const addToDialer = useCallback(async () => {
     setDialerMsg('');
@@ -580,7 +609,22 @@ export function NewRegistersScreen() {
                 }))
             : []
         }
-        onClose={() => setSelected(null)}
+        actions={
+          selected && !hideContact && selected.mobile
+            ? ([
+                {
+                  label: calling ? 'Sending to dialer…' : callMsg ? `Call — ${callMsg}` : 'Call (send to dialer)',
+                  tone: 'primary',
+                  disabled: calling,
+                  onPress: () => void singleCall(selected),
+                },
+              ] satisfies SheetAction[])
+            : undefined
+        }
+        onClose={() => {
+          setSelected(null);
+          setCallMsg('');
+        }}
       />
 
       <View style={styles.pager}>
