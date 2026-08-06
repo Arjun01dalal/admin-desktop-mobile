@@ -5,7 +5,9 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -330,7 +332,10 @@ export function NonPerformingUserScreen() {
         animationType="slide"
         onRequestClose={() => setCommentsRow(null)}
       >
-        <View style={styles.backdrop}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <TouchableWithoutFeedback onPress={() => setCommentsRow(null)}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
@@ -395,7 +400,7 @@ export function NonPerformingUserScreen() {
               )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <View style={styles.pager}>
