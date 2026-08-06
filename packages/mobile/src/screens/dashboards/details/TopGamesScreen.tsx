@@ -33,6 +33,8 @@ type Item = {
   status?: boolean;
   createdOn?: string;
   updatedOn?: string;
+  imagePath?: string;
+  images?: Array<{ type?: string; url?: string }>;
   [key: string]: unknown;
 };
 
@@ -49,6 +51,18 @@ function gameName(item: Item): string {
 
 function providerName(item: Item): string {
   return String(item.providerName || item.provider?.name || '—');
+}
+
+/** Desktop getImageUrl: imagePath, else preferred image type. */
+function getImageUrl(item: Item): string {
+  if (item.imagePath) return item.imagePath;
+  const images = item.images || [];
+  const preferred =
+    images.find((img) => img.type === 'logo-square') ||
+    images.find((img) => img.type === 'banner') ||
+    images.find((img) => img.type === 'logo-round') ||
+    images[0];
+  return preferred?.url || '';
 }
 
 /** Desktop normalizePayload: canonical { data: { [category]: Item[] } }. */
@@ -274,6 +288,7 @@ export function TopGamesScreen() {
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? gameName(sheetRow) : ''}
+        imageUri={sheetRow ? getImageUrl(sheetRow) || undefined : undefined}
         fields={
           sheetRow
             ? columns
