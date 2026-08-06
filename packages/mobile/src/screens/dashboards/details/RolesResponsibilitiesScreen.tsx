@@ -1,0 +1,598 @@
+/**
+ * Roles & Responsibilities — mobile port of desktop RolesResponsibilitiesPage.
+ * roles.list + responsibilities.list load the data; roles.clone (add role),
+ * responsibilities.add (add responsibility), roles.update (edit a role's name +
+ * responsibilities) and roles.delete are the mutations. All mutations are gated
+ * by the same permissions as desktop (View / Edit / Delete / Add).
+ *
+ * The roles table shows Name + a responsibilities-count subset; row tap opens
+ * the detail sheet listing the full responsibility names plus Edit / Delete
+ * actions. Add Role / Add Responsibility / Edit use bottom-sheet forms; Edit
+ * groups responsibilities by Group with checkboxes (matching desktop).
+ */
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+import { asList } from '@astro/shared';
+import { colors, radius, spacing } from '../../../theme';
+import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { secureApi } from '../../../api/client';
+import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+
+type Responsibility = { _id: string; Enum?: string; Name?: string; Group?: string };
+type Role = { _id: string; Name?: string; Responsibilities?: string[] };
+
+function display(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value);
+}
+
+export function RolesResponsibilitiesScreen() {
+  const user = useMemo(() => getSessionUser(), []);
+  const canView = hasPermission(Permissions.View_Roles_and_Responsibilities, user);
+  const canEdit = hasPermission(Permissions.Edit_Role, user);
+  const canDelete = hasPermission(Permissions.Delete_Role, user);
+  const canAdd = hasPermission(Permissions.add_new_role_responsibility, user);
+
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [sheetRole, setSheetRole] = useState<Role | null>(null);
+
+  // Add Role (clone) form
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneName, setCloneName] = useState('');
+  const [cloneRefId, setCloneRefId] = useState('');
+
+  // Add Responsibility form
+  const [respOpen, setRespOpen] = useState(false);
+  const [respName, setRespName] = useState('');
+  const [respGroup, setRespGroup] = useState('');
+
+  // Edit Role form
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editRespIds, setEditRespIds] = useState<string[]>([]);
+
+  const respById = useMemo(() => {
+    const map = new Map<string, Responsibility>();
+    for (const r of responsibilities) map.set(r._id, r);
+    return map;
+  }, [responsibilities]);
+
+  const groups = useMemo(() => {
+    const names = [...new Set(responsibilities.map((r) => r.Group || 'Other'))];
+    return names.sort((a, b) => a.localeCompare(b));
+  }, [responsibilities]);
+
+  const responsibilityNames = useCallback(
+    (ids: string[] | undefined) =>
+      (ids || [])
+        .map((id) => respById.get(id)?.Name)
+        .filter(Boolean)
+        .join(', '),
+    [respById],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [rolesRes, respRes] = await Promise.all([
+        secureApi<unknown>('roles.list', {}),
+        secureApi<unknown>('responsibilities.list', {}),
+      ]);
+      if (!rolesRes.ok) {
+        setError(rolesRes.message || 'Failed to load roles');
+        setRoles([]);
+      } else {
+        setRoles(asList<Role>(rolesRes.data));
+      }
+      if (!respRes.ok) {
+        setError((prev) => prev || respRes.message || 'Failed to load responsibilities');
+        setResponsibilities([]);
+      } else {
+        setResponsibilities(asList<Responsibility>(respRes.data));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canView) void load();
+  }, [canView, load]);
+
+  const handleClone = useCallback(async () => {
+    if (!cloneName.trim()) {
+      Alert.alert('Enter role name');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload: Record<string, unknown> = { Name: cloneName.trim() };
+      if (cloneRefId) payload.Reference_Role_ID = cloneRefId;
+      const res = await secureApi<unknown>('roles.clone', payload);
+      if (!res.ok) {
+        Alert.alert(res.message || 'Failed to create role');
+        return;
+      }
+      setCloneOpen(false);
+      setCloneName('');
+      setCloneRefId('');
+      void load();
+    } finally {
+      setSubmitting(false);
+    }
+  }, [cloneName, cloneRefId, load]);
+
+  const handleAddResponsibility = useCallback(async () => {
+    if (!respName.trim()) {
+      Alert.alert('Name should not be empty');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload: Record<string, unknown> = { Name: respName.trim() };
+      if (respGroup.trim()) payload.Group = respGroup.trim();
+      const res = await secureApi<unknown>('responsibilities.add', payload);
+      if (!res.ok) {
+        Alert.alert(res.message || 'Failed to add responsibility');
+        return;
+      }
+      setRespOpen(false);
+      setRespName('');
+      setRespGroup('');
+      void load();
+    } finally {
+      setSubmitting(false);
+    }
+  }, [respName, respGroup, load]);
+
+  const openEdit = useCallback((role: Role) => {
+    setEditId(role._id);
+    setEditName(role.Name || '');
+    setEditRespIds([...(role.Responsibilities || [])]);
+    setSheetRole(null);
+    setEditOpen(true);
+  }, []);
+
+  const toggleResp = useCallback((id: string, checked: boolean) => {
+    setEditRespIds((prev) => {
+      if (checked) return [...new Set([...prev, id])];
+      return prev.filter((x) => x !== id);
+    });
+  }, []);
+
+  const handleUpdate = useCallback(async () => {
+    if (!editName.trim()) {
+      Alert.alert('Please enter name');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await secureApi<unknown>('roles.update', {
+        _id: editId,
+        Name: editName.trim(),
+        Responsibilities: editRespIds,
+      });
+      if (!res.ok) {
+        Alert.alert(res.message || 'Failed to update role');
+        return;
+      }
+      setEditOpen(false);
+      void load();
+    } finally {
+      setSubmitting(false);
+    }
+  }, [editId, editName, editRespIds, load]);
+
+  const handleDelete = useCallback(
+    (role: Role) => {
+      Alert.alert('Are you sure?', 'Do you want to delete this role?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setSubmitting(true);
+              try {
+                const res = await secureApi<unknown>('roles.delete', { Role_ID: role._id });
+                if (!res.ok) {
+                  setError(res.message || 'Failed to delete role');
+                  setSheetRole(null);
+                  return;
+                }
+                setSheetRole(null);
+                void load();
+              } finally {
+                setSubmitting(false);
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [load],
+  );
+
+  const columns = useMemo<DataTableColumn<Role>[]>(
+    () => [
+      { key: 'name', label: 'Name', width: 180, render: (r) => display(r.Name) },
+      {
+        key: 'count',
+        label: 'Responsibilities',
+        width: 120,
+        align: 'right',
+        render: (r) => String(r.Responsibilities?.length || 0),
+      },
+    ],
+    [],
+  );
+
+  const sheetFields = useMemo<SheetField[]>(() => {
+    if (!sheetRole) return [];
+    const names = responsibilityNames(sheetRole.Responsibilities);
+    return [
+      { label: 'Name', value: display(sheetRole.Name) },
+      { label: 'Responsibilities', value: names || '—', multiline: true },
+    ];
+  }, [sheetRole, responsibilityNames]);
+
+  const sheetActions = useMemo<SheetAction[]>(() => {
+    if (!sheetRole) return [];
+    const role = sheetRole;
+    const actions: SheetAction[] = [];
+    if (canEdit) actions.push({ label: 'Edit', tone: 'primary', onPress: () => openEdit(role) });
+    if (canDelete) actions.push({ label: 'Delete', tone: 'warning', onPress: () => handleDelete(role) });
+    return actions;
+  }, [sheetRole, canEdit, canDelete, openEdit, handleDelete]);
+
+  if (!canView) {
+    return (
+      <View style={styles.noPerm}>
+        <Text style={styles.noPermText}>You do not have permission to view this page.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+      }
+    >
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Roles & Responsibilities</Text>
+      </View>
+
+      {canAdd ? (
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={styles.headBtn}
+            onPress={() => {
+              setCloneName('');
+              setCloneRefId('');
+              setCloneOpen(true);
+            }}
+          >
+            <Text style={styles.headBtnText}>＋ Add Role</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headBtn}
+            onPress={() => {
+              setRespName('');
+              setRespGroup('');
+              setRespOpen(true);
+            }}
+          >
+            <Text style={styles.headBtnText}>＋ Add Responsibility</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      <DataTable
+        columns={columns}
+        rows={roles}
+        keyFor={(r, i) => String(r._id || i)}
+        loading={loading}
+        emptyMessage="No roles found"
+        onRowPress={(row) => setSheetRole(row)}
+        hint="Tap a role to view responsibilities & actions"
+      />
+
+      <RowDetailSheet
+        visible={sheetRole !== null}
+        title={sheetRole ? display(sheetRole.Name) : ''}
+        fields={sheetFields}
+        actions={sheetActions}
+        onClose={() => setSheetRole(null)}
+      />
+
+      {/* Add Role (clone) */}
+      <Modal visible={cloneOpen} transparent animationType="slide" onRequestClose={() => setCloneOpen(false)}>
+        <View style={styles.backdrop}>
+          <TouchableWithoutFeedback onPress={() => !submitting && setCloneOpen(false)}>
+            <View style={styles.backdropTouch} />
+          </TouchableWithoutFeedback>
+          <View style={styles.formSheet}>
+            <Text style={styles.formTitle}>Add Role</Text>
+            <Text style={styles.fieldLabel}>Role Name</Text>
+            <TextInput
+              style={styles.input}
+              value={cloneName}
+              onChangeText={setCloneName}
+              placeholder="Role Name"
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.fieldLabel}>Reference Role (optional)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+              <TouchableOpacity
+                style={[styles.chip, cloneRefId === '' && styles.chipActive]}
+                onPress={() => setCloneRefId('')}
+              >
+                <Text style={[styles.chipText, cloneRefId === '' && styles.chipTextActive]}>Empty Role</Text>
+              </TouchableOpacity>
+              {roles.map((role) => (
+                <TouchableOpacity
+                  key={role._id}
+                  style={[styles.chip, cloneRefId === role._id && styles.chipActive]}
+                  onPress={() => setCloneRefId(role._id)}
+                >
+                  <Text style={[styles.chipText, cloneRefId === role._id && styles.chipTextActive]}>
+                    {role.Name || role._id}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.formActions}>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnGhost]}
+                onPress={() => setCloneOpen(false)}
+                disabled={submitting}
+              >
+                <Text style={styles.formBtnGhostText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnPrimary, submitting && styles.btnDisabled]}
+                onPress={() => void handleClone()}
+                disabled={submitting}
+              >
+                <Text style={styles.formBtnPrimaryText}>{submitting ? 'Creating…' : 'Create Role'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Responsibility */}
+      <Modal visible={respOpen} transparent animationType="slide" onRequestClose={() => setRespOpen(false)}>
+        <View style={styles.backdrop}>
+          <TouchableWithoutFeedback onPress={() => !submitting && setRespOpen(false)}>
+            <View style={styles.backdropTouch} />
+          </TouchableWithoutFeedback>
+          <View style={styles.formSheet}>
+            <Text style={styles.formTitle}>Add Responsibility</Text>
+            <Text style={styles.fieldLabel}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={respName}
+              onChangeText={setRespName}
+              placeholder="Name"
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.fieldLabel}>Group (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={respGroup}
+              onChangeText={setRespGroup}
+              placeholder="Group"
+              placeholderTextColor={colors.muted}
+            />
+            <View style={styles.formActions}>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnGhost]}
+                onPress={() => setRespOpen(false)}
+                disabled={submitting}
+              >
+                <Text style={styles.formBtnGhostText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnPrimary, submitting && styles.btnDisabled]}
+                onPress={() => void handleAddResponsibility()}
+                disabled={submitting}
+              >
+                <Text style={styles.formBtnPrimaryText}>{submitting ? 'Saving…' : 'Submit'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Role */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <View style={styles.backdrop}>
+          <TouchableWithoutFeedback onPress={() => !submitting && setEditOpen(false)}>
+            <View style={styles.backdropTouch} />
+          </TouchableWithoutFeedback>
+          <View style={[styles.formSheet, styles.editSheet]}>
+            <Text style={styles.formTitle}>Edit Role</Text>
+            <Text style={styles.fieldLabel}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Name"
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.sectionLabel}>Responsibilities</Text>
+            <ScrollView style={styles.respScroll} contentContainerStyle={{ paddingBottom: spacing(2) }}>
+              {groups.map((group) => (
+                <View key={group} style={styles.groupBlock}>
+                  <Text style={styles.groupLabel}>{group}</Text>
+                  {responsibilities
+                    .filter((r) => (r.Group || 'Other') === group)
+                    .map((r) => {
+                      const checked = editRespIds.includes(r._id);
+                      return (
+                        <TouchableOpacity
+                          key={r._id}
+                          style={styles.checkRow}
+                          onPress={() => toggleResp(r._id, !checked)}
+                        >
+                          <View style={[styles.checkbox, checked && styles.checkboxOn]}>
+                            {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                          </View>
+                          <Text style={styles.checkLabel}>{r.Name || r._id}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.formActions}>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnGhost]}
+                onPress={() => setEditOpen(false)}
+                disabled={submitting}
+              >
+                <Text style={styles.formBtnGhostText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnPrimary, submitting && styles.btnDisabled]}
+                onPress={() => void handleUpdate()}
+                disabled={submitting}
+              >
+                <Text style={styles.formBtnPrimaryText}>{submitting ? 'Saving…' : 'Submit'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing(4), paddingBottom: spacing(10) },
+  noPerm: { flex: 1, backgroundColor: colors.background, padding: spacing(4) },
+  noPermText: { color: colors.muted, fontSize: 14 },
+  headerRow: { marginBottom: spacing(3) },
+  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+  actionsRow: { flexDirection: 'row', gap: spacing(2), marginBottom: spacing(3), flexWrap: 'wrap' },
+  headBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(2.5),
+  },
+  headBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  errorBox: {
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: colors.destructive,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(3),
+  },
+  errorText: { color: colors.destructive, fontSize: 13 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  backdropTouch: { flex: 1 },
+  formSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(4),
+    gap: spacing(1),
+  },
+  editSheet: { maxHeight: '85%' },
+  formTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700', marginBottom: spacing(2) },
+  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: spacing(2) },
+  sectionLabel: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: spacing(3),
+    marginBottom: spacing(1),
+  },
+  input: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    fontSize: 14,
+    marginTop: spacing(1),
+  },
+  chipsRow: { flexDirection: 'row', gap: spacing(2), paddingVertical: spacing(1) },
+  chip: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: colors.primaryForeground },
+  respScroll: { maxHeight: 320, marginTop: spacing(1) },
+  groupBlock: { marginBottom: spacing(2) },
+  groupLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginBottom: spacing(1) },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(2), paddingVertical: spacing(1.5) },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkboxTick: { color: colors.primaryForeground, fontSize: 13, fontWeight: '700' },
+  checkLabel: { color: colors.foreground, fontSize: 13, flex: 1 },
+  formActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
+  formBtn: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing(3),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  formBtnGhost: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
+  formBtnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
+  formBtnPrimary: { backgroundColor: colors.primary },
+  formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  btnDisabled: { opacity: 0.5 },
+});

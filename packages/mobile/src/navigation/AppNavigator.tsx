@@ -58,6 +58,16 @@ import { DumpUsersScreen } from '../screens/dashboards/details/DumpUsersScreen';
 import { PercentageScreen } from '../screens/dashboards/details/PercentageScreen';
 import { NewDepositsScreen } from '../screens/dashboards/details/NewDepositsScreen';
 import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
+import { DepositListScreen } from '../screens/dashboards/details/DepositListScreen';
+import { WithdrawalFundScreen } from '../screens/dashboards/details/WithdrawalFundScreen';
+import { SocialMediaScreen } from '../screens/dashboards/details/SocialMediaScreen';
+import { MobileAppScreen } from '../screens/dashboards/details/MobileAppScreen';
+import { IncomingBotCallScreen } from '../screens/dashboards/details/IncomingBotCallScreen';
+import { RolesResponsibilitiesScreen } from '../screens/dashboards/details/RolesResponsibilitiesScreen';
+import { BonusWalletFundRequestScreen } from '../screens/dashboards/details/BonusWalletFundRequestScreen';
+import { BonusWalletRequestsScreen } from '../screens/dashboards/details/BonusWalletRequestsScreen';
+import { DepositApprovedReportScreen } from '../screens/dashboards/details/DepositApprovedReportScreen';
+import { UniqueDepositPendingScreen } from '../screens/dashboards/details/UniqueDepositPendingScreen';
 import { colors } from '../theme';
 
 const Drawer = createDrawerNavigator();
@@ -114,6 +124,16 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/percentage': PercentageScreen as AnyScreen,
   '/newdeposits': NewDepositsScreen as AnyScreen,
   '/botPerformance': BotPerformanceScreen as AnyScreen,
+  '/depositList': DepositListScreen as AnyScreen,
+  '/withdrawal-fund': WithdrawalFundScreen as AnyScreen,
+  '/social-media': SocialMediaScreen as AnyScreen,
+  '/mobile-app': MobileAppScreen as AnyScreen,
+  '/incoming-bot-call': IncomingBotCallScreen as AnyScreen,
+  '/roles-responsibilities': RolesResponsibilitiesScreen as AnyScreen,
+  '/fund-request-bonus-wallet': BonusWalletFundRequestScreen as AnyScreen,
+  '/bonus-wallet': BonusWalletRequestsScreen as AnyScreen,
+  '/DepositApprovedReport': DepositApprovedReportScreen as AnyScreen,
+  '/unique_deposit_pending': UniqueDepositPendingScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {
