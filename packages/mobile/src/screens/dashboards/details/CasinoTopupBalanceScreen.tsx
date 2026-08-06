@@ -20,7 +20,8 @@ import {
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
-import { hasPermission } from '../../../auth/permissions';
+import { hasPermission, canAccessNavItem } from '../../../auth/permissions';
+import { NAV_ITEMS } from '../../../navigation/navItems';
 
 type ProviderKey = 'qtech' | 'betconstruct';
 
@@ -212,7 +213,10 @@ const emptyProviders = (): Record<ProviderKey, ProviderState> => ({
 });
 
 export function CasinoTopupBalanceScreen() {
-  const canView = hasPermission('view_casino_balance');
+  const canView = (() => {
+    const item = NAV_ITEMS.find((n) => n.path === '/casino-topup-balance');
+    return item ? canAccessNavItem(item) : hasPermission('view_casino_balance');
+  })();
   const [providers, setProviders] = useState<Record<ProviderKey, ProviderState>>(emptyProviders);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

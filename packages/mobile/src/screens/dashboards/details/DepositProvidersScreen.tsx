@@ -364,6 +364,7 @@ export function DepositProvidersScreen() {
         onPress: () => {
           setEditRow(sheetRow);
           setEditKey('displayName');
+          setInputValue(String(sheetRow.displayName ?? ''));
           setModalMsg('');
           setSheetRow(null);
         },
@@ -373,6 +374,7 @@ export function DepositProvidersScreen() {
         onPress: () => {
           setListRow(sheetRow);
           setListKey('mid');
+          setInputValue('');
           setModalMsg('');
           setSheetRow(null);
         },

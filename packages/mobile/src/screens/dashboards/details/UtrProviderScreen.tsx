@@ -56,7 +56,11 @@ function asList<T>(data: unknown): T[] {
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
     for (const key of ['payload', 'items', 'data']) {
-      if (Array.isArray(obj[key])) return obj[key] as T[];
+      const v = obj[key];
+      if (Array.isArray(v)) return v as T[];
+      if (v && typeof v === 'object' && Array.isArray((v as Record<string, unknown>).items)) {
+        return (v as Record<string, unknown>).items as T[];
+      }
     }
   }
   return [];
