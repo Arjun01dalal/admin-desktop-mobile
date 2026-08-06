@@ -75,7 +75,9 @@ function normalizeMids(raw: unknown): Array<Record<string, unknown>> {
 }
 
 export function FundsScreen() {
-  const user = getSessionUser();
+  // Read once — getSessionUser returns a fresh object each call; using it directly
+  // in hook deps retriggers load() every render (infinite API polling).
+  const user = useMemo(() => getSessionUser(), []);
   const canShowTotal = hasPermission(Permissions.show_gateway_and_total);
 
   const [draftStart, setDraftStart] = useState(todayIST);

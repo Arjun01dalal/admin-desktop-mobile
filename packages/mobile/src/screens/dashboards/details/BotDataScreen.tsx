@@ -155,7 +155,8 @@ function toggle(list: string[], value: string): string[] {
 }
 
 export function BotDataScreen() {
-  const user = getStoredUser<{ _id?: string; name?: string }>();
+  // Read once — getStoredUser returns a fresh object each call (hook-dep safety).
+  const user = useMemo(() => getStoredUser<{ _id?: string; name?: string }>(), []);
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [userType, setUserType] = useState('User');
