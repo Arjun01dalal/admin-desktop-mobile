@@ -14,16 +14,23 @@
  * Skipped vs desktop: SheetUploadDialog (Excel/CSV file picker + XLSX parsing)
  * needs a document picker + sheet parser not available in this app — the
  * upload action and withdrawalFund.sheetComparison are not wired here.
- * Dialer-call and "Add Comment" desktop actions are also omitted (external
- * dialer HTTP call / local-only comment, no registry action).
+ *
+ * Desktop-parity row actions (in the row detail sheet): "Dialer Call" pushes
+ * the single entry to the dialer campaign API (ganesha999.com, server picked
+ * from the admin's serverId, same as desktop), and "Add Comment" edits the
+ * local-only comment field on the row (desktop does not persist it either).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -33,7 +40,7 @@ import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type WithdrawalDoc = {
   _id?: string;
@@ -254,7 +261,7 @@ function typeTotal(typeItem: TypeGroup): number {
 export function WithdrawalFundScreen() {
   // Read once — getSessionUser returns a fresh object each call; using it directly
   // in hook deps retriggers load() every render (infinite API polling).
-  useMemo(() => getSessionUser(), []);
+  const sessionUser = useMemo(() => getSessionUser() as { serverId?: string | number } | null, []);
   const canShowMobile = hasPermission('show_mobile');
 
   const [draftStart, setDraftStart] = useState(todayIST());
@@ -284,6 +291,67 @@ export function WithdrawalFundScreen() {
   const [midCache, setMidCache] = useState<Record<string, MidReportPayload>>({});
   const [midLoading, setMidLoading] = useState(false);
   const midGenRef = useRef(0);
+
+  // Row actions (desktop WithdrawUserDataPage parity): dialer call + local comment.
+  const [dialerBusy, setDialerBusy] = useState(false);
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentText, setCommentText] = useState('');
+
+  /** Push a single entry to the dialer campaign (exact desktop payload). */
+  const dialerCall = useCallback(
+    async (item: WithdrawalDoc) => {
+      const SERVER_MAP: Record<string, string> = { '1': 'api2', '3': 'api', default: 'api' };
+      const serverPrefix = SERVER_MAP[String(sessionUser?.serverId ?? '')] || SERVER_MAP.default;
+      const apiUrl = `https://${serverPrefix}.ganesha999.com/API/`;
+      const payload = {
+        list_id: '990001',
+        list_name: 'Withdrawal Campaign1',
+        campaign_id: 'WDL1',
+        leads: [
+          {
+            first_name: item?.name || item?.accountHolderName || item?.userName,
+            phone_number: item?.mobile || item?.userMobile,
+            city: item?.city,
+            state: item?.state,
+            email: item?.clientName,
+            comments: item?.clientName,
+            province: item?._id,
+          },
+        ],
+      };
+      setDialerBusy(true);
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error('failed');
+        Alert.alert('Dialer Call', 'Data sent successfully');
+      } catch {
+        Alert.alert('Dialer Call', 'API request failed');
+      } finally {
+        setDialerBusy(false);
+      }
+    },
+    [sessionUser],
+  );
+
+  const saveComment = useCallback(() => {
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+    setRow((prev) => (prev ? { ...prev, comment: trimmed } : prev));
+    setBucket((prev) =>
+      prev
+        ? {
+            ...prev,
+            rows: prev.rows.map((r) => (r === row ? { ...r, comment: trimmed } : r)),
+          }
+        : prev,
+    );
+    setCommentOpen(false);
+    Alert.alert('Comment', 'Comment added successfully');
+  }, [commentText, row]);
 
   const types = useMemo(() => transformWithdrawData(grouped), [grouped]);
 
@@ -504,6 +572,26 @@ export function WithdrawalFundScreen() {
 
   const wdMainKeys = ['idx', 'accountHolderName', 'amount', 'mobile'];
 
+  const rowActions = useMemo<SheetAction[]>(() => {
+    if (!row) return [];
+    return [
+      {
+        label: dialerBusy ? 'Sending…' : 'Dialer Call',
+        tone: 'primary',
+        disabled: dialerBusy,
+        onPress: () => void dialerCall(row),
+      },
+      {
+        label: 'Add Comment',
+        tone: 'default',
+        onPress: () => {
+          setCommentText(String(row.comment || ''));
+          setCommentOpen(true);
+        },
+      },
+    ];
+  }, [row, dialerBusy, dialerCall]);
+
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!row) return [];
     return wdColumns
@@ -666,11 +754,44 @@ export function WithdrawalFundScreen() {
         />
 
         <RowDetailSheet
-          visible={row !== null}
+          visible={row !== null && !commentOpen}
           title={row ? display(row.accountHolderName || row.userName || row.name) : ''}
           fields={sheetFields}
           onClose={() => setRow(null)}
+          actions={rowActions}
         />
+
+        <Modal visible={commentOpen} transparent animationType="fade" onRequestClose={() => setCommentOpen(false)}>
+          <View style={styles.commentBackdrop}>
+            <TouchableWithoutFeedback onPress={() => setCommentOpen(false)}>
+              <View style={StyleSheet.absoluteFill} />
+            </TouchableWithoutFeedback>
+            <View style={styles.commentCard}>
+              <Text style={styles.commentTitle}>Add Comment</Text>
+              <Text style={styles.commentHint}>Please enter a valid comment.</Text>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Enter your comment..."
+                placeholderTextColor={colors.muted}
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+              />
+              <View style={styles.commentBtnRow}>
+                <TouchableOpacity style={styles.commentCancelBtn} onPress={() => setCommentOpen(false)}>
+                  <Text style={styles.commentCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.commentSaveBtn, !commentText.trim() && styles.commentSaveBtnDisabled]}
+                  onPress={saveComment}
+                  disabled={!commentText.trim()}
+                >
+                  <Text style={styles.commentSaveText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
@@ -769,6 +890,49 @@ export function WithdrawalFundScreen() {
 }
 
 const styles = StyleSheet.create({
+  commentBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing(5),
+  },
+  commentCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(4),
+    gap: spacing(2),
+  },
+  commentTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
+  commentHint: { color: colors.muted, fontSize: 12 },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    padding: spacing(3),
+    minHeight: 80,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    backgroundColor: colors.surfaceAlt,
+  },
+  commentBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing(3),
+    marginTop: spacing(1),
+  },
+  commentCancelBtn: { paddingVertical: spacing(2), paddingHorizontal: spacing(3) },
+  commentCancelText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  commentSaveBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(4),
+  },
+  commentSaveBtnDisabled: { opacity: 0.5 },
+  commentSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
