@@ -255,6 +255,10 @@ export function UpiPaymentsScreen() {
 
   const submitApprove = useCallback(async () => {
     if (!approveItem) return;
+    if (!approveReason) {
+      setApproveMsg('Select a reason');
+      return;
+    }
     setApproveSaving(true);
     setApproveMsg('');
     try {
@@ -262,7 +266,7 @@ export function UpiPaymentsScreen() {
         userId: approveItem.userId,
         balance: approveItem.amount,
         updatedBy: { name: admin?.name, _id: admin?._id },
-        reason: approveReason || 'Approved',
+        reason: approveReason,
         remark: `Deposit of ${approveItem.userName} through ${approveItem.paymentGatewayName} order ${approveItem.orderId}`,
         tag: 'credit',
         orderId: approveItem.orderId,
@@ -688,13 +692,20 @@ export function UpiPaymentsScreen() {
                 ? `Add ₹${approveItem.amount} to ${approveItem.userName} (order ${approveItem.orderId})`
                 : ''}
             </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={approveReason}
-              onChangeText={setApproveReason}
-              placeholder="Reason (default: Approved)"
-              placeholderTextColor={colors.muted}
-            />
+            <Text style={styles.modalLabel}>Reason</Text>
+            <View style={styles.chipsWrap}>
+              {['Deposit Failure', 'deposit-manual'].map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.chip, approveReason === r && styles.chipActive]}
+                  onPress={() => setApproveReason(r)}
+                >
+                  <Text style={[styles.chipText, approveReason === r && styles.chipTextActive]}>
+                    {r}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TouchableOpacity
               style={[styles.submitBtn, approveSaving && styles.btnDisabled]}
               disabled={approveSaving}
