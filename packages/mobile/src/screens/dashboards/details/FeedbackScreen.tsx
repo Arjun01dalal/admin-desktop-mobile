@@ -249,7 +249,11 @@ export function FeedbackScreen() {
           sheetRow
             ? columns
                 .filter((c) => c.key !== 'idx')
-                .map<SheetField>((c) => ({ label: c.label, value: c.render(sheetRow, 0) }))
+                .map<SheetField>((c) => ({
+                  label: c.label,
+                  value: c.render(sheetRow, 0),
+                  multiline: c.key === 'message' || c.key === 'reply',
+                }))
             : []
         }
         actions={sheetActions}

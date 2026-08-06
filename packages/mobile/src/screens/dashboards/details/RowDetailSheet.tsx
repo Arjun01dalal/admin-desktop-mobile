@@ -21,6 +21,8 @@ export type SheetField = {
   color?: string;
   /** Renders the value as a colored pill (e.g. call status badge). */
   badgeColor?: string;
+  /** Long text: label on top, full-width left-aligned value below. */
+  multiline?: boolean;
 };
 
 export type SheetAction = {
@@ -93,7 +95,15 @@ export function RowDetailSheet({ visible, title, fields, onClose, action, action
               </View>
             ) : null}
             {note ? <Text style={styles.note}>{note}</Text> : null}
-            {fields.map((f) => (
+            {fields.map((f) =>
+              f.multiline ? (
+                <View key={f.label} style={styles.fieldBlock}>
+                  <Text style={styles.label}>{f.label}</Text>
+                  <Text style={[styles.blockValue, f.color ? { color: f.color } : null]} selectable>
+                    {f.value || '—'}
+                  </Text>
+                </View>
+              ) : (
               <View key={f.label} style={styles.fieldRow}>
                 <Text style={styles.label}>{f.label}</Text>
                 {f.badgeColor ? (
@@ -106,7 +116,8 @@ export function RowDetailSheet({ visible, title, fields, onClose, action, action
                   </Text>
                 )}
               </View>
-            ))}
+              ),
+            )}
             {action ? (
               <TouchableOpacity style={styles.singleActionBtn} onPress={action.onPress}>
                 <Text style={styles.singleActionText}>{action.label}</Text>
@@ -175,6 +186,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 11,
     paddingBottom: spacing(2),
+  },
+  fieldBlock: {
+    paddingVertical: spacing(2),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  blockValue: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: spacing(1),
+    lineHeight: 19,
   },
   fieldRow: {
     flexDirection: 'row',
