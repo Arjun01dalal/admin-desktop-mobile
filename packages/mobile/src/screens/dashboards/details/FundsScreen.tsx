@@ -748,13 +748,20 @@ export function FundsScreen() {
           }
           fields={
             txnSheet
-              ? payinColumns
-                  .filter((c) => c.key !== 'idx')
-                  .map<SheetField>((c) => ({
-                    label: c.label,
-                    value: c.render(txnSheet, 0),
-                    multiline: c.key === 'remark' || c.key === 'orderId',
-                  }))
+              ? [
+                  ...payinColumns
+                    .filter((c) => c.key !== 'idx')
+                    .map<SheetField>((c) => ({
+                      label: c.label,
+                      value: c.render(txnSheet, 0),
+                      multiline: c.key === 'remark' || c.key === 'orderId',
+                    })),
+                  // UTR is not a table column for every request type, but always
+                  // show it in the detail sheet when the row carries one.
+                  ...(payinColumns.some((c) => c.key === 'utr')
+                    ? []
+                    : [{ label: 'UTR', value: display(txnSheet.utr), multiline: true }]),
+                ]
               : []
           }
           onClose={() => setTxnSheet(null)}
