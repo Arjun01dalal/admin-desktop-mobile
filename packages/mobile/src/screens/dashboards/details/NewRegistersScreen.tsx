@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
@@ -29,6 +30,7 @@ import {
   pickUserBankName,
 } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
+import { getStoredUser } from '../../../lib/webShim';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -159,6 +161,16 @@ export function NewRegistersScreen() {
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Row | null>(null);
 
+  // New web-panel filters (reference: NewRegisterUsers)
+  const [newRegistration, setNewRegistration] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Active' | 'InActive'>('All');
+  const [nonPerforming, setNonPerforming] = useState(false);
+  const [otherState, setOtherState] = useState(false);
+  const [showEmpty, setShowEmpty] = useState(false);
+
+  // Stored admin — read once (fresh object each call would retrigger load).
+  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -175,13 +187,23 @@ export function NewRegistersScreen() {
           filter[appliedSearch.field] = text;
         }
       }
-      const res = await secureApi<Response>('users.getAll', {
+      if (otherState) filter.state = 'other';
+      if (activeFilter === 'Active') filter.active = true;
+      else if (activeFilter === 'InActive') filter.active = false;
+      if (nonPerforming) filter.nonPerforming = true;
+
+      const payload: Record<string, unknown> = {
         itemsPerPage: pageSize,
         pageNo: page,
         filter,
         startDate,
         endDate,
-      });
+        newRegistration,
+      };
+      const adminApp = admin?.clientName || admin?.allotedApps;
+      if (adminApp) payload.app = adminApp;
+
+      const res = await secureApi<Response>('users.getAll', payload);
       if (!res.ok) {
         setError(res.message || 'Failed to load users');
         setRows([]);
@@ -192,9 +214,26 @@ export function NewRegistersScreen() {
         data.payload && typeof data.payload === 'object' && !Array.isArray(data.payload)
           ? data.payload
           : data;
-      const list: Row[] = Array.isArray(res.data)
+      let list: Row[] = Array.isArray(res.data)
         ? (res.data as Row[])
         : nested.items || nested.users || data.items || data.users || [];
+
+      // Web-panel post-fetch behavior:
+      if (showEmpty) list = list.filter((v) => !v.activeUser);
+      const states = Array.isArray(admin?.accessibleStates)
+        ? (admin.accessibleStates as string[]).map((s) => String(s).toLowerCase())
+        : [];
+      if (states.length > 0) {
+        list = list.filter((item) => states.includes(String(item.state || '').toLowerCase()));
+      }
+      list = [...list].sort((a, b) => {
+        const valA = String(a.userComesFrom || '').trim();
+        const valB = String(b.userComesFrom || '').trim();
+        if (!valA && valB) return 1;
+        if (valA && !valB) return -1;
+        return valA.localeCompare(valB);
+      });
+
       setSelected(null);
       setRows(list);
       setTotal(
@@ -203,7 +242,20 @@ export function NewRegistersScreen() {
     } finally {
       setLoading(false);
     }
-  }, [appClientName, appliedSearch, endDate, page, pageSize, startDate]);
+  }, [
+    appClientName,
+    appliedSearch,
+    endDate,
+    page,
+    pageSize,
+    startDate,
+    newRegistration,
+    activeFilter,
+    nonPerforming,
+    otherState,
+    showEmpty,
+    admin,
+  ]);
 
   useEffect(() => {
     void load();
@@ -353,6 +405,57 @@ export function NewRegistersScreen() {
           setPage(1);
         }}
       />
+      {/* Web-panel quick filters */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRow}>
+        <TouchableOpacity
+          style={[styles.chip, newRegistration && styles.chipActive]}
+          onPress={() => {
+            setNewRegistration((v) => !v);
+            setPage(1);
+          }}
+        >
+          <Text style={[styles.chipText, newRegistration && styles.chipTextActive]}>
+            New Registration: {newRegistration ? 'True' : 'False'}
+          </Text>
+        </TouchableOpacity>
+        {(['All', 'Active', 'InActive'] as const).map((opt) => (
+          <TouchableOpacity
+            key={opt}
+            style={[styles.chip, activeFilter === opt && styles.chipActive]}
+            onPress={() => {
+              setActiveFilter(opt);
+              setPage(1);
+            }}
+          >
+            <Text style={[styles.chipText, activeFilter === opt && styles.chipTextActive]}>{opt}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={[styles.chip, nonPerforming && styles.chipActive]}
+          onPress={() => {
+            setNonPerforming((v) => !v);
+            setPage(1);
+          }}
+        >
+          <Text style={[styles.chipText, nonPerforming && styles.chipTextActive]}>Non-Performing</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chip, otherState && styles.chipActive]}
+          onPress={() => {
+            setOtherState((v) => !v);
+            setPage(1);
+          }}
+        >
+          <Text style={[styles.chipText, otherState && styles.chipTextActive]}>Other State</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chip, showEmpty && styles.chipActive]}
+          onPress={() => setShowEmpty((v) => !v)}
+        >
+          <Text style={[styles.chipText, showEmpty && styles.chipTextActive]}>Show Empty Record</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
@@ -421,6 +524,19 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  quickRow: { marginTop: spacing(3), flexGrow: 0 },
+  chip: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    marginRight: spacing(2),
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: colors.primaryForeground },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',
