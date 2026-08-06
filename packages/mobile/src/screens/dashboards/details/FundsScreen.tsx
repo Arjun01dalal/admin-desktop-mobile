@@ -252,17 +252,22 @@ export function FundsScreen() {
                 : typeof res.data
             }`,
         );
+        // Tables are nested under payload.data ({ data: {...}, summary: {...} }).
+        const inner =
+          payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+            ? (payload.data as Record<string, unknown>)
+            : payload;
         const txnData =
-          payload.transactionData && typeof payload.transactionData === 'object'
-            ? (payload.transactionData as Record<string, unknown>)
+          inner.transactionData && typeof inner.transactionData === 'object'
+            ? (inner.transactionData as Record<string, unknown>)
             : {};
         const coinData =
-          payload.coinData && typeof payload.coinData === 'object'
-            ? (payload.coinData as Record<string, unknown>)
+          inner.coinData && typeof inner.coinData === 'object'
+            ? (inner.coinData as Record<string, unknown>)
             : {};
         const debitData =
-          payload.debitCoinsData && typeof payload.debitCoinsData === 'object'
-            ? (payload.debitCoinsData as Record<string, unknown>)
+          inner.debitCoinsData && typeof inner.debitCoinsData === 'object'
+            ? (inner.debitCoinsData as Record<string, unknown>)
             : {};
         setSummary(
           payload.summary && typeof payload.summary === 'object'
