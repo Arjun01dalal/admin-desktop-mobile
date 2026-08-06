@@ -41,7 +41,16 @@ type Row = {
 
 type Provider = 'QTECH' | 'WACS';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+const GAME_CATEGORIES = [
+  'Andar Bahar',
+  'Roulette',
+  'Dragon Tiger',
+  'Lucky Sevens',
+  'Poker',
+  'Teen Patti',
+  'BlackJack',
+];
 const MAIN_KEYS = new Set(['idx', 'name', 'gameId', 'status']);
 
 function display(value: unknown): string {
@@ -56,6 +65,8 @@ function asProvider(value: unknown): Provider {
 export function CasinoGamesScreen() {
   const [provider, setProvider] = useState<Provider>('QTECH');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [gameCategory, setGameCategory] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,14 +92,16 @@ export function CasinoGamesScreen() {
     setError(null);
     try {
       const filters: Record<string, unknown> = {};
-      if (applied.name.trim()) filters.Name = applied.name.trim();
+      // Desktop: the category select takes priority over the name search.
+      const nameFilter = gameCategory.trim() || applied.name.trim();
+      if (nameFilter) filters.Name = nameFilter;
       if (applied.id.trim()) {
         if (provider === 'QTECH') filters.gameId = applied.id.trim();
         else filters.Game_Code = applied.id.trim();
       }
       const res = await secureApi<unknown>('ops.casinoGetData', {
         pageNo: page,
-        itemsPerPage: PAGE_SIZE,
+        itemsPerPage: pageSize,
         Filters: filters,
       });
       if (gen !== genRef.current) return;
@@ -105,7 +118,7 @@ export function CasinoGamesScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [page, applied, provider]);
+  }, [page, pageSize, gameCategory, applied, provider]);
 
   useEffect(() => {
     void load();
@@ -151,7 +164,7 @@ export function CasinoGamesScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
+      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
       { key: 'id', label: 'ID', width: 150, render: (r) => display(r._id) },
       { key: 'name', label: 'Game Name', width: 150, render: (r) => display(r.Name || r.name) },
       {
@@ -177,7 +190,7 @@ export function CasinoGamesScreen() {
       },
       { key: 'status', label: 'Status', width: 80, render: (r) => (r.status ? 'Active' : 'Inactive') },
     ],
-    [page, provider],
+    [page, pageSize, provider],
   );
 
   return (
@@ -221,6 +234,43 @@ export function CasinoGamesScreen() {
         >
           <Text style={styles.searchBtnText}>Search</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.chipsRow}>
+        <Text style={styles.chipsLabel}>Category:</Text>
+        {['', ...GAME_CATEGORIES].map((cat) => (
+          <TouchableOpacity
+            key={cat || 'All'}
+            style={[styles.chip, gameCategory === cat && styles.chipActive]}
+            onPress={() => {
+              if (gameCategory !== cat) {
+                setGameCategory(cat);
+                setPage(1);
+              }
+            }}
+          >
+            <Text style={[styles.chipText, gameCategory === cat && styles.chipTextActive]}>
+              {cat || 'All'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.chipsRow}>
+        <Text style={styles.chipsLabel}>Per page:</Text>
+        {PAGE_SIZE_OPTIONS.map((n) => (
+          <TouchableOpacity
+            key={n}
+            style={[styles.chip, pageSize === n && styles.chipActive]}
+            onPress={() => {
+              if (pageSize !== n) {
+                setPageSize(n);
+                setPage(1);
+              }
+            }}
+          >
+            <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>{n}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {error ? (
@@ -314,6 +364,25 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
+  chipsLabel: { color: colors.muted, fontSize: 12 },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    backgroundColor: colors.surface,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: colors.primaryForeground },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
