@@ -7,3 +7,5 @@ The mobile `secureApi` (packages/mobile/src/api/client.ts) is a hand-port of des
 **How to apply:** When a mobile screen shows empty data but desktop works, diff client.ts against the desktop bridge first (URL building, GET params, array unwrap special-cases, keepDataEnvelope).
 
 - Not every desktop "local" registry action needs the Electron bridge: callLogs.processCall is a plain POST to https://helper.callingbot.live/process-call and mobile calls it directly with fetch. Only externalDialer* truly require the desktop bridge.
+
+**Empty-restriction pitfall:** the backend treats an empty `app: []` (or empty-string) restriction in `users.getAll` as "match nothing" and returns 0 records. Only include restriction keys (app, state, etc.) when non-empty. Mobile stored users often have `allotedApps: []`, which is truthy in JS — guard with length checks, not `||`.
