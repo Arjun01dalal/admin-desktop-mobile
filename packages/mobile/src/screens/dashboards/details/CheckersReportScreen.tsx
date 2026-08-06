@@ -9,6 +9,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type CheckerMaps = {
   checkBy?: Record<string, number>;
@@ -26,6 +27,7 @@ export function CheckersReportScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [maps, setMaps] = useState<Required<CheckerMaps>>({ checkBy: {}, crossCheckBy: {} });
+  const [selected, setSelected] = useState<Row | null>(null);
   const genRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -119,6 +121,19 @@ export function CheckersReportScreen() {
         keyFor={(r) => r.name}
         loading={loading}
         emptyMessage="No data available"
+        onRowPress={(row) => setSelected(row)}
+        hint="Tap a row to see details"
+      />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? selected.name : ''}
+        fields={
+          selected
+            ? columns.map<SheetField>((c) => ({ label: c.label, value: c.render(selected, 0) }))
+            : []
+        }
+        onClose={() => setSelected(null)}
       />
     </ScrollView>
   );
