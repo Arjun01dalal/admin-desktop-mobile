@@ -145,7 +145,7 @@ export function PointsReportScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'subadminName', label: 'Pseudo Name', width: 130, render: (r) => display(r.subadminName) },
+      { key: 'subadminName', label: 'Pseudo Name', width: 140, render: (r) => display(r.subadminName) },
       { key: 'realName', label: 'Real-Name', width: 130, render: (r) => display(r.realName) },
       {
         key: 'mobile',
@@ -154,20 +154,20 @@ export function PointsReportScreen() {
         render: (r) =>
           canShowMobile ? display(r.subadminMobile) : r.subadminMobile ? '**********' : '—',
       },
-      { key: 'creditCount', label: 'Credit Count', width: 90, align: 'right', render: (r) => String(r.creditCount ?? 0) },
+      { key: 'creditCount', label: 'Credit Count', width: 100, align: 'center', render: (r) => String(r.creditCount ?? 0) },
       {
         key: 'totalGiven',
         label: 'Total Balance Give',
-        width: 120,
-        align: 'right',
+        width: 130,
+        align: 'center',
         render: (r) => floorNum(r.totalBalanceGiven ?? 0).toLocaleString('en-IN'),
       },
-      { key: 'debitCount', label: 'Debit Count', width: 90, align: 'right', render: (r) => String(r.debitCount ?? 0) },
+      { key: 'debitCount', label: 'Debit Count', width: 100, align: 'center', render: (r) => String(r.debitCount ?? 0) },
       {
         key: 'totalRemove',
         label: 'Total Balance Remove',
-        width: 130,
-        align: 'right',
+        width: 140,
+        align: 'center',
         render: (r) => floorNum(r.totalBalanceRemove ?? 0).toLocaleString('en-IN'),
       },
     ],
@@ -191,7 +191,7 @@ export function PointsReportScreen() {
         key: 'balance',
         label: 'Balance',
         width: 90,
-        align: 'right',
+        align: 'center',
         render: (d) => floorNum(d.balance ?? 0).toLocaleString('en-IN'),
       },
       { key: 'tag', label: 'Tag', width: 90, render: (d) => display(d.tag) },
