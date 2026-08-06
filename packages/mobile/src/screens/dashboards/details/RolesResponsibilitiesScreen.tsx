@@ -13,7 +13,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -28,7 +30,6 @@ import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
-import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type Responsibility = { _id: string; Enum?: string; Name?: string; Group?: string };
 type Role = { _id: string; Name?: string; Responsibilities?: string[] };
@@ -50,7 +51,9 @@ export function RolesResponsibilitiesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [sheetRole, setSheetRole] = useState<Role | null>(null);
+  // Full-page drill-down instead of a modal: view a role, or edit it.
+  const [pageRole, setPageRole] = useState<Role | null>(null);
+  const [pageMode, setPageMode] = useState<'view' | 'edit' | null>(null);
 
   // Add Role (clone) form
   const [cloneOpen, setCloneOpen] = useState(false);
@@ -62,8 +65,7 @@ export function RolesResponsibilitiesScreen() {
   const [respName, setRespName] = useState('');
   const [respGroup, setRespGroup] = useState('');
 
-  // Edit Role form
-  const [editOpen, setEditOpen] = useState(false);
+  // Edit Role form (rendered as its own page)
   const [editId, setEditId] = useState('');
   const [editName, setEditName] = useState('');
   const [editRespIds, setEditRespIds] = useState<string[]>([]);
@@ -167,8 +169,8 @@ export function RolesResponsibilitiesScreen() {
     setEditId(role._id);
     setEditName(role.Name || '');
     setEditRespIds([...(role.Responsibilities || [])]);
-    setSheetRole(null);
-    setEditOpen(true);
+    setPageRole(role);
+    setPageMode('edit');
   }, []);
 
   const toggleResp = useCallback((id: string, checked: boolean) => {
@@ -194,7 +196,8 @@ export function RolesResponsibilitiesScreen() {
         Alert.alert(res.message || 'Failed to update role');
         return;
       }
-      setEditOpen(false);
+      setPageMode(null);
+      setPageRole(null);
       void load();
     } finally {
       setSubmitting(false);
@@ -215,10 +218,12 @@ export function RolesResponsibilitiesScreen() {
                 const res = await secureApi<unknown>('roles.delete', { Role_ID: role._id });
                 if (!res.ok) {
                   setError(res.message || 'Failed to delete role');
-                  setSheetRole(null);
+                  setPageRole(null);
+                  setPageMode(null);
                   return;
                 }
-                setSheetRole(null);
+                setPageRole(null);
+                setPageMode(null);
                 void load();
               } finally {
                 setSubmitting(false);
@@ -245,28 +250,125 @@ export function RolesResponsibilitiesScreen() {
     [],
   );
 
-  const sheetFields = useMemo<SheetField[]>(() => {
-    if (!sheetRole) return [];
-    const names = responsibilityNames(sheetRole.Responsibilities);
-    return [
-      { label: 'Name', value: display(sheetRole.Name) },
-      { label: 'Responsibilities', value: names || '—', multiline: true },
-    ];
-  }, [sheetRole, responsibilityNames]);
-
-  const sheetActions = useMemo<SheetAction[]>(() => {
-    if (!sheetRole) return [];
-    const role = sheetRole;
-    const actions: SheetAction[] = [];
-    if (canEdit) actions.push({ label: 'Edit', tone: 'primary', onPress: () => openEdit(role) });
-    if (canDelete) actions.push({ label: 'Delete', tone: 'warning', onPress: () => handleDelete(role) });
-    return actions;
-  }, [sheetRole, canEdit, canDelete, openEdit, handleDelete]);
-
   if (!canView) {
     return (
       <View style={styles.noPerm}>
         <Text style={styles.noPermText}>You do not have permission to view this page.</Text>
+      </View>
+    );
+  }
+
+  // ---------- Edit Role page ----------
+  if (pageMode === 'edit' && pageRole) {
+    return (
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity onPress={() => setPageMode('view')}>
+            <Text style={styles.backLink}>‹ Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Edit Role</Text>
+          <Text style={styles.fieldLabel}>Name</Text>
+          <TextInput
+            style={styles.input}
+            value={editName}
+            onChangeText={setEditName}
+            placeholder="Name"
+            placeholderTextColor={colors.muted}
+          />
+          <Text style={styles.sectionLabel}>Responsibilities</Text>
+          {groups.map((group) => (
+            <View key={group} style={styles.groupBlock}>
+              <Text style={styles.groupLabel}>{group}</Text>
+              {responsibilities
+                .filter((r) => (r.Group || 'Other') === group)
+                .map((r) => {
+                  const checked = editRespIds.includes(r._id);
+                  return (
+                    <TouchableOpacity
+                      key={r._id}
+                      style={styles.checkRow}
+                      onPress={() => toggleResp(r._id, !checked)}
+                    >
+                      <View style={[styles.checkbox, checked && styles.checkboxOn]}>
+                        {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                      </View>
+                      <Text style={styles.checkLabel}>{r.Name || r._id}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
+          ))}
+          <View style={styles.formActions}>
+            <TouchableOpacity
+              style={[styles.formBtn, styles.formBtnGhost]}
+              onPress={() => setPageMode('view')}
+              disabled={submitting}
+            >
+              <Text style={styles.formBtnGhostText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.formBtn, styles.formBtnPrimary, submitting && styles.btnDisabled]}
+              onPress={() => void handleUpdate()}
+              disabled={submitting}
+            >
+              <Text style={styles.formBtnPrimaryText}>{submitting ? 'Saving…' : 'Submit'}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ---------- View Role page ----------
+  if (pageMode === 'view' && pageRole) {
+    const role = roles.find((r) => r._id === pageRole._id) || pageRole;
+    const names = (role.Responsibilities || [])
+      .map((id) => respById.get(id)?.Name)
+      .filter(Boolean) as string[];
+    return (
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity
+            onPress={() => {
+              setPageMode(null);
+              setPageRole(null);
+            }}
+          >
+            <Text style={styles.backLink}>‹ Back to Roles</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>{display(role.Name)}</Text>
+          <Text style={styles.subCount}>{names.length} responsibilities</Text>
+
+          <View style={styles.formActions}>
+            {canEdit ? (
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnPrimary]}
+                onPress={() => openEdit(role)}
+              >
+                <Text style={styles.formBtnPrimaryText}>Edit</Text>
+              </TouchableOpacity>
+            ) : null}
+            {canDelete ? (
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnDanger]}
+                onPress={() => handleDelete(role)}
+              >
+                <Text style={styles.formBtnPrimaryText}>Delete</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <Text style={styles.sectionLabel}>Responsibilities</Text>
+          {names.length === 0 ? (
+            <Text style={styles.noPermText}>No responsibilities assigned.</Text>
+          ) : (
+            names.map((n, i) => (
+              <View key={`${n}-${i}`} style={styles.respItem}>
+                <Text style={styles.respItemText}>• {n}</Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
       </View>
     );
   }
@@ -321,21 +423,19 @@ export function RolesResponsibilitiesScreen() {
         keyFor={(r, i) => String(r._id || i)}
         loading={loading}
         emptyMessage="No roles found"
-        onRowPress={(row) => setSheetRole(row)}
-        hint="Tap a role to view responsibilities & actions"
-      />
-
-      <RowDetailSheet
-        visible={sheetRole !== null}
-        title={sheetRole ? display(sheetRole.Name) : ''}
-        fields={sheetFields}
-        actions={sheetActions}
-        onClose={() => setSheetRole(null)}
+        onRowPress={(row) => {
+          setPageRole(row);
+          setPageMode('view');
+        }}
+        hint="Tap a role to open its page"
       />
 
       {/* Add Role (clone) */}
       <Modal visible={cloneOpen} transparent animationType="slide" onRequestClose={() => setCloneOpen(false)}>
-        <View style={styles.backdrop}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <TouchableWithoutFeedback onPress={() => !submitting && setCloneOpen(false)}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
@@ -386,12 +486,15 @@ export function RolesResponsibilitiesScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Add Responsibility */}
       <Modal visible={respOpen} transparent animationType="slide" onRequestClose={() => setRespOpen(false)}>
-        <View style={styles.backdrop}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <TouchableWithoutFeedback onPress={() => !submitting && setRespOpen(false)}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
@@ -430,69 +533,9 @@ export function RolesResponsibilitiesScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Edit Role */}
-      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
-        <View style={styles.backdrop}>
-          <TouchableWithoutFeedback onPress={() => !submitting && setEditOpen(false)}>
-            <View style={styles.backdropTouch} />
-          </TouchableWithoutFeedback>
-          <View style={[styles.formSheet, styles.editSheet]}>
-            <Text style={styles.formTitle}>Edit Role</Text>
-            <Text style={styles.fieldLabel}>Name</Text>
-            <TextInput
-              style={styles.input}
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Name"
-              placeholderTextColor={colors.muted}
-            />
-            <Text style={styles.sectionLabel}>Responsibilities</Text>
-            <ScrollView style={styles.respScroll} contentContainerStyle={{ paddingBottom: spacing(2) }}>
-              {groups.map((group) => (
-                <View key={group} style={styles.groupBlock}>
-                  <Text style={styles.groupLabel}>{group}</Text>
-                  {responsibilities
-                    .filter((r) => (r.Group || 'Other') === group)
-                    .map((r) => {
-                      const checked = editRespIds.includes(r._id);
-                      return (
-                        <TouchableOpacity
-                          key={r._id}
-                          style={styles.checkRow}
-                          onPress={() => toggleResp(r._id, !checked)}
-                        >
-                          <View style={[styles.checkbox, checked && styles.checkboxOn]}>
-                            {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
-                          </View>
-                          <Text style={styles.checkLabel}>{r.Name || r._id}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                </View>
-              ))}
-            </ScrollView>
-            <View style={styles.formActions}>
-              <TouchableOpacity
-                style={[styles.formBtn, styles.formBtnGhost]}
-                onPress={() => setEditOpen(false)}
-                disabled={submitting}
-              >
-                <Text style={styles.formBtnGhostText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.formBtn, styles.formBtnPrimary, submitting && styles.btnDisabled]}
-                onPress={() => void handleUpdate()}
-                disabled={submitting}
-              >
-                <Text style={styles.formBtnPrimaryText}>{submitting ? 'Saving…' : 'Submit'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }
@@ -504,6 +547,11 @@ const styles = StyleSheet.create({
   noPermText: { color: colors.muted, fontSize: 14 },
   headerRow: { marginBottom: spacing(3) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+  backLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginBottom: spacing(2) },
+  subCount: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+  respItem: { paddingVertical: spacing(1.5) },
+  respItemText: { color: colors.foreground, fontSize: 13 },
+  formBtnDanger: { backgroundColor: colors.destructive },
   actionsRow: { flexDirection: 'row', gap: spacing(2), marginBottom: spacing(3), flexWrap: 'wrap' },
   headBtn: {
     backgroundColor: colors.primary,
