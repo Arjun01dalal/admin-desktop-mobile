@@ -33,6 +33,9 @@ import { SosBlockedUsersScreen } from '../screens/dashboards/details/SosBlockedU
 import { CheckersReportScreen } from '../screens/dashboards/details/CheckersReportScreen';
 import { SheetDownloadReportScreen } from '../screens/dashboards/details/SheetDownloadReportScreen';
 import { PointsReportScreen } from '../screens/dashboards/details/PointsReportScreen';
+import { CoinRemovalListScreen } from '../screens/dashboards/details/CoinRemovalListScreen';
+import { CustomerAllotmentScreen } from '../screens/dashboards/details/CustomerAllotmentScreen';
+import { NonPerformingUserScreen } from '../screens/dashboards/details/NonPerformingUserScreen';
 import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
 import { colors } from '../theme';
 
@@ -65,6 +68,9 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/checkers-report': CheckersReportScreen as AnyScreen,
   '/downlaodReport': SheetDownloadReportScreen as AnyScreen,
   '/coins-report': PointsReportScreen as AnyScreen,
+  '/coins-removal': CoinRemovalListScreen as AnyScreen,
+  '/customer-allotment': CustomerAllotmentScreen as AnyScreen,
+  '/non_performing_user': NonPerformingUserScreen as AnyScreen,
   '/botPerformance': BotPerformanceScreen as AnyScreen,
 };
 
