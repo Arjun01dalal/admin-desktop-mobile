@@ -14,6 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -83,6 +85,38 @@ function dt(value: unknown): string {
   } catch {
     return display(value);
   }
+}
+
+function getCreatedOn(row: Record<string, unknown>): string {
+  return String(row.createdOn ?? row.createdAt ?? row.createAt ?? '');
+}
+
+function getUpdatedOn(row: Record<string, unknown>): string {
+  return String(row.updatedOn ?? row.updatedAt ?? '');
+}
+
+/** Convert a timestamp to its IST calendar day (YYYY-MM-DD), '' if invalid. */
+function toIstYmd(value?: string): string {
+  if (!value) return '';
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return '';
+  const ist = new Date(time + 5.5 * 60 * 60 * 1000);
+  return ist.toISOString().slice(0, 10);
+}
+
+function csvEscape(value: unknown): string {
+  const str = value === null || value === undefined ? '' : String(value);
+  return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function toCsv(rows: Record<string, unknown>[]): string {
+  if (!rows.length) return '';
+  const headers = Object.keys(rows[0]);
+  const lines = [headers.join(',')];
+  for (const row of rows) {
+    lines.push(headers.map((h) => csvEscape(row[h])).join(','));
+  }
+  return lines.join('\r\n');
 }
 
 /** Mirror desktop unpackPayload: unwrap a single `.payload` object. */
@@ -408,10 +442,10 @@ export function FundsScreen() {
       { key: 'userState', label: 'State', width: 110, render: (r) => display(r.userState) },
       { key: 'userBankName', label: 'User Bank', width: 130, render: (r) => display(r.userBankName) },
       {
-        key: 'userAccountNumber',
+        key: 'accountNumber',
         label: 'User Account',
         width: 150,
-        render: (r) => display(r.userAccountNumber ?? r.userAccount),
+        render: (r) => display(r.accountNumber ?? r.userAccountNumber ?? r.userAccount),
       },
       {
         key: 'createdOn',
@@ -436,6 +470,17 @@ export function FundsScreen() {
       { key: 'balance', label: 'Balance', width: 90, align: 'right', render: (r) => display(r.balance) },
       { key: 'reason', label: 'Reason', width: 150, render: (r) => display(r.reason) },
       { key: 'remark', label: 'Remark', width: 200, render: (r) => display(r.remark) },
+      // UTR is present on Scanner Add rows only (desktop parity).
+      ...(requestType === 'scanner add'
+        ? [
+            {
+              key: 'utr',
+              label: 'UTR',
+              width: 160,
+              render: (r: TxnRow) => display(r.utr),
+            } as DataTableColumn<TxnRow>,
+          ]
+        : []),
       {
         key: 'createdOn',
         label: 'Created At',
@@ -443,7 +488,7 @@ export function FundsScreen() {
         render: (r) => dt(r.createdOn ?? r.createdAt),
       },
     ],
-    [],
+    [requestType],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
@@ -468,6 +513,95 @@ export function FundsScreen() {
       },
     ];
   }, [sheetRow, openMids]);
+
+  // Today / Previous Date split by createdAt IST day (mirrors desktop).
+  const dateSplitStats = useMemo(() => {
+    const referenceDay = endDate || startDate || todayIST();
+    const dayOf = (row: TxnRow) => toIstYmd(getCreatedOn(row));
+    const sumAmount = (list: TxnRow[]) =>
+      list.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    const sumBalance = (list: TxnRow[]) =>
+      list.reduce((sum, row) => sum + (Number(row.balance) || 0), 0);
+
+    const split = (list: TxnRow[]) => ({
+      today: list.filter((r) => dayOf(r) === referenceDay && dayOf(r) !== ''),
+      previous: list.filter((r) => dayOf(r) !== referenceDay && dayOf(r) !== ''),
+    });
+    const txn = split(transactions);
+    const cr = split(coins);
+    const db = split(debitCoins);
+    return {
+      todayTotal: sumAmount(txn.today) + sumBalance(cr.today) - sumBalance(db.today),
+      todayCount: txn.today.length + cr.today.length + db.today.length,
+      previousTotal:
+        sumAmount(txn.previous) + sumBalance(cr.previous) - sumBalance(db.previous),
+      previousCount: txn.previous.length + cr.previous.length + db.previous.length,
+    };
+  }, [transactions, coins, debitCoins, startDate, endDate]);
+
+  const downloadSheet = useCallback(async () => {
+    let rows: Record<string, unknown>[] = [];
+    let sheetName = 'Automatic';
+    if (requestType === 'automaticDeposit') {
+      rows = transactions.map((r) => ({
+        UserId: r.userId,
+        Amount: r.amount,
+        OrderID: r.orderId,
+        UserName: r.userName,
+        Status: r.status,
+        UserMobile: canShowMobile ? r.userMobile : '',
+        City: r.userCity,
+        State: r.userState,
+        UserBankName: r.userBankName,
+        UserAccount: r.accountNumber,
+        CreatedAt: dt(getCreatedOn(r)),
+        UpdatedOn: dt(getUpdatedOn(r)),
+      }));
+    } else if (requestType === 'scanner add') {
+      sheetName = 'ScannerAdd';
+      rows = coins.map((r) => ({
+        UserId: r.userId,
+        Balance: r.balance,
+        Reason: r.reason,
+        Remark: r.remark,
+        UTR: r.utr,
+        UserName: r.userName,
+        UserMobile: canShowMobile ? r.userMobile : '',
+        CreatedAt: dt(getCreatedOn(r)),
+        UpdatedOn: dt(getUpdatedOn(r)),
+      }));
+    } else {
+      sheetName = 'ScannerRemove';
+      rows = debitCoins.map((r) => ({
+        UserId: r.userId,
+        Balance: r.balance,
+        Reason: r.reason,
+        Remark: r.remark,
+        UserName: r.userName,
+        UserMobile: canShowMobile ? r.userMobile : '',
+        CreatedAt: dt(getCreatedOn(r)),
+        UpdatedOn: dt(getUpdatedOn(r)),
+      }));
+    }
+    if (!rows.length) {
+      setPayinError('No data to export');
+      return;
+    }
+    try {
+      const fileUri = `${FileSystem.cacheDirectory}${sheetName.toLowerCase()}_${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(fileUri, toCsv(rows));
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: `${sheetName} sheet`,
+        });
+      } else {
+        setPayinError('Sharing is not available on this device');
+      }
+    } catch (err) {
+      setPayinError(err instanceof Error ? err.message : 'Failed to export sheet');
+    }
+  }, [requestType, transactions, coins, debitCoins, canShowMobile]);
 
   const payinRows =
     requestType === 'scanner add' ? coins : requestType === 'scanner remove' ? debitCoins : transactions;
@@ -538,6 +672,17 @@ export function FundsScreen() {
           </View>
           <View style={styles.kpiBox}>
             <Text style={styles.kpiText}>
+              Today Total: {formatAmt(dateSplitStats.todayTotal)} ({dateSplitStats.todayCount})
+            </Text>
+          </View>
+          <View style={styles.kpiBox}>
+            <Text style={styles.kpiText}>
+              Previous Date Total: {formatAmt(dateSplitStats.previousTotal)} (
+              {dateSplitStats.previousCount})
+            </Text>
+          </View>
+          <View style={styles.kpiBox}>
+            <Text style={styles.kpiText}>
               Transaction Amount: {formatAmt(summary?.transactionAmount)} ({txnCount})
             </Text>
           </View>
@@ -568,6 +713,12 @@ export function FundsScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            style={[styles.chip, styles.downloadChip]}
+            onPress={() => void downloadSheet()}
+          >
+            <Text style={styles.downloadChipText}>⬇ Download Sheet</Text>
+          </TouchableOpacity>
         </View>
 
         {payinError ? (
@@ -732,6 +883,8 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
+  downloadChip: { borderColor: colors.primary },
+  downloadChipText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
