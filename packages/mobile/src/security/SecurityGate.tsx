@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 import { useSecurity } from './useSecurity';
 
@@ -24,7 +25,7 @@ export function SecurityGate({ children }: { children: React.ReactNode }) {
   const reasons = threats.filter((t) => LABELS[t]).map((t) => LABELS[t]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.icon}>🔒</Text>
       <Text style={styles.title}>Access blocked</Text>
       <Text style={styles.subtitle}>
@@ -37,7 +38,7 @@ export function SecurityGate({ children }: { children: React.ReactNode }) {
           </Text>
         ))}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

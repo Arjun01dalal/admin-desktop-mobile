@@ -25,6 +25,7 @@ import { CallerResponsibilityScreen } from '../screens/dashboards/details/Caller
 import { PlayerActivityScreen } from '../screens/dashboards/details/PlayerActivityScreen';
 import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
 import { CallLogsScreen } from '../screens/dashboards/details/CallLogsScreen';
+import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
 import { colors } from '../theme';
 
 const Drawer = createDrawerNavigator();
@@ -48,6 +49,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/player-activity': PlayerActivityScreen as AnyScreen,
   '/game-activity': GameActivityScreen as AnyScreen,
   '/call-logs': CallLogsScreen as AnyScreen,
+  '/botPerformance': BotPerformanceScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {
