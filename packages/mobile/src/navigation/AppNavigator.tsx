@@ -42,6 +42,14 @@ import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstr
 import { CasinoGamesScreen } from '../screens/dashboards/details/CasinoGamesScreen';
 import { CasinoSwitchScreen } from '../screens/dashboards/details/CasinoSwitchScreen';
 import { TopGamesScreen } from '../screens/dashboards/details/TopGamesScreen';
+import { CasinoTopupBalanceScreen } from '../screens/dashboards/details/CasinoTopupBalanceScreen';
+import { BannersScreen } from '../screens/dashboards/details/BannersScreen';
+import { UpiPaymentsScreen } from '../screens/dashboards/details/UpiPaymentsScreen';
+import { UpiListsScreen } from '../screens/dashboards/details/UpiListsScreen';
+import { UtrProviderScreen } from '../screens/dashboards/details/UtrProviderScreen';
+import { InstantDepositProvidersScreen } from '../screens/dashboards/details/InstantDepositProvidersScreen';
+import { DepositProvidersScreen } from '../screens/dashboards/details/DepositProvidersScreen';
+import { DepositConfigScreen } from '../screens/dashboards/details/DepositConfigScreen';
 import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
 import { colors } from '../theme';
 
@@ -83,6 +91,14 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/casino-lists': CasinoGamesScreen as AnyScreen,
   '/dynamic-casino-switching': CasinoSwitchScreen as AnyScreen,
   '/top-games': TopGamesScreen as AnyScreen,
+  '/casino-topup-balance': CasinoTopupBalanceScreen as AnyScreen,
+  '/banners': BannersScreen as AnyScreen,
+  '/all-upi-payments': UpiPaymentsScreen as AnyScreen,
+  '/upi-lists': UpiListsScreen as AnyScreen,
+  '/utr-provider': UtrProviderScreen as AnyScreen,
+  '/instant-provider': InstantDepositProvidersScreen as AnyScreen,
+  '/pay-g-mid': DepositProvidersScreen as AnyScreen,
+  '/deposit-config': DepositConfigScreen as AnyScreen,
   '/botPerformance': BotPerformanceScreen as AnyScreen,
 };
 
