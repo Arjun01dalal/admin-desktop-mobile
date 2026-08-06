@@ -187,18 +187,14 @@ export function SocialMediaScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'name', label: 'Name', width: 220, render: (r) => display(r.name) },
+      { key: 'name', label: 'Name', width: 260, render: (r) => display(r.name) },
     ],
     [],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!sheetRow) return [];
-    return [
-      { label: 'Name', value: display(sheetRow.name) },
-      { label: 'Link', value: display(sheetRow.link), multiline: true },
-    ];
+    return [{ label: 'Name', value: display(sheetRow.name) }];
   }, [sheetRow]);
 
   const sheetActions = useMemo<SheetAction[]>(() => {
