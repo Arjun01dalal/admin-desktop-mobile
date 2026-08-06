@@ -47,7 +47,7 @@ type Row = {
   [key: string]: unknown;
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 const MAIN_KEYS = new Set(['idx', 'name', 'dpId', 'mobile', 'balance']);
 
 const SEARCH_FIELDS: readonly SearchFieldOption[] = [
@@ -75,6 +75,7 @@ function formatAmount(value: unknown): string {
 
 export function DumpUsersScreen() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [searchField, setSearchField] = useState<string>('name');
   const [searchText, setSearchText] = useState('');
   const [applied, setApplied] = useState<{ field: string; text: string }>({
@@ -106,7 +107,7 @@ export function DumpUsersScreen() {
         else filter.name = text;
       }
       const res = await secureApi<unknown>('users.getAll', {
-        itemsPerPage: PAGE_SIZE,
+        itemsPerPage: pageSize,
         pageNo: page,
         filter,
       });
@@ -126,7 +127,7 @@ export function DumpUsersScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [page, applied]);
+  }, [page, pageSize, applied]);
 
   useEffect(() => {
     void load();
@@ -171,7 +172,7 @@ export function DumpUsersScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const cols: DataTableColumn<Row>[] = [
-      { key: 'idx', label: '#', width: 48, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
+      { key: 'idx', label: '#', width: 48, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
       { key: 'name', label: 'Name', width: 150, render: (r) => display(r.name) },
       { key: 'dpId', label: 'Dp Id', width: 200, render: (r) => display(r._id) },
       { key: 'mobile', label: 'Mobile', width: 130, render: (r) => maskMobile(r.mobile, canShowMobile) },
@@ -292,6 +293,24 @@ export function DumpUsersScreen() {
         hint="Tap a row to see all details"
       />
 
+      <View style={styles.perPageRow}>
+        <Text style={styles.chipsLabel}>Per page:</Text>
+        {PAGE_SIZE_OPTIONS.map((n) => (
+          <TouchableOpacity
+            key={n}
+            style={[styles.chip, pageSize === n && styles.chipActive]}
+            onPress={() => {
+              if (pageSize !== n) {
+                setPageSize(n);
+                setPage(1);
+              }
+            }}
+          >
+            <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>{n}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <View style={styles.pager}>
         <Text
           style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
@@ -357,6 +376,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  perPageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
   searchRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
