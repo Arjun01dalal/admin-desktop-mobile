@@ -159,6 +159,7 @@ export function NewRegistersScreen() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
+  const [serverCount, setServerCount] = useState<number | null>(null);
   const [selected, setSelected] = useState<Row | null>(null);
 
   // New web-panel filters (reference: NewRegisterUsers)
@@ -209,6 +210,11 @@ export function NewRegistersScreen() {
         setRows([]);
         return;
       }
+      if (res.success === false) {
+        setError(res.message || 'Server rejected the request');
+        setRows([]);
+        return;
+      }
       const data = (res.data || {}) as Response;
       const nested =
         data.payload && typeof data.payload === 'object' && !Array.isArray(data.payload)
@@ -217,6 +223,7 @@ export function NewRegistersScreen() {
       let list: Row[] = Array.isArray(res.data)
         ? (res.data as Row[])
         : nested.items || nested.users || data.items || data.users || [];
+      setServerCount(list.length);
 
       // Web-panel post-fetch behavior:
       if (showEmpty) list = list.filter((v) => !v.activeUser);
@@ -373,6 +380,9 @@ export function NewRegistersScreen() {
       <Text style={styles.title}>New Registers</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
+        {serverCount !== null && serverCount !== rows.length
+          ? ` · server sent ${serverCount}, shown ${rows.length}`
+          : ''}
       </Text>
       <DetailFilterBar
         startDate={draftStart}
