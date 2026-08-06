@@ -2,7 +2,7 @@
  * Login Report — port of desktop LoginReportPage.
  * Calls reports.loginByRole ({}) once; role chips switch the locally loaded group.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -50,12 +50,15 @@ export function LoginReportScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Item | null>(null);
+  const genRef = useRef(0);
 
   const load = useCallback(async () => {
+    const gen = ++genRef.current;
     setLoading(true);
     setError(null);
     try {
       const res = await secureApi<unknown>('reports.loginByRole', {});
+      if (gen !== genRef.current) return;
       if (!res.ok) {
         setGrouped({});
         setRoleIds([]);
@@ -79,7 +82,7 @@ export function LoginReportScreen() {
       setRoleIds(ids);
       setRoleId((prev) => (prev && next[prev] ? prev : ids[0] || ''));
     } finally {
-      setLoading(false);
+      if (gen === genRef.current) setLoading(false);
     }
   }, []);
 
