@@ -54,8 +54,8 @@ type Row = {
   [key: string]: unknown;
 };
 
-const MAIN_KEYS = new Set(['subadminName', 'realName', 'mobile', 'creditCount', 'totalGiven', 'debitCount', 'totalRemove']);
-const DOC_MAIN_KEYS = new Set(['idx', 'userName', 'userBankName', 'userId', 'appCode', 'mobile', 'balance', 'tag', 'reason', 'mid', 'remark', 'time']);
+const MAIN_KEYS = new Set(['subadminName', 'creditCount', 'totalGiven']);
+const DOC_MAIN_KEYS = new Set(['idx', 'userName', 'balance', 'time']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
