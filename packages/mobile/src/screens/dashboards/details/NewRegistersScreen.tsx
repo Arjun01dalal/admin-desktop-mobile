@@ -204,7 +204,13 @@ export function NewRegistersScreen() {
       const adminApp = admin?.clientName || admin?.allotedApps;
       if (adminApp) payload.app = adminApp;
 
+      // TEMP DEBUG: streams to Metro logs via the Expo tunnel.
+      console.log('[NewRegisters] payload =>', JSON.stringify(payload));
       const res = await secureApi<Response>('users.getAll', payload);
+      console.log(
+        '[NewRegisters] response =>',
+        JSON.stringify({ ok: res.ok, success: res.success, message: res.message, status: res.status, data: res.data })?.slice(0, 2000),
+      );
       if (!res.ok) {
         setError(res.message || 'Failed to load users');
         setRows([]);
