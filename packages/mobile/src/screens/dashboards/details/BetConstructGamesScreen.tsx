@@ -5,19 +5,23 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type Row = {
   _id?: string;
@@ -55,6 +59,11 @@ export function BetConstructGamesScreen() {
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [sheetRow, setSheetRow] = useState<Row | null>(null);
+  // Image update modal.
+  const [imageRow, setImageRow] = useState<Row | null>(null);
+  const [imageUrl, setImageUrl] = useState('');
+  const [savingImage, setSavingImage] = useState(false);
+  const [imageMsg, setImageMsg] = useState('');
   const genRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -79,11 +88,12 @@ export function BetConstructGamesScreen() {
         return;
       }
       const data = (res.data || {}) as { games?: Row[]; count?: number };
-      const count = Number(data.count) || 0;
+      const list = Array.isArray(data.games) ? data.games : [];
+      const count = Number(data.count ?? list.length) || 0;
       setSheetRow(null);
-      setRows(Array.isArray(data.games) ? data.games : []);
+      setRows(list);
       setTotal(count);
-      setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
+      setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE) || 1));
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
@@ -92,6 +102,33 @@ export function BetConstructGamesScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const submitImage = useCallback(async () => {
+    const url = imageUrl.trim();
+    if (!url) {
+      setImageMsg('Please add image URL');
+      return;
+    }
+    const gameId = imageRow?.gameId;
+    if (!gameId) {
+      setImageMsg('Please select a proper game');
+      return;
+    }
+    setSavingImage(true);
+    setImageMsg('');
+    try {
+      const res = await secureApi<unknown>('ops.betConstructUpdateImage', { gameId, url });
+      if (!res.ok) {
+        setImageMsg(res.message || 'Failed to update image');
+        return;
+      }
+      setImageRow(null);
+      setImageUrl('');
+      void load();
+    } finally {
+      setSavingImage(false);
+    }
+  }, [imageUrl, imageRow, load]);
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
@@ -207,9 +244,73 @@ export function BetConstructGamesScreen() {
                 .map<SheetField>((c) => ({ label: c.label, value: c.render(sheetRow, 0) }))
             : []
         }
-        note="Image upload is available on the desktop panel."
+        actions={
+          sheetRow
+            ? ([
+                {
+                  label: 'Update image',
+                  tone: 'primary',
+                  onPress: () => {
+                    setImageRow(sheetRow);
+                    setImageUrl('');
+                    setImageMsg('');
+                    setSheetRow(null);
+                  },
+                },
+              ] satisfies SheetAction[])
+            : []
+        }
         onClose={() => setSheetRow(null)}
       />
+
+      {/* Image update modal */}
+      <Modal
+        visible={imageRow !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setImageRow(null)}
+      >
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={() => setImageRow(null)}>
+            <View style={styles.backdropTouch} />
+          </TouchableWithoutFeedback>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} numberOfLines={1}>
+                Update image{imageRow ? ` — ${display(imageRow.Name || imageRow.name)}` : ''}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setImageRow(null)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalRow}>
+              <TextInput
+                style={styles.modalInput}
+                value={imageUrl}
+                onChangeText={setImageUrl}
+                placeholder="Image URL…"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={[styles.searchBtn, (savingImage || !imageUrl.trim()) && styles.btnDisabled]}
+                disabled={savingImage || !imageUrl.trim()}
+                onPress={() => void submitImage()}
+              >
+                <Text style={styles.searchBtnText}>{savingImage ? 'Saving…' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+            {imageMsg ? <Text style={styles.modalMsg}>{imageMsg}</Text> : null}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <View style={styles.pager}>
         <Text
@@ -266,6 +367,36 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  backdropTouch: { flex: 1 },
+  modalSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radius.md * 2,
+    borderTopRightRadius: radius.md * 2,
+    padding: spacing(4),
+  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: {
+    color: colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: spacing(2),
+  },
+  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
+  modalRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(3) },
+  modalInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(3),
+    fontSize: 14,
+    marginRight: spacing(2),
+  },
+  modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',
