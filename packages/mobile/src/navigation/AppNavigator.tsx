@@ -26,6 +26,8 @@ import { PlayerActivityScreen } from '../screens/dashboards/details/PlayerActivi
 import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
 import { CallLogsScreen } from '../screens/dashboards/details/CallLogsScreen';
 import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersScreen';
+import { StateWiseRegistrationScreen } from '../screens/dashboards/details/StateWiseRegistrationScreen';
+import { LoginReportScreen } from '../screens/dashboards/details/LoginReportScreen';
 import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
 import { colors } from '../theme';
 
@@ -51,6 +53,8 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/game-activity': GameActivityScreen as AnyScreen,
   '/call-logs': CallLogsScreen as AnyScreen,
   '/new-registers': NewRegistersScreen as AnyScreen,
+  '/register-user-report': StateWiseRegistrationScreen as AnyScreen,
+  '/login-report': LoginReportScreen as AnyScreen,
   '/botPerformance': BotPerformanceScreen as AnyScreen,
 };
 
