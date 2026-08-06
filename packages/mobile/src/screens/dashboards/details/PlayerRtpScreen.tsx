@@ -15,6 +15,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
@@ -214,10 +215,32 @@ export function PlayerRtpScreen() {
     setGameId(draftGameId.trim());
   }, [draftUserId, draftGameId]);
 
+  // Fit the visible (main) columns to the phone width so there is no
+  // horizontal scroll. Widths scale with the screen size.
+  const { width: screenWidth } = useWindowDimensions();
+  const availableWidth = Math.max(280, screenWidth - spacing(4) * 2 - spacing(2));
+  const IDX_W = 34;
+  const fit = (weight: number, totalWeight: number) =>
+    Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
+  // Qtech main columns: userId(3) gameCount(2) totalAmount(3) winPct(2)
+  const qtechW = {
+    userId: fit(3, 10),
+    gameCount: fit(2, 10),
+    totalAmount: fit(3, 10),
+    winPct: fit(2, 10),
+  };
+  // Exchange main columns: userId(3) amount(2.5) name(3) winLoss(2.5)
+  const exchW = {
+    userId: fit(3, 11),
+    amount: fit(2.5, 11),
+    name: fit(3, 11),
+    winLoss: fit(2.5, 11),
+  };
+
   const qtechColumns = useMemo<DataTableColumn<QtechRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'userId', label: 'User ID', width: 140, render: (r) => display(r.userId) },
+      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
+      { key: 'userId', label: 'User ID', width: qtechW.userId, render: (r) => display(r.userId) },
       {
         key: 'games',
         label: 'Games',
@@ -231,45 +254,47 @@ export function PlayerRtpScreen() {
       },
       {
         key: 'gameCount',
-        label: 'Game Count',
-        width: 90,
+        label: 'Games',
+        width: qtechW.gameCount,
         align: 'center',
         render: (r) => String(r.games?.length || 0),
       },
-      { key: 'totalAmount', label: 'Total Amount', width: 120, align: 'right', render: (r) => formatAmount(r.combined?.totalAmount ?? 0) },
+      { key: 'totalAmount', label: 'Amount', width: qtechW.totalAmount, align: 'right', render: (r) => formatAmount(r.combined?.totalAmount ?? 0) },
       { key: 'totalBets', label: 'Total Bets', width: 100, align: 'right', render: (r) => display(r.combined?.totalBets ?? 0) },
       { key: 'totalWins', label: 'Total Wins', width: 100, align: 'right', render: (r) => display(r.combined?.totalWins ?? 0) },
       { key: 'winAmount', label: 'Total Wins Amount', width: 130, align: 'right', render: (r) => formatAmount(r.combined?.winAmount ?? 0) },
       {
         key: 'winPct',
-        label: 'Total Win %',
-        width: 100,
+        label: 'Win %',
+        width: qtechW.winPct,
         render: (r) => display(r.combined?.winPercentage ?? 0),
         badge: (r) => winPctBadge(r.combined?.winPercentage),
       },
     ],
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [availableWidth],
   );
 
   const exchangeColumns = useMemo<DataTableColumn<ExchangeRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'userId', label: 'User ID', width: 140, render: (r) => display(r.userId) },
-      { key: 'amount', label: 'Amount', width: 110, align: 'right', render: (r) => formatAmount(r.amount) },
+      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
+      { key: 'userId', label: 'User ID', width: exchW.userId, render: (r) => display(r.userId) },
+      { key: 'amount', label: 'Amount', width: exchW.amount, align: 'right', render: (r) => formatAmount(r.amount) },
       { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
-      { key: 'name', label: 'Name', width: 130, render: (r) => display(r.name) },
+      { key: 'name', label: 'Name', width: exchW.name, render: (r) => display(r.name) },
       { key: 'provider', label: 'Provider', width: 120, render: (r) => display(r.provider) },
       { key: 'totalBets', label: 'Total Bets', width: 100, align: 'right', render: (r) => display(r.totalBets) },
       {
         key: 'winLoss',
         label: 'Win Loss',
-        width: 110,
+        width: exchW.winLoss,
         align: 'right',
         render: (r) => formatAmount(r.winLoss ?? 0),
         color: (r) => (Number(r.winLoss) < 0 ? colors.destructive : '#16a34a'),
       },
     ],
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [availableWidth],
   );
 
   const isQtech = type === 'Qtech';
@@ -418,7 +443,7 @@ export function PlayerRtpScreen() {
           onRowPress={(row) =>
             setSheetRow({ userId: row.userId, games: [], combined: {} })
           }
-          hint="Swipe sideways to see all columns →"
+          hint="Tap a row to see details"
         />
       )}
 
