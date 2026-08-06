@@ -124,11 +124,14 @@ export async function secureApi<T = unknown>(
         }
       } catch (err) {
         if (typeof data.data === 'string') {
-          return {
-            ok: false,
-            status: res.status,
-            message: err instanceof Error ? err.message : 'Decrypt failed',
-          };
+          // Some mutation endpoints (e.g. upiLists/update) return a plain/non-encrypted
+          // body on success. HTTP was OK, so treat as success instead of surfacing a
+          // decrypt/JSON-parse error; log the raw body for remote diagnostics.
+          console.log(
+            `[api] ${action} decrypt failed (${err instanceof Error ? err.message : err}); ` +
+              `treating HTTP ${res.status} as success. raw=${String(data.data).slice(0, 200)}`,
+          );
+          data = { ...data, data: null };
         }
       }
     }
