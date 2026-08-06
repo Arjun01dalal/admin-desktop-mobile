@@ -390,7 +390,7 @@ export function BotPerformanceScreen() {
               const id = c.id.trim();
               return (
                 <TouchableOpacity
-                  key={id}
+                  key={c.id}
                   style={[styles.chip, campaignId === id && styles.chipActive]}
                   onPress={() => setCampaignId(campaignId === id ? '' : id)}
                 >

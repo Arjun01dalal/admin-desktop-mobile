@@ -97,6 +97,8 @@ export async function secureApi<T = unknown>(
     }
 
     if (!res.ok) {
+      // Surfaced in tunnel logs so failing actions can be diagnosed remotely.
+      console.log(`[api] ${action} failed: HTTP ${res.status}`);
       return {
         ok: false,
         status: res.status,
