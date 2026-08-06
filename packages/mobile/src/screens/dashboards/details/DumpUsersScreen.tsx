@@ -277,22 +277,6 @@ export function DumpUsersScreen() {
         </View>
       </View>
 
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No dump users found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
-
       <View style={styles.perPageRow}>
         <Text style={styles.chipsLabel}>Per page:</Text>
         {PAGE_SIZE_OPTIONS.map((n) => (
@@ -310,6 +294,22 @@ export function DumpUsersScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      <DataTable
+        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
+        rows={rows}
+        keyFor={(r, i) => String(r._id || i)}
+        loading={loading}
+        emptyMessage="No dump users found"
+        onRowPress={(row) => setSheetRow(row)}
+        hint="Tap a row to see all details"
+      />
 
       <View style={styles.pager}>
         <Text
