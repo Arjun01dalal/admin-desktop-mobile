@@ -28,6 +28,11 @@ import { CallLogsScreen } from '../screens/dashboards/details/CallLogsScreen';
 import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersScreen';
 import { StateWiseRegistrationScreen } from '../screens/dashboards/details/StateWiseRegistrationScreen';
 import { LoginReportScreen } from '../screens/dashboards/details/LoginReportScreen';
+import { AllUserLoginReportScreen } from '../screens/dashboards/details/AllUserLoginReportScreen';
+import { SosBlockedUsersScreen } from '../screens/dashboards/details/SosBlockedUsersScreen';
+import { CheckersReportScreen } from '../screens/dashboards/details/CheckersReportScreen';
+import { SheetDownloadReportScreen } from '../screens/dashboards/details/SheetDownloadReportScreen';
+import { PointsReportScreen } from '../screens/dashboards/details/PointsReportScreen';
 import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
 import { colors } from '../theme';
 
@@ -55,6 +60,11 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/new-registers': NewRegistersScreen as AnyScreen,
   '/register-user-report': StateWiseRegistrationScreen as AnyScreen,
   '/login-report': LoginReportScreen as AnyScreen,
+  '/all-user-login-report': AllUserLoginReportScreen as AnyScreen,
+  '/sos-blocked-users': SosBlockedUsersScreen as AnyScreen,
+  '/checkers-report': CheckersReportScreen as AnyScreen,
+  '/downlaodReport': SheetDownloadReportScreen as AnyScreen,
+  '/coins-report': PointsReportScreen as AnyScreen,
   '/botPerformance': BotPerformanceScreen as AnyScreen,
 };
 
