@@ -31,6 +31,8 @@ import {
 } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
+import { CAMPAIGN_LIST } from '../../../utils/campaignList';
+import { addToDialerBatch } from '../../../utils/externalDialer';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -172,6 +174,12 @@ export function NewRegistersScreen() {
   // Stored admin — read once (fresh object each call would retrigger load).
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
 
+  // Add to Dialer — like the web panel, sends ALL currently loaded rows.
+  const [campaignId, setCampaignId] = useState('');
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [dialerMsg, setDialerMsg] = useState('');
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -273,6 +281,37 @@ export function NewRegistersScreen() {
   }, [load]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+
+  const addToDialer = useCallback(async () => {
+    setDialerMsg('');
+    if (!campaignId) {
+      setDialerMsg('Campaign should not be empty');
+      return;
+    }
+    if (!rows.length) {
+      setDialerMsg('No users to send');
+      return;
+    }
+    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
+    setPushing(true);
+    try {
+      const res = await addToDialerBatch({
+        campaignId,
+        serverId: campaign?.serverId,
+        leads: rows.map((r) => ({
+          _id: String(r._id || ''),
+          name: r.name,
+          mobile: r.mobile,
+          city: r.city,
+          state: r.state,
+          clientName: r.clientName,
+        })),
+      });
+      setDialerMsg(res.message);
+    } finally {
+      setPushing(false);
+    }
+  }, [campaignId, rows]);
 
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const cols: DataTableColumn<Row>[] = [
@@ -470,6 +509,47 @@ export function NewRegistersScreen() {
         </TouchableOpacity>
       </ScrollView>
 
+      {/* Add to Dialer — sends all users on the current page, like the website */}
+      <TouchableOpacity style={styles.dialerHeader} onPress={() => setDialerOpen((o) => !o)}>
+        <Text style={styles.dialerHeaderText}>
+          Add to Dialer{campaignId ? ` · ${campaignId}` : ''} {dialerOpen ? '▲' : '▼'}
+        </Text>
+      </TouchableOpacity>
+      {dialerOpen && (
+        <View style={styles.dialerCard}>
+          <Text style={styles.dialerLabel}>Campaign</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRow}>
+            {CAMPAIGN_LIST.map((c) => {
+              const id = c.id.trim();
+              return (
+                <TouchableOpacity
+                  key={id}
+                  style={[styles.chip, campaignId === id && styles.chipActive]}
+                  onPress={() => setCampaignId(campaignId === id ? '' : id)}
+                >
+                  <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
+                    {id} · {c.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.dialerHint}>
+            Sends all {rows.length} users shown below to the selected campaign.
+          </Text>
+          <TouchableOpacity
+            style={[styles.dialerBtn, (pushing || !rows.length || !campaignId) && styles.dialerBtnDisabled]}
+            onPress={() => void addToDialer()}
+            disabled={pushing || !rows.length || !campaignId}
+          >
+            <Text style={styles.dialerBtnText}>
+              {pushing ? 'Sending…' : `Add ${rows.length} to Dialer`}
+            </Text>
+          </TouchableOpacity>
+          {dialerMsg ? <Text style={styles.dialerMsg}>{dialerMsg}</Text> : null}
+        </View>
+      )}
+
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
@@ -551,6 +631,28 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
+  dialerHeader: { marginTop: spacing(3) },
+  dialerHeaderText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  dialerCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginTop: spacing(2),
+  },
+  dialerLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginBottom: spacing(1) },
+  dialerHint: { color: colors.muted, fontSize: 11, marginTop: spacing(2) },
+  dialerBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    marginTop: spacing(2),
+  },
+  dialerBtnDisabled: { opacity: 0.5 },
+  dialerBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  dialerMsg: { color: colors.foreground, fontSize: 12, marginTop: spacing(2), textAlign: 'center' },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',
