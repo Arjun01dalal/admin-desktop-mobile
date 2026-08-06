@@ -42,7 +42,7 @@ type Row = {
   [key: string]: unknown;
 };
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const MAIN_KEYS = new Set(['idx', 'name', 'category', 'status']);
 
 function display(value: unknown): string {
@@ -52,6 +52,8 @@ function display(value: unknown): string {
 
 export function BetConstructGamesScreen() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [statusFilter, setStatusFilter] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -74,8 +76,8 @@ export function BetConstructGamesScreen() {
     try {
       const payload: Record<string, unknown> = {
         pageNo: page,
-        itemPerPage: PAGE_SIZE,
-        status: true,
+        itemPerPage: pageSize,
+        status: statusFilter,
       };
       const name = appliedSearch.trim();
       if (name) payload.Name = name;
@@ -95,12 +97,12 @@ export function BetConstructGamesScreen() {
       setRows(list);
       setTotal(count);
       // If the server's count is unreliable, keep Next enabled while pages come back full.
-      const pages = Math.max(1, Math.ceil(count / PAGE_SIZE) || 1);
-      setTotalPages(list.length === PAGE_SIZE ? Math.max(pages, page + 1) : pages);
+      const pages = Math.max(1, Math.ceil(count / pageSize) || 1);
+      setTotalPages(list.length === pageSize ? Math.max(pages, page + 1) : pages);
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [page, appliedSearch]);
+  }, [page, pageSize, statusFilter, appliedSearch]);
 
   useEffect(() => {
     void load();
@@ -135,7 +137,7 @@ export function BetConstructGamesScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
+      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
       { key: 'name', label: 'Name', width: 160, render: (r) => display(r.Name || r.name) },
       { key: 'category', label: 'Category', width: 110, render: (r) => display(r.category) },
       {
@@ -179,7 +181,7 @@ export function BetConstructGamesScreen() {
           r.updatedOn ? `${formatDisplayDate(r.updatedOn)} ${formatDisplayTime(r.updatedOn)}` : '—',
       },
     ],
-    [page],
+    [page, pageSize],
   );
 
   return (
@@ -219,6 +221,46 @@ export function BetConstructGamesScreen() {
         >
           <Text style={styles.searchBtnText}>Search</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.chipsRow}>
+        <Text style={styles.chipsLabel}>Status:</Text>
+        {[
+          { label: 'Active', value: true },
+          { label: 'Inactive', value: false },
+        ].map((o) => (
+          <TouchableOpacity
+            key={o.label}
+            style={[styles.chip, statusFilter === o.value && styles.chipActive]}
+            onPress={() => {
+              if (statusFilter !== o.value) {
+                setStatusFilter(o.value);
+                setPage(1);
+              }
+            }}
+          >
+            <Text style={[styles.chipText, statusFilter === o.value && styles.chipTextActive]}>
+              {o.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.chipsRow}>
+        <Text style={styles.chipsLabel}>Per page:</Text>
+        {PAGE_SIZE_OPTIONS.map((n) => (
+          <TouchableOpacity
+            key={n}
+            style={[styles.chip, pageSize === n && styles.chipActive]}
+            onPress={() => {
+              if (pageSize !== n) {
+                setPageSize(n);
+                setPage(1);
+              }
+            }}
+          >
+            <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>{n}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {error ? (
@@ -364,6 +406,25 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
+  chipsLabel: { color: colors.muted, fontSize: 12 },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    backgroundColor: colors.surface,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: colors.primaryForeground },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
