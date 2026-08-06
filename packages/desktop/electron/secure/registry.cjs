@@ -804,6 +804,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'ops.betConstructUpdateStatus': {
+    method: 'POST',
+    path: '/BetConstruct/Update-game-status',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'ops.casinoGetData': {
     method: 'POST',
     path: '/casinoGames/getDataWithPages',

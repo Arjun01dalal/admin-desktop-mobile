@@ -142,6 +142,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'ops.bannersUpdate': {"method":"POST","path":"/bannerGames","encryptRequest":true,"decryptResponse":true},
   'ops.betConstructGetAll': {"method":"POST","path":"/BetConstruct/get-all-games","encryptRequest":true,"decryptResponse":true},
   'ops.betConstructUpdateImage': {"method":"POST","path":"/BetConstruct/Update-game-image","encryptRequest":true,"decryptResponse":true},
+  'ops.betConstructUpdateStatus': {"method":"POST","path":"/BetConstruct/Update-game-status","encryptRequest":true,"decryptResponse":true},
   'ops.casinoGetData': {"method":"POST","path":"/casinoGames/getDataWithPages","encryptRequest":true,"decryptResponse":true},
   'ops.casinoGetProviders': {"method":"POST","path":"/Qtech/Get-provider","encryptRequest":true,"decryptResponse":true},
   'ops.casinoGetConfig': {"method":"GET","path":"/configs","encryptRequest":false,"decryptResponse":false},

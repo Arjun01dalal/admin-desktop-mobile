@@ -5,6 +5,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -107,6 +108,40 @@ export function BetConstructGamesScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const toggleStatus = useCallback(
+    (row: Row) => {
+      const next = !row.status;
+      const name = display(row.Name || row.name);
+      Alert.alert(
+        next ? 'Activate game' : 'Deactivate game',
+        `${next ? 'Activate' : 'Deactivate'} ${name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: next ? 'Activate' : 'Deactivate',
+            style: next ? 'default' : 'destructive',
+            onPress: () => {
+              void (async () => {
+                const res = await secureApi<unknown>('ops.betConstructUpdateStatus', {
+                  gameId: row.gameId,
+                  status: next,
+                });
+                if (res.ok) {
+                  setSheetRow(null);
+                  void load();
+                } else {
+                  setError(res.message || 'Failed to change game status');
+                  setSheetRow(null);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [load],
+  );
 
   const submitImage = useCallback(async () => {
     const url = imageUrl.trim();
@@ -295,6 +330,11 @@ export function BetConstructGamesScreen() {
         actions={
           sheetRow
             ? ([
+                {
+                  label: sheetRow.status ? 'Deactivate' : 'Activate',
+                  tone: sheetRow.status ? 'warning' : 'primary',
+                  onPress: () => toggleStatus(sheetRow),
+                },
                 {
                   label: 'Update image',
                   tone: 'primary',
