@@ -72,6 +72,16 @@ function display(value: unknown): string {
   return String(value);
 }
 
+function statusBadge(status: unknown): string | undefined {
+  const s = String(status || '').toLowerCase();
+  if (s === 'approved' || s === 'success') return '#16a34a';
+  if (s === 'pending') return '#d97706';
+  if (s === 'processing') return '#2563eb';
+  if (s === 'hold') return '#7c3aed';
+  if (s === 'failed' || s === 'rejected') return '#dc2626';
+  return undefined;
+}
+
 function dt(value: unknown): string {
   return value ? `${formatDisplayDate(String(value))} ${formatDisplayTime(String(value))}` : '—';
 }
@@ -310,7 +320,13 @@ export function UpiPaymentsScreen() {
       { key: 'updatedOn', label: 'Updated On', width: 150, render: (r) => dt(r.updatedOn) },
       { key: 'reason', label: 'Mis Match Info', width: 160, render: (r) => display(r.reason) },
       { key: 'updatedByName', label: 'Updated By', width: 120, render: (r) => display(r.updatedByName) },
-      { key: 'status', label: 'Status', width: 100, render: (r) => display(r.status) },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 100,
+        render: (r) => display(r.status),
+        badge: (r) => statusBadge(r.status),
+      },
     ],
     [notifPage, pageSize],
   );
@@ -342,7 +358,13 @@ export function UpiPaymentsScreen() {
         width: 160,
         render: (r) => `${display(r.paymentGatewayName)}${r.mid ? ` - ${r.mid}` : ''}`,
       },
-      { key: 'status', label: 'Status', width: 100, render: (r) => display(r.status) },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 100,
+        render: (r) => display(r.status),
+        badge: (r) => statusBadge(r.status),
+      },
       { key: 'updatedByName', label: 'Updated By', width: 120, render: (r) => display(r.updatedBy?.name) },
       { key: 'createdOn', label: 'Created On', width: 150, render: (r) => dt(r.createdOn) },
     ],
