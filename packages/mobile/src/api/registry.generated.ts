@@ -151,6 +151,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'ops.casinoEditGame': {"method":"POST","path":"/Qtech/Edit-Games","encryptRequest":true,"decryptResponse":true},
   'ops.casinoAddTableId': {"method":"POST","path":"/Qtech/Add-tableId","encryptRequest":true,"decryptResponse":true},
   'ops.nonPerformingUser': {"method":"POST","path":"/User/nonPerformingUser","encryptRequest":true,"decryptResponse":true},
+  'ops.addNonPerformingComment': {"method":"POST","path":"/User/add-non-performing-comment","encryptRequest":true,"decryptResponse":false},
   'ops.activeCustomers': {"method":"POST","path":"/User/get-active-customers","encryptRequest":true,"decryptResponse":true},
   'users.inactiveDeposit': {"method":"POST","path":"/transaction/inactive-customer-deposit","encryptRequest":true,"decryptResponse":true},
   'users.nonPerformingActive': {"method":"POST","path":"/User/inactive-7days-active-today","encryptRequest":true,"decryptResponse":true},

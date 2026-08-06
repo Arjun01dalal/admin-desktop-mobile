@@ -858,6 +858,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'ops.addNonPerformingComment': {
+    method: 'POST',
+    path: '/User/add-non-performing-comment',
+    encryptRequest: true,
+    decryptResponse: false,
+  },
   'ops.activeCustomers': {
     method: 'POST',
     path: '/User/get-active-customers',
