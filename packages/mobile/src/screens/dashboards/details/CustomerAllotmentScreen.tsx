@@ -96,8 +96,20 @@ function unpackDeposits(raw: unknown): Map<string, DepositEntry> {
     else list = [obj as DepositEntry];
   }
   for (const entry of list) {
-    const key = String(entry?._id || entry?.callerId || '');
-    if (key) map.set(key, entry);
+    if (!entry || typeof entry !== 'object') continue;
+    const key = String(entry._id || entry.callerId || '');
+    if (key) {
+      map.set(key, entry);
+      continue;
+    }
+    // Desktop also handles a map keyed directly by caller id:
+    // { [callerId]: { depositData, coinData } }
+    for (const [k, v] of Object.entries(entry)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const val = v as DepositEntry;
+        if (Array.isArray(val.depositData) || Array.isArray(val.coinData)) map.set(k, val);
+      }
+    }
   }
   return map;
 }

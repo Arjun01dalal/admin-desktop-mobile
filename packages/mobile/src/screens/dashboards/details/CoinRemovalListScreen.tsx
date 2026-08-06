@@ -204,6 +204,7 @@ export function CoinRemovalListScreen() {
       >
         <TouchableOpacity
           onPress={() => {
+            txnGenRef.current += 1; // invalidate any in-flight request
             setDetailUser(null);
             setTxns([]);
             setTxnPage(1);
@@ -323,6 +324,8 @@ export function CoinRemovalListScreen() {
             label: 'Open transactions',
             onPress: () => {
               if (sheetRow) {
+                txnGenRef.current += 1; // invalidate stale in-flight transactions
+                setTxns([]);
                 setDetailUser(sheetRow);
                 setTxnPage(1);
               }

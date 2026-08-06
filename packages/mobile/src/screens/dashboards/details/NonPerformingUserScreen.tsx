@@ -66,11 +66,11 @@ function formatTs(ts?: string): string {
 export function NonPerformingUserScreen() {
   const canShowMobile = hasPermission('show_mobile');
 
-  const today = todayIST();
-  const [draftStart, setDraftStart] = useState(today);
-  const [draftEnd, setDraftEnd] = useState(today);
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  // Desktop starts with no date restriction; dates apply only when both are entered.
+  const [draftStart, setDraftStart] = useState('');
+  const [draftEnd, setDraftEnd] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [appClientName, setAppClientName] = useState('');
   const [searchField, setSearchField] = useState<SearchFieldKey>('name');
   const [searchDraft, setSearchDraft] = useState('');
@@ -177,7 +177,8 @@ export function NonPerformingUserScreen() {
     >
       <Text style={styles.title}>Non Performing User</Text>
       <Text style={styles.sub}>
-        {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
+        {startDate && endDate ? `${startDate} → ${endDate}` : 'All dates'} · Total:{' '}
+        {total.toLocaleString('en-IN')}
       </Text>
       <DetailFilterBar
         startDate={draftStart}
