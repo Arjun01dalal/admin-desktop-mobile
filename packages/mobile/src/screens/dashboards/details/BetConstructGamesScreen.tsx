@@ -24,6 +24,7 @@ type Row = {
   Name?: string;
   name?: string;
   category?: string;
+  allowedCurrency?: string[];
   allowedCurrencies?: string[];
   subCategory?: string;
   gameId?: string | number;
@@ -101,7 +102,10 @@ export function BetConstructGamesScreen() {
         key: 'currency',
         label: 'Allowed Currency',
         width: 130,
-        render: (r) => (Array.isArray(r.allowedCurrencies) ? r.allowedCurrencies.join(', ') : '—'),
+        render: (r) => {
+          const list = r.allowedCurrency ?? r.allowedCurrencies;
+          return Array.isArray(list) ? list.join(', ') : '—';
+        },
       },
       { key: 'subCategory', label: 'Sub Category', width: 110, render: (r) => display(r.subCategory) },
       { key: 'gameId', label: 'Game Id', width: 110, render: (r) => display(r.gameId) },

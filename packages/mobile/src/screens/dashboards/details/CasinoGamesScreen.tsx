@@ -29,7 +29,10 @@ type Row = {
   Game_Code?: string | number;
   tableId?: string | number;
   providerId?: string | number;
+  Provider_ID?: string | number;
+  provider?: { id?: string | number };
   category?: string;
+  Category_ID?: string;
   status?: boolean;
   [key: string]: unknown;
 };
@@ -158,8 +161,18 @@ export function CasinoGamesScreen() {
       ...(provider === 'QTECH'
         ? [{ key: 'tableId', label: 'Table ID', width: 100, render: (r: Row) => display(r.tableId) }]
         : []),
-      { key: 'providerId', label: 'Provider ID', width: 100, render: (r) => display(r.providerId) },
-      { key: 'category', label: 'Category', width: 110, render: (r) => display(r.category) },
+      {
+        key: 'providerId',
+        label: 'Provider ID',
+        width: 100,
+        render: (r) => display(r.provider?.id ?? r.Provider_ID ?? r.providerId),
+      },
+      {
+        key: 'category',
+        label: 'Category',
+        width: 110,
+        render: (r) => display(r.category ?? r.Category_ID),
+      },
       { key: 'status', label: 'Status', width: 80, render: (r) => (r.status ? 'Active' : 'Inactive') },
     ],
     [page, provider],
