@@ -18,7 +18,7 @@ export type DataTableColumn<Row> = {
   key: string;
   label: string;
   width: number;
-  align?: 'left' | 'right';
+  align?: 'left' | 'right' | 'center';
   render: (row: Row, index: number) => string;
   /** Optional value color (e.g. red for negative GGR). */
   color?: (row: Row) => string | undefined;
@@ -71,7 +71,7 @@ export function DataTable<Row>({
                   style={{ width: col.width }}
                 >
                   <Text
-                    style={[styles.headText, col.align === 'right' && styles.right]}
+                    style={[styles.headText, col.align === 'right' && styles.right, col.align === 'center' && styles.center]}
                     numberOfLines={2}
                   >
                     {col.label}
@@ -84,6 +84,7 @@ export function DataTable<Row>({
                     styles.headText,
                     { width: col.width },
                     col.align === 'right' && styles.right,
+                    col.align === 'center' && styles.center,
                   ]}
                   numberOfLines={2}
                 >
@@ -118,6 +119,7 @@ export function DataTable<Row>({
                     styles.cell,
                     { width: col.width },
                     col.align === 'right' && styles.right,
+                    col.align === 'center' && styles.center,
                     color ? { color, fontWeight: '700' as const } : null,
                   ];
                   if (badgeBg) {
@@ -183,6 +185,7 @@ export function DataTable<Row>({
                     styles.headText,
                     { width: col.width },
                     col.align === 'right' && styles.right,
+                    col.align === 'center' && styles.center,
                   ]}
                   numberOfLines={1}
                 >
@@ -236,6 +239,7 @@ const styles = StyleSheet.create({
   },
   cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1) },
   right: { textAlign: 'right' },
+  center: { textAlign: 'center' },
   link: { color: colors.primary, textDecorationLine: 'underline' },
   spinner: { marginVertical: spacing(6) },
   empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(6) },
