@@ -243,6 +243,15 @@ export function FundsScreen() {
           return;
         }
         const payload = unpackPayload(res.data);
+        // Diagnostic: surfaces the response shape in tunnel logs.
+        console.log(
+          `[funds.allPayment] mid=${mid} keys=${JSON.stringify(Object.keys(payload))} ` +
+            `dataKeys=${
+              res.data && typeof res.data === 'object'
+                ? JSON.stringify(Object.keys(res.data as object))
+                : typeof res.data
+            }`,
+        );
         const txnData =
           payload.transactionData && typeof payload.transactionData === 'object'
             ? (payload.transactionData as Record<string, unknown>)
