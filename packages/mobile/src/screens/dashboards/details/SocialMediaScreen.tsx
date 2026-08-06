@@ -187,9 +187,36 @@ export function SocialMediaScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'name', label: 'Name', width: 260, render: (r) => display(r.name) },
+      { key: 'name', label: 'Name', width: 150, render: (r) => display(r.name) },
+      {
+        key: 'share',
+        label: '',
+        width: 55,
+        align: 'center',
+        render: () => 'Share',
+        color: () => colors.primary,
+        onCellPress: (r) => void shareLink(r),
+      },
+      {
+        key: 'edit',
+        label: '',
+        width: 50,
+        align: 'center',
+        render: () => 'Edit',
+        color: () => '#f59e0b',
+        onCellPress: (r) => openEdit(r),
+      },
+      {
+        key: 'delete',
+        label: '',
+        width: 60,
+        align: 'center',
+        render: () => 'Delete',
+        color: () => '#ef4444',
+        onCellPress: (r) => handleDelete(r),
+      },
     ],
-    [],
+    [shareLink, openEdit, handleDelete],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {

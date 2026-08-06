@@ -160,7 +160,10 @@ export function DataTable<Row>({
                         onPress={() => col.onCellPress?.(row)}
                         style={{ width: col.width }}
                       >
-                        <Text style={[textStyle, styles.link, { width: undefined }]} numberOfLines={2}>
+                        <Text
+                          style={[textStyle, styles.link, { width: undefined }, color ? { color } : null]}
+                          numberOfLines={2}
+                        >
                           {value}
                         </Text>
                       </TouchableOpacity>
