@@ -1,0 +1,436 @@
+/* AUTO-GENERATED from src/layout/navItems.ts — do not edit. Run mobile/scripts/sync-shared.cjs */
+import { Permissions, type Permission } from '../auth/permissions';
+
+export type NavItem = {
+  id: string;
+  label: string;
+  path: string;
+  /** When set, item is shown only if login `Responsibilities` includes it. */
+  permission?: Permission;
+};
+
+/**
+ * Panel side nav — visibility is driven by Role_ID → Responsibilities from login.
+ * Items without `permission` (Welcome, House Games) are always visible.
+ */
+export const NAV_ITEMS: NavItem[] = [
+  { id: 'welcome', label: 'Welcome', path: '/welcome' },
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    path: '/dashboard',
+    permission: Permissions.View_Dashboard,
+  },
+  {
+    id: 'vipDashboard',
+    label: 'VIP Dashboard',
+    path: '/vip-dashboard',
+    permission: Permissions.View_Dashboard,
+  },
+  {
+    id: 'combinedDashboard',
+    label: 'Combined Dashboard',
+    path: '/combined-dashboard',
+    permission: Permissions.View_Dashboard,
+  },
+  {
+    id: 'riskDashboard',
+    label: 'Risk Analysis',
+    path: '/risk-dashboard',
+    permission: Permissions.risk_management_analysis,
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    path: '/analytics',
+    permission: Permissions.analytics_tab,
+  },
+  {
+    id: 'masterFlow',
+    label: 'Master Flow',
+    path: '/master-flow',
+    permission: Permissions.master_flow,
+  },
+  {
+    id: 'profitLoss',
+    label: 'Profit & Loss',
+    path: '/profit-loss',
+    permission: Permissions.View_Profit_and_Loss,
+  },
+  { id: 'houseGames', label: 'House Games', path: '/house-games' },
+  {
+    id: 'leaderboard',
+    label: 'Leaderboard',
+    path: '/leaderboard',
+    permission: Permissions.caller_leaderboard_tab,
+  },
+  {
+    id: 'callerResponsibility',
+    label: 'Caller Responsibility',
+    path: '/caller-responsibility',
+    permission: Permissions.caller_responsibility,
+  },
+  {
+    id: 'playerActivity',
+    label: 'Player Activity',
+    path: '/player-activity',
+    permission: Permissions.player_activity,
+  },
+  {
+    id: 'whatsapp',
+    label: 'Whatsapp',
+    path: '/whatsappView',
+    permission: Permissions.show_whatsapp_messages,
+  },
+  {
+    id: 'gameActivity',
+    label: 'Games Activity',
+    path: '/game-activity',
+    permission: Permissions.game_activity,
+  },
+  {
+    id: 'callLogs',
+    label: 'Call Logs',
+    path: '/call-logs',
+    permission: Permissions.call_logs,
+  },
+  // Always listed (laxminarayan App route has no Responsibility gate).
+  {
+    id: 'botPerformance',
+    label: 'Bot Performance',
+    path: '/botPerformance',
+  },
+  {
+    id: 'newRegisters',
+    label: 'New Registers',
+    path: '/new-registers',
+    permission: Permissions.new_registrations,
+  },
+  {
+    id: 'stateWiseRegistration',
+    label: 'State wise Registration',
+    path: '/register-user-report',
+    permission: Permissions.state_wise_registartion,
+  },
+  {
+    id: 'users',
+    label: 'Users',
+    path: '/users',
+    permission: Permissions.View_Users,
+  },
+  {
+    id: 'loginReport',
+    label: 'Login Report',
+    path: '/login-report',
+    permission: Permissions.Login_Report,
+  },
+  {
+    id: 'allUserLoginReport',
+    label: 'All User Login Report',
+    path: '/all-user-login-report',
+    permission: Permissions.login_logout_report,
+  },
+  {
+    id: 'sosBlockedUsers',
+    label: 'SOS Blocked Users',
+    path: '/sos-blocked-users',
+    permission: Permissions.sos_blocked_users,
+  },
+  {
+    id: 'checkersReport',
+    label: 'Checkers Report',
+    path: '/checkers-report',
+    permission: Permissions.Checkers_Report,
+  },
+  {
+    id: 'sheetDownloadReport',
+    label: 'Sheet Download Report',
+    path: '/downlaodReport',
+    permission: Permissions.sheet_downlaod_report,
+  },
+  {
+    id: 'pointsReport',
+    label: 'Points Report',
+    path: '/coins-report',
+    permission: Permissions.coin_report,
+  },
+  {
+    id: 'coinRemoval',
+    label: 'Coin Removal List',
+    path: '/coins-removal',
+    permission: Permissions.Coin_Removal,
+  },
+  {
+    id: 'customerAllotment',
+    label: 'Customer Allotment',
+    path: '/customer-allotment',
+    permission: Permissions.customer_allotment,
+  },
+  {
+    id: 'nonPerformingUser',
+    label: 'Non Performing User',
+    path: '/non_performing_user',
+    permission: Permissions.Non_Performing_User,
+  },
+  {
+    id: 'todaysActive',
+    label: 'Todays Active',
+    path: '/todays-active',
+    permission: Permissions.todays_active,
+  },
+  {
+    id: 'feedback',
+    label: 'Pending Feedback',
+    path: '/feedback',
+    permission: Permissions.View_Feedback,
+  },
+  {
+    id: 'betConstructLists',
+    label: 'BetConstruct Games',
+    path: '/betConstruct-lists',
+    permission: Permissions.View_Games,
+  },
+  {
+    id: 'casinoLists',
+    label: 'Casino Games',
+    path: '/casino-lists',
+    permission: Permissions.View_Games,
+  },
+  {
+    id: 'casinoSwitch',
+    label: 'Casino Switch',
+    path: '/dynamic-casino-switching',
+    permission: Permissions.casino_switch,
+  },
+  {
+    id: 'topGames',
+    label: 'Top Games',
+    path: '/top-games',
+    permission: Permissions.hide_show_games,
+  },
+  {
+    id: 'casinoTopup',
+    label: 'Casino Top-up Balance',
+    path: '/casino-topup-balance',
+    permission: Permissions.view_casino_balance,
+  },
+  {
+    id: 'usersKyc',
+    label: 'KYC',
+    path: '/users-kyc',
+    permission: Permissions.View_KYCs,
+  },
+  {
+    id: 'banners',
+    label: 'Banners List',
+    path: '/banners',
+    permission: Permissions.View_Banners,
+  },
+  {
+    id: 'upiPayments',
+    label: 'UPI Payments',
+    path: '/all-upi-payments',
+    permission: Permissions.UPI_Payment,
+  },
+  {
+    id: 'upiLists',
+    label: 'AB UPIs',
+    path: '/upi-lists',
+    permission: Permissions.View_UPIs,
+  },
+  {
+    id: 'utrProvider',
+    label: 'UTR Providers',
+    path: '/utr-provider',
+    permission: Permissions.Utr_Provider,
+  },
+  {
+    id: 'instantDepositProviders',
+    label: 'Instant Deposit Providers',
+    path: '/instant-provider',
+    permission: Permissions.View_PayIn_Accounts,
+  },
+  {
+    id: 'depositProviders',
+    label: 'Deposit Providers',
+    path: '/pay-g-mid',
+    permission: Permissions.View_PayIn_Accounts,
+  },
+  {
+    id: 'depositConfig',
+    label: 'Deposit Config',
+    path: '/deposit-config',
+    permission: Permissions.Deposit_Config,
+  },
+  {
+    id: 'funds',
+    label: 'Funds',
+    path: '/funds',
+    permission: Permissions.Deposit_Config,
+  },
+  {
+    id: 'withdrawalProviders',
+    label: 'Withdrawal Providers',
+    path: '/payout-accounts',
+    permission: Permissions.View_PayOut_Accounts,
+  },
+  {
+    id: 'botData',
+    label: 'Bot Data',
+    path: '/botData',
+    permission: Permissions.bot_data_upload,
+  },
+  {
+    id: 'playerRtp',
+    label: 'Players RTP',
+    path: '/playerRtp',
+    permission: Permissions.player_rtp,
+  },
+  {
+    id: 'dumpUsers',
+    label: 'Dump Users',
+    path: '/dumpUsers',
+    permission: Permissions.View_Users,
+  },
+  {
+    id: 'callerAllotment',
+    label: 'Caller Allotment',
+    path: '/callerAllotment',
+    permission: Permissions.caller_allotment,
+  },
+  {
+    id: 'percentage',
+    label: 'Percentage',
+    path: '/percentage',
+    permission: Permissions.Percentage,
+  },
+  {
+    id: 'newDeposits',
+    label: 'New Deposits',
+    path: '/newdeposits',
+    permission: Permissions.New_Deposits,
+  },
+  {
+    id: 'deposit',
+    label: 'Deposit',
+    path: '/deposit',
+    permission: Permissions.View_Deposits,
+  },
+  {
+    id: 'depositList',
+    label: 'Deposit List',
+    path: '/depositList',
+    permission: Permissions.View_Deposit_List,
+  },
+  {
+    id: 'stateWiseDeposit',
+    label: 'State Wise Deposit',
+    path: '/state-wise-deposit',
+    permission: Permissions.State_Wise_Deposit,
+  },
+  {
+    id: 'withdrawal',
+    label: 'Withdrawal',
+    path: '/withdrawal',
+    permission: Permissions.View_Withdrawals,
+  },
+  {
+    id: 'withdrawalFund',
+    label: 'Withdrawal Fund',
+    path: '/withdrawal-fund',
+    permission: Permissions.withdrawal_fund,
+  },
+  {
+    id: 'fundRequest',
+    label: 'Fund Requests',
+    path: '/fund-request',
+    permission: Permissions.Fund_Request,
+  },
+  {
+    id: 'socialMedia',
+    label: 'Social Media',
+    path: '/social-media',
+    permission: Permissions.Social_Media,
+  },
+  {
+    id: 'mobileApp',
+    label: 'Mobile App',
+    path: '/mobile-app',
+    permission: Permissions.Mobile_App,
+  },
+  {
+    id: 'incomingBotCall',
+    label: 'Incoming Bot Call',
+    path: '/incoming-bot-call',
+    permission: Permissions.show_incoming_bot,
+  },
+  {
+    id: 'rolesResponsibilities',
+    label: 'Roles & Responsibilities',
+    path: '/roles-responsibilities',
+    permission: Permissions.View_Roles_and_Responsibilities,
+  },
+  {
+    id: 'bonusWalletFundRequest',
+    label: 'Bonus Wallet Fund Requests',
+    path: '/fund-request-bonus-wallet',
+    permission: Permissions.Bonus_Wallet_Fund_Request,
+  },
+  {
+    id: 'bonusWalletRequests',
+    label: 'Bonus Wallet Requests',
+    path: '/bonus-wallet',
+    permission: Permissions.Bonus_Wallet_Request,
+  },
+  {
+    id: 'depositApprovedReport',
+    label: 'Deposit Approved Report',
+    path: '/DepositApprovedReport',
+    permission: Permissions.View_Deposits_Approved_Report,
+  },
+  {
+    id: 'uniqueDepositPending',
+    label: 'Unique Deposit Pending User',
+    path: '/unique_deposit_pending',
+    permission: Permissions.Unique_Deposit_Pending_User,
+  },
+];
+
+export type PanelPath = (typeof NAV_ITEMS)[number]['path'];
+
+export const PANEL_PATHS = new Set<string>([
+  ...NAV_ITEMS.map((item) => item.path),
+  '/caller-responsibility/deposit-list',
+  '/caller-responsibility/bot-users',
+  '/caller-responsibility/details',
+  '/player-activity/details',
+  '/game-activity/details',
+  '/coins-removal/details',
+  '/coin-reports/report',
+  '/customer-allotted',
+  '/add-customer',
+  '/remove-customer',
+  '/playerRtp/details',
+  '/fund-request-bonus-wallet-table',
+  '/bonus-wallet-history',
+  '/state-wise-deposit',
+  '/withdraw-user-data',
+  '/depositList/user-wise',
+  '/funds/mid',
+  '/funds/payin',
+  '/funds/mid/payingAccount',
+  '/kycList',
+  '/falconRateManagement',
+  '/exchangeRateManagement',
+  '/betConstructGamesList',
+  '/falcon-rate-management',
+  '/exchange-rate-management',
+  '/balance-f',
+  '/total-bonus-users-p',
+  '/registered-users',
+  '/liveMatchTotal',
+  '/masterLiveMatchTotal',
+  '/bothLiveMatchTotal',
+  '/bothMasterAddPage',
+  '/masterDashboard',
+]);

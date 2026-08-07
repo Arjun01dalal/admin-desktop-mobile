@@ -295,6 +295,7 @@ export const SECURE_ACTIONS = [
   'dashboard.activeExchangeUpdate',
   'dashboard.appDeposit',
   'analytics.userBalance',
+  'analytics.userAnalytics',
   'profitLoss.depositWithdrawal',
   'profitLoss.list',
   'masterFlow.masters',

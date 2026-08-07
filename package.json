@@ -23,6 +23,9 @@
     "mobile:start": "npm run start -w @astro/mobile",
     "shared:typecheck": "npm run typecheck -w @astro/shared"
   },
+  "overrides": {
+    "tar": "^7.4.3"
+  },
   "engines": {
     "node": ">=18"
   },

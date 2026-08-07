@@ -804,6 +804,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'ops.betConstructUpdateStatus': {
+    method: 'POST',
+    path: '/BetConstruct/Update-game-status',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'ops.casinoGetData': {
     method: 'POST',
     path: '/casinoGames/getDataWithPages',
@@ -857,6 +863,12 @@ module.exports = {
     path: '/User/nonPerformingUser',
     encryptRequest: true,
     decryptResponse: true,
+  },
+  'ops.addNonPerformingComment': {
+    method: 'POST',
+    path: '/User/add-non-performing-comment',
+    encryptRequest: true,
+    decryptResponse: false,
   },
   'ops.activeCustomers': {
     method: 'POST',
@@ -1333,6 +1345,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'analytics.userAnalytics': {
+    method: 'POST',
+    path: '/User/analytics',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   'profitLoss.depositWithdrawal': {
     method: 'POST',
     path: '/transaction/deposit-withdrawal',
@@ -1561,6 +1579,26 @@ module.exports = {
   'responsibilities.add': {
     method: 'POST',
     path: '/responsibilities/add',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+
+  // Coin Permission page (Add_Roles_And_Responsibilities in the web panel)
+  'subadmin.updateCoinRoles': {
+    method: 'POST',
+    path: '/SubAdmin/update-coin-roles',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'subadmin.removeCoinPermission': {
+    method: 'POST',
+    path: '/SubAdmin/removeCoin',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'subadmin.updateAppHeads': {
+    method: 'POST',
+    path: '/SubAdmin/update-app-heads',
     encryptRequest: true,
     decryptResponse: true,
   },

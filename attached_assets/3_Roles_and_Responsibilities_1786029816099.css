@@ -1,0 +1,10 @@
+.coin-edite-button_ {
+    margin-left: 10px;
+    border-radius: 4px;
+    border: 1px solid #fd7e14;
+    outline: none;
+}
+
+.mui-edite_ {
+    font-size: 18px !important;
+}

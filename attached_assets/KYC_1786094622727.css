@@ -1,0 +1,25 @@
+.text-kyc{
+    width: 150px !important;
+}
+
+
+@media (max-width: 1200px) {
+    .lbl {
+        font-size: 8px;
+    }
+}
+
+.upload-btn{
+    background: #f1a144 !important;
+    color: #000 !important;
+}
+.upload-btn.disabled{
+    background: #ffd4a361 !important;
+    cursor:not-allowed !important;
+    filter: blur(.7px);
+} 
+.withdraw-btn.disabled_{
+     background: #ffd4a361 !important;
+    cursor:not-allowed !important;
+    filter: blur(.7px);
+}

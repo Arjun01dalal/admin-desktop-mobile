@@ -1,0 +1,202 @@
+import type { DashboardMode, KpiItem, OpsDashboardBundle } from './types';
+import { floorNum, toNum } from './mergeMetrics';
+
+/** Build KPI tiles for main Dashboard (VIP/Combined skip KPIs). */
+export function buildKpiItems(
+  mode: DashboardMode,
+  bundle: OpsDashboardBundle | null,
+  startDate: string,
+  endDate: string,
+  today: string,
+): KpiItem[] {
+  if (mode !== 'main' || !bundle) return [];
+
+  const s = bundle.summary;
+  const dw = bundle.depositWithdrawal;
+  const dc = bundle.depositCount;
+  const active = bundle.activeCustomers;
+
+  const liability =
+    toNum(s.falconTotalBetPendingAmount) +
+    toNum(s.jetfairTotalBetPendingAmount) +
+    toNum(s.sattaMatkaTotalBetPendingAmount);
+
+  const todaysActiveCustomers =
+    floorNum(
+      toNum(asCount(active, 'qtech')) +
+        toNum(asCount(active, 'wco')) +
+        toNum(asCount(active, 'jetfair')) +
+        toNum(asCount(active, 'falcon')) +
+        toNum(asCount(active, 'sattaMatka')) +
+        toNum(asCount(active, 'exchange')),
+    ) || floorNum(s.totalActiveCustomersToday ?? s.todaysActiveUsers);
+
+  const dateState = { startDate, endDate };
+
+  const items: KpiItem[] = [
+    {
+      id: 'totalDeposit',
+      label: 'Total Deposits',
+      value: floorNum(dw.totalDeposit ?? s.totalDeposit),
+      prefix: '₹',
+    },
+    {
+      id: 'totalWithdrawal',
+      label: 'Total Withdrawals',
+      value: floorNum(dw.totalWithdrawal ?? s.totalWithdrawal),
+      prefix: '₹',
+    },
+    {
+      id: 'instantDeposit',
+      label: 'Total Instant Deposit',
+      value: floorNum(dw.instantDeposit ?? s.instantDeposit),
+      prefix: '₹',
+    },
+    {
+      id: 'usersBalance',
+      label: 'Total Users Balance',
+      value: floorNum(s.totalBalanceOfUsers),
+      prefix: '₹',
+      href: '/balance-f',
+    },
+    {
+      id: 'bonusBalance',
+      label: 'Total Users Bonus Balance',
+      value: floorNum(s.totalBonusBalanceOfUsers),
+      prefix: '₹',
+      href: '/total-bonus-users-p',
+    },
+    {
+      id: 'totalUsers',
+      label: 'Total Users',
+      value: floorNum(s.totalRegisterUsers),
+    },
+    {
+      id: 'regWeb',
+      label: 'Total Registered Users Web',
+      value: floorNum(s.totalRegisterUsersOfWeb),
+    },
+    {
+      id: 'regApp',
+      label: 'Total Registered Users App',
+      value: floorNum(s.totalRegisterUsersOfApp),
+    },
+    {
+      id: 'regToday',
+      label: 'Total Registered Users Today',
+      value: floorNum(s.totalTodayRegisterUsers),
+      href: '/new-registers',
+    },
+    {
+      id: 'regWebToday',
+      label: 'Total Registered Users Web Today',
+      value: floorNum(s.totalTodayRegisterUsersOfWeb),
+    },
+    {
+      id: 'regAppToday',
+      label: 'Total Registered Users App Today',
+      value: floorNum(s.totalTodayRegisterUsersOfApp),
+      href: '/registered-users',
+    },
+    {
+      id: 'active7d',
+      label: 'Last 7 days Active Users',
+      value: floorNum(s.totalActiveUsers),
+    },
+    {
+      id: 'active7dApp',
+      label: 'Last 7 Days Active Users App',
+      value: floorNum(s.totalActiveUsersApp),
+    },
+    {
+      id: 'liability',
+      label: 'Liability',
+      value: floorNum(liability),
+      prefix: '₹',
+    },
+    {
+      id: 'bonusGiven',
+      label: 'Total Bonus Given',
+      value: floorNum(s.totalBonusGiven),
+      prefix: '₹',
+    },
+    {
+      id: 'ftdAmount',
+      label: 'FTD Amount',
+      value: floorNum(dc.ftdAmount),
+      prefix: '₹',
+    },
+    {
+      id: 'ftdCount',
+      label: 'FTD Count',
+      value: floorNum(dc.ftdCount),
+    },
+    {
+      id: 'stdAmount',
+      label: 'STD Amount',
+      value: floorNum(dc.stdAmount),
+      prefix: '₹',
+    },
+    {
+      id: 'stdCount',
+      label: 'STD Count',
+      value: floorNum(dc.stdCount),
+    },
+    {
+      id: 'depositCount',
+      label: 'Deposit Count',
+      value: floorNum(dc.depositCount),
+    },
+  ];
+
+  if (todaysActiveCustomers > 0) {
+    items.push({
+      id: 'todaysActive',
+      label: "Today's Active Users",
+      value: todaysActiveCustomers,
+      href: '/todays-active',
+      state: dateState,
+    });
+  }
+
+  items.push(
+    {
+      id: 'masterData',
+      label: 'Master Data',
+      value: '',
+      headingOnly: true,
+      href: '/masterDashboard',
+      state: { selectActiveCustomers: true },
+    },
+    {
+      id: 'liveMatchTotal',
+      label: 'Live Match Total',
+      value: '',
+      headingOnly: true,
+      href: '/liveMatchTotal',
+      state: dateState,
+    },
+  );
+
+  if (startDate !== today) {
+    items.splice(3, 0, {
+      id: 'balancePrev',
+      label: `User Balance (Date:-${startDate})`,
+      value: floorNum(s.balance),
+      prefix: '₹',
+    });
+  }
+
+  return items;
+}
+
+function asCount(
+  active: Record<string, unknown>,
+  key: string,
+): number {
+  const node = active[key];
+  if (node && typeof node === 'object' && !Array.isArray(node)) {
+    return toNum((node as { count?: unknown }).count);
+  }
+  return toNum(node);
+}
