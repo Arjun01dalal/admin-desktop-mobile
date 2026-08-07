@@ -50,6 +50,7 @@ import { UtrProviderScreen } from '../screens/dashboards/details/UtrProviderScre
 import { InstantDepositProvidersScreen } from '../screens/dashboards/details/InstantDepositProvidersScreen';
 import { DepositProvidersScreen } from '../screens/dashboards/details/DepositProvidersScreen';
 import { DepositConfigScreen } from '../screens/dashboards/details/DepositConfigScreen';
+import { DepositScreen } from '../screens/dashboards/details/DepositScreen';
 import { FundsScreen } from '../screens/dashboards/details/FundsScreen';
 import { WithdrawalProvidersScreen } from '../screens/dashboards/details/WithdrawalProvidersScreen';
 import { BotDataScreen } from '../screens/dashboards/details/BotDataScreen';
@@ -116,6 +117,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/instant-provider': InstantDepositProvidersScreen as AnyScreen,
   '/pay-g-mid': DepositProvidersScreen as AnyScreen,
   '/deposit-config': DepositConfigScreen as AnyScreen,
+  '/deposit': DepositScreen as AnyScreen,
   '/funds': FundsScreen as AnyScreen,
   '/payout-accounts': WithdrawalProvidersScreen as AnyScreen,
   '/botData': BotDataScreen as AnyScreen,
