@@ -82,9 +82,17 @@ type Props = {
  * while a slip is being read; unmount on completion.
  */
 export function SlipOcrWebView({ imageBase64, onText, onError }: Props) {
+  // Strict allowlist: only valid base64 characters may reach the HTML string,
+  // so the interpolation below cannot break out of the script literal.
+  const safeBase64 = useMemo(
+    () => imageBase64.replace(/[^A-Za-z0-9+/=]/g, ''),
+    [imageBase64],
+  );
   const html = useMemo(
     () => `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"
+  integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F"
+  crossorigin="anonymous"></script>
 <script>
 (function () {
   function send(msg) { window.ReactNativeWebView.postMessage(JSON.stringify(msg)); }
@@ -93,7 +101,7 @@ export function SlipOcrWebView({ imageBase64, onText, onError }: Props) {
       send({ error: 'OCR library failed to load (check internet)' });
       return;
     }
-    Tesseract.recognize('data:image/jpeg;base64,${imageBase64}', 'eng')
+    Tesseract.recognize('data:image/jpeg;base64,${safeBase64}', 'eng')
       .then(function (res) { send({ text: (res && res.data && res.data.text) || '' }); })
       .catch(function (e) { send({ error: String((e && e.message) || e) }); });
   } catch (e) {
@@ -101,7 +109,7 @@ export function SlipOcrWebView({ imageBase64, onText, onError }: Props) {
   }
 })();
 </script></body></html>`,
-    [imageBase64],
+    [safeBase64],
   );
 
   return (

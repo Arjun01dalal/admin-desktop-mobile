@@ -168,6 +168,16 @@ export function DepositScreen() {
   const [saving, setSaving] = useState(false);
   const [ocrImage, setOcrImage] = useState<string | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const settleRowRef = useRef<DepositRow | null>(null);
+  useEffect(() => {
+    settleRowRef.current = settleRow;
+  }, [settleRow]);
+
+  const closeSettle = useCallback(() => {
+    setOcrImage(null);
+    setOcrBusy(false);
+    setSettleRow(null);
+  }, []);
 
   // Secondary user name modal state
   const [secRow, setSecRow] = useState<DepositRow | null>(null);
@@ -342,6 +352,8 @@ export function DepositScreen() {
     (text: string) => {
       setOcrImage(null);
       setOcrBusy(false);
+      const row = settleRow;
+      if (!row) return; // modal closed while OCR was running — discard
       const utr = extractUtrFromText(text);
       if (!utr) {
         Alert.alert('Could not read UTR from slip. Please enter manually.');
@@ -350,10 +362,16 @@ export function DepositScreen() {
       setSUtr(utr);
       Alert.alert('UTR read from slip', utr, [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Settle', onPress: () => submitSettle(utr) },
+        {
+          text: 'Settle',
+          onPress: () => {
+            // Guard against the modal switching rows after the alert opened.
+            if (settleRowRef.current?.orderId === row.orderId) submitSettle(utr);
+          },
+        },
       ]);
     },
-    [submitSettle],
+    [settleRow, submitSettle],
   );
 
   const onOcrError = useCallback((message: string) => {
@@ -609,7 +627,7 @@ export function DepositScreen() {
         visible={settleRow !== null}
         transparent
         animationType="slide"
-        onRequestClose={() => !saving && setSettleRow(null)}
+        onRequestClose={() => !saving && closeSettle()}
       >
         <KeyboardAvoidingView
           style={styles.modalBackdrop}
@@ -724,7 +742,7 @@ export function DepositScreen() {
                 <TouchableOpacity
                   style={styles.cancelBtn}
                   disabled={saving}
-                  onPress={() => setSettleRow(null)}
+                  onPress={closeSettle}
                 >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
