@@ -283,7 +283,7 @@ export function BonusWalletFundRequestScreen() {
               status: actionStatus,
             },
           });
-          if (!res.ok) {
+          if (!res.ok || res.success === false) {
             setTableError(res.message || `Failed to ${actionStatus}`);
             return;
           }

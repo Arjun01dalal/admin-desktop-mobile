@@ -209,7 +209,7 @@ export function BonusWalletRequestsScreen() {
               status: actionStatus,
             },
           });
-          if (!res.ok) {
+          if (!res.ok || res.success === false) {
             setError(res.message || `Failed to ${actionStatus}`);
             return;
           }
