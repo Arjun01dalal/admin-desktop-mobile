@@ -142,7 +142,11 @@ export function UniqueDepositPendingScreen() {
   const [pageSize, setPageSize] = useState(50);
   const [clientName, setClientName] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
+  const [searchField, setSearchField] = useState('userId');
+  const [applied, setApplied] = useState<{ field: string; text: string }>({
+    field: 'userId',
+    text: '',
+  });
 
   const [rows, setRows] = useState<UniquePendingRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -175,7 +179,8 @@ export function UniqueDepositPendingScreen() {
     try {
       const filter: Record<string, unknown> = {};
       if (clientName) filter.clientName = clientName;
-      if (appliedSearch.trim()) filter.userId = appliedSearch.trim();
+      const text = applied.text.trim();
+      if (text) filter[applied.field] = text;
       const payload: Record<string, unknown> = {
         pageNo: page,
         itemsPerPage: pageSize,
@@ -200,7 +205,7 @@ export function UniqueDepositPendingScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [clientName, appliedSearch, page, pageSize, startDate, endDate]);
+  }, [clientName, applied, page, pageSize, startDate, endDate]);
 
   const loadSummary = useCallback(async () => {
     const gen = ++summaryGenRef.current;
@@ -238,9 +243,9 @@ export function UniqueDepositPendingScreen() {
   }, [draftStart, draftEnd]);
 
   const search = useCallback(() => {
-    setAppliedSearch(draftSearch);
+    setApplied({ field: searchField, text: draftSearch });
     setPage(1);
-  }, [draftSearch]);
+  }, [searchField, draftSearch]);
 
   const openInput = useCallback((mode: 'comment' | 'status', row: UniquePendingRow) => {
     if (!row.orderId) {
@@ -541,9 +546,14 @@ export function UniqueDepositPendingScreen() {
           setPageSize(n);
           setPage(1);
         }}
-        searchFields={[{ key: 'userId', label: 'DP Id' }]}
-        searchField="userId"
-        onSearchFieldChange={() => {}}
+        searchFields={[
+          { key: 'userId', label: 'DP Id' },
+          { key: 'amount', label: 'Amount' },
+          { key: 'city', label: 'City' },
+          { key: 'state', label: 'State' },
+        ]}
+        searchField={searchField}
+        onSearchFieldChange={setSearchField}
         searchText={draftSearch}
         onSearchTextChange={setDraftSearch}
         onSearchSubmit={search}
