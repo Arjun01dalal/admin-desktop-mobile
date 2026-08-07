@@ -12,6 +12,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -24,10 +25,10 @@ import { asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
-import { hasPermission } from '../../../auth/permissions';
+import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type NavType = 'approved' | 'pending' | 'totalData';
 
@@ -40,8 +41,11 @@ type FundSummary = {
   totalPendingAmount?: number;
 };
 
+type ActionStatus = 'approve' | 'reject' | 'remove';
+
 type FundRow = {
   _id: string;
+  userId?: string;
   name?: string;
   mobile?: string;
   bonusWalletOpenBalance?: number | string;
@@ -123,6 +127,11 @@ function unpackDocuments(data: unknown): { rows: FundRow[]; total: number; total
 
 export function BonusWalletFundRequestScreen() {
   const canShowMobile = hasPermission('show_mobile');
+  // Read once — getSessionUser returns a fresh object each call.
+  const admin = useMemo(
+    () => getSessionUser() as { _id?: string; name?: string } | null,
+    [],
+  );
 
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
@@ -151,6 +160,7 @@ export function BonusWalletFundRequestScreen() {
   const [tableLoading, setTableLoading] = useState(false);
   const [tableError, setTableError] = useState<string | null>(null);
   const [sheetRow, setSheetRow] = useState<FundRow | null>(null);
+  const [actingId, setActingId] = useState('');
   const tableGenRef = useRef(0);
 
   const loadSummary = useCallback(
@@ -253,6 +263,59 @@ export function BonusWalletFundRequestScreen() {
     setPage(1);
   }, [searchField, draftSearch]);
 
+  const performAction = useCallback(
+    (row: FundRow, actionStatus: ActionStatus) => {
+      if (!row._id || !row.userId) {
+        setTableError('Missing request id');
+        return;
+      }
+      void (async () => {
+        setActingId(`${row._id}:${actionStatus}`);
+        try {
+          const res = await secureApi<unknown>('bonusWallet.updateTransferRequest', {
+            userId: row.userId,
+            _id: row._id,
+            amount: row.amount,
+            status: actionStatus,
+            updatedBy: {
+              name: admin?.name || '',
+              _id: admin?._id || '',
+              status: actionStatus,
+            },
+          });
+          if (!res.ok) {
+            setTableError(res.message || `Failed to ${actionStatus}`);
+            return;
+          }
+          setSheetRow(null);
+          void loadTable();
+          void loadSummary({ allData, start: startDate, end: endDate });
+        } finally {
+          setActingId('');
+        }
+      })();
+    },
+    [admin, loadTable, loadSummary, allData, startDate, endDate],
+  );
+
+  const handleAction = useCallback(
+    (row: FundRow, actionStatus: ActionStatus) => {
+      Alert.alert(
+        `${actionStatus[0].toUpperCase()}${actionStatus.slice(1)} request`,
+        `${actionStatus} the request for ${display(row.name)} (${formatIN(row.amount)})?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: actionStatus,
+            style: actionStatus === 'approve' ? 'default' : 'destructive',
+            onPress: () => performAction(row, actionStatus),
+          },
+        ],
+      );
+    },
+    [performAction],
+  );
+
   const cards = useMemo(
     () => [
       {
@@ -336,6 +399,19 @@ export function BonusWalletFundRequestScreen() {
       .filter((c) => c.key !== 'idx')
       .map<SheetField>((c) => ({ label: c.label, value: c.render(sheetRow, 0) }));
   }, [sheetRow, columns]);
+
+  const sheetActions = useMemo<SheetAction[]>(() => {
+    if (!sheetRow || !sheetRow.userId) return [];
+    const pending = String(sheetRow.status || '').trim().toLowerCase() === 'pending';
+    if (!pending) return [];
+    const busy = Boolean(actingId);
+    return (['approve', 'reject', 'remove'] as ActionStatus[]).map((a) => ({
+      label: actingId === `${sheetRow._id}:${a}` ? '…' : a[0].toUpperCase() + a.slice(1),
+      tone: a === 'approve' ? 'primary' : a === 'reject' ? 'warning' : 'default',
+      disabled: busy,
+      onPress: () => handleAction(sheetRow, a),
+    }));
+  }, [sheetRow, actingId, handleAction]);
 
   // ---------- Table sub-view ----------
   if (view === 'table') {
@@ -431,6 +507,7 @@ export function BonusWalletFundRequestScreen() {
           visible={sheetRow !== null}
           title={sheetRow ? display(sheetRow.name) : ''}
           fields={sheetFields}
+          actions={sheetActions}
           onClose={() => setSheetRow(null)}
         />
       </ScrollView>
