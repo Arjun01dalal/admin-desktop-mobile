@@ -390,8 +390,8 @@ export function UsersKycScreen() {
         Alert.alert('Please enter Customer OTP and Admin OTP');
         return;
       }
-      if (!/^\d{4}$/.test(f.otp.trim())) {
-        Alert.alert('Please enter a valid 4 digit OTP');
+      if (!/^\d{6}$/.test(f.otp.trim())) {
+        Alert.alert('Please enter a valid 6 digit OTP');
         return;
       }
       if (!f.comment.trim()) {
@@ -454,6 +454,10 @@ export function UsersKycScreen() {
     if (!row?._id) return;
     if (!rejectOtp.trim() || !rejectAdminOtp.trim()) {
       Alert.alert('Please enter Customer OTP and Admin OTP');
+      return;
+    }
+    if (!/^\d{4}$/.test(rejectOtp.trim())) {
+      Alert.alert('Please enter a valid 4 digit OTP');
       return;
     }
     void (async () => {
@@ -553,6 +557,49 @@ export function UsersKycScreen() {
     })();
   }, [manualTarget, manualForm, updatedBy, load]);
 
+  // ---- Call via dialer (web panel connectToDialer parity) ----
+  const connectToDialer = useCallback((row: KycRow) => {
+    if (!row.mobile) {
+      Alert.alert('No mobile number on file for this user');
+      return;
+    }
+    void (async () => {
+      setBusy(true);
+      try {
+        const res = await fetch('https://api2.ganesha999.com/API/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            list_id: '800001',
+            list_name: 'KYC UPDATION',
+            campaign_id: 'KYC',
+            leads: [
+              {
+                first_name: row.name ?? '',
+                last_name: '',
+                phone_number: row.mobile,
+                city: '',
+                state: '',
+                email: row.clientName ?? '',
+                comments: row.clientName ?? '',
+                province: row._id,
+              },
+            ],
+          }),
+        });
+        if (!res.ok) {
+          Alert.alert('Failed to send call request');
+          return;
+        }
+        Alert.alert('Data sent successfully');
+      } catch {
+        Alert.alert('Failed to send call request');
+      } finally {
+        setBusy(false);
+      }
+    })();
+  }, []);
+
   // ---- Verify UPI ----
   const verifyUpi = useCallback((row: KycRow) => {
     if (!row.upiId) {
@@ -621,12 +668,13 @@ export function UsersKycScreen() {
       ];
     }
     return [
+      { label: '📞 Call Customer', tone: 'default', disabled: busy, onPress: () => connectToDialer(sheetRow) },
       { label: 'Approve KYC', tone: 'primary', disabled: busy, onPress: () => openApprove(sheetRow) },
       { label: 'Reject KYC', tone: 'warning', disabled: busy, onPress: () => openReject(sheetRow) },
       { label: 'Manual KYC Update', tone: 'default', disabled: busy, onPress: () => openManual(sheetRow) },
       { label: 'Verify UPI', tone: 'default', disabled: busy, onPress: () => verifyUpi(sheetRow) },
     ];
-  }, [sheetRow, nightLocked, busy, openApprove, openReject, openManual, verifyUpi]);
+  }, [sheetRow, nightLocked, busy, connectToDialer, openApprove, openReject, openManual, verifyUpi]);
 
   const setA = useCallback(
     (key: keyof ApproveForm) => (v: string) =>
@@ -846,7 +894,7 @@ export function UsersKycScreen() {
                 </>
               ) : (
                 <>
-                  <Field label="Customer OTP (4 digit)" value={approveForm.otp} onChange={setA('otp')} keyboard="numeric" />
+                  <Field label="Customer OTP (6 digit)" value={approveForm.otp} onChange={setA('otp')} keyboard="numeric" />
                   <Field label="Admin OTP" value={approveForm.kycAdminOtp} onChange={setA('kycAdminOtp')} keyboard="numeric" />
                   <Field label="Comment" value={approveForm.comment} onChange={setA('comment')} />
                 </>
@@ -891,7 +939,7 @@ export function UsersKycScreen() {
             <Text style={styles.modalSub}>
               {display(rejectTarget?.name)} · {maskMobile(rejectTarget?.mobile, canShowMobile)}
             </Text>
-            <Field label="Customer OTP" value={rejectOtp} onChange={setRejectOtp} keyboard="numeric" />
+            <Field label="Customer OTP (4 digit)" value={rejectOtp} onChange={setRejectOtp} keyboard="numeric" />
             <Field label="Admin OTP" value={rejectAdminOtp} onChange={setRejectAdminOtp} keyboard="numeric" />
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
