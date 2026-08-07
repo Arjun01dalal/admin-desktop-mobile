@@ -847,6 +847,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
+    marginTop: spacing(3),
     marginBottom: spacing(3),
   },
   allDataText: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
