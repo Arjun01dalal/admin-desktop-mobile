@@ -558,6 +558,9 @@ export function UsersKycScreen() {
   }, [manualTarget, manualForm, updatedBy, load]);
 
   // ---- Call via dialer (web panel connectToDialer parity) ----
+  /** Row for which the dialer call was sent; KYC action buttons unlock only for this row. */
+  const [calledId, setCalledId] = useState('');
+
   const connectToDialer = useCallback((row: KycRow) => {
     if (!row.mobile) {
       Alert.alert('No mobile number on file for this user');
@@ -592,6 +595,7 @@ export function UsersKycScreen() {
           return;
         }
         Alert.alert('Data sent successfully');
+        setCalledId(row._id ?? '');
       } catch {
         Alert.alert('Failed to send call request');
       } finally {
@@ -667,14 +671,19 @@ export function UsersKycScreen() {
         },
       ];
     }
+    const called = calledId !== '' && calledId === sheetRow._id;
     return [
       { label: '📞 Call Customer', tone: 'default', disabled: busy, onPress: () => connectToDialer(sheetRow) },
-      { label: 'Approve KYC', tone: 'primary', disabled: busy, onPress: () => openApprove(sheetRow) },
-      { label: 'Reject KYC', tone: 'warning', disabled: busy, onPress: () => openReject(sheetRow) },
-      { label: 'Manual KYC Update', tone: 'default', disabled: busy, onPress: () => openManual(sheetRow) },
+      ...(called
+        ? ([
+            { label: 'Approve KYC', tone: 'primary', disabled: busy, onPress: () => openApprove(sheetRow) },
+            { label: 'Reject KYC', tone: 'warning', disabled: busy, onPress: () => openReject(sheetRow) },
+            { label: 'Manual KYC Update', tone: 'default', disabled: busy, onPress: () => openManual(sheetRow) },
+          ] as SheetAction[])
+        : []),
       { label: 'Verify UPI', tone: 'default', disabled: busy, onPress: () => verifyUpi(sheetRow) },
     ];
-  }, [sheetRow, nightLocked, busy, connectToDialer, openApprove, openReject, openManual, verifyUpi]);
+  }, [sheetRow, nightLocked, busy, calledId, connectToDialer, openApprove, openReject, openManual, verifyUpi]);
 
   const setA = useCallback(
     (key: keyof ApproveForm) => (v: string) =>
