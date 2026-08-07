@@ -272,10 +272,14 @@ export function DepositScreen() {
       setSaving(true);
       try {
         if (sGateway && sGateway !== row.paymentGatewayName) {
-          await secureApi<unknown>('deposits.updateGatewayName', {
+          const gwRes = await secureApi<unknown>('deposits.updateGatewayName', {
             _id: row._id,
             paymentGatewayName: sGateway,
           });
+          if (!gwRes.ok || gwRes.success === false) {
+            Alert.alert(gwRes.message || 'Failed to update payment gateway name');
+            return;
+          }
         }
         const payload: Record<string, unknown> = {
           userId: row.userId,
