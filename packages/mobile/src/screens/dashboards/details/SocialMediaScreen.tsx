@@ -25,7 +25,6 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
@@ -187,40 +186,6 @@ export function SocialMediaScreen() {
     [load],
   );
 
-  const columns = useMemo<DataTableColumn<Row>[]>(
-    () => [
-      { key: 'name', label: 'Name', width: 150, render: (r) => display(r.name) },
-      {
-        key: 'share',
-        label: '',
-        width: 55,
-        align: 'center',
-        render: () => 'Share',
-        color: () => colors.primary,
-        onCellPress: (r) => void shareLink(r),
-      },
-      {
-        key: 'edit',
-        label: '',
-        width: 50,
-        align: 'center',
-        render: () => 'Edit',
-        color: () => '#f59e0b',
-        onCellPress: (r) => openEdit(r),
-      },
-      {
-        key: 'delete',
-        label: '',
-        width: 60,
-        align: 'center',
-        render: () => 'Delete',
-        color: () => '#ef4444',
-        onCellPress: (r) => handleDelete(r),
-      },
-    ],
-    [shareLink, openEdit, handleDelete],
-  );
-
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!sheetRow) return [];
     return [{ label: 'Name', value: display(sheetRow.name) }];
@@ -258,15 +223,25 @@ export function SocialMediaScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No social media links found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to Share / Edit / Delete"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No social media links found</Text>
+      ) : null}
+      <View style={styles.grid}>
+        {rows.map((row, i) => (
+          <TouchableOpacity
+            key={String(row._id || i)}
+            style={styles.card}
+            activeOpacity={0.7}
+            onPress={() => setSheetRow(row)}
+          >
+            <Text style={styles.cardName} numberOfLines={2}>
+              {display(row.name)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {rows.length ? <Text style={styles.hint}>Tap a card to Share / Edit / Delete</Text> : null}
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -356,6 +331,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
+  card: {
+    width: '48%',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(4),
+    paddingHorizontal: spacing(2),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardName: { color: colors.foreground, fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  hint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: spacing(3) },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   backdropTouch: { flex: 1 },
   formSheet: {
