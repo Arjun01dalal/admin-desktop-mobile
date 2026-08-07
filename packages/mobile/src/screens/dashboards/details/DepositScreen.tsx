@@ -10,14 +10,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { appCodeForName, asPaged } from '@astro/shared';
+import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
@@ -52,7 +54,39 @@ type DepositRow = {
   upiId?: string;
   userUpiId?: string;
   updatedBy?: { name?: string } | string;
+  oldMultipleNames?: string[];
 };
+
+// --- Manual settle helpers (desktop deposit/logic.ts parity) ---
+const UPI_GATEWAYS = new Set(['upi-payment', 'IMPS', 'NEFT']);
+const SETTLE_REASONS = [
+  'deposit-uco-trpl',
+  'Deposit Failure',
+  'instant-deposit-manual',
+  'deposit-upi-id',
+  'deposit-sapt-rishi',
+  'deposit-manual',
+];
+
+function defaultSettleReason(row: DepositRow): string {
+  const gateway = String(row.paymentGatewayName || '').replace(/\t/g, '');
+  if (String(row.status || '').toLowerCase() === 'pending') {
+    if (String(row.paymentType || '') === 'instant-deposit-manual') return 'instant-deposit-manual';
+    return gateway ? `manual-deposit-${gateway}` : 'deposit-manual';
+  }
+  return 'deposit-manual';
+}
+
+function settleReasonOptions(row: DepositRow): string[] {
+  const gateway = String(row.paymentGatewayName || '').replace(/\t/g, '');
+  const dynamic = gateway ? `manual-deposit-${gateway}` : '';
+  if (dynamic && !SETTLE_REASONS.includes(dynamic)) return [dynamic, ...SETTLE_REASONS];
+  return [...SETTLE_REASONS];
+}
+
+function isUpiGateway(gateway?: string): boolean {
+  return UPI_GATEWAYS.has(String(gateway || ''));
+}
 
 const STATUS_OPTIONS = ['', 'Pending', 'Approved', 'Rejected'] as const;
 
@@ -116,8 +150,41 @@ export function DepositScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sheetRow, setSheetRow] = useState<DepositRow | null>(null);
-  const [actingId, setActingId] = useState('');
   const genRef = useRef(0);
+
+  // Manual settle modal state
+  const [settleRow, setSettleRow] = useState<DepositRow | null>(null);
+  const [mids, setMids] = useState<string[]>([]);
+  const [sAmount, setSAmount] = useState('');
+  const [sReason, setSReason] = useState('');
+  const [sMid, setSMid] = useState('');
+  const [sGateway, setSGateway] = useState('');
+  const [sDate, setSDate] = useState(todayIST);
+  const [sUtr, setSUtr] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Secondary user name modal state
+  const [secRow, setSecRow] = useState<DepositRow | null>(null);
+  const [secName, setSecName] = useState('');
+  const [secSaving, setSecSaving] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await secureApi<unknown>('deposits.mids', {});
+      if (!res.ok) return;
+      const body = unpackPayload(res.data) as { items?: unknown };
+      const list = Array.isArray(res.data)
+        ? (res.data as { mid?: string | number }[])
+        : Array.isArray(body.items)
+          ? (body.items as { mid?: string | number }[])
+          : asList<{ mid?: string | number }>(res.data);
+      setMids(
+        list
+          .filter((m) => m && m.mid != null && m.mid !== '')
+          .map((m) => String(m.mid)),
+      );
+    })();
+  }, []);
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -170,49 +237,109 @@ export function DepositScreen() {
     setPage(1);
   }, [searchField, draftSearch]);
 
-  const performApprove = useCallback(
-    (row: DepositRow) => {
-      if (!row.orderId) {
-        setError('Missing order id');
-        return;
-      }
-      void (async () => {
-        setActingId(row.orderId || row._id);
-        try {
-          const res = await secureApi<unknown>('deposits.updateStatus', {
-            transactionId: row.orderId,
-            status: 'Approved',
-            reason: '',
-            updatedBy: { _id: admin?._id || '', name: admin?.name || '' },
-          });
-          if (!res.ok || res.success === false) {
-            Alert.alert(res.message || 'Failed to approve');
-            return;
-          }
-          Alert.alert(res.message || 'Deposit approved');
-          setSheetRow(null);
-          void load();
-        } finally {
-          setActingId('');
-        }
-      })();
-    },
-    [admin, load],
-  );
+  // Approve → open Manual Settle modal (desktop SettleDialog parity, simplified).
+  const openSettle = useCallback((row: DepositRow) => {
+    setSheetRow(null);
+    setSAmount(String(row.amount ?? ''));
+    setSReason(defaultSettleReason(row));
+    setSMid(row.mid != null ? String(row.mid) : '');
+    setSGateway(row.paymentGatewayName || '');
+    setSDate(todayIST());
+    setSUtr('');
+    setSettleRow(row);
+  }, []);
 
-  const confirmApprove = useCallback(
-    (row: DepositRow) => {
-      Alert.alert(
-        'Approve deposit',
-        `Approve ${display(row.userName)} — ₹${formatIN(row.amount)}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Approve', onPress: () => performApprove(row) },
-        ],
-      );
-    },
-    [performApprove],
-  );
+  const submitSettle = useCallback(() => {
+    const row = settleRow;
+    if (!row?.orderId || !row.userId) {
+      Alert.alert('Missing order / user');
+      return;
+    }
+    const utrValue = sUtr.trim();
+    if (!utrValue) {
+      Alert.alert('Please enter UTR No');
+      return;
+    }
+    if (utrValue.length <= 10) {
+      Alert.alert('UTR No length should be more than 10 characters');
+      return;
+    }
+    if (!sReason.trim()) {
+      Alert.alert('Select reason');
+      return;
+    }
+    void (async () => {
+      setSaving(true);
+      try {
+        if (sGateway && sGateway !== row.paymentGatewayName) {
+          await secureApi<unknown>('deposits.updateGatewayName', {
+            _id: row._id,
+            paymentGatewayName: sGateway,
+          });
+        }
+        const payload: Record<string, unknown> = {
+          userId: row.userId,
+          balance: Number(sAmount) || row.amount,
+          updatedBy: { name: admin?.name || '', _id: admin?._id || '' },
+          reason: sReason.trim(),
+          remark: `Deposite failure of ${row.userName || ''} through ${sGateway || row.paymentGatewayName || ''} pay with order id ${row.orderId} and mobile no ${row.userMobile || row.mobile || ''}`,
+          tag: 'credit',
+          orderId: row.orderId,
+          mid: sMid || row.mid,
+          paymentDate: sDate,
+          utr: utrValue,
+        };
+        if (sReason.startsWith('manual-deposit-')) {
+          payload.type = 'paymentGatewayManualDeposit';
+        }
+        const action = isUpiGateway(row.paymentGatewayName)
+          ? 'upiPayments.addCoin'
+          : 'deposits.addCoin';
+        const res = await secureApi<unknown>(action, payload);
+        if (!res.ok || res.success === false) {
+          Alert.alert(res.message || 'Settle failed');
+          return;
+        }
+        Alert.alert(res.message || 'Settled successfully');
+        setSettleRow(null);
+        void load();
+      } finally {
+        setSaving(false);
+      }
+    })();
+  }, [settleRow, sUtr, sReason, sGateway, sAmount, sMid, sDate, admin, load]);
+
+  // Secondary user name (desktop SecondaryNameCell parity).
+  const submitSecondary = useCallback(() => {
+    const row = secRow;
+    const trimmed = secName.trim();
+    if (!row || !trimmed) return;
+    const names = Array.isArray(row.oldMultipleNames) ? row.oldMultipleNames : [];
+    if (names.some((n) => n?.toLowerCase() === trimmed.toLowerCase())) {
+      Alert.alert(`"${trimmed}" already exists in the list!`);
+      return;
+    }
+    void (async () => {
+      setSecSaving(true);
+      try {
+        const res = await secureApi<unknown>('deposits.updateUserOldName', {
+          userId: row.userId,
+          name: trimmed,
+          transactionId: row.orderId,
+        });
+        if (!res.ok || res.success === false) {
+          Alert.alert(res.message || 'Failed to add secondary name');
+          return;
+        }
+        Alert.alert('Secondary user name added successfully!');
+        setSecRow(null);
+        setSecName('');
+        void load();
+      } finally {
+        setSecSaving(false);
+      }
+    })();
+  }, [secRow, secName, load]);
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!sheetRow) return [];
@@ -234,6 +361,13 @@ export function DepositScreen() {
       { label: 'State', value: display(r.userState || r.state) },
       { label: 'City', value: display(r.userCity || r.city) },
       { label: 'Reason', value: display(r.reason), multiline: true },
+      {
+        label: 'Secondary Names',
+        value: Array.isArray(r.oldMultipleNames) && r.oldMultipleNames.length
+          ? r.oldMultipleNames.join(', ')
+          : '—',
+        multiline: true,
+      },
       { label: 'Created', value: formatDateTime(r.createdOn) },
       { label: 'Updated', value: formatDateTime(r.updatedOn) },
       {
@@ -246,16 +380,23 @@ export function DepositScreen() {
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
     if (String(sheetRow.status || '').toLowerCase() !== 'pending') return [];
-    const busy = Boolean(actingId);
     return [
       {
-        label: busy ? 'Approving…' : 'Approve',
+        label: 'Approve (Manual Settle)',
         tone: 'primary',
-        disabled: busy,
-        onPress: () => confirmApprove(sheetRow),
+        onPress: () => openSettle(sheetRow),
+      },
+      {
+        label: 'Add Secondary Name',
+        tone: 'default',
+        onPress: () => {
+          setSheetRow(null);
+          setSecName('');
+          setSecRow(sheetRow);
+        },
       },
     ];
-  }, [sheetRow, actingId, confirmApprove]);
+  }, [sheetRow, openSettle]);
 
   return (
     <ScrollView
@@ -326,7 +467,6 @@ export function DepositScreen() {
 
       {rows.map((r, i) => {
         const pending = String(r.status || '').toLowerCase() === 'pending';
-        const busy = actingId === (r.orderId || r._id);
         const badge = statusBadge(r.status);
         return (
           <TouchableOpacity
@@ -365,13 +505,20 @@ export function DepositScreen() {
               </View>
             </View>
             {pending ? (
-              <TouchableOpacity
-                style={[styles.approveBtn, busy && styles.approveBtnDisabled]}
-                disabled={busy}
-                onPress={() => confirmApprove(r)}
-              >
-                <Text style={styles.approveBtnText}>{busy ? 'Approving…' : 'Approve'}</Text>
-              </TouchableOpacity>
+              <View style={styles.cardBtnRow}>
+                <TouchableOpacity style={styles.approveBtn} onPress={() => openSettle(r)}>
+                  <Text style={styles.approveBtnText}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => {
+                    setSecName('');
+                    setSecRow(r);
+                  }}
+                >
+                  <Text style={styles.secondaryBtnText}>+ Secondary Name</Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
             <Text style={styles.cardHint}>Tap for all details</Text>
           </TouchableOpacity>
@@ -403,6 +550,175 @@ export function DepositScreen() {
         actions={sheetActions}
         onClose={() => setSheetRow(null)}
       />
+
+      {/* Manual Settle modal */}
+      <Modal
+        visible={settleRow !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !saving && setSettleRow(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Manual Settle Transaction</Text>
+              <Text style={styles.modalSub}>
+                {display(settleRow?.userName)} · {display(settleRow?.orderId)}
+              </Text>
+
+              <Text style={styles.fieldLabel}>Amount</Text>
+              <TextInput
+                style={styles.input}
+                value={sAmount}
+                onChangeText={setSAmount}
+                keyboardType="numeric"
+                placeholder="Amount"
+                placeholderTextColor={colors.muted}
+              />
+
+              <Text style={styles.fieldLabel}>Reason</Text>
+              <View style={styles.optionWrap}>
+                {(settleRow ? settleReasonOptions(settleRow) : []).map((r) => (
+                  <TouchableOpacity
+                    key={r}
+                    style={[styles.optionChip, sReason === r && styles.optionChipActive]}
+                    onPress={() => setSReason(r)}
+                  >
+                    <Text
+                      style={[styles.optionChipText, sReason === r && styles.optionChipTextActive]}
+                    >
+                      {r}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>MID</Text>
+              {mids.length ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.optionRow}>
+                    {mids.map((m) => (
+                      <TouchableOpacity
+                        key={m}
+                        style={[styles.optionChip, sMid === m && styles.optionChipActive]}
+                        onPress={() => setSMid(m)}
+                      >
+                        <Text
+                          style={[styles.optionChipText, sMid === m && styles.optionChipTextActive]}
+                        >
+                          {m}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={sMid}
+                  onChangeText={setSMid}
+                  placeholder="MID"
+                  placeholderTextColor={colors.muted}
+                />
+              )}
+
+              <Text style={styles.fieldLabel}>Payment Gateway</Text>
+              <TextInput
+                style={styles.input}
+                value={sGateway}
+                onChangeText={setSGateway}
+                placeholder="Payment gateway"
+                placeholderTextColor={colors.muted}
+              />
+
+              <Text style={styles.fieldLabel}>Payment Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.input}
+                value={sDate}
+                onChangeText={setSDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.muted}
+              />
+
+              <Text style={styles.fieldLabel}>UTR No</Text>
+              <TextInput
+                style={styles.input}
+                value={sUtr}
+                onChangeText={setSUtr}
+                placeholder="UTR number (more than 10 chars)"
+                placeholderTextColor={colors.muted}
+              />
+
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  disabled={saving}
+                  onPress={() => setSettleRow(null)}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.approveBtn, styles.modalSubmitBtn, saving && styles.btnDisabled]}
+                  disabled={saving}
+                  onPress={submitSettle}
+                >
+                  <Text style={styles.approveBtnText}>{saving ? 'Settling…' : 'Settle'}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Secondary Name modal */}
+      <Modal
+        visible={secRow !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !secSaving && setSecRow(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Secondary Name</Text>
+            <Text style={styles.modalSub}>
+              {display(secRow?.userName)} · {display(secRow?.orderId)}
+            </Text>
+            {Array.isArray(secRow?.oldMultipleNames) && secRow.oldMultipleNames.length ? (
+              <Text style={styles.modalNote}>
+                Existing: {secRow.oldMultipleNames.join(', ')}
+              </Text>
+            ) : null}
+            <Text style={styles.fieldLabel}>Secondary user name</Text>
+            <TextInput
+              style={styles.input}
+              value={secName}
+              onChangeText={setSecName}
+              placeholder="Secondary name"
+              placeholderTextColor={colors.muted}
+            />
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                disabled={secSaving}
+                onPress={() => setSecRow(null)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.approveBtn,
+                  styles.modalSubmitBtn,
+                  (secSaving || !secName.trim()) && styles.btnDisabled,
+                ]}
+                disabled={secSaving || !secName.trim()}
+                onPress={submitSecondary}
+              >
+                <Text style={styles.approveBtnText}>{secSaving ? 'Adding…' : 'Add'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -457,15 +773,90 @@ const styles = StyleSheet.create({
   cardCell: { minWidth: '28%', flexGrow: 1 },
   cardLabel: { color: colors.muted, fontSize: 10, fontWeight: '600', textTransform: 'uppercase' },
   cardValue: { color: colors.foreground, fontSize: 13, marginTop: 2 },
+  cardBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
   approveBtn: {
     backgroundColor: '#16a34a',
     borderRadius: radius.md,
     paddingVertical: spacing(2.5),
     alignItems: 'center',
+    flex: 1,
+  },
+  approveBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  secondaryBtn: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    flex: 1,
+  },
+  secondaryBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  btnDisabled: { opacity: 0.5 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing(4),
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(4),
+    maxHeight: '88%',
+  },
+  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
+  modalSub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+  modalNote: { color: colors.muted, fontSize: 12, marginTop: spacing(2) },
+  fieldLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
     marginTop: spacing(3),
   },
-  approveBtnDisabled: { opacity: 0.5 },
-  approveBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  input: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    fontSize: 13,
+    marginTop: spacing(1.5),
+  },
+  optionWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(1.5),
+  },
+  optionRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(1.5) },
+  optionChip: {
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1.5),
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  optionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  optionChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  optionChipTextActive: { color: colors.primaryForeground },
+  modalBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
+  cancelBtn: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    flex: 1,
+  },
+  cancelBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  modalSubmitBtn: { flex: 1 },
   cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(2), textAlign: 'center' },
   pager: {
     flexDirection: 'row',
