@@ -217,9 +217,14 @@ export function FundRequestScreen() {
   const [editRemark, setEditRemark] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
+  /** Generation guards: discard responses from superseded requests. */
+  const summaryGenRef = React.useRef(0);
+  const drillGenRef = React.useRef(0);
+
   const loadSummary = useCallback(
     async (opts?: { allData?: boolean }) => {
       const useAll = opts?.allData ?? allData;
+      const gen = ++summaryGenRef.current;
       setSummaryLoading(true);
       try {
         const datePayload = useAll
@@ -239,14 +244,16 @@ export function FundRequestScreen() {
           secureApi<unknown>('fundRequests.depositWithdrawal', datePayload),
         ]);
 
-        if (!sumRes.ok) {
+        if (gen !== summaryGenRef.current) return;
+
+        if (apiFailed(sumRes)) {
           Alert.alert(sumRes.message || 'Failed to load fund request summary');
           setSummary({});
         } else {
           setSummary(unpackPayload(sumRes.data) as DepositFundSummary);
         }
-        setCoinSummary(coinRes.ok ? (unpackPayload(coinRes.data) as FundRequestCoinSummary) : {});
-        if (holdRes.ok) {
+        setCoinSummary(!apiFailed(coinRes) ? (unpackPayload(coinRes.data) as FundRequestCoinSummary) : {});
+        if (!apiFailed(holdRes)) {
           const body = unpackPayload(holdRes.data);
           setHoldWithdrawal({
             count: num(body.count ?? body.totalCount),
@@ -255,11 +262,11 @@ export function FundRequestScreen() {
         } else {
           setHoldWithdrawal({});
         }
-        setBonusSummary(bonusRes.ok ? (unpackPayload(bonusRes.data) as BonusWalletSummary) : {});
-        setDepositWithdrawTotal(dwRes.ok ? num(unpackPayload(dwRes.data).totalDeposit) : 0);
+        setBonusSummary(!apiFailed(bonusRes) ? (unpackPayload(bonusRes.data) as BonusWalletSummary) : {});
+        setDepositWithdrawTotal(!apiFailed(dwRes) ? num(unpackPayload(dwRes.data).totalDeposit) : 0);
         setAllData(useAll);
       } finally {
-        setSummaryLoading(false);
+        if (gen === summaryGenRef.current) setSummaryLoading(false);
       }
     },
     [allData, startDate, endDate, canViewBonusWallet],
@@ -276,6 +283,7 @@ export function FundRequestScreen() {
       itemsPerPage: number;
       useAll: boolean;
     }) => {
+      const gen = ++drillGenRef.current;
       setTableLoading(true);
       try {
         const filter: Record<string, unknown> = {};
@@ -296,7 +304,8 @@ export function FundRequestScreen() {
         }
 
         const res = await secureApi<unknown>('fundRequests.transactions', payload);
-        if (!res.ok) {
+        if (gen !== drillGenRef.current) return;
+        if (apiFailed(res)) {
           Alert.alert(res.message || 'Failed to load transactions');
           setRows([]);
           setTotal(0);
@@ -308,7 +317,7 @@ export function FundRequestScreen() {
         setTotal(paged.total);
         setTotalPages(Math.max(1, paged.totalPages));
       } finally {
-        setTableLoading(false);
+        if (gen === drillGenRef.current) setTableLoading(false);
       }
     },
     [startDate, endDate],
