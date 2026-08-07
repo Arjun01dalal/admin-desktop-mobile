@@ -946,6 +946,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.md,
     padding: spacing(4),
+    paddingBottom: spacing(6),
   },
   modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginBottom: spacing(3) },
   modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(3) },
