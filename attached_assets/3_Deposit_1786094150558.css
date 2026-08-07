@@ -1,0 +1,134 @@
+.MuiSelect-selectMenu {
+    padding: 6px !important;
+}
+
+.flow-off {
+    overflow: auto !important;
+}
+
+.lbl {
+    font-size: 12px;
+}
+
+.approved-clr {
+    background-color: #84d184 !important;
+    color: black;
+}
+
+.pending-clr {
+    background-color: #fff !important;
+    color: black;
+}
+
+.rejected-clr {
+    background-color: #ff7e7e !important;
+    color: black;
+}
+
+@media (max-width: 1200px) {
+    .sechBtn {
+        /* width: 85px !important; */
+        font-size: 12px;
+    }
+    .lbl {
+        font-size: 9px;
+    }
+}
+.update-mid-modal .MuiDialog-paper {
+    width: 100%;
+    max-width: 560px;
+    min-width: 300px;
+    margin: 16px;
+    border-radius: 8px;
+}
+
+.update-mid-modal .MuiDialogTitle-root {
+    font-size: 1.25rem;
+    font-weight: 600;
+    padding: 20px 24px 12px;
+}
+
+.update-mid-modal .MuiDialogContent-root {
+    padding: 16px 24px 8px;
+}
+
+.update-mid-modal .update-mid-modal__info {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    color: #555;
+}
+
+.update-mid-modal .update-mid-modal__note {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    color: #5c4b00;
+    background-color: #fff8e1;
+    border-left: 3px solid #ffc107;
+    border-radius: 4px;
+}
+
+.update-mid-modal .update-mid-modal__field-spacing {
+    margin-top: 16px;
+}
+
+.update-mid-modal .MuiDialogActions-root {
+    padding: 12px 24px 20px;
+    gap: 12px;
+}
+
+.user-upi-cell {
+    min-width: 220px;
+    max-width: 420px;
+    vertical-align: top;
+}
+
+.user-upi-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.user-upi-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.user-upi-chip {
+    display: inline-block;
+    background-color: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: #111;
+    word-break: break-all;
+}
+
+@media (max-width: 600px) {
+    .update-mid-modal .MuiDialog-paper {
+        max-width: calc(100vw - 24px);
+        margin: 12px;
+    }
+
+    .update-mid-modal .MuiDialogTitle-root {
+        font-size: 1.05rem;
+        padding: 16px 16px 8px;
+    }
+
+    .update-mid-modal .MuiDialogContent-root {
+        padding: 12px 16px 8px;
+    }
+
+    .update-mid-modal .MuiDialogActions-root {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        padding: 12px 16px 16px;
+    }
+
+    .update-mid-modal .MuiDialogActions-root .MuiButton-root {
+        width: 100%;
+        margin: 0;
+    }
+}

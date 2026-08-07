@@ -26,8 +26,10 @@ import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import * as ImagePicker from 'expo-image-picker';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { SlipOcrWebView, extractUtrFromText } from './utrOcr';
 
 type DepositRow = {
   _id: string;
@@ -164,6 +166,8 @@ export function DepositScreen() {
   const [sDate, setSDate] = useState(todayIST);
   const [sUtr, setSUtr] = useState('');
   const [saving, setSaving] = useState(false);
+  const [ocrImage, setOcrImage] = useState<string | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
 
   // Secondary user name modal state
   const [secRow, setSecRow] = useState<DepositRow | null>(null);
@@ -248,16 +252,18 @@ export function DepositScreen() {
     setSGateway(row.paymentGatewayName || '');
     setSDate(todayIST());
     setSUtr('');
+    setOcrImage(null);
+    setOcrBusy(false);
     setSettleRow(row);
   }, []);
 
-  const submitSettle = useCallback(() => {
+  const submitSettle = useCallback((utrOverride?: string) => {
     const row = settleRow;
     if (!row?.orderId || !row.userId) {
       Alert.alert('Missing order / user');
       return;
     }
-    const utrValue = sUtr.trim();
+    const utrValue = (utrOverride ?? sUtr).trim();
     if (!utrValue) {
       Alert.alert('Please enter UTR No');
       return;
@@ -314,6 +320,47 @@ export function DepositScreen() {
       }
     })();
   }, [settleRow, sUtr, sReason, sGateway, sAmount, sMid, sDate, admin, load]);
+
+  // Upload slip photo → OCR (WebView tesseract) → extract UTR → auto submit.
+  const pickSlip = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      base64: true,
+      quality: 0.9,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const base64 = result.assets[0].base64;
+    if (!base64) {
+      Alert.alert('Could not read the selected photo');
+      return;
+    }
+    setOcrBusy(true);
+    setOcrImage(base64);
+  }, []);
+
+  const onOcrText = useCallback(
+    (text: string) => {
+      setOcrImage(null);
+      setOcrBusy(false);
+      const utr = extractUtrFromText(text);
+      if (!utr) {
+        Alert.alert('Could not read UTR from slip. Please enter manually.');
+        return;
+      }
+      setSUtr(utr);
+      Alert.alert('UTR read from slip', utr, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Settle', onPress: () => submitSettle(utr) },
+      ]);
+    },
+    [submitSettle],
+  );
+
+  const onOcrError = useCallback((message: string) => {
+    setOcrImage(null);
+    setOcrBusy(false);
+    Alert.alert(message || 'Failed to read UTR from slip');
+  }, []);
 
   // Secondary user name (desktop SecondaryNameCell parity).
   const submitSecondary = useCallback(() => {
@@ -653,13 +700,25 @@ export function DepositScreen() {
               />
 
               <Text style={styles.fieldLabel}>UTR No</Text>
+              <TouchableOpacity
+                style={[styles.uploadBtn, ocrBusy && styles.btnDisabled]}
+                disabled={ocrBusy || saving}
+                onPress={() => void pickSlip()}
+              >
+                <Text style={styles.uploadBtnText}>
+                  {ocrBusy ? 'Reading slip…' : '📷 Upload Slip (auto-read UTR)'}
+                </Text>
+              </TouchableOpacity>
               <TextInput
                 style={styles.input}
                 value={sUtr}
                 onChangeText={setSUtr}
-                placeholder="UTR number (more than 10 chars)"
+                placeholder="UTR will appear here after upload"
                 placeholderTextColor={colors.muted}
               />
+              {ocrImage ? (
+                <SlipOcrWebView imageBase64={ocrImage} onText={onOcrText} onError={onOcrError} />
+              ) : null}
 
               <View style={styles.modalBtnRow}>
                 <TouchableOpacity
@@ -672,7 +731,7 @@ export function DepositScreen() {
                 <TouchableOpacity
                   style={[styles.approveBtn, styles.modalSubmitBtn, saving && styles.btnDisabled]}
                   disabled={saving}
-                  onPress={submitSettle}
+                  onPress={() => submitSettle()}
                 >
                   <Text style={styles.approveBtnText}>{saving ? 'Settling…' : 'Settle'}</Text>
                 </TouchableOpacity>
@@ -858,6 +917,15 @@ const styles = StyleSheet.create({
   optionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   optionChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   optionChipTextActive: { color: colors.primaryForeground },
+  uploadBtn: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    marginTop: spacing(1.5),
+  },
+  uploadBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   modalBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
   cancelBtn: {
     borderRadius: radius.md,
