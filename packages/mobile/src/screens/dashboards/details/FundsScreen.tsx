@@ -624,6 +624,27 @@ export function FundsScreen() {
         <TouchableOpacity onPress={() => setView('main')}>
           <Text style={styles.backLink}>‹ Back to Funds</Text>
         </TouchableOpacity>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: spacing(2) }}
+        >
+          {rows.map((r, i) => {
+            const label = r.name === 'coinRemove' ? 'Other Removal' : String(r.name);
+            const active = label === drillName;
+            return (
+              <TouchableOpacity
+                key={`${r.name}-${i}`}
+                style={[styles.chip, active && styles.chipActive, { marginRight: spacing(1.5) }]}
+                onPress={() => {
+                  if (!active) openMids(r);
+                }}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
         <Text style={styles.title}>{drillName} — MIDs</Text>
         <Text style={styles.sub}>
           {startDate} → {endDate} · {drillMids.length} MIDs
@@ -818,8 +839,8 @@ export function FundsScreen() {
         keyFor={(r, i) => `${r.name}-${i}`}
         loading={loading}
         emptyMessage="No data"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
+        onRowPress={(row) => openMids(row)}
+        hint="Tap a row to open its MID list"
       />
 
       <RowDetailSheet
