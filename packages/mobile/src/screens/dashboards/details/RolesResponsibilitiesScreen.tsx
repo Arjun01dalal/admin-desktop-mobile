@@ -27,7 +27,6 @@ import {
 } from 'react-native';
 import { asList } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { CoinPermissionScreen } from './CoinPermissionScreen';
@@ -246,20 +245,6 @@ export function RolesResponsibilitiesScreen() {
     [load],
   );
 
-  const columns = useMemo<DataTableColumn<Role>[]>(
-    () => [
-      { key: 'name', label: 'Name', width: 180, render: (r) => display(r.Name) },
-      {
-        key: 'count',
-        label: 'Responsibilities',
-        width: 120,
-        align: 'right',
-        render: (r) => String(r.Responsibilities?.length || 0),
-      },
-    ],
-    [],
-  );
-
   if (!canView) {
     return (
       <View style={styles.noPerm}>
@@ -441,18 +426,35 @@ export function RolesResponsibilitiesScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns}
-        rows={roles}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No roles found"
-        onRowPress={(row) => {
-          setPageRole(row);
-          setPageMode('view');
-        }}
-        hint="Tap a role to open its page"
-      />
+      {loading && roles.length === 0 ? <Text style={styles.noPermText}>Loading…</Text> : null}
+      {!loading && roles.length === 0 ? <Text style={styles.noPermText}>No roles found</Text> : null}
+      {roles.map((role, i) => {
+        const count = role.Responsibilities?.length || 0;
+        return (
+          <TouchableOpacity
+            key={String(role._id || i)}
+            style={styles.roleCard}
+            activeOpacity={0.7}
+            onPress={() => {
+              setPageRole(role);
+              setPageMode('view');
+            }}
+          >
+            <View style={styles.roleCardTop}>
+              <Text style={styles.roleCardName} numberOfLines={1}>
+                {display(role.Name)}
+              </Text>
+              <View style={styles.roleCountPill}>
+                <Text style={styles.roleCountText}>{count}</Text>
+              </View>
+            </View>
+            <Text style={styles.roleCardSub} numberOfLines={2}>
+              {responsibilityNames(role.Responsibilities) || 'No responsibilities assigned'}
+            </Text>
+            <Text style={styles.roleCardHint}>Tap for details & actions</Text>
+          </TouchableOpacity>
+        );
+      })}
 
       {/* Add Role (clone) */}
       <Modal visible={cloneOpen} transparent animationType="slide" onRequestClose={() => setCloneOpen(false)}>
@@ -610,6 +612,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  roleCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(2),
+  },
+  roleCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  roleCardName: { color: colors.foreground, fontSize: 15, fontWeight: '700', flex: 1, marginRight: spacing(2) },
+  roleCountPill: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(0.75),
+  },
+  roleCountText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  roleCardSub: { color: colors.muted, fontSize: 12, marginTop: spacing(1.5) },
+  roleCardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1.5), fontStyle: 'italic' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   backdropTouch: { flex: 1 },
   formSheet: {
