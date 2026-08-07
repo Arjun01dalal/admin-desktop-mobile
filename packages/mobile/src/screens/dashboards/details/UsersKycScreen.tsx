@@ -56,6 +56,19 @@ function apiFailed(res: { ok: boolean; success?: boolean }): boolean {
   return !res.ok || res.success === false;
 }
 
+/** KYC night lock window: 8pm–10am IST (desktop useKycNightLock parity). */
+function isKycNightHours(now = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric',
+    hour12: false,
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value || 0);
+  return hour >= 20 || hour < 10;
+}
+
+const NIGHT_UNLOCK_MS = 60_000;
+
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
@@ -129,9 +142,10 @@ const EMPTY_MANUAL: ManualForm = {
 };
 
 export function UsersKycScreen() {
+  const canView = hasPermission('View_KYCs');
   const canShowMobile = hasPermission('show_mobile');
   const admin = useMemo(
-    () => getSessionUser() as { _id?: string; name?: string } | null,
+    () => getSessionUser() as { _id?: string; name?: string; mobile?: string } | null,
     [],
   );
   const updatedBy = useCallback(
@@ -219,6 +233,84 @@ export function UsersKycScreen() {
     setApplied({ field: searchField, text: draftSearch });
     setPage(1);
   }, [searchField, draftSearch]);
+
+  // ---- Night lock (8pm–10am IST; OTP unlock for 1 min — desktop parity) ----
+  const [nightLocked, setNightLocked] = useState(isKycNightHours());
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [unlockOtpSent, setUnlockOtpSent] = useState(false);
+  const [unlockOtp, setUnlockOtp] = useState('');
+  const [unlockBusy, setUnlockBusy] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // While a timed unlock is active, the timer below re-locks; skip checks.
+      if (!unlockTimerRef.current) setNightLocked(isKycNightHours());
+    }, 60_000);
+    return () => {
+      clearInterval(interval);
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+    };
+  }, []);
+
+  const sendUnlockOtp = useCallback(() => {
+    const mobile = admin?.mobile;
+    if (!mobile) {
+      Alert.alert('Admin mobile not found');
+      return;
+    }
+    void (async () => {
+      setUnlockBusy(true);
+      try {
+        const res = await secureApi<unknown>('users.sendBlockOtp', { mobile });
+        if (apiFailed(res)) {
+          Alert.alert(res.message || 'Failed to send OTP');
+          return;
+        }
+        setUnlockOtpSent(true);
+        Alert.alert('OTP sent successfully');
+      } finally {
+        setUnlockBusy(false);
+      }
+    })();
+  }, [admin]);
+
+  const verifyUnlockOtp = useCallback(() => {
+    const mobile = admin?.mobile;
+    if (!mobile) {
+      Alert.alert('Admin mobile not found');
+      return;
+    }
+    if (unlockOtp.trim().length !== 4) {
+      Alert.alert('OTP must be 4 digits');
+      return;
+    }
+    void (async () => {
+      setUnlockBusy(true);
+      try {
+        const res = await secureApi<unknown>('users.verifyBlockOtp', {
+          mobile,
+          otp: Number(unlockOtp.trim()),
+        });
+        if (apiFailed(res)) {
+          Alert.alert(res.message || 'Invalid OTP');
+          return;
+        }
+        setNightLocked(false);
+        setUnlockOpen(false);
+        setUnlockOtpSent(false);
+        setUnlockOtp('');
+        if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+        unlockTimerRef.current = setTimeout(() => {
+          unlockTimerRef.current = null;
+          setNightLocked(isKycNightHours());
+        }, NIGHT_UNLOCK_MS);
+        Alert.alert('KYC actions unlocked for 1 minute');
+      } finally {
+        setUnlockBusy(false);
+      }
+    })();
+  }, [admin, unlockOtp]);
 
   // ---- OTP send (shared) ----
   const sendKycOtp = useCallback(async (row: KycRow, sendOTPToClient: boolean) => {
@@ -513,13 +605,28 @@ export function UsersKycScreen() {
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
+    if (nightLocked) {
+      return [
+        {
+          label: '🔒 KYC locked (8pm–10am) — Unlock via OTP',
+          tone: 'warning',
+          disabled: busy,
+          onPress: () => {
+            setSheetRow(null);
+            setUnlockOtpSent(false);
+            setUnlockOtp('');
+            setUnlockOpen(true);
+          },
+        },
+      ];
+    }
     return [
       { label: 'Approve KYC', tone: 'primary', disabled: busy, onPress: () => openApprove(sheetRow) },
       { label: 'Reject KYC', tone: 'warning', disabled: busy, onPress: () => openReject(sheetRow) },
       { label: 'Manual KYC Update', tone: 'default', disabled: busy, onPress: () => openManual(sheetRow) },
       { label: 'Verify UPI', tone: 'default', disabled: busy, onPress: () => verifyUpi(sheetRow) },
     ];
-  }, [sheetRow, busy, openApprove, openReject, openManual, verifyUpi]);
+  }, [sheetRow, nightLocked, busy, openApprove, openReject, openManual, verifyUpi]);
 
   const setA = useCallback(
     (key: keyof ApproveForm) => (v: string) =>
@@ -533,6 +640,14 @@ export function UsersKycScreen() {
   );
 
   const sheetImage = sheetRow ? aadhaarImageUri(sheetRow.aadhaarImageBase64) : null;
+
+  if (!canView) {
+    return (
+      <View style={[styles.screen, styles.centered]}>
+        <Text style={styles.empty}>You do not have permission to view KYC.</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -660,6 +775,47 @@ export function UsersKycScreen() {
         imageUri={sheetImage || undefined}
         onClose={() => setSheetRow(null)}
       />
+
+      {/* Night-lock unlock modal */}
+      <Modal
+        visible={unlockOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !unlockBusy && setUnlockOpen(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Unlock KYC Actions</Text>
+            <Text style={styles.modalSub}>
+              KYC actions are locked from 8pm to 10am IST. Verify admin OTP to unlock for 1 minute.
+            </Text>
+            {unlockOtpSent ? (
+              <Field label="Admin OTP (4 digit)" value={unlockOtp} onChange={setUnlockOtp} keyboard="numeric" />
+            ) : null}
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                disabled={unlockBusy}
+                onPress={() => setUnlockOpen(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryBtn, unlockBusy && styles.btnDisabled]}
+                disabled={unlockBusy}
+                onPress={unlockOtpSent ? verifyUnlockOtp : sendUnlockOtp}
+              >
+                <Text style={styles.primaryBtnText}>
+                  {unlockBusy ? 'Please wait…' : unlockOtpSent ? 'Verify & Unlock' : 'Send OTP'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Approve modal (2-step) */}
       <Modal
@@ -838,6 +994,7 @@ function Field({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
