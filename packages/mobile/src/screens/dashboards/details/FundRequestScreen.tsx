@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -228,6 +229,12 @@ export function FundRequestScreen() {
       const useAll = opts?.allData ?? allData;
       const gen = ++summaryGenRef.current;
       setSummaryLoading(true);
+      // Clear stale values so the loader is shown instead of old numbers.
+      setSummary({});
+      setCoinSummary({});
+      setBonusSummary({});
+      setHoldWithdrawal({});
+      setDepositWithdrawTotal(0);
       try {
         const datePayload = useAll
           ? {}
@@ -589,6 +596,12 @@ export function FundRequestScreen() {
             <Text style={styles.allDataText}>{allData ? '✓ All Data (active)' : 'All Data'}</Text>
           </TouchableOpacity>
 
+          {summaryLoading ? (
+            <View style={styles.loaderWrap}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.hint}>Loading…</Text>
+            </View>
+          ) : (
           <View style={styles.kpiGrid}>
             {kpiItems
               .filter((c) => c.show !== false)
@@ -612,6 +625,7 @@ export function FundRequestScreen() {
                 );
               })}
           </View>
+          )}
         </>
       ) : null}
 
@@ -851,6 +865,7 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(4) },
   hint: { color: colors.muted, textAlign: 'center', marginTop: spacing(4), fontSize: 12 },
   backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
+  loaderWrap: { alignItems: 'center', paddingVertical: spacing(8) },
   allDataBtn: {
     alignSelf: 'flex-start',
     backgroundColor: colors.surfaceAlt,
