@@ -211,6 +211,8 @@ export function FundRequestScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [tableLoading, setTableLoading] = useState(false);
   const [sheetRow, setSheetRow] = useState<TxnRow | null>(null);
+  /** When true, the drill-down transaction list is shown as its own full page. */
+  const [drillOpen, setDrillOpen] = useState(false);
 
   const [editRow, setEditRow] = useState<TxnRow | null>(null);
   const [editStatus, setEditStatus] = useState('');
@@ -354,6 +356,7 @@ export function FundRequestScreen() {
       setAmountFilter('');
       setAppFilter('');
       setPage(1);
+      setDrillOpen(true);
       void loadTransactions({
         type,
         status,
@@ -565,51 +568,58 @@ export function FundRequestScreen() {
         />
       }
     >
-      <DetailFilterBar
-        startDate={startDate}
-        endDate={endDate}
-        loading={summaryLoading}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-        onApply={() => {
-          void loadSummary({ allData: false });
-          reloadDrill();
-        }}
-      />
-      <TouchableOpacity
-        style={styles.allDataBtn}
-        disabled={summaryLoading}
-        onPress={() => void loadSummary({ allData: true })}
-      >
-        <Text style={styles.allDataText}>{allData ? '✓ All Data (active)' : 'All Data'}</Text>
-      </TouchableOpacity>
+      {!drillOpen ? (
+        <>
+          <DetailFilterBar
+            startDate={startDate}
+            endDate={endDate}
+            loading={summaryLoading}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onApply={() => {
+              void loadSummary({ allData: false });
+              reloadDrill();
+            }}
+          />
+          <TouchableOpacity
+            style={styles.allDataBtn}
+            disabled={summaryLoading}
+            onPress={() => void loadSummary({ allData: true })}
+          >
+            <Text style={styles.allDataText}>{allData ? '✓ All Data (active)' : 'All Data'}</Text>
+          </TouchableOpacity>
 
-      <View style={styles.kpiGrid}>
-        {kpiItems
-          .filter((c) => c.show !== false)
-          .map((c) => {
-            const color = TONE_COLOR[c.tone];
-            return (
-              <TouchableOpacity
-                key={c.key}
-                style={[styles.kpiCard, { borderColor: c.active ? color : colors.border }]}
-                activeOpacity={c.onPress ? 0.7 : 1}
-                onPress={c.onPress}
-                disabled={!c.onPress || summaryLoading}
-              >
-                <Text style={[styles.kpiLabel, { color }]} numberOfLines={2}>
-                  {c.label}
-                </Text>
-                <Text style={styles.kpiValue}>
-                  ({c.bucket.count ?? 0}) : {c.bucket.totalAmount ?? 0}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-      </View>
+          <View style={styles.kpiGrid}>
+            {kpiItems
+              .filter((c) => c.show !== false)
+              .map((c) => {
+                const color = TONE_COLOR[c.tone];
+                return (
+                  <TouchableOpacity
+                    key={c.key}
+                    style={[styles.kpiCard, { borderColor: c.active ? color : colors.border }]}
+                    activeOpacity={c.onPress ? 0.7 : 1}
+                    onPress={c.onPress}
+                    disabled={!c.onPress || summaryLoading}
+                  >
+                    <Text style={[styles.kpiLabel, { color }]} numberOfLines={2}>
+                      {c.label}
+                    </Text>
+                    <Text style={styles.kpiValue}>
+                      ({c.bucket.count ?? 0}) : {c.bucket.totalAmount ?? 0}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+          </View>
+        </>
+      ) : null}
 
-      {drillType ? (
-        <View style={{ marginTop: spacing(3) }}>
+      {drillOpen && drillType ? (
+        <View>
+          <TouchableOpacity onPress={() => setDrillOpen(false)}>
+            <Text style={styles.backLink}>‹ Back to Fund Requests</Text>
+          </TouchableOpacity>
           <Text style={styles.sectionTitle}>
             {drillType === 'deposit' ? 'Deposit' : 'Withdrawal'} Transactions ({total})
           </Text>
@@ -772,9 +782,10 @@ export function FundRequestScreen() {
             </View>
           ) : null}
         </View>
-      ) : (
+      ) : null}
+      {!drillOpen ? (
         <Text style={styles.hint}>Kisi bhi card par tap karke uski transactions dekhein.</Text>
-      )}
+      ) : null}
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -839,6 +850,7 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
   empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(4) },
   hint: { color: colors.muted, textAlign: 'center', marginTop: spacing(4), fontSize: 12 },
+  backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
   allDataBtn: {
     alignSelf: 'flex-start',
     backgroundColor: colors.surfaceAlt,
