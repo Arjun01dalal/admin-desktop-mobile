@@ -50,6 +50,7 @@ type KycRow = {
   userBankName?: string;
   kycRejectCheckBy?: CheckStamp;
   kycManualCheckBy?: CheckStamp;
+  manualKycUpdatedBy?: CheckStamp;
 };
 
 function apiFailed(res: { ok: boolean; success?: boolean }): boolean {
@@ -650,6 +651,7 @@ export function UsersKycScreen() {
       { label: 'User Bank Name', value: display(r.userBankName) },
       { label: 'Reject Check By', value: stamp(r.kycRejectCheckBy) },
       { label: 'Manual Check By', value: stamp(r.kycManualCheckBy) },
+      { label: 'Manual Approved By', value: stamp(r.manualKycUpdatedBy) },
       { label: 'Registered', value: formatDateTime(r.createdOn) },
     ];
   }, [sheetRow, canShowMobile]);
@@ -802,6 +804,11 @@ export function UsersKycScreen() {
               </Text>
             </View>
           </View>
+          {r.manualKycUpdatedBy?.name ? (
+            <Text style={styles.cardDoneBy} numberOfLines={1}>
+              Manual Approved by {r.manualKycUpdatedBy.name}
+            </Text>
+          ) : null}
           <Text style={styles.cardHint}>Tap for details & actions</Text>
         </TouchableOpacity>
       ))}
@@ -1052,6 +1059,7 @@ function Field({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
+  cardDoneBy: { color: '#16a34a', fontSize: 12, fontWeight: '600', marginTop: spacing(1) },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
