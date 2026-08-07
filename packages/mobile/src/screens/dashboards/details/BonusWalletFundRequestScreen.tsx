@@ -25,7 +25,7 @@ import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
-import { formatDisplayTime, todayIST } from '../../../utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
@@ -93,8 +93,9 @@ function formatIN(value: unknown): string {
 
 function formatDateTime(value?: string | number): string {
   if (value == null || value === '') return '—';
+  const d = formatDisplayDate(value);
   const t = formatDisplayTime(value);
-  return t || '—';
+  return [d, t].filter(Boolean).join(' ') || '—';
 }
 
 function unpackSummary(data: unknown): FundSummary {
