@@ -60,7 +60,7 @@ type FundRow = {
   updatedAt?: string | number;
 };
 
-const ITEMS_PER_PAGE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'amount', 'status']);
 
 const ACTION_BY_TYPE: Record<NavType, string> = {
@@ -138,6 +138,7 @@ export function BonusWalletFundRequestScreen() {
   const [view, setView] = useState<'main' | 'table'>('main');
   const [tableType, setTableType] = useState<NavType>('pending');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [draftSearch, setDraftSearch] = useState('');
   const [searchField, setSearchField] = useState<string>('name');
   const [applied, setApplied] = useState<{ field: string; text: string }>({
@@ -202,7 +203,7 @@ export function BonusWalletFundRequestScreen() {
         else filter.name = text;
       }
       const base: Record<string, unknown> = {
-        itemsPerPage: ITEMS_PER_PAGE,
+        itemsPerPage: pageSize,
         pageNo: page,
         filter,
       };
@@ -231,7 +232,7 @@ export function BonusWalletFundRequestScreen() {
     } finally {
       if (gen === tableGenRef.current) setTableLoading(false);
     }
-  }, [tableType, page, applied, allData, startDate, endDate]);
+  }, [tableType, page, pageSize, applied, allData, startDate, endDate]);
 
   useEffect(() => {
     if (view === 'table') void loadTable();
@@ -291,7 +292,7 @@ export function BonusWalletFundRequestScreen() {
 
   const columns = useMemo<DataTableColumn<FundRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * ITEMS_PER_PAGE + i + 1) },
+      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
       { key: 'name', label: 'Name', width: w.name, render: (r) => display(r.name) },
       { key: 'mobile', label: 'Mobile', width: w.mobile, render: (r) => maskMobile(r.mobile, canShowMobile) },
       { key: 'openBal', label: 'Opening Balance', width: 130, align: 'right', render: (r) => display(r.bonusWalletOpenBalance) },
@@ -326,7 +327,7 @@ export function BonusWalletFundRequestScreen() {
       { key: 'updated', label: 'Updated', width: 110, render: (r) => formatDateTime(r.updatedOn ?? r.updatedAt) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, canShowMobile, availableWidth],
+    [page, pageSize, canShowMobile, availableWidth],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
@@ -373,6 +374,24 @@ export function BonusWalletFundRequestScreen() {
           onSearchTextChange={setDraftSearch}
           onSearchSubmit={search}
         />
+
+        <View style={styles.pageSizeRow}>
+          <Text style={styles.pageSizeLabel}>Per page:</Text>
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <TouchableOpacity
+              key={n}
+              style={[styles.chip, pageSize === n && styles.chipActive]}
+              onPress={() => {
+                if (pageSize !== n) {
+                  setPageSize(n);
+                  setPage(1);
+                }
+              }}
+            >
+              <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {tableError ? (
           <View style={styles.errorBox}>
@@ -499,6 +518,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
+  pageSizeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    alignItems: 'center',
+    marginTop: spacing(2),
+    marginBottom: spacing(2),
+  },
+  pageSizeLabel: { color: colors.muted, fontSize: 12 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
