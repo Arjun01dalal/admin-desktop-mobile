@@ -17,11 +17,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { CLIENT_APP_CODES, CLIENT_NAMES } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { getSessionUser } from '../../../auth/permissions';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
@@ -103,15 +103,6 @@ export function MobileAppScreen() {
     }
   }, []);
 
-  const columns = useMemo<DataTableColumn<AppLink>[]>(
-    () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'code', label: 'App Code', width: 100, render: (r) => r.code },
-      { key: 'name', label: 'App', width: 180, render: (r) => r.name },
-    ],
-    [],
-  );
-
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!sheetRow) return [];
     return [
@@ -147,18 +138,23 @@ export function MobileAppScreen() {
       <Text style={styles.title}>Mobile App</Text>
       <Text style={styles.sub}>Emp Code: {empCode}</Text>
 
-      <DataTable
-        columns={columns}
-        rows={apps}
-        keyFor={(r) => r.key}
-        emptyMessage="No apps"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to share its registration / deposit link"
-      />
+      <View style={styles.grid}>
+        {apps.map((row) => (
+          <TouchableOpacity
+            key={row.key}
+            style={styles.appCard}
+            activeOpacity={0.7}
+            onPress={() => setSheetRow(row)}
+          >
+            <Text style={styles.appCode}>{row.code}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={styles.hint}>Tap a card to share its registration / deposit link</Text>
 
       <RowDetailSheet
         visible={sheetRow !== null}
-        title={sheetRow ? sheetRow.name : ''}
+        title={sheetRow ? sheetRow.code : ''}
         fields={sheetFields}
         actions={sheetActions}
         onClose={() => setSheetRow(null)}
@@ -172,4 +168,17 @@ const styles = StyleSheet.create({
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1), marginBottom: spacing(2) },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(2) },
+  appCard: {
+    width: '48%',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(4),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appCode: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
+  hint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: spacing(3) },
 });
