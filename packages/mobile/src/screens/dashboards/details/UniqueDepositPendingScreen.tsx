@@ -96,6 +96,14 @@ function languageByState(state?: string): string {
   return map[String(state || '')] || 'Hindi';
 }
 
+function statusBadge(status: unknown): string | undefined {
+  const s = String(status || '').toLowerCase();
+  if (s === 'approve' || s === 'approved' || s === 'success') return '#16a34a';
+  if (s === 'pending') return '#d97706';
+  if (s === 'failed' || s === 'reject' || s === 'rejected') return '#dc2626';
+  return undefined;
+}
+
 function csvEscape(value: unknown): string {
   const str = value === null || value === undefined ? '' : String(value);
   return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
@@ -461,7 +469,7 @@ export function UniqueDepositPendingScreen() {
       { key: 'paymentMethod', label: 'Payment Method', width: 180, render: (r) => paymentMethod(r.paymentGatewayName, r.mid) },
       { key: 'date', label: 'Date', width: 110, render: (r) => formatDisplayDate(r.createdOn) || '—' },
       { key: 'time', label: 'Time', width: 100, render: (r) => formatDisplayTime(r.createdOn) || '—' },
-      { key: 'status', label: 'Status', width: w.status, render: (r) => display(r.status) },
+      { key: 'status', label: 'Status', width: w.status, render: (r) => display(r.status), badge: (r) => statusBadge(r.status) },
       { key: 'comment', label: 'Comment', width: 200, render: (r) => display(r.uniquePendingReason?.reason) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -476,6 +484,7 @@ export function UniqueDepositPendingScreen() {
         label: c.label,
         value: c.render(sheetRow, 0),
         multiline: c.key === 'orderId' || c.key === 'comment',
+        badgeColor: c.key === 'status' ? statusBadge(sheetRow.status) : undefined,
       }));
   }, [sheetRow, columns]);
 
