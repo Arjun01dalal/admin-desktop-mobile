@@ -18,6 +18,8 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -27,6 +29,19 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type RequestType = 'automaticDeposit' | 'scannerDeposit';
+
+function csvEscape(value: unknown): string {
+  const str = value === null || value === undefined ? '' : String(value);
+  return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function toCsv(rows: Record<string, unknown>[]): string {
+  if (!rows.length) return '';
+  const headers = Object.keys(rows[0]);
+  const lines = [headers.join(',')];
+  for (const row of rows) lines.push(headers.map((h) => csvEscape(row[h])).join(','));
+  return lines.join('\r\n');
+}
 
 type DepositRow = {
   _id: string;
@@ -124,6 +139,29 @@ export function DepositApprovedReportScreen() {
   const sumGenRef = useRef(0);
 
   const isScanner = requestType === 'scannerDeposit';
+
+  const downloadExcel = useCallback(async () => {
+    const source = isScanner ? scannerRows : rows;
+    if (!source.length) {
+      setError('No data to export');
+      return;
+    }
+    try {
+      const csv = toCsv(source as unknown as Record<string, unknown>[]);
+      const fileUri = `${FileSystem.cacheDirectory}deposit_data_${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(fileUri, csv);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Deposit Data',
+        });
+      } else {
+        setError('Sharing is not available on this device');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export sheet');
+    }
+  }, [isScanner, scannerRows, rows]);
   const selectedGateway = useMemo(
     () => gateways.find((g) => g._id === gatewayId) || null,
     [gateways, gatewayId],
@@ -483,6 +521,13 @@ export function DepositApprovedReportScreen() {
               : 'Total Approved Sum: select gateway'}
           </Text>
         </View>
+        <TouchableOpacity
+          style={[styles.downloadBtn, loading && styles.downloadBtnDisabled]}
+          disabled={loading}
+          onPress={() => void downloadExcel()}
+        >
+          <Text style={styles.downloadBtnText}>Download Excel Data</Text>
+        </TouchableOpacity>
       </View>
 
       {error ? (
@@ -552,6 +597,14 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+  downloadBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+  },
+  downloadBtnDisabled: { opacity: 0.5 },
+  downloadBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
   chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
