@@ -80,6 +80,22 @@ function paymentMethod(gw: unknown, mid: unknown): string {
   return m ? `${g} - ${m}` : g;
 }
 
+/** Desktop parity — users/toolbarHelpers languageByState. */
+function languageByState(state?: string): string {
+  const map: Record<string, string> = {
+    Maharashtra: 'Marathi',
+    Gujarat: 'Gujarati',
+    'Tamil Nadu': 'Tamil',
+    Karnataka: 'Kannada',
+    Telangana: 'Telugu',
+    'Andhra Pradesh': 'Telugu',
+    Kerala: 'Malayalam',
+    'West Bengal': 'Bengali',
+    Punjab: 'Punjabi',
+  };
+  return map[String(state || '')] || 'Hindi';
+}
+
 function csvEscape(value: unknown): string {
   const str = value === null || value === undefined ? '' : String(value);
   return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
@@ -271,6 +287,62 @@ export function UniqueDepositPendingScreen() {
     }
   }, [inputRow, inputText, inputMode, admin, load, loadSummary]);
 
+  /** Manual Call — open the phone dialer (mobile adaptation of desktop's external dialer). */
+  const openDialer = useCallback((row: UniquePendingRow) => {
+    const rawMobile = row.userMobile || row.mobile;
+    if (!rawMobile) {
+      Alert.alert('No mobile number for this user');
+      return;
+    }
+    void Linking.openURL(`tel:${String(rawMobile).replace(/\D/g, '')}`).catch(() =>
+      Alert.alert('Unable to open the dialer'),
+    );
+  }, []);
+
+  /** Bot Call — SubAdmin/add-to-dialer (desktop CallingBtn initiateBotCall parity). */
+  const initiateBotCall = useCallback(
+    (row: UniquePendingRow) => {
+      const mobile = String(row.userMobile || row.mobile || '');
+      if (!mobile) {
+        Alert.alert('No mobile number for this user');
+        return;
+      }
+      void (async () => {
+        setBusy(true);
+        try {
+          const state = row.userState || row.state || '';
+          const setting: Record<string, unknown> = {
+            botId: 1,
+            reason: 'Unique Pending Deposit',
+            language: languageByState(state),
+            phone_number: mobile,
+          };
+          if (row.clientName) setting.app_name = row.clientName;
+          if (row.userName) setting.client_name = String(row.userName).replace(/_/g, ' ').trim();
+          const id = row._id || row.userId;
+          if (id) setting.id = id;
+          if (state) setting.state = state;
+          const city = row.userCity || row.city;
+          if (city) setting.city = city;
+
+          const res = await secureApi<unknown>('callLogs.addToBotDialer', {
+            userId: admin?._id,
+            created_by: admin?.name,
+            dialout_settings: [setting],
+          });
+          if (!res.ok || res.success === false) {
+            Alert.alert(res.message || 'Bot call failed');
+            return;
+          }
+          Alert.alert(res.message || 'Call Initiated.');
+        } finally {
+          setBusy(false);
+        }
+      })();
+    },
+    [admin],
+  );
+
   const openWhatsApp = useCallback((row: UniquePendingRow) => {
     const rawMobile = row.userMobile || row.mobile;
     if (!rawMobile) {
@@ -412,11 +484,24 @@ export function UniqueDepositPendingScreen() {
     if (canWhatsApp && isPending) {
       acts.push({ label: 'WhatsApp', tone: 'primary', onPress: () => openWhatsApp(sheetRow) });
     }
+    const hasMobile = Boolean(sheetRow.userMobile || sheetRow.mobile);
+    acts.push({
+      label: 'Call',
+      tone: 'default',
+      disabled: !hasMobile || busy,
+      onPress: () => openDialer(sheetRow),
+    });
+    acts.push({
+      label: busy ? 'Calling…' : 'Bot Call',
+      tone: 'primary',
+      disabled: !hasMobile || busy,
+      onPress: () => initiateBotCall(sheetRow),
+    });
     if (canChangeStatus) {
       acts.push({ label: 'Change Status', tone: 'warning', onPress: () => openInput('status', sheetRow) });
     }
     return acts;
-  }, [sheetRow, canWhatsApp, canChangeStatus, openInput, openWhatsApp]);
+  }, [sheetRow, canWhatsApp, canChangeStatus, busy, openInput, openWhatsApp, openDialer, initiateBotCall]);
 
   return (
     <ScrollView
