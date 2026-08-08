@@ -9,6 +9,9 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppBackground } from '../components/AppBackground';
+import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
+import { useRevealCodes } from '../context/useRevealCodes';
+import { TouchableOpacity } from 'react-native';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
 import { canAccessNavItem } from '../auth/permissions';
@@ -153,6 +156,8 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   const { logout, user } = useAuth();
   const current = rest.state.routes[rest.state.index]?.name;
   const [menuQuery, setMenuQuery] = useState('');
+  const reveal = useRevealCodes();
+  const [revealOtpOpen, setRevealOtpOpen] = useState(false);
   const visibleItems = menuQuery.trim()
     ? items.filter((item) =>
         toDisplayText(item.label).toLowerCase().includes(menuQuery.trim().toLowerCase()),
@@ -173,6 +178,24 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
         autoCapitalize="none"
         autoCorrect={false}
       />
+      <TouchableOpacity
+        style={[styles.revealBtn, reveal.active && styles.revealBtnActive]}
+        onPress={() => {
+          // Before the hour expires: tap again reverses to secret/Jyotish names.
+          if (reveal.active) {
+            reveal.clear();
+            return;
+          }
+          setRevealOtpOpen(true);
+        }}
+      >
+        <Text style={[styles.revealBtnText, reveal.active && styles.revealBtnTextActive]}>
+          {reveal.active
+            ? `🙈 Hide original (${Math.max(1, Math.ceil((reveal.expiresAt - Date.now()) / 60000))}m)`
+            : '👁 Reveal codes'}
+        </Text>
+      </TouchableOpacity>
+      <RevealCodesOtpModal visible={revealOtpOpen} onClose={() => setRevealOtpOpen(false)} />
       {visibleItems.length === 0 ? (
         <Text style={styles.drawerNoMatch}>No menu found</Text>
       ) : null}
@@ -295,6 +318,18 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing(3),
     marginBottom: spacing(2),
   },
+  revealBtn: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2),
+    alignItems: 'center',
+    marginHorizontal: spacing(3),
+    marginBottom: spacing(2),
+  },
+  revealBtnActive: { backgroundColor: colors.primary },
+  revealBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  revealBtnTextActive: { color: colors.primaryForeground },
   drawerNoMatch: {
     color: colors.muted,
     fontSize: 12,
