@@ -635,7 +635,15 @@ function setupAutoUpdate() {
     }
   });
 
-  const runCheck = () => {
+  let lastCheckAt = 0;
+  const MIN_CHECK_GAP_MS = 10 * 60 * 1000; // don't hammer GitHub
+
+  const runCheck = (force = false) => {
+    // Don't re-check while a ready dialog is already up / install pending.
+    if (readyDialogShown) return;
+    const now = Date.now();
+    if (!force && now - lastCheckAt < MIN_CHECK_GAP_MS) return;
+    lastCheckAt = now;
     autoUpdater.checkForUpdates().catch((err) => {
       const message = err?.message || String(err);
       console.warn('autoUpdater checkForUpdates failed:', message);
@@ -643,9 +651,18 @@ function setupAutoUpdate() {
     });
   };
 
-  // Wait for renderer listeners, then check (and retry once).
-  setTimeout(runCheck, 3000);
-  setTimeout(runCheck, 15000);
+  // Startup: wait for renderer, then check (+ one quick retry).
+  setTimeout(() => runCheck(true), 3000);
+  setTimeout(() => runCheck(true), 15000);
+  // Keep checking while the app stays open (so a new release is noticed
+  // without requiring a manual restart first). Install still needs restart.
+  const PERIODIC_MS = 30 * 60 * 1000; // 30 minutes
+  setInterval(() => runCheck(true), PERIODIC_MS);
+
+  app.on('browser-window-focus', () => {
+    if (readyDialogShown || availableDialogShown) return;
+    runCheck(false); // throttled
+  });
 }
 
 function registerIpc() {
