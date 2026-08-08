@@ -194,6 +194,20 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   );
 }
 
+/**
+ * Per-screen wrapper: opaque cosmic background behind every screen so
+ * navigation transitions never show screens overlapping through
+ * transparent roots.
+ */
+function Screened({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <AppBackground />
+      {children}
+    </View>
+  );
+}
+
 /** Header icon-only toggle for reveal codes (👁 = locked, 🙈 = revealed). */
 function RevealHeaderButton() {
   const reveal = useRevealCodes();
@@ -232,7 +246,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           drawerType: 'front',
           overlayColor: 'rgba(0,0,0,0.55)',
           drawerStyle: { backgroundColor: colors.surface },
-          sceneStyle: { backgroundColor: 'transparent' },
+          sceneStyle: { backgroundColor: colors.background },
         }}
       >
         {items.map((item) => {
@@ -244,7 +258,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
               name={screenNameFor(item)}
               options={{ title }}
             >
-              {() => (Impl ? <Impl /> : <PlaceholderScreen title={title} />)}
+              {() => <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>}
             </Drawer.Screen>
           );
         })}
@@ -262,13 +276,12 @@ export function AppNavigator() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppBackground />
       <NavigationContainer
       theme={{
         ...DarkTheme,
         colors: {
           ...DarkTheme.colors,
-          background: 'transparent',
+          background: colors.background,
           card: colors.surface,
           text: colors.foreground,
           primary: colors.primary,
@@ -281,7 +294,8 @@ export function AppNavigator() {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: colors.background },
+          animation: 'slide_from_right',
         }}
       >
         <RootStack.Screen name="panel" options={{ headerShown: false }}>
@@ -293,7 +307,11 @@ export function AppNavigator() {
             name={route.path}
             options={{ title: toDisplayText(route.title) }}
           >
-            {() => <route.Component />}
+            {() => (
+              <Screened>
+                <route.Component />
+              </Screened>
+            )}
           </RootStack.Screen>
         ))}
       </RootStack.Navigator>
