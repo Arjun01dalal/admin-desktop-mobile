@@ -156,8 +156,6 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   const { logout, user } = useAuth();
   const current = rest.state.routes[rest.state.index]?.name;
   const [menuQuery, setMenuQuery] = useState('');
-  const reveal = useRevealCodes();
-  const [revealOtpOpen, setRevealOtpOpen] = useState(false);
   const visibleItems = menuQuery.trim()
     ? items.filter((item) =>
         toDisplayText(item.label).toLowerCase().includes(menuQuery.trim().toLowerCase()),
@@ -178,24 +176,6 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
         autoCapitalize="none"
         autoCorrect={false}
       />
-      <TouchableOpacity
-        style={[styles.revealBtn, reveal.active && styles.revealBtnActive]}
-        onPress={() => {
-          // Before the hour expires: tap again reverses to secret/Jyotish names.
-          if (reveal.active) {
-            reveal.clear();
-            return;
-          }
-          setRevealOtpOpen(true);
-        }}
-      >
-        <Text style={[styles.revealBtnText, reveal.active && styles.revealBtnTextActive]}>
-          {reveal.active
-            ? `🙈 Hide original (${Math.max(1, Math.ceil((reveal.expiresAt - Date.now()) / 60000))}m)`
-            : '👁 Reveal codes'}
-        </Text>
-      </TouchableOpacity>
-      <RevealCodesOtpModal visible={revealOtpOpen} onClose={() => setRevealOtpOpen(false)} />
       {visibleItems.length === 0 ? (
         <Text style={styles.drawerNoMatch}>No menu found</Text>
       ) : null}
@@ -214,6 +194,31 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   );
 }
 
+/** Header icon-only toggle for reveal codes (👁 = locked, 🙈 = revealed). */
+function RevealHeaderButton() {
+  const reveal = useRevealCodes();
+  const [otpOpen, setOtpOpen] = useState(false);
+  return (
+    <>
+      <TouchableOpacity
+        style={styles.headerIconBtn}
+        onPress={() => {
+          // Before the hour expires: tap again reverses to secret/Jyotish names.
+          if (reveal.active) {
+            reveal.clear();
+            return;
+          }
+          setOtpOpen(true);
+        }}
+        accessibilityLabel={reveal.active ? 'Hide original names' : 'Reveal original names'}
+      >
+        <Text style={styles.headerIconText}>{reveal.active ? '🙈' : '👁'}</Text>
+      </TouchableOpacity>
+      <RevealCodesOtpModal visible={otpOpen} onClose={() => setOtpOpen(false)} />
+    </>
+  );
+}
+
 function PanelDrawer({ items }: { items: NavItem[] }) {
   return (
     <Drawer.Navigator
@@ -223,6 +228,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
+          headerRight: () => <RevealHeaderButton />,
           drawerType: 'front',
           overlayColor: 'rgba(0,0,0,0.55)',
           drawerStyle: { backgroundColor: colors.surface },
@@ -318,18 +324,11 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing(3),
     marginBottom: spacing(2),
   },
-  revealBtn: {
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2),
-    alignItems: 'center',
-    marginHorizontal: spacing(3),
-    marginBottom: spacing(2),
+  headerIconBtn: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
   },
-  revealBtnActive: { backgroundColor: colors.primary },
-  revealBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  revealBtnTextActive: { color: colors.primaryForeground },
+  headerIconText: { fontSize: 18 },
   drawerNoMatch: {
     color: colors.muted,
     fontSize: 12,
