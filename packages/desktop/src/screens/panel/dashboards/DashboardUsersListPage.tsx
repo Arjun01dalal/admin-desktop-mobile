@@ -19,6 +19,7 @@ import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { asPaged, display, maskMobile } from '@/screens/panel/shared';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { formatAmount, todayIST } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 
@@ -165,7 +166,7 @@ export function DashboardUsersListPage({ mode }: Props) {
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={2}>
-        {meta.title}
+        {toDisplayText(meta.title)}
       </Typography>
 
       <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>

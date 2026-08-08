@@ -6,6 +6,7 @@ import {
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { toDisplayText } from './ops/jyotishMapping';
 
 type Props = {
   open: boolean;
@@ -41,7 +42,7 @@ export function LiveStreamModal({ open, onClose, streamId }: Props) {
           alignItems="center"
           mb={1}
         >
-          <Typography fontWeight="bold">Live Match</Typography>
+          <Typography fontWeight="bold">{toDisplayText('Live Match')}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>

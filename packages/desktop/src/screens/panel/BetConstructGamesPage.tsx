@@ -31,6 +31,8 @@ import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { display } from '@/screens/panel/shared';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type BetConstructRow = {
   gameId: string;
@@ -95,6 +97,7 @@ function ColumnSearch({
 }
 
 export function BetConstructGamesPage() {
+  useRevealCodes();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [nameSearch, setNameSearch] = useState('');
@@ -309,7 +312,7 @@ export function BetConstructGamesPage() {
     <Box p={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h5" fontWeight={700}>
-          BetConstruct Games
+          {toDisplayText('BetConstruct Games')}
         </Typography>
         <Button
           variant="outlined"

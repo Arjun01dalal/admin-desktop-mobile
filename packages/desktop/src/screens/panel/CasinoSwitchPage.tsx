@@ -22,6 +22,8 @@ import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { asList, display, useReportQuery } from '@/screens/panel/shared';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type CasinoSwitchRow = {
   _id: string;
@@ -54,6 +56,7 @@ function normalizeCasinoList(data: unknown): CasinoSwitchRow[] {
 }
 
 export function CasinoSwitchPage() {
+  useRevealCodes();
   const canUse = hasPermission(Permissions.casino_switch);
   const canDelete = hasPermission(Permissions.casino_delete_button);
 
@@ -229,7 +232,7 @@ export function CasinoSwitchPage() {
         mb={2}
       >
         <Typography variant="h5" fontWeight={700}>
-          Casino Switch
+          {toDisplayText('Casino Switch')}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           <Button
@@ -280,11 +283,11 @@ export function CasinoSwitchPage() {
 
       <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
         <Box component="form" onSubmit={(e) => void handleCreate(e)}>
-          <DialogTitle>Add Casino Provider</DialogTitle>
+          <DialogTitle>{toDisplayText('Add Casino Provider')}</DialogTitle>
           <DialogContent>
             <Stack spacing={2} pt={1}>
               <TextField
-                label="Casino Active Provider"
+                label={toDisplayText('Casino Active Provider')}
                 size="small"
                 fullWidth
                 placeholder="e.g. QTECH"
@@ -307,7 +310,9 @@ export function CasinoSwitchPage() {
 
       <Dialog open={deleteOpen} onClose={() => !submitting && setDeleteOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Are You Sure?</DialogTitle>
-        <DialogContent>Do you want to delete this casino provider?</DialogContent>
+        <DialogContent>
+          Do you want to delete this {toDisplayText('casino')} provider?
+        </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setDeleteOpen(false)} disabled={submitting}>
             Cancel

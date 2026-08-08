@@ -7,6 +7,8 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type ActivityFilterBarProps = {
   startDate: string;
@@ -65,6 +67,7 @@ export function ActivityFilterBar({
   isQtech,
   onSourceChange,
 }: ActivityFilterBarProps) {
+  useRevealCodes();
   return (
     <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflow: 'auto' }}>
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
@@ -106,8 +109,8 @@ export function ActivityFilterBar({
             disabled={loading}
             sx={sourceToggleSx}
           >
-            <ToggleButton value="qtech">Qtech</ToggleButton>
-            <ToggleButton value="wco">WCO</ToggleButton>
+            <ToggleButton value="qtech">{toDisplayText('Qtech')}</ToggleButton>
+            <ToggleButton value="wco">{toDisplayText('WCO')}</ToggleButton>
           </ToggleButtonGroup>
         )}
         {loading && <CircularProgress size={22} />}

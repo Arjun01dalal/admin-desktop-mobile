@@ -9,6 +9,8 @@ import {
 } from '@mui/material';
 import type { ProviderCardModel } from './types';
 import { floorNum } from './mergeMetrics';
+import { metricJyotishLabel, toDisplayText } from './constants';
+import { useRevealCodes } from '@/context/useRevealCodes';
 
 type Props = {
   card: ProviderCardModel;
@@ -17,6 +19,7 @@ type Props = {
 
 /** Reusable provider metric card (Ludo / Diva / Plutus support select + actions). */
 export function ProviderMetricCard({ card, onClick }: Props) {
+  useRevealCodes(); // re-render when OTP reveal toggles
   return (
     <Paper
       onClick={onClick}
@@ -40,7 +43,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
         flexWrap="wrap"
       >
         <Typography variant="subtitle1" fontWeight={800}>
-          {card.title}
+          {toDisplayText(card.title)}
         </Typography>
         {card.selectOptions && card.onSelectChange && (
           <TextField
@@ -56,7 +59,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
           >
             {card.selectOptions.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
+                {toDisplayText(opt.label)}
               </MenuItem>
             ))}
           </TextField>
@@ -67,7 +70,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
         {card.activeCustomerCount != null && (
           <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
             <Typography variant="body2" fontWeight={700}>
-              Active Customer:
+              {toDisplayText(metricJyotishLabel('Active Customer'))}:
             </Typography>
             <Typography
               variant="body2"
@@ -85,7 +88,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
             sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}
           >
             <Typography variant="body2" fontWeight={700}>
-              {row.label}:
+              {toDisplayText(row.label)}:
             </Typography>
             <Typography
               variant="body2"
@@ -100,7 +103,12 @@ export function ProviderMetricCard({ card, onClick }: Props) {
       </Stack>
 
       {card.actions && card.actions.length > 0 && (
-        <Stack direction="row" spacing={2} mt={1.5} onClick={(e) => e.stopPropagation()}>
+        <Stack
+          direction="row"
+          spacing={2}
+          mt={1.5}
+          onClick={(e) => e.stopPropagation()}
+        >
           {card.actions.map((action) => (
             <Link
               key={action.label}
@@ -115,7 +123,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
                 cursor: 'pointer',
               }}
             >
-              {action.label}
+              {toDisplayText(action.label)}
             </Link>
           ))}
         </Stack>

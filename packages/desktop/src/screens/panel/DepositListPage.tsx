@@ -24,7 +24,7 @@ import {
   DEFAULT_ITEMS_PER_PAGE,
   ITEMS_PER_PAGE_OPTIONS,
 } from '@/utils/pagination';
-import { display } from '@/screens/panel/shared';
+import { display, displayRaw } from '@/screens/panel/shared';
 
 type MidTotal = { mid?: string; amount?: number; count?: number };
 
@@ -321,7 +321,7 @@ export function DepositListPage() {
             placeholder="Search by App Name"
           />
         ),
-        render: (row) => display(row.clientName),
+        render: (row) => displayRaw(row.clientName),
       },
       {
         id: 'lastActivity',

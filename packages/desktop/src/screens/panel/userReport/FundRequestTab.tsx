@@ -21,6 +21,7 @@ import {
   HISTORY_PAGINATION_SX,
   SearchFilter,
 } from './historyFilters';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type FundType = 'deposit' | 'withdrawal' | 'coin';
 type Props = { userId: string };
@@ -445,7 +446,7 @@ export function FundRequestTab({ userId }: Props) {
         textTransform: 'none',
       }}
     >
-      {label}
+      {toDisplayText(label)}
     </Button>
   );
 

@@ -211,7 +211,7 @@ export function CreateUserDialog({ open, mode, onClose, onCreated }: Props) {
               <TextField
                 select
                 fullWidth
-                label="App Name"
+                label="App Code"
                 value={form.clientName}
                 error={Boolean(errors.clientName)}
                 helperText={errors.clientName}

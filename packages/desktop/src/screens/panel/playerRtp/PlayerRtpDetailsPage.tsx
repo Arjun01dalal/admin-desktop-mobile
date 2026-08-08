@@ -4,6 +4,8 @@ import { Box, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount } from '@/utils/dates';
 import { display } from '../shared';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type GameRtp = {
   gameId?: string;
@@ -20,6 +22,7 @@ type DetailsState = {
 
 /** Per-game RTP breakdown for a single Qtech user — reads router state from PlayerRtpPage. */
 export function PlayerRtpDetailsPage() {
+  useRevealCodes();
   const location = useLocation();
   const state = (location.state || {}) as DetailsState;
   const rows = useMemo(() => state.gameData || [], [state.gameData]);
@@ -69,7 +72,7 @@ export function PlayerRtpDetailsPage() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={2}>
-        Players RTP Details
+        {toDisplayText('Players RTP Details')}
       </Typography>
 
       <CommonTable

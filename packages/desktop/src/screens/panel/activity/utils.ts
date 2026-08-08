@@ -1,4 +1,5 @@
 import { formatAmount } from '@/utils/dates';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 export type ActivityRow = Record<string, unknown>;
 
@@ -57,7 +58,8 @@ export function getMetric(item: ActivityRow, key: SortKey | string): number {
 }
 
 export function providerLabel(item: ActivityRow): string {
-  return String(item.provider || item.providerName || item.name || '-');
+  const raw = String(item.provider || item.providerName || item.name || '-');
+  return raw === '-' ? raw : toDisplayText(raw);
 }
 
 export function userIdOf(item: ActivityRow): string {

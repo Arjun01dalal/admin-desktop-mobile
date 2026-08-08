@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
@@ -794,7 +795,7 @@ export function FundRequestPage() {
               onClick={() => navigate('/state-wise-deposit')}
               sx={orangeBtnSx}
             >
-              State Wise Deposit
+              {toDisplayText('State Wise Deposit')}
             </Button>
           ) : null}
           <Button variant="contained" disabled={tableLoading} onClick={downloadExcel} sx={orangeBtnSx}>
@@ -893,7 +894,8 @@ export function FundRequestPage() {
           </Box>
 
           <Typography variant="h6" fontWeight={700} mb={1.5}>
-            {drillType === 'deposit' ? 'Deposit' : 'Withdrawal'} Transactions
+            {toDisplayText(drillType === 'deposit' ? 'Deposit' : 'Withdrawal')}{' '}
+            Transactions
           </Typography>
 
           <CommonTable

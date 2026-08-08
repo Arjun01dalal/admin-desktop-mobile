@@ -4,6 +4,7 @@ import { asList, asPaged } from '@astro/shared';
 import { secureApi, type SecureResult } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 export { asList, asPaged };
 
@@ -156,6 +157,13 @@ export function maskMobile(value: unknown, canShow: boolean): string {
 }
 
 export function display(value: unknown, fallback = '—'): string {
+  if (value === null || value === undefined || value === '') return fallback;
+  // Map Casino / Qtech / Bet / Win / … from API responses (respects Reveal codes).
+  return toDisplayText(String(value));
+}
+
+/** Plain value — no Jyotish mapping (app/client names, IDs, etc.). */
+export function displayRaw(value: unknown, fallback = '—'): string {
   if (value === null || value === undefined || value === '') return fallback;
   return String(value);
 }

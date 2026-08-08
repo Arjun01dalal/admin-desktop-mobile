@@ -1,5 +1,7 @@
 /** Shared helpers for Deposit / Withdrawal / Fund Request pages. */
 
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+
 export const orangeBtnSx = {
   bgcolor: '#ff9f0a',
   color: '#1a1200',
@@ -220,11 +222,11 @@ export function asBonusWalletSummary(data: unknown): BonusWalletSummary {
 export function bucketLabel(prefix: string, bucket?: FundSummaryBucket): string {
   const count = bucket?.count ?? 0;
   const amt = bucket?.totalAmount ?? 0;
-  return `${prefix} (${count}) : ${amt}`;
+  return `${toDisplayText(prefix)} (${count}) : ${amt}`;
 }
 
 export function statLabel(prefix: string, count?: number, amount?: number): string {
-  return `${prefix} (${count ?? 0}) : ${amount ?? 0}`;
+  return `${toDisplayText(prefix)} (${count ?? 0}) : ${amount ?? 0}`;
 }
 
 /** Map flat WithdrawalData (+ nested bucket fallback) into FundSummaryBucket. */

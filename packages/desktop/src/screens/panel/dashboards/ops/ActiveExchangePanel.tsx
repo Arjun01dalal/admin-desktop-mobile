@@ -9,23 +9,29 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-
-const EXCHANGES = ['AAA', 'FALCON', 'JETFAIR'] as const;
+import {
+  ACTIVE_EXCHANGE_MAP,
+  PANEL_LABELS,
+  activeExchangeJyotishLabel,
+  toDisplayText,
+} from './jyotishMapping';
+import { useRevealCodes } from '@/context/useRevealCodes';
 
 type Props = {
   activeExchangeName?: string;
   onUpdated?: () => void;
 };
 
-/** Active Exchange panel — main Dashboard only (laxminarayan). */
+/** Active Exaltation panel — Dashboard / VIP / Combined. */
 export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
   const [selected, setSelected] = useState('');
   const [saving, setSaving] = useState(false);
+  useRevealCodes();
 
   const update = async () => {
     const exchangeName = selected || activeExchangeName || '';
     if (!exchangeName) {
-      toast.error('Choose an exchange type');
+      toast.error('Choose an Exaltation type');
       return;
     }
     setSaving(true);
@@ -34,10 +40,10 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
         exchangeName,
       });
       if (!res.ok) {
-        toast.error(res.message || 'Failed to update exchange');
+        toast.error(res.message || 'Failed to update Exaltation');
         return;
       }
-      toast.success(res.message || 'Exchange updated');
+      toast.success(res.message || 'Exaltation updated');
       onUpdated?.();
     } finally {
       setSaving(false);
@@ -57,12 +63,12 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
       }}
     >
       <Typography variant="h6" fontWeight={800} mb={1}>
-        Active Exchange
+        {toDisplayText(PANEL_LABELS.title)}
       </Typography>
       <Typography variant="body2" fontWeight={700} mb={2}>
-        Active Exchange Name:
+        {toDisplayText(PANEL_LABELS.activeName)}:
         <Typography component="span" fontWeight={800} ml={1}>
-          {activeExchangeName || '—'}
+          {activeExchangeJyotishLabel(activeExchangeName)}
         </Typography>
       </Typography>
 
@@ -73,18 +79,18 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
       >
         <TextField
           select
-          label="Exchange List"
+          label={toDisplayText(PANEL_LABELS.list)}
           size="small"
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           sx={{ minWidth: 220, flex: 1 }}
         >
           <MenuItem value="">
-            <em>Choose Exchange Type</em>
+            <em>{toDisplayText(PANEL_LABELS.chooseType)}</em>
           </MenuItem>
-          {EXCHANGES.map((name) => (
-            <MenuItem key={name} value={name}>
-              {name}
+          {ACTIVE_EXCHANGE_MAP.map(({ jyotish, original }) => (
+            <MenuItem key={original} value={original}>
+              {toDisplayText(jyotish)}
             </MenuItem>
           ))}
         </TextField>

@@ -13,6 +13,8 @@ import {
 import { monthStartIST, todayIST, formatAmount } from '@/utils/dates';
 import TransactionTable from './houseGames/TransactionTable';
 import UpdateBetStatusModal from './houseGames/UpdateBetStatusModal';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import { useRevealCodes } from '@/context/useRevealCodes';
 import {
   INITIAL_FILTERS,
   ITEMS_PER_PAGE_OPTIONS,
@@ -22,6 +24,7 @@ import { useHouseGamesQuery } from './houseGames/useHouseGamesQuery';
 import type { HouseGameTransaction } from './houseGames/types';
 
 export function HouseGamesPage() {
+  useRevealCodes();
   const [startDate, setStartDate] = useState(monthStartIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -65,7 +68,7 @@ export function HouseGamesPage() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={2}>
-        House Games
+        {toDisplayText('House Krida')}
       </Typography>
 
       <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflow: 'auto' }}>
@@ -121,7 +124,7 @@ export function HouseGamesPage() {
 
         <Stack direction="row" spacing={3} mt={1.5} flexWrap="nowrap">
           <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-            Total Count: {totalCount}
+            {toDisplayText('Total')}: {totalCount}
           </Typography>
           {totalAmount !== undefined && (
             <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>

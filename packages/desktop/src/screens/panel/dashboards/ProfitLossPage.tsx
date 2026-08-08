@@ -28,6 +28,8 @@ import {
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { useSecureQuery } from './useSecureQuery';
 import { toNumber } from './format';
+import { toDisplayText } from './ops/jyotishMapping';
+import { useRevealCodes } from '@/context/useRevealCodes';
 
 type PLRow = {
   _id: string;
@@ -164,6 +166,8 @@ export function ProfitLossPage() {
     [draft, setDraft, applyFilter],
   );
 
+  const { active: revealActive } = useRevealCodes();
+
   const columns = useMemo<CommonTableColumn<PLRow>[]>(
     () => [
       {
@@ -222,39 +226,27 @@ export function ProfitLossPage() {
       },
       {
         id: 'deposite',
-        label: 'Deposite',
+        label: toDisplayText('Deposit'),
         render: (row) => fmt(row.deposite),
       },
       {
         id: 'betAmount',
-        label: (
-          <>
-            Bet
-            <br />
-            Amount
-          </>
-        ),
+        label: toDisplayText('Panja'),
         render: (row) => fmt(row.betAmount),
       },
       {
         id: 'winAmount',
-        label: (
-          <>
-            Win
-            <br />
-            Amount
-          </>
-        ),
+        label: toDisplayText('Jaya'),
         render: (row) => fmt(row.totalProfit),
       },
       {
         id: 'withdraw',
-        label: 'Withdraw',
+        label: toDisplayText('Refund'),
         render: (row) => fmt(row.withdrawl),
       },
       {
         id: 'bonus',
-        label: 'Bonus',
+        label: toDisplayText('Bonus'),
         render: (row) => fmt(row.bonus ?? 0),
       },
       {
@@ -269,7 +261,7 @@ export function ProfitLossPage() {
         render: (row) => fmt(row.balance),
       },
     ],
-    [page, pageSize, canShowMobile],
+    [page, pageSize, canShowMobile, revealActive],
   );
 
   return (
@@ -288,7 +280,7 @@ export function ProfitLossPage() {
             Profit & Loss
           </Typography>
           <Typography variant="body2" color="text.secondary" mt={0.5}>
-            Per-user balances, bets, deposits and withdrawals.
+            Per-user balances, Panja, deposits and refunds.
           </Typography>
         </Box>
 

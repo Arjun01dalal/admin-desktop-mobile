@@ -20,6 +20,7 @@ import {
 import { BetAmountBars } from './BetAmountBars';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { WalletRow } from './types';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type Props = { userId: string };
 
@@ -272,7 +273,7 @@ export function WalletLedgerTable({ userId }: Props) {
             fullWidth
           />
         ),
-        render: (r) => String(r.providerName || '-'),
+        render: (r) => toDisplayText(String(r.providerName || '-')),
       },
       {
         id: 'action',

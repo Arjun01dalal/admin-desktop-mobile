@@ -5,6 +5,8 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { todayIST } from '@/utils/dates';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { ActivityFilterBar } from './activity/ActivityFilterBar';
 import {
   betCount,
@@ -34,6 +36,7 @@ type LocationState = {
 export function GameActivityPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  useRevealCodes();
   const navState = (location.state || {}) as LocationState;
   const lockedSource = Boolean(navState.type);
 
@@ -189,7 +192,7 @@ export function GameActivityPage() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={2}>
-        Games Activity
+        {toDisplayText('Games Activity')}
       </Typography>
 
       <ActivityFilterBar

@@ -10,7 +10,7 @@ export type NavItem = {
 
 /**
  * Panel side nav — visibility is driven by Role_ID → Responsibilities from login.
- * Items without `permission` (Welcome, House Games) are always visible.
+ * Items without `permission` (Welcome, House Krida) are always visible.
  */
 export const NAV_ITEMS: NavItem[] = [
   { id: 'welcome', label: 'Welcome', path: '/welcome' },
@@ -56,7 +56,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/profit-loss',
     permission: Permissions.View_Profit_and_Loss,
   },
-  { id: 'houseGames', label: 'House Games', path: '/house-games' },
+  { id: 'houseGames', label: 'House Krida', path: '/house-games' },
   {
     id: 'leaderboard',
     label: 'Leaderboard',

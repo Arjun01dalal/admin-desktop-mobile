@@ -3,6 +3,7 @@ import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { formatAmount, formatDisplayDate } from '@/utils/dates';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { WalletLedgerTable } from './WalletLedgerTable';
 import type { EncryptedUser } from './types';
 
@@ -131,7 +132,7 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
             footer="Grand Total"
           />
           <BazarCol
-            header="(Win - Loss)"
+            header={toDisplayText('(Win - Loss)')}
             rows={['0 - 0', '0 - 0', '0 - 0', '0 - 0']}
             footer="-"
           />
@@ -159,11 +160,11 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
             </Stack>
           ) : (
             <Stack spacing={0}>
-              <StatText>{`Deposit: ${formatAmount(depositTotal)}`}</StatText>
-              <StatText>{`Withdraw: ${formatAmount(withdrawalTotal)}`}</StatText>
+              <StatText>{`${toDisplayText('Deposit')}: ${formatAmount(depositTotal)}`}</StatText>
+              <StatText>{`${toDisplayText('Withdraw')}: ${formatAmount(withdrawalTotal)}`}</StatText>
               <StatText>{`Balance: ${formatAmount(balanceTotal)}`}</StatText>
-              <StatText>{`Bonus Wallet Balance: ${formatAmount(bonusBalance)}`}</StatText>
-              <StatText>{`Pending withdrawal: ${formatAmount(pendingWithdrawal)}`}</StatText>
+              <StatText>{`${toDisplayText('Bonus Wallet Balance')}: ${formatAmount(bonusBalance)}`}</StatText>
+              <StatText>{`${toDisplayText('Pending withdrawal')}: ${formatAmount(pendingWithdrawal)}`}</StatText>
               <StatText>
                 {`Created At: ${formatDisplayDate(encrypted?.createdAt) || '-'}`}
               </StatText>
@@ -194,9 +195,11 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
                         color: profitAfter < 0 ? 'red' : 'green',
                       }}
                     >
-                      {profitAfter < 0
-                        ? 'Loss After Withdrawal'
-                        : 'Profit After Withdrawal'}
+                      {toDisplayText(
+                        profitAfter < 0
+                          ? 'Loss After Withdrawal'
+                          : 'Profit After Withdrawal',
+                      )}
                       : {formatAmount(profitAfter)}
                     </Typography>
                   </Box>
@@ -204,15 +207,15 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
               )}
 
               <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
-                Bonus Earning ({bonusData?.userOwnEarningCount ?? 0}) :{' '}
+                {toDisplayText('Bonus Earning')} ({bonusData?.userOwnEarningCount ?? 0}) :{' '}
                 {formatAmount(bonusData?.userOwnEarning ?? 0)}
               </Typography>
               <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
-                Bonus Earning ({availedBonus?.count ?? 0}) :{' '}
+                {toDisplayText('Bonus Earning')} ({availedBonus?.count ?? 0}) :{' '}
                 {formatAmount(availedBonus?.totalAmount ?? 0)}
               </Typography>
               <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
-                Bonus Referral Earning ({bonusData?.userReferralCount ?? 0}) :{' '}
+                {toDisplayText('Bonus Referral Earning')} ({bonusData?.userReferralCount ?? 0}) :{' '}
                 {formatAmount(bonusData?.userReferral ?? 0)}
               </Typography>
               <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
@@ -246,7 +249,7 @@ function BazarCol({
       </Box>
       {rows.map((row, i) => (
         <Typography key={`${header}-${i}`} sx={{ fontSize: 15, py: 0.5, color: '#000' }}>
-          {row}
+          {toDisplayText(row)}
         </Typography>
       ))}
       <Box sx={{ borderTop: '1px solid #000', mt: 1.25 }}>

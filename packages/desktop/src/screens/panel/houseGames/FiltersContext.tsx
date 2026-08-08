@@ -6,6 +6,8 @@ export type HouseGamesFiltersValue = {
   onFilterChange: (key: keyof FiltersState, value: string) => void;
   onCheckboxChange: (key: 'isBot' | 'human', checked: boolean) => void;
   onSearch: () => void;
+  /** API-original gameId values for the Krida dropdown. */
+  gameIdOptions: string[];
 };
 
 const { Provider, useFilters } =

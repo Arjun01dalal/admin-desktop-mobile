@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Grid, Paper, Stack, Typography } from '@mui/material';
 import { secureApi } from '@/api/secureClient';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from './ops/jyotishMapping';
 
 type TeamTotals = {
   team: string;
@@ -118,6 +120,7 @@ function Row({ label, value }: { label: string; value: number }) {
  * AAA & Master AAA combined risk — ported from laxminarayan BothMasterAddPage.
  */
 export function BothMasterAddPage() {
+  useRevealCodes();
   const [loading, setLoading] = useState(true);
   const [commonData, setCommonData] = useState<MatchTotals[]>([]);
 
@@ -147,7 +150,7 @@ export function BothMasterAddPage() {
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={2}>
-        Live Match Total (AAA & Master AAA)
+        {toDisplayText('Live Match Total (AAA & Master AAA)')}
       </Typography>
 
       {loading ? (

@@ -22,6 +22,7 @@ import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount } from '@/utils/dates';
 import { asList, useReportQuery } from '@/screens/panel/shared';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type PercentageRow = {
   _id: string;
@@ -330,7 +331,7 @@ export function PercentagePage() {
                 onChange={(e) => setField('endAmount', e.target.value)}
               />
               <TextField
-                label="Bonus"
+                label={toDisplayText('Bonus')}
                 type="number"
                 size="small"
                 fullWidth
@@ -382,7 +383,7 @@ export function PercentagePage() {
                 onChange={(e) => setField('endAmount', e.target.value)}
               />
               <TextField
-                label="Bonus"
+                label={toDisplayText('Bonus')}
                 type="number"
                 size="small"
                 fullWidth

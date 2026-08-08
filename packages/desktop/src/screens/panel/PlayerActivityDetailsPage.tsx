@@ -9,6 +9,8 @@ import {
   userIdOf,
   type ActivityRow,
 } from './activity/utils';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type DetailRow = {
   id: string;
@@ -112,6 +114,7 @@ function buildDetailRows(data: ActivityRow, isQtech: boolean): DetailRow[] {
 }
 
 export function PlayerActivityDetailsPage() {
+  useRevealCodes();
   const location = useLocation();
   const state = (location.state || {}) as DetailsState;
   const player = state.data;
@@ -177,11 +180,11 @@ export function PlayerActivityDetailsPage() {
     return (
       <Box>
         <Typography variant="h5" fontWeight={700} mb={2}>
-          Player Activity Details
+          {toDisplayText('Player Activity Details')}
         </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
           <Typography color="text.secondary">
-            No player selected. Open a UserId from Player Activity.
+            No player selected. Open a UserId from {toDisplayText('Player Activity')}.
           </Typography>
         </Paper>
       </Box>

@@ -10,6 +10,8 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import { useRevealCodes } from '@/context/useRevealCodes';
 import type { HouseGameTransaction } from './types';
 
 type Props = {
@@ -25,6 +27,7 @@ export default function UpdateBetStatusModal({
   selectedItem,
   onSuccess,
 }: Props) {
+  useRevealCodes();
   const [status, setStatus] = useState('');
   const [winningAmount, setWinningAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -90,7 +93,7 @@ export default function UpdateBetStatusModal({
       maxWidth="xs"
       PaperProps={{ sx: { maxWidth: 380, bgcolor: '#1a1a1f' } }}
     >
-      <DialogTitle>Update Bet Status</DialogTitle>
+      <DialogTitle>{toDisplayText('Update Bet Status')}</DialogTitle>
       <DialogContent>
         <TextField
           margin="dense"
@@ -107,14 +110,14 @@ export default function UpdateBetStatusModal({
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
-          <MenuItem value="L">Loss (L)</MenuItem>
-          <MenuItem value="R">Refund (R)</MenuItem>
-          <MenuItem value="W">Win (W)</MenuItem>
+          <MenuItem value="L">{toDisplayText('Loss')} (L)</MenuItem>
+          <MenuItem value="R">{toDisplayText('Refund')} (R)</MenuItem>
+          <MenuItem value="W">{toDisplayText('Win')} (W)</MenuItem>
         </TextField>
         {status === 'W' && (
           <TextField
             margin="dense"
-            label="Winning Amount"
+            label={toDisplayText('Winning Amount')}
             type="number"
             fullWidth
             value={winningAmount}

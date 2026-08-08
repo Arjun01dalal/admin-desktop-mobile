@@ -1,4 +1,4 @@
-import { CLIENT_NAMES } from '@/constants/clientNames';
+import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 
 export const USER_TYPES = [
   'User',
@@ -104,5 +104,5 @@ export const INDIA_STATES = [
 
 export const APP_OPTIONS = CLIENT_NAMES.map((name) => ({
   value: name,
-  label: name,
+  label: appCodeForName(name),
 }));

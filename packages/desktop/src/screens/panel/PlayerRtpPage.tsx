@@ -19,6 +19,8 @@ import { appCodeForName } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { todayIST, formatAmount } from '@/utils/dates';
 import { display } from './shared';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type RtpType =
   | 'Qtech'
@@ -194,6 +196,7 @@ function rowBgSx(winPercentage: number | undefined) {
 
 /** Players RTP — ops.playerRtpQtech / ops.playerRtpExchange. */
 export function PlayerRtpPage() {
+  useRevealCodes();
   const navigate = useNavigate();
   const location = useLocation();
   const fromUserReport = Boolean(
@@ -460,7 +463,7 @@ export function PlayerRtpPage() {
         mb={2}
       >
         <Typography variant="h5" fontWeight={700}>
-          Players RTP
+          {toDisplayText('Players RTP')}
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           {fromUserReport ? <BackButton /> : null}

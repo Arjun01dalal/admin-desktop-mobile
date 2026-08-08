@@ -12,6 +12,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 export type SosBlockRow = {
   _id?: string;
@@ -51,7 +52,7 @@ function unpackSosBlocks(data: unknown): SosBlockRow[] {
 
 function display(value: unknown): string {
   if (value == null || value === '') return '—';
-  return String(value);
+  return toDisplayText(String(value));
 }
 
 function formatWhen(value?: string): string {

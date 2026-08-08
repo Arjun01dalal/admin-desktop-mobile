@@ -2,14 +2,17 @@ import { Box, Paper, Typography } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { useNavigate } from 'react-router-dom';
 import type { KpiItem } from './types';
+import { toDisplayText } from './jyotishMapping';
+import { useRevealCodes } from '@/context/useRevealCodes';
 
 type Props = {
   items: KpiItem[];
 };
 
-/** KPI tile grid — main Dashboard only (VIP/Combined skip). */
+/** KPI tile grid — main Dashboard metrics; VIP/Combined show Panchang & Gochar. */
 export function KpiStatGrid({ items }: Props) {
   const navigate = useNavigate();
+  useRevealCodes();
   if (items.length === 0) return null;
 
   return (
@@ -60,7 +63,7 @@ export function KpiStatGrid({ items }: Props) {
                   letterSpacing: item.headingOnly ? 0 : 0.4,
                 }}
               >
-                {item.label}
+                {toDisplayText(item.label)}
               </Typography>
               {!item.headingOnly && (
                 <Typography

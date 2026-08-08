@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw } from 'lucide-react';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type Props = {
   title: string;
@@ -35,7 +36,9 @@ export function PanelPage({
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {toDisplayText(title)}
+          </h1>
           {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>
         <div className="flex items-center gap-2">

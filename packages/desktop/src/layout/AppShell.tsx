@@ -21,12 +21,17 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { toast } from 'react-toastify';
 import { NAV_ITEMS } from './navItems';
 import { getBackPath } from './backPaths';
 import { AstroLogo } from '@/components/AstroLogo';
 import { BackButton } from '@/components/BackButton';
+import { RevealCodesOtpModal } from '@/components/RevealCodesOtpModal';
 import { secureApi } from '@/api/secureClient';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import {
   buildSosEnablePayload,
   canAccessNavItem,
@@ -53,6 +58,16 @@ export function AppShell({ onLogout }: Props) {
   const [sosLoading, setSosLoading] = useState(false);
   const [userVersion, setUserVersion] = useState(0);
   const [navSearch, setNavSearch] = useState('');
+  const [revealOtpOpen, setRevealOtpOpen] = useState(false);
+  const reveal = useRevealCodes();
+  const [revealTick, setRevealTick] = useState(0);
+
+  useEffect(() => {
+    if (!reveal.active) return;
+    const id = window.setInterval(() => setRevealTick((n) => n + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, [reveal.active]);
+  void revealTick;
 
   const user = getSessionUser();
   const responsibilities = getResponsibilities(user);
@@ -293,6 +308,31 @@ export function AppShell({ onLogout }: Props) {
             </Button>
           )}
 
+          <Button
+            size="small"
+            variant={reveal.active ? 'contained' : 'outlined'}
+            color="warning"
+            startIcon={reveal.active ? <VisibilityIcon /> : <VisibilityOffIcon />}
+            title={
+              reveal.active
+                ? 'Click to hide original names (restore secret codes)'
+                : 'Reveal original names (OTP, 1 hour)'
+            }
+            onClick={() => {
+              // Before 60 min expires: click again reverses to secret/Jyotish names.
+              if (reveal.active) {
+                reveal.clear();
+                return;
+              }
+              setRevealOtpOpen(true);
+            }}
+            sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+          >
+            {reveal.active
+              ? `Hide original (${Math.max(1, Math.ceil((reveal.expiresAt - Date.now()) / 60000))}m)`
+              : 'Reveal codes'}
+          </Button>
+
           <Typography variant="body2" color="text.secondary">
             {user?.name || user?.mobile || 'Admin'}
           </Typography>
@@ -406,7 +446,7 @@ export function AppShell({ onLogout }: Props) {
               }}
             >
               <ListItemText
-                primary={item.label}
+                primary={toDisplayText(item.label)}
                 primaryTypographyProps={{
                   sx: { fontSize: 13, whiteSpace: 'normal', wordBreak: 'break-word' },
                 }}
@@ -480,6 +520,11 @@ export function AppShell({ onLogout }: Props) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <RevealCodesOtpModal
+        open={revealOtpOpen}
+        onClose={() => setRevealOtpOpen(false)}
+      />
     </Box>
   );
 }

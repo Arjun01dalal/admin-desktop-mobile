@@ -4,6 +4,8 @@ import { Box, Paper, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount } from '@/utils/dates';
 import { providerLabel, type ActivityRow } from './gameActivity/utils';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type GameRow = Record<string, unknown>;
 
@@ -17,6 +19,7 @@ function gameName(game: GameRow): string {
 }
 
 export function GameActivityDetailsPage() {
+  useRevealCodes();
   const location = useLocation();
   const state = (location.state || {}) as DetailsState;
   const provider = state.data;
@@ -91,11 +94,11 @@ export function GameActivityDetailsPage() {
     return (
       <Box>
         <Typography variant="h5" fontWeight={700} mb={2}>
-          Game Activity Details
+          {toDisplayText('Game Activity Details')}
         </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
           <Typography color="text.secondary">
-            No provider selected. Open a provider from Games Activity.
+            No provider selected. Open a provider from {toDisplayText('Games Activity')}.
           </Typography>
         </Paper>
       </Box>

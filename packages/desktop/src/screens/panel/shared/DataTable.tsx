@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 export type DataColumn<T> = {
   id: string;
@@ -37,6 +39,13 @@ type Props<T> = {
   maxHeight?: number | string;
 };
 
+function displayColLabel(label: ReactNode): ReactNode {
+  if (typeof label === 'string' || typeof label === 'number') {
+    return toDisplayText(String(label));
+  }
+  return label;
+}
+
 /** Reusable Tailwind data table for panel list pages. */
 export function DataTable<T>({
   columns,
@@ -51,6 +60,7 @@ export function DataTable<T>({
   stickyHeader = true,
   maxHeight = 'calc(100vh - 280px)',
 }: Props<T>) {
+  useRevealCodes();
   const hasFilters = columns.some((col) => col.filter);
 
   return (
@@ -77,7 +87,7 @@ export function DataTable<T>({
                     col.headClassName,
                   )}
                 >
-                  {col.label}
+                  {displayColLabel(col.label)}
                 </TableHead>
               ))}
             </TableRow>
@@ -116,7 +126,7 @@ export function DataTable<T>({
                   colSpan={columns.length}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  {emptyMessage}
+                  {toDisplayText(emptyMessage)}
                 </TableCell>
               </TableRow>
             ) : (

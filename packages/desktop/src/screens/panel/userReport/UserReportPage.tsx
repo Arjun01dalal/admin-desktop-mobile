@@ -30,6 +30,8 @@ import {
   type EncryptedUser,
   type UserReportTab,
 } from './types';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 function TabBody({
   tab,
@@ -84,6 +86,7 @@ function TabBody({
 
 /** User Report hub — opened from Users name click (wallet_history). */
 export function UserReportPage() {
+  useRevealCodes();
   const { userId = '', userName = '' } = useParams<{
     userId: string;
     userName: string;
@@ -196,7 +199,7 @@ export function UserReportPage() {
             onClick={() => onTabClick(item.id)}
             sx={laxmiTabBtnSx(tab === item.id)}
           >
-            {item.label}
+            {toDisplayText(item.label)}
           </Button>
         ))}
       </Box>

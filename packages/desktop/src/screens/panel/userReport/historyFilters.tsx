@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 export const HISTORY_PAGINATION_SX = {
   '& .MuiPaginationItem-root': {
@@ -137,7 +138,7 @@ export function StatusSelectFilter({
     >
       {options.map((o) => (
         <MenuItem key={o.id || 'all'} value={o.id}>
-          {o.label}
+          {toDisplayText(o.label)}
         </MenuItem>
       ))}
     </TextField>

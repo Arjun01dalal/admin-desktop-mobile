@@ -19,6 +19,8 @@ import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { todayIST } from '@/utils/dates';
 import { LiveStreamModal } from './LiveStreamModal';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from './ops/jyotishMapping';
 
 export type LiveMatchVariant = 'laxmi' | 'master' | 'both';
 
@@ -235,6 +237,7 @@ function unpackBookList(raw: unknown): unknown[] {
  * MasterLiveMatchTotal / BothLiveMatchTotal.
  */
 export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
+  useRevealCodes();
   const location = useLocation();
   const navState = (location.state || {}) as {
     startDate?: string;
@@ -337,7 +340,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={0.5}>
-        {TITLES[variant]}
+        {toDisplayText(TITLES[variant])}
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         {startDate} → {endDate}
@@ -569,7 +572,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                                           )
                                         }
                                       >
-                                        {`${f?.marketName} (Bet Size:- ${f?.betSize})`}
+                                        {`${f?.marketName} (${toDisplayText('Bet Size')}:- ${f?.betSize})`}
                                         <span>
                                           {openIndex === uniqueIndex ? '▲' : '▼'}
                                         </span>

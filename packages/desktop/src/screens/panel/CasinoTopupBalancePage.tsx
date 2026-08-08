@@ -32,6 +32,8 @@ import {
   type ProviderState,
   type TopupRecord,
 } from '@/screens/panel/casinoTopup/helpers';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 const orangeBtnSx = {
   bgcolor: '#ff9f0a',
@@ -49,6 +51,7 @@ const emptyProviders = (): Record<ProviderKey, ProviderState> => ({
 });
 
 export function CasinoTopupBalancePage() {
+  const { active: revealActive } = useRevealCodes();
   // Match sidebar gating (full-access / QA see all nav even if Responsibility row is missing).
   const canView = canAccessNavItem({
     id: 'casinoTopup',
@@ -174,7 +177,7 @@ export function CasinoTopupBalancePage() {
       },
       {
         id: 'toppedUpAtIst',
-        label: 'Topped Up At (IST)',
+        label: toDisplayText('Topped Up At (IST)'),
         render: (row) => displayToppedUpAt(row),
       },
       {
@@ -183,14 +186,14 @@ export function CasinoTopupBalancePage() {
         render: (row) => display(row.note),
       },
     ],
-    [],
+    [revealActive],
   );
 
   if (!canView) {
     return (
       <Box>
         <Typography variant="h5" fontWeight={700} mb={2}>
-          Casino Top-up Balance
+          {toDisplayText('Casino Top-up Balance')}
         </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
           <Typography color="text.secondary">
@@ -227,7 +230,7 @@ export function CasinoTopupBalancePage() {
         >
           <Box>
             <Typography fontWeight={700} fontSize={18}>
-              {config.title}
+              {toDisplayText(config.title)}
             </Typography>
             <Typography color="text.secondary" fontSize={13}>
               Topped-up balance
@@ -296,7 +299,7 @@ export function CasinoTopupBalancePage() {
         gap={1}
       >
         <Typography variant="h5" fontWeight={700}>
-          Casino Top-up Balance
+          {toDisplayText('Casino Top-up Balance')}
         </Typography>
         <Button
           startIcon={
@@ -327,7 +330,7 @@ export function CasinoTopupBalancePage() {
 
       <Dialog open={!!addProvider} onClose={closeAddPopup} maxWidth="sm" fullWidth>
         <DialogTitle>
-          Add {addProvider ? PROVIDER_CONFIG[addProvider].title : ''} Top-up
+          Add {addProvider ? toDisplayText(PROVIDER_CONFIG[addProvider].title) : ''} Top-up
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
@@ -366,7 +369,7 @@ export function CasinoTopupBalancePage() {
               fullWidth
               size="small"
               type="datetime-local"
-              label="Topped Up At (IST) *"
+              label={`${toDisplayText('Topped Up At (IST)')} *`}
               value={form.toppedUpAtIst}
               error={formErrors.toppedUpAtIst}
               helperText={

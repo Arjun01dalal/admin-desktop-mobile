@@ -4,6 +4,8 @@ import { Box, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { todayIST } from '@/utils/dates';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from './ops/jyotishMapping';
 
 type EventRow = Record<string, unknown>;
 
@@ -82,6 +84,7 @@ function formatValue(key: string, value: unknown): string {
  * Opened from dashboard cards via `?startDate&endDate&type=jetfair|falcon`.
  */
 export function FalconRateManagementPage() {
+  useRevealCodes();
   const location = useLocation();
   const [params] = useSearchParams();
   const navState = (location.state || {}) as {
@@ -147,13 +150,13 @@ export function FalconRateManagementPage() {
   }, [load]);
 
   const title = isJetfair
-    ? 'Jetfair Platform Details'
-    : 'Falcon Platform Details';
+    ? 'Jyeshtha Details'
+    : 'Phalguni Details';
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={0.5}>
-        {title}
+        {toDisplayText(title)}
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         {startDate} → {endDate}
@@ -225,7 +228,7 @@ export function FalconRateManagementPage() {
                         }}
                       >
                         <Typography variant="body2" fontWeight={700}>
-                          {labelFor(key)}:
+                          {toDisplayText(labelFor(key))}:
                         </Typography>
                         <Typography
                           variant="body2"

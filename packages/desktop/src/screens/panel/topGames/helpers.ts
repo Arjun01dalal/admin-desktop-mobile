@@ -1,4 +1,5 @@
 import type { GameRow, TopGameItem, TopGamesDoc } from './types';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 export function getImageUrl(item: TopGameItem): string {
   if (item?.imagePath) return item.imagePath;
@@ -18,7 +19,8 @@ export function getGameName(item: TopGameItem): string {
 }
 
 export function getProviderName(item: TopGameItem): string {
-  return item.providerName || item.provider?.name || '-';
+  const raw = item.providerName || item.provider?.name || '-';
+  return raw === '-' ? raw : toDisplayText(raw);
 }
 
 export function formatDateValue(value?: string | { $date?: string }): string {
@@ -29,12 +31,14 @@ export function formatDateValue(value?: string | { $date?: string }): string {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 }
 
-/** QtechIndian -> Qtech Indian */
+/** QtechIndian -> Ketu Indian (via toDisplayText) */
 export function formatCategoryLabel(key: string): string {
-  if (!key || key === 'All') return key || 'All';
-  return key
+  if (!key) return key || 'All';
+  if (key === 'All') return toDisplayText('All');
+  const spaced = key
     .replace(/([a-z\d])([A-Z])/g, '$1 $2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+  return toDisplayText(spaced);
 }
 
 export function normalizePayload(payload: unknown): TopGamesDoc {

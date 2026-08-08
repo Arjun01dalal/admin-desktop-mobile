@@ -5,9 +5,10 @@ import type {
 } from './types';
 import { floorNum, sumArrayField, toNum } from './mergeMetrics';
 import { buildGameMetricRows, gameNames } from './gameMetrics';
+import { metricJyotishLabel } from './constants';
 
 function row(label: string, value: unknown) {
-  return { label, value: floorNum(value) };
+  return { label: metricJyotishLabel(label), value: floorNum(value) };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -142,8 +143,8 @@ export function buildProviderCards(
   const cards: ProviderCardModel[] = [
     {
       id: 'totalProviders',
-      title: 'Total Providers Detail',
-      filters: ['All'],
+      title: 'Ashwini Details',
+      filters: ['Ashwini'],
       showOnVip: true,
       loading,
       rows: [
@@ -155,8 +156,8 @@ export function buildProviderCards(
     },
     {
       id: 'totalExch',
-      title: 'Total Exch Details',
-      filters: ['All', 'Exchange'],
+      title: 'Exaltation Details',
+      filters: ['Ashwini', 'Exaltation'],
       showOnVip: false,
       loading,
       rows: [
@@ -177,8 +178,8 @@ export function buildProviderCards(
     },
     {
       id: 'qtech',
-      title: 'Qtech Platform Details',
-      filters: ['All', 'Casino', 'Qtech'],
+      title: 'Ketu Details',
+      filters: ['Ashwini', 'Chandra', 'Ketu'],
       showOnVip: true,
       loading,
       href: '/game-activity',
@@ -201,8 +202,8 @@ export function buildProviderCards(
     },
     {
       id: 'betConstruct',
-      title: 'BetConstruct Platform Details',
-      filters: ['All', 'Casino', 'BetConstruct'],
+      title: 'Budha Details',
+      filters: ['Ashwini', 'Chandra', 'Budha'],
       showOnVip: false,
       loading,
       href: '/betConstructGamesList',
@@ -221,8 +222,8 @@ export function buildProviderCards(
     },
     {
       id: 'wco',
-      title: 'WCO Platform Details',
-      filters: ['All', 'Casino', 'WCO'],
+      title: 'Vakra Details',
+      filters: ['Ashwini', 'Chandra', 'Vakra'],
       showOnVip: true,
       loading,
       href: '/game-activity',
@@ -239,8 +240,8 @@ export function buildProviderCards(
     },
     {
       id: 'satta',
-      title: 'Satta Matka Details',
-      filters: ['All', 'Satta Matka'],
+      title: 'Shatabhisha Details',
+      filters: ['Ashwini', 'Shatabhisha'],
       showOnVip: true,
       loading,
       activeCustomerCount: toNum(asRecord(active.sattaMatka).count),
@@ -268,8 +269,8 @@ export function buildProviderCards(
     },
     {
       id: 'sportBook',
-      title: 'SportBook Details',
-      filters: ['All', 'SportBook'],
+      title: 'Shani Details',
+      filters: ['Ashwini', 'Shani'],
       showOnVip: false,
       loading,
       rows: [
@@ -282,8 +283,8 @@ export function buildProviderCards(
     },
     {
       id: 'ludo',
-      title: 'Ludo Platform Details',
-      filters: ['All', 'Ludo'],
+      title: 'Lagna Details',
+      filters: ['Ashwini', 'Lagna'],
       showOnVip: false,
       loading,
       selectValue: selectedLudo,
@@ -310,8 +311,8 @@ export function buildProviderCards(
     },
     {
       id: 'jetfair',
-      title: 'Jetfair Exchange Details',
-      filters: ['All', 'Exchange', 'Jetfair'],
+      title: 'Jyeshtha Details',
+      filters: ['Ashwini', 'Exaltation', 'Jyeshtha'],
       showOnVip: true,
       loading,
       href: '/falconRateManagement',
@@ -332,8 +333,8 @@ export function buildProviderCards(
     },
     {
       id: 'falcon',
-      title: 'Falcon Exchange Details',
-      filters: ['All', 'Exchange', 'Falcon'],
+      title: 'Phalguni Details',
+      filters: ['Ashwini', 'Exaltation', 'Phalguni'],
       showOnVip: true,
       loading,
       href: '/falconRateManagement',
@@ -350,8 +351,8 @@ export function buildProviderCards(
     },
     {
       id: 'aaa',
-      title: 'AAA Exch Details',
-      filters: ['All', 'Exchange', 'AAA Exchange'],
+      title: 'Ascendant Details',
+      filters: ['Ashwini', 'Exaltation', 'Ascendant'],
       showOnVip: false,
       loading,
       href: '/exchangeRateManagement',
@@ -372,10 +373,8 @@ export function buildProviderCards(
     {
       id: 'indianDiva',
       title:
-        selectedDiva !== 'All'
-          ? `Indian Diva Games - ${selectedDiva}`
-          : 'Indian Diva Games',
-      filters: ['All', 'Indian Diva'],
+        selectedDiva !== 'All' ? `Indu Details - ${selectedDiva}` : 'Indu Details',
+      filters: ['Ashwini', 'Indu'],
       showOnVip: false,
       loading,
       selectValue: selectedDiva,
@@ -387,9 +386,9 @@ export function buildProviderCards(
       id: 'plutus',
       title:
         selectedPlutus !== 'All'
-          ? `Plutus Games - ${selectedPlutus}`
-          : 'Plutus Games',
-      filters: ['All', 'Plutus Gaming'],
+          ? `Pushya Details - ${selectedPlutus}`
+          : 'Pushya Details',
+      filters: ['Ashwini', 'Pushya'],
       showOnVip: false,
       loading,
       selectValue: selectedPlutus,

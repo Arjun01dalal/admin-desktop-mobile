@@ -34,6 +34,8 @@ import type {
   StatusTarget,
   TopGamesDoc,
 } from '@/screens/panel/topGames/types';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 const orangeBtnSx = {
   bgcolor: '#ff9f0a',
@@ -51,6 +53,7 @@ function unpackDoc(data: unknown): TopGamesDoc {
 }
 
 export function TopGamesPage() {
+  useRevealCodes();
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [doc, setDoc] = useState<TopGamesDoc | null>(null);
@@ -300,7 +303,7 @@ export function TopGamesPage() {
         gap={1}
       >
         <Typography variant="h5" fontWeight={700}>
-          Top Games
+          {toDisplayText('Top Games')}
         </Typography>
         <Button
           startIcon={

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { todayIST } from '@/utils/dates';
 import type { DashboardFilters, ProviderFilter } from './types';
+import { DEFAULT_PROVIDER_FILTER } from './constants';
 
 const today = () => todayIST();
 
@@ -9,14 +10,14 @@ export function useDashboardFilters(initial?: Partial<DashboardFilters>) {
   const [endDate, setEndDate] = useState(initial?.endDate ?? today());
   const [appClientName, setAppClientName] = useState(initial?.appClientName ?? '');
   const [filterBy, setFilterBy] = useState<ProviderFilter>(
-    initial?.filterBy ?? 'All',
+    initial?.filterBy ?? DEFAULT_PROVIDER_FILTER,
   );
-  /** Applied snapshot — only changes on Apply / All Data. */
+  /** Applied snapshot — only changes on Apply. */
   const [applied, setApplied] = useState<DashboardFilters>({
     startDate: initial?.startDate ?? today(),
     endDate: initial?.endDate ?? today(),
     appClientName: initial?.appClientName ?? '',
-    filterBy: initial?.filterBy ?? 'All',
+    filterBy: initial?.filterBy ?? DEFAULT_PROVIDER_FILTER,
   });
 
   const apply = useCallback(() => {
@@ -24,16 +25,15 @@ export function useDashboardFilters(initial?: Partial<DashboardFilters>) {
   }, [startDate, endDate, appClientName, filterBy]);
 
   const clearAll = useCallback(() => {
-    const t = today();
-    setStartDate(t);
-    setEndDate(t);
+    setStartDate('');
+    setEndDate('');
     setAppClientName('');
-    setFilterBy('All');
+    setFilterBy(DEFAULT_PROVIDER_FILTER);
     setApplied({
-      startDate: t,
-      endDate: t,
+      startDate: '',
+      endDate: '',
       appClientName: '',
-      filterBy: 'All',
+      filterBy: DEFAULT_PROVIDER_FILTER,
     });
   }, []);
 

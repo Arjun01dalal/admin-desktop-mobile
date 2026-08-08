@@ -10,7 +10,6 @@ import {
   HumanFilter,
   IsBotFilter,
   NameFilter,
-  OperatorIdFilter,
   RefTxnIdFilter,
   RoundCapacityFilter,
   RoundIdFilter,
@@ -24,6 +23,8 @@ import { HouseGamesFiltersProvider } from './FiltersContext';
 import { TABLE_COLUMNS, type FiltersState } from './constants';
 import type { HouseGameTransaction } from './types';
 import { formatDateTime, getIsBotValue, getPlayerIdentity } from './utils';
+import { houseGameIdLabel, toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import { useRevealCodes } from '@/context/useRevealCodes';
 
 type Props = {
   data: HouseGameTransaction[];
@@ -50,12 +51,13 @@ const TransactionTable = ({
 }: Props) => {
   const rowOffset = (currentPage - 1) * itemsPerPage;
   const deferredData = useDeferredValue(data);
+  const { active: revealActive } = useRevealCodes();
 
   const columns = useMemo<CommonTableColumn<HouseGameTransaction>[]>(
     () => [
       {
         id: 'sr',
-        label: TABLE_COLUMNS[0],
+        label: toDisplayText(TABLE_COLUMNS[0]),
         width: 72,
         filter: null,
         render: (item, index) => (
@@ -63,7 +65,7 @@ const TransactionTable = ({
             <span>{index + 1 + rowOffset}</span>
             <IconButton
               size="small"
-              aria-label="edit bet status"
+              aria-label={toDisplayText('Update Bet Status')}
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(item);
@@ -77,103 +79,97 @@ const TransactionTable = ({
       },
       {
         id: 'name',
-        label: TABLE_COLUMNS[1],
+        label: toDisplayText(TABLE_COLUMNS[1]),
         filter: <NameFilter />,
         render: (item) => String(item?.name ?? '-'),
       },
       {
         id: 'userId',
-        label: TABLE_COLUMNS[2],
+        label: toDisplayText(TABLE_COLUMNS[2]),
         filter: <UserIdFilter />,
         render: (item) => <CopyText value={String(item?.userId ?? '')} />,
       },
       {
         id: 'txnId',
-        label: TABLE_COLUMNS[3],
+        label: toDisplayText(TABLE_COLUMNS[3]),
         filter: <TxnIdFilter />,
         render: (item) => String(item?.txnId ?? item?.transactionId ?? '-'),
       },
       {
         id: 'refTxnId',
-        label: TABLE_COLUMNS[4],
+        label: toDisplayText(TABLE_COLUMNS[4]),
         filter: <RefTxnIdFilter />,
         render: (item) => String(item?.refTxnId ?? '-'),
       },
       {
         id: 'roundId',
-        label: TABLE_COLUMNS[5],
+        label: toDisplayText(TABLE_COLUMNS[5]),
         filter: <RoundIdFilter />,
         render: (item) => String(item?.roundId ?? '-'),
       },
       {
         id: 'sessionId',
-        label: TABLE_COLUMNS[6],
+        label: toDisplayText(TABLE_COLUMNS[6]),
         filter: <SessionIdFilter />,
         render: (item) => String(item?.sessionId ?? '-'),
       },
       {
         id: 'gameId',
-        label: TABLE_COLUMNS[7],
+        label: toDisplayText(TABLE_COLUMNS[7]),
         filter: <GameIdFilter />,
-        render: (item) => String(item?.gameId ?? '-'),
-      },
-      {
-        id: 'operatorId',
-        label: TABLE_COLUMNS[8],
-        filter: <OperatorIdFilter />,
-        render: (item) => String(item?.operatorId ?? '-'),
+        render: (item) => houseGameIdLabel(item?.gameId),
       },
       {
         id: 'type',
-        label: TABLE_COLUMNS[9],
+        label: toDisplayText(TABLE_COLUMNS[8]),
         filter: <TypeFilter />,
-        render: (item) => String(item?.type ?? '-'),
+        render: (item) => toDisplayText(String(item?.type ?? '-')),
       },
       {
         id: 'status',
-        label: TABLE_COLUMNS[10],
+        label: toDisplayText(TABLE_COLUMNS[9]),
         filter: <StatusFilter />,
         render: (item) => String(item?.status ?? '-'),
       },
       {
         id: 'currency',
-        label: TABLE_COLUMNS[11],
+        label: toDisplayText(TABLE_COLUMNS[10]),
         filter: <CurrencyFilter />,
         render: (item) => String(item?.currency ?? '-'),
       },
       {
         id: 'amount',
-        label: TABLE_COLUMNS[12],
+        label: toDisplayText(TABLE_COLUMNS[11]),
         filter: <AmountFilter />,
         render: (item) => formatAmount(item?.amount ?? 0),
       },
       {
         id: 'winingPoint',
-        label: TABLE_COLUMNS[13],
+        label: toDisplayText(TABLE_COLUMNS[12]),
         filter: null,
         render: (item) => String(item?.winingPoint ?? '-'),
       },
       {
         id: 'roundCapacity',
-        label: TABLE_COLUMNS[14],
+        label: toDisplayText(TABLE_COLUMNS[13]),
         filter: <RoundCapacityFilter />,
         render: (item) => String(item?.roundCapacity ?? '-'),
       },
       {
         id: 'isBot',
-        label: TABLE_COLUMNS[15],
+        label: toDisplayText(TABLE_COLUMNS[14]),
         filter: <IsBotFilter />,
         render: (item) => getIsBotValue(item),
       },
       {
         id: 'player',
-        label: TABLE_COLUMNS[16],
+        label: toDisplayText(TABLE_COLUMNS[15]),
         filter: <HumanFilter />,
         render: (item) => getPlayerIdentity(item),
       },
       {
         id: 'created',
-        label: TABLE_COLUMNS[17],
+        label: toDisplayText(TABLE_COLUMNS[16]),
         filter: null,
         render: (item) =>
           formatDateTime(
@@ -181,12 +177,27 @@ const TransactionTable = ({
           ),
       },
     ],
-    [onEdit, rowOffset],
+    [onEdit, rowOffset, revealActive],
   );
 
+  const gameIdOptions = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of deferredData) {
+      const id = String(row?.gameId ?? '').trim();
+      if (id) ids.add(id);
+    }
+    return Array.from(ids);
+  }, [deferredData]);
+
   const filtersValue = useMemo(
-    () => ({ filters, onFilterChange, onCheckboxChange, onSearch }),
-    [filters, onFilterChange, onCheckboxChange, onSearch],
+    () => ({
+      filters,
+      onFilterChange,
+      onCheckboxChange,
+      onSearch,
+      gameIdOptions,
+    }),
+    [filters, onFilterChange, onCheckboxChange, onSearch, gameIdOptions],
   );
 
   return (

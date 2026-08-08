@@ -9,14 +9,19 @@ import type { KpiItem, ProviderCardModel } from './types';
 import { floorNum, toNum } from './mergeMetrics';
 import { useDashboardFilters } from './useDashboardFilters';
 import { useRiskDashboardData } from './useRiskDashboardData';
+import {
+  RISK_CARD_TITLES,
+  RISK_NAV_MAP,
+  metricJyotishLabel,
+} from './jyotishMapping';
 
 function row(label: string, value: unknown) {
-  return { label, value: floorNum(value) };
+  return { label: metricJyotishLabel(label), value: floorNum(value) };
 }
 
 /**
  * Risk Analysis Dashboard — ported from admin-panel-domains RiskManagementDashobard.
- * Live Match nav tiles + Jetfair / Falcon / AAA / Master AAA cards.
+ * Gochar nav tiles + Jyeshtha / Phalguni / Ascendant cards.
  */
 export function RiskAnalysisPage() {
   const navigate = useNavigate();
@@ -42,40 +47,15 @@ export function RiskAnalysisPage() {
   );
 
   const navCards = useMemo<KpiItem[]>(
-    () => [
-      {
-        id: 'liveMatch',
-        label: 'Live Match Total',
+    () =>
+      RISK_NAV_MAP.map((item) => ({
+        id: item.id,
+        label: item.jyotish,
         value: '',
         headingOnly: true,
-        href: '/liveMatchTotal',
+        href: item.href,
         state: dateState,
-      },
-      {
-        id: 'liveMatchMaster',
-        label: 'Live Match Total (Master)',
-        value: '',
-        headingOnly: true,
-        href: '/masterLiveMatchTotal',
-        state: dateState,
-      },
-      {
-        id: 'liveMatchBoth',
-        label: 'Live Match Total (Master & Laxmi)',
-        value: '',
-        headingOnly: true,
-        href: '/bothLiveMatchTotal',
-        state: dateState,
-      },
-      {
-        id: 'liveMatchAaa',
-        label: 'Live Match Total (AAA & Master AAA)',
-        value: '',
-        headingOnly: true,
-        href: '/bothMasterAddPage',
-        state: dateState,
-      },
-    ],
+      })),
     [dateState],
   );
 
@@ -91,8 +71,8 @@ export function RiskAnalysisPage() {
     return [
       {
         id: 'jetfair',
-        title: 'Jetfair Platform Details',
-        filters: ['All'],
+        title: 'Jyeshtha Details',
+        filters: ['Ashwini'],
         loading,
         href: '/falconRateManagement',
         search: `?${dateQuery}&type=jetfair`,
@@ -107,8 +87,8 @@ export function RiskAnalysisPage() {
       },
       {
         id: 'falcon',
-        title: 'Falcon Platform Details',
-        filters: ['All'],
+        title: 'Phalguni Details',
+        filters: ['Ashwini'],
         loading,
         href: '/falconRateManagement',
         search: `?${dateQuery}&type=falcon`,
@@ -127,8 +107,8 @@ export function RiskAnalysisPage() {
       },
       {
         id: 'aaa',
-        title: 'AAA Exch Details',
-        filters: ['All'],
+        title: 'Ascendant Details',
+        filters: ['Ashwini'],
         loading,
         href: '/exchangeRateManagement',
         search: `?${dateQuery}`,
@@ -146,8 +126,8 @@ export function RiskAnalysisPage() {
       },
       {
         id: 'masterAaa',
-        title: 'Master AAA Book',
-        filters: ['All'],
+        title: RISK_CARD_TITLES.masterAaaBook.jyotish,
+        filters: ['Ashwini'],
         loading,
         href: '/masterDashboard',
         state: dateState,
@@ -172,7 +152,7 @@ export function RiskAnalysisPage() {
         Risk Analysis
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
-        Live match books and exchange risk metrics.
+        Gochar books and Exaltation risk metrics.
       </Typography>
 
       <DashboardFilterBar
@@ -188,7 +168,6 @@ export function RiskAnalysisPage() {
         onAppChange={filters.setAppClientName}
         onFilterByChange={filters.setFilterBy}
         onApply={filters.apply}
-        onAllData={filters.clearAll}
         onRefresh={() => void reload()}
       />
 

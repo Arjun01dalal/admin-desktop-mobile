@@ -25,6 +25,15 @@ import {
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { copyToClipboard } from '@/utils/clipboard';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+
+function displayColLabel(label: ReactNode): ReactNode {
+  if (typeof label === 'string' || typeof label === 'number') {
+    return toDisplayText(String(label));
+  }
+  return label;
+}
 
 /**
  * Shared table styles.
@@ -340,6 +349,7 @@ export function CommonTable<T>({
   estimateRowHeight,
   tone = 'dark',
 }: CommonTableProps<T>) {
+  useRevealCodes(); // re-render headers when Reveal codes toggles
   const styles = tone === 'light' ? commonTableStylesLight : commonTableStyles;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const cellBase: SxProps<Theme> = dense
@@ -449,7 +459,7 @@ export function CommonTable<T>({
                   ] as SxProps<Theme>
                 }
               >
-                {col.label}
+                {displayColLabel(col.label)}
               </TableCell>
             );
           })}
@@ -522,7 +532,7 @@ export function CommonTable<T>({
         {rows.length === 0 && !loading && (
           <TableRow>
             <TableCell colSpan={columns.length} align="center" sx={cellBase}>
-              {emptyMessage}
+              {toDisplayText(emptyMessage)}
             </TableCell>
           </TableRow>
         )}

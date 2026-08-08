@@ -143,14 +143,13 @@ export function OpsDashboardPage({ mode }: Props) {
         appClientName={filters.appClientName}
         filterBy={filters.filterBy}
         appOptions={appOptions}
-        showProviderFilter={mode !== 'vip'}
+        showProviderFilter
         loading={loading}
         onStartDateChange={filters.setStartDate}
         onEndDateChange={filters.setEndDate}
         onAppChange={filters.setAppClientName}
         onFilterByChange={filters.setFilterBy}
         onApply={filters.apply}
-        onAllData={filters.clearAll}
         onRefresh={() => {
           setSelectedLudoGame('All');
           setSelectedIndianDiva('All');
@@ -167,12 +166,10 @@ export function OpsDashboardPage({ mode }: Props) {
 
       <KpiStatGrid items={kpiItems} />
 
-      {mode === 'main' && (
-        <ActiveExchangePanel
-          activeExchangeName={activeExchangeName}
-          onUpdated={() => void reloadActiveExchange()}
-        />
-      )}
+      <ActiveExchangePanel
+        activeExchangeName={activeExchangeName}
+        onUpdated={() => void reloadActiveExchange()}
+      />
 
       <ProviderCardGrid cards={providerCards} filterBy={filters.filterBy} />
 

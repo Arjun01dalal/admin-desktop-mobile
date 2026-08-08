@@ -8,7 +8,8 @@ import {
 } from '@mui/material';
 import { appCodeForName } from '@/constants/clientNames';
 import type { ProviderFilter } from './types';
-import { PROVIDER_FILTERS } from './constants';
+import { PROVIDER_FILTER_META, toDisplayText } from './constants';
+import { useRevealCodes } from '@/context/useRevealCodes';
 
 type Props = {
   startDate: string;
@@ -23,11 +24,11 @@ type Props = {
   onAppChange: (v: string) => void;
   onFilterByChange: (v: ProviderFilter) => void;
   onApply: () => void;
-  onAllData: () => void;
+  onAllData?: () => void;
   onRefresh?: () => void;
 };
 
-/** Shared filter bar — dates / Apply / All Data / App / Filter By / Refresh. */
+/** Shared filter bar — dates / Apply / App / Filter By / Refresh. */
 export function DashboardFilterBar({
   startDate,
   endDate,
@@ -44,6 +45,7 @@ export function DashboardFilterBar({
   onAllData,
   onRefresh,
 }: Props) {
+  useRevealCodes();
   return (
     <Paper
       sx={{
@@ -91,15 +93,17 @@ export function DashboardFilterBar({
         >
           Apply
         </Button>
-        <Button
-          variant="contained"
-          color="warning"
-          onClick={onAllData}
-          disabled={loading}
-          sx={{ flexShrink: 0, fontWeight: 700 }}
-        >
-          All Data
-        </Button>
+        {onAllData && (
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={onAllData}
+            disabled={loading}
+            sx={{ flexShrink: 0, fontWeight: 700 }}
+          >
+            All Data
+          </Button>
+        )}
         {onRefresh && (
           <Button
             variant="outlined"
@@ -135,11 +139,11 @@ export function DashboardFilterBar({
             size="small"
             value={filterBy}
             onChange={(e) => onFilterByChange(e.target.value as ProviderFilter)}
-            sx={{ width: 180, flexShrink: 0 }}
+            sx={{ width: 200, flexShrink: 0 }}
           >
-            {PROVIDER_FILTERS.map((name) => (
+            {PROVIDER_FILTER_META.map(({ name }) => (
               <MenuItem key={name} value={name}>
-                {name}
+                {toDisplayText(name)}
               </MenuItem>
             ))}
           </TextField>

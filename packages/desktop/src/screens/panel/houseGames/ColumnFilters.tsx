@@ -1,4 +1,5 @@
 import type { ChangeEvent } from 'react';
+import { useMemo } from 'react';
 import {
   Checkbox,
   FormControlLabel,
@@ -11,6 +12,12 @@ import SearchIcon from '@mui/icons-material/Search';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { SELECT_FILTER_FIELDS, type FiltersState } from './constants';
 import { useHouseGamesFilters } from './FiltersContext';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import {
+  HOUSE_GAME_ID_OPTIONS,
+  houseGameIdLabel,
+  toDisplayText,
+} from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 const selectSx = {
   width: 90,
@@ -62,10 +69,49 @@ export function SessionIdFilter() {
   return <TextFilter field="sessionId" placeholder="Session ID" />;
 }
 export function GameIdFilter() {
-  return <TextFilter field="gameId" placeholder="Game ID" width={100} />;
-}
-export function OperatorIdFilter() {
-  return <TextFilter field="operatorId" placeholder="Operator ID" width={100} />;
+  useRevealCodes();
+  const { filters, onFilterChange, onSearch, gameIdOptions } =
+    useHouseGamesFilters();
+  const options = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const id of [
+      ...HOUSE_GAME_ID_OPTIONS.map((o) => o.value).filter(Boolean),
+      ...gameIdOptions,
+    ]) {
+      const key = String(id || '').trim();
+      if (!key) continue;
+      const low = key.toLowerCase();
+      if (seen.has(low)) continue;
+      seen.add(low);
+      list.push(key);
+    }
+    list.sort((a, b) => a.localeCompare(b));
+    return list;
+  }, [gameIdOptions]);
+
+  return (
+    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+      <TextField
+        select
+        size="small"
+        fullWidth={false}
+        value={filters.gameId}
+        onChange={(e) => onFilterChange('gameId', e.target.value)}
+        sx={{ ...selectSx, width: 120 }}
+      >
+        <MenuItem value="">{toDisplayText('All')}</MenuItem>
+        {options.map((id) => (
+          <MenuItem key={id} value={id}>
+            {houseGameIdLabel(id)}
+          </MenuItem>
+        ))}
+      </TextField>
+      <IconButton size="small" onClick={onSearch} sx={{ color: '#4a5568' }}>
+        <SearchIcon sx={{ fontSize: 16 }} />
+      </IconButton>
+    </Stack>
+  );
 }
 export function CurrencyFilter() {
   return <TextFilter field="currency" placeholder="Currency" width={90} />;
@@ -97,6 +143,7 @@ export function AmountFilter() {
 }
 
 export function TypeFilter() {
+  useRevealCodes();
   const { filters, onFilterChange, onSearch } = useHouseGamesFilters();
   return (
     <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
@@ -110,7 +157,7 @@ export function TypeFilter() {
       >
         {SELECT_FILTER_FIELDS[0].options.map((o) => (
           <MenuItem key={o.value || 'all'} value={o.value}>
-            {o.label}
+            {toDisplayText(o.label)}
           </MenuItem>
         ))}
       </TextField>

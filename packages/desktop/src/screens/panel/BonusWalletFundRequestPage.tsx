@@ -12,6 +12,7 @@ import {
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { todayIST } from '@/utils/dates';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type FundSummary = {
   pendingCount?: number;
@@ -234,7 +235,7 @@ export function BonusWalletFundRequestPage() {
                 fontWeight={800}
                 sx={{ textTransform: 'uppercase', letterSpacing: 0.4 }}
               >
-                {card.label}
+                {toDisplayText(card.label)}
               </Typography>
               <Typography
                 variant="h6"

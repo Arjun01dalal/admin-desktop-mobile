@@ -1,7 +1,30 @@
 import type { DashboardMode, KpiItem, OpsDashboardBundle } from './types';
 import { floorNum, toNum } from './mergeMetrics';
+import { KPI_MAP, NAV_MAP } from './jyotishMapping';
 
-/** Build KPI tiles for main Dashboard (VIP/Combined skip KPIs). */
+function navCards(startDate: string, endDate: string): KpiItem[] {
+  const dateState = { startDate, endDate };
+  return [
+    {
+      id: 'masterData',
+      label: NAV_MAP.masterData.jyotish,
+      value: '',
+      headingOnly: true,
+      href: '/masterDashboard',
+      state: { selectActiveCustomers: true },
+    },
+    {
+      id: 'liveMatchTotal',
+      label: NAV_MAP.liveMatchTotal.jyotish,
+      value: '',
+      headingOnly: true,
+      href: '/liveMatchTotal',
+      state: dateState,
+    },
+  ];
+}
+
+/** Build KPI tiles — full KPIs on main; Panchang/Gochar nav on VIP & Combined. */
 export function buildKpiItems(
   mode: DashboardMode,
   bundle: OpsDashboardBundle | null,
@@ -9,6 +32,10 @@ export function buildKpiItems(
   endDate: string,
   today: string,
 ): KpiItem[] {
+  if (mode === 'vip' || mode === 'combined') {
+    return navCards(startDate, endDate);
+  }
+
   if (mode !== 'main' || !bundle) return [];
 
   const s = bundle.summary;
@@ -42,8 +69,13 @@ export function buildKpiItems(
     },
     {
       id: 'totalWithdrawal',
-      label: 'Total Withdrawals',
-      value: floorNum(dw.totalWithdrawal ?? s.totalWithdrawal),
+      label: KPI_MAP.totalWithdrawal.jyotish,
+      value: floorNum(
+        dw.totalRefund ??
+          s.totalRefund ??
+          dw.totalWithdrawal ??
+          s.totalWithdrawal,
+      ),
       prefix: '₹',
     },
     {
@@ -159,24 +191,7 @@ export function buildKpiItems(
     });
   }
 
-  items.push(
-    {
-      id: 'masterData',
-      label: 'Master Data',
-      value: '',
-      headingOnly: true,
-      href: '/masterDashboard',
-      state: { selectActiveCustomers: true },
-    },
-    {
-      id: 'liveMatchTotal',
-      label: 'Live Match Total',
-      value: '',
-      headingOnly: true,
-      href: '/liveMatchTotal',
-      state: dateState,
-    },
-  );
+  items.push(...navCards(startDate, endDate));
 
   if (startDate !== today) {
     items.splice(3, 0, {

@@ -16,5 +16,6 @@ export {
   asPaged,
   maskMobile,
   display,
+  displayRaw,
 } from './useReportQuery';
 export { CLIENT_NAMES, CLIENT_NAME_OPTIONS } from './clientNames';

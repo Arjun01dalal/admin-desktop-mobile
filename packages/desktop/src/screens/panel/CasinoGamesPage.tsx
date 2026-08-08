@@ -34,6 +34,8 @@ import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { display } from '@/screens/panel/shared';
+import { useRevealCodes } from '@/context/useRevealCodes';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type CasinoGameRow = {
   _id: string;
@@ -133,6 +135,7 @@ function asProvider(value: unknown): CasinoProvider {
 }
 
 export function CasinoGamesPage() {
+  useRevealCodes();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [nameSearch, setNameSearch] = useState('');
@@ -536,7 +539,7 @@ export function CasinoGamesPage() {
         mb={2}
       >
         <Typography variant="h5" fontWeight={700}>
-          Casino Games
+          {toDisplayText('Casino Games')}
         </Typography>
         <Button
           variant="outlined"
@@ -569,7 +572,7 @@ export function CasinoGamesPage() {
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             select
-            label="Active Casino Provider"
+            label={toDisplayText('Active Casino Provider')}
             size="small"
             value={activeProvider}
             onChange={(e) => {
@@ -582,7 +585,7 @@ export function CasinoGamesPage() {
           >
             {PROVIDER_OPTIONS.map((opt) => (
               <MenuItem key={opt} value={opt}>
-                {opt}
+                {toDisplayText(opt)}
               </MenuItem>
             ))}
           </TextField>
@@ -664,7 +667,8 @@ export function CasinoGamesPage() {
         <DialogTitle>Are You Sure?</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Change active casino provider to <strong>{pendingProvider.current}</strong>?
+            Change active {toDisplayText('casino')} provider to{' '}
+            <strong>{toDisplayText(pendingProvider.current)}</strong>?
           </Typography>
         </DialogContent>
         <DialogActions>

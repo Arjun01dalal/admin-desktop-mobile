@@ -16,6 +16,7 @@ import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { display } from '@/screens/panel/shared';
 import { todayIST } from '@/utils/dates';
 import { floorNum, toNum } from '@/screens/panel/dashboards/ops/mergeMetrics';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type LocationState = {
   startDate?: string;
@@ -153,7 +154,7 @@ export function BetConstructGamesListPage() {
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={2}>
-        Bet Construct Details
+        Budha Details
       </Typography>
 
       <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
@@ -203,16 +204,16 @@ export function BetConstructGamesListPage() {
 
         <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap mt={2}>
           <Typography variant="body2" fontWeight={700}>
-            Total Bet Amount : {floorNum(summary.totalBetAmount)}
+            {toDisplayText('Total Bet Amount')} : {floorNum(summary.totalBetAmount)}
           </Typography>
           <Typography variant="body2" fontWeight={700}>
-            Total Win Amount : {floorNum(summary.totalWinningAmount)}
+            {toDisplayText('Total Win Amount')} : {floorNum(summary.totalWinningAmount)}
           </Typography>
           <Typography variant="body2" fontWeight={700}>
-            Total Profit : {floorNum(summary.profit)}
+            {toDisplayText('Total Profit')} : {floorNum(summary.profit)}
           </Typography>
           <Typography variant="body2" fontWeight={700}>
-            Total GGR : {floorNum(summary.ggr)}
+            {toDisplayText('Total GGR')} : {floorNum(summary.ggr)}
           </Typography>
         </Stack>
       </Paper>

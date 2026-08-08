@@ -53,7 +53,7 @@ export function ExchangeRateManagementPage() {
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={0.5}>
-        AAA Exch Details
+        Ascendant Details
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         {startDate} → {endDate}

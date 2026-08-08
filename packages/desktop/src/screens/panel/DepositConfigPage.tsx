@@ -19,6 +19,7 @@ import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { asList, display, useReportQuery } from '@/screens/panel/shared';
+import { appCodeForName } from '@/constants/clientNames';
 
 type DepositConfigRow = {
   _id: string;
@@ -142,7 +143,7 @@ export function DepositConfigPage() {
       {
         id: 'clientName',
         label: 'App Name',
-        render: (row) => display(row.clientName),
+        render: (row) => appCodeForName(row.clientName),
       },
       {
         id: 'minDeposit',

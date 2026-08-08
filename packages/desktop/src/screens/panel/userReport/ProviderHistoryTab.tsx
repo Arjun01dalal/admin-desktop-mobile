@@ -16,6 +16,7 @@ import { formatAmount, todayIST } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
 import { StatusSelectFilter } from './historyFilters';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type Kind = 'qtech' | 'missing' | 'jetfair' | 'sm';
 type Props = { userId: string; kind: Kind };
@@ -309,7 +310,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
         id: 'gp',
         label: 'Game Provider',
         filter: null,
-        render: (r) => String(r.gameProvider || r.providerName || '-'),
+        render: (r) => toDisplayText(String(r.gameProvider || r.providerName || '-')),
       },
       {
         id: 'gid',
@@ -321,7 +322,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
         id: 'gcat',
         label: 'Game Category',
         filter: null,
-        render: (r) => String(r.gameCategory || r.category || '-'),
+        render: (r) => toDisplayText(String(r.gameCategory || r.category || '-')),
       },
     ],
     [kind, status, viewType],

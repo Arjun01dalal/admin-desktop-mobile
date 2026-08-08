@@ -129,8 +129,8 @@ export function MasterDashboardPage() {
     return [
       {
         id: 'wco',
-        title: 'WCO Platform Details',
-        filters: ['All'],
+        title: 'Vakra Details',
+        filters: ['Ashwini'],
         loading,
         href: '/game-activity',
         state: { startDate, endDate, provider: 'wco' },
@@ -152,8 +152,8 @@ export function MasterDashboardPage() {
       },
       {
         id: 'falcon',
-        title: 'Falcon Platform Details',
-        filters: ['All'],
+        title: 'Phalguni Details',
+        filters: ['Ashwini'],
         loading,
         href: '/falconRateManagement',
         search: rateSearch('falcon'),
@@ -171,8 +171,8 @@ export function MasterDashboardPage() {
       },
       {
         id: 'masterAaa',
-        title: 'AAA Exch Details',
-        filters: ['All'],
+        title: 'Ascendant Details',
+        filters: ['Ashwini'],
         loading,
         href: '/exchangeRateManagement',
         search: aaaSearch,
@@ -191,8 +191,8 @@ export function MasterDashboardPage() {
       },
       {
         id: 'satta',
-        title: 'Satta Matka Bets Today',
-        filters: ['All'],
+        title: 'Shatabhisha Details',
+        filters: ['Ashwini'],
         loading,
         href: '/falconRateManagement',
         search: rateSearch('falcon'),

@@ -22,14 +22,15 @@ import {
   StatusSelectFilter,
   formatDt,
 } from './historyFilters';
+import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type Props = { userId: string };
 
 function statusLabel(s: unknown) {
   const v = String(s || '').toUpperCase();
-  if (v === 'W') return 'Win';
-  if (v === 'L') return 'Loss';
-  if (v === 'R') return 'Roll Back';
+  if (v === 'W') return toDisplayText('Win');
+  if (v === 'L') return toDisplayText('Loss');
+  if (v === 'R') return toDisplayText('Roll Back');
   return v || '-';
 }
 
@@ -172,7 +173,7 @@ export function QtechHistoryTab({ userId }: Props) {
             placeholder="Search category"
           />
         ),
-        render: (r) => String(r.category || '-'),
+        render: (r) => toDisplayText(String(r.category || '-')),
       },
       {
         id: 'amount',
