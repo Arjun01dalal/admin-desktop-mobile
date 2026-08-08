@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import {
   createDrawerNavigator,
@@ -7,7 +7,7 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppBackground } from '../components/AppBackground';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
@@ -73,7 +73,7 @@ import { BonusWalletFundRequestScreen } from '../screens/dashboards/details/Bonu
 import { BonusWalletRequestsScreen } from '../screens/dashboards/details/BonusWalletRequestsScreen';
 import { DepositApprovedReportScreen } from '../screens/dashboards/details/DepositApprovedReportScreen';
 import { UniqueDepositPendingScreen } from '../screens/dashboards/details/UniqueDepositPendingScreen';
-import { colors } from '../theme';
+import { colors, radius, spacing } from '../theme';
 
 const Drawer = createDrawerNavigator();
 const RootStack = createNativeStackNavigator();
@@ -152,13 +152,31 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   const { items, ...rest } = props;
   const { logout, user } = useAuth();
   const current = rest.state.routes[rest.state.index]?.name;
+  const [menuQuery, setMenuQuery] = useState('');
+  const visibleItems = menuQuery.trim()
+    ? items.filter((item) =>
+        toDisplayText(item.label).toLowerCase().includes(menuQuery.trim().toLowerCase()),
+      )
+    : items;
   return (
     <DrawerContentScrollView {...rest} style={{ backgroundColor: colors.surface }}>
       <View style={styles.drawerHeader}>
         <Text style={styles.drawerTitle}>Astro</Text>
         {user?.name ? <Text style={styles.drawerSub}>{user.name}</Text> : null}
       </View>
-      {items.map((item) => (
+      <TextInput
+        style={styles.drawerSearch}
+        value={menuQuery}
+        onChangeText={setMenuQuery}
+        placeholder="🔍 Search menu…"
+        placeholderTextColor={colors.muted}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      {visibleItems.length === 0 ? (
+        <Text style={styles.drawerNoMatch}>No menu found</Text>
+      ) : null}
+      {visibleItems.map((item) => (
         <DrawerItem
           key={item.id}
           label={toDisplayText(item.label)}
@@ -182,6 +200,8 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
+          drawerType: 'front',
+          overlayColor: 'rgba(0,0,0,0.55)',
           drawerStyle: { backgroundColor: colors.surface },
           sceneStyle: { backgroundColor: 'transparent' },
         }}
@@ -263,4 +283,22 @@ const styles = StyleSheet.create({
   },
   drawerTitle: { color: colors.primary, fontSize: 18, fontWeight: '700' },
   drawerSub: { color: colors.muted, fontSize: 13, marginTop: 4 },
+  drawerSearch: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    fontSize: 13,
+    marginHorizontal: spacing(3),
+    marginBottom: spacing(2),
+  },
+  drawerNoMatch: {
+    color: colors.muted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginVertical: spacing(3),
+  },
 });
