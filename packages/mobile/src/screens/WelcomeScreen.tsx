@@ -117,7 +117,7 @@ export function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   content: {
     padding: spacing(4),
     paddingBottom: spacing(10),

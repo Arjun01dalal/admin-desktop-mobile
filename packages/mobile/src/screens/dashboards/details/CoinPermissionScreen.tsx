@@ -551,7 +551,7 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   backLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginBottom: spacing(2) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700', marginBottom: spacing(3) },

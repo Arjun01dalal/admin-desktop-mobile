@@ -201,7 +201,7 @@ export function GameActivityDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   centerBox: { justifyContent: 'center', alignItems: 'center', padding: spacing(6) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },

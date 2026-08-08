@@ -860,7 +860,7 @@ export function FundRequestScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
   empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(4) },
   hint: { color: colors.muted, textAlign: 'center', marginTop: spacing(4), fontSize: 12 },

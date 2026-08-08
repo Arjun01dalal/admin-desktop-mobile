@@ -138,7 +138,7 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, justifyContent: 'center', padding: spacing(5) },
   card: { gap: spacing(3) },
   title: { color: colors.foreground, fontSize: 24, fontWeight: '700', textAlign: 'center' },

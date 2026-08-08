@@ -8,6 +8,7 @@ import {
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
+import { AppBackground } from '../components/AppBackground';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
 import { canAccessNavItem } from '../auth/permissions';
@@ -154,7 +155,7 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   return (
     <DrawerContentScrollView {...rest} style={{ backgroundColor: colors.surface }}>
       <View style={styles.drawerHeader}>
-        <Text style={styles.drawerTitle}>Astro Admin</Text>
+        <Text style={styles.drawerTitle}>Astro</Text>
         {user?.name ? <Text style={styles.drawerSub}>{user.name}</Text> : null}
       </View>
       {items.map((item) => (
@@ -182,7 +183,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
           drawerStyle: { backgroundColor: colors.surface },
-          sceneStyle: { backgroundColor: colors.background },
+          sceneStyle: { backgroundColor: 'transparent' },
         }}
       >
         {items.map((item) => {
@@ -211,12 +212,14 @@ export function AppNavigator() {
   );
 
   return (
-    <NavigationContainer
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <AppBackground />
+      <NavigationContainer
       theme={{
         ...DarkTheme,
         colors: {
           ...DarkTheme.colors,
-          background: colors.background,
+          background: 'transparent',
           card: colors.surface,
           text: colors.foreground,
           primary: colors.primary,
@@ -229,7 +232,7 @@ export function AppNavigator() {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
-          contentStyle: { backgroundColor: colors.background },
+          contentStyle: { backgroundColor: 'transparent' },
         }}
       >
         <RootStack.Screen name="panel" options={{ headerShown: false }}>
@@ -245,7 +248,8 @@ export function AppNavigator() {
           </RootStack.Screen>
         ))}
       </RootStack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </View>
   );
 }
 

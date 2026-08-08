@@ -459,7 +459,7 @@ export function NewDepositsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },

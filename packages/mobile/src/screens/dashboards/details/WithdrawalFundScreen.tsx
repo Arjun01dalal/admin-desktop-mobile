@@ -934,7 +934,7 @@ const styles = StyleSheet.create({
   },
   commentSaveBtnDisabled: { opacity: 0.5 },
   commentSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
