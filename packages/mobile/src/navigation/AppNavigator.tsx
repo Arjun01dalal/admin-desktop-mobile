@@ -12,6 +12,7 @@ import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
 import { useRevealCodes } from '../context/useRevealCodes';
 import { TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
 import { canAccessNavItem } from '../auth/permissions';
@@ -200,10 +201,14 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
  * transparent roots.
  */
 function Screened({ children }: { children: React.ReactNode }) {
+  // Top inset is handled by the navigation header; bottom edge keeps content
+  // clear of the home-indicator / gesture bar (and notch edges in landscape).
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <AppBackground />
-      {children}
+      <SafeAreaView edges={['bottom', 'left', 'right']} style={{ flex: 1 }}>
+        {children}
+      </SafeAreaView>
     </View>
   );
 }
