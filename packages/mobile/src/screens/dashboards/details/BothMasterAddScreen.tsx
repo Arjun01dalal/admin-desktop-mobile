@@ -15,6 +15,7 @@ import {
 import { secureApi } from '../../../api/client';
 import { toNum } from '../../../dashboards/mergeMetrics';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 
 type TeamTotals = {
   team: string;
@@ -187,7 +188,7 @@ export function BothMasterAddScreen() {
         />
       }
     >
-      <Text style={styles.title}>Live Match Total (AAA & Master AAA)</Text>
+      <Text style={styles.title}>{toDisplayText('Live Match Total (AAA & Master AAA)')}</Text>
 
       {error ? (
         <View style={styles.errorBox}>

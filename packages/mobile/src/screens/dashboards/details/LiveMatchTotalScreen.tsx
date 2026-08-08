@@ -28,6 +28,7 @@ import type { SecureAction } from '../../../api/registry.generated';
 import { toNum } from '../../../dashboards/mergeMetrics';
 import { LiveStreamModal } from '../../../dashboards/ui/LiveStreamModal';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { todayIST } from '../../../utils/dates';
 
 type Variant = 'laxmi' | 'master' | 'both';
@@ -345,7 +346,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         />
       }
     >
-      <Text style={styles.title}>{TITLES[variant]}</Text>
+      <Text style={styles.title}>{toDisplayText(TITLES[variant])}</Text>
       <Text style={styles.dateRange}>
         {startDate} → {endDate}
       </Text>

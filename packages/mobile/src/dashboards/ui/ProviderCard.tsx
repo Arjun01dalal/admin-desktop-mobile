@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../theme';
+import { toDisplayText } from '../jyotish/jyotishMapping';
 import type { ProviderCardModel } from '../types';
 
 function formatValue(v: number | string): string {
@@ -32,14 +33,14 @@ export function ProviderCard({
         : {})}
     >
       <View style={styles.headerRow}>
-        <Text style={styles.title}>{card.title}</Text>
+        <Text style={styles.title}>{toDisplayText(card.title)}</Text>
         {onPress ? <Text style={styles.chevron}>›</Text> : null}
         {card.loading ? <ActivityIndicator size="small" color={colors.primary} /> : null}
       </View>
       {typeof card.activeCustomerCount === 'number' && card.activeCustomerCount > 0 && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>
-            Active users: {card.activeCustomerCount.toLocaleString('en-IN')}
+            {toDisplayText('Active users')}: {card.activeCustomerCount.toLocaleString('en-IN')}
           </Text>
         </View>
       )}
@@ -59,7 +60,7 @@ export function ProviderCard({
                 style={[styles.selChip, active && styles.selChipActive]}
               >
                 <Text style={[styles.selChipText, active && styles.selChipTextActive]}>
-                  {opt.label}
+                  {toDisplayText(opt.label)}
                 </Text>
               </TouchableOpacity>
             );
@@ -73,7 +74,7 @@ export function ProviderCard({
             key={`${r.label}-${i}`}
             style={[styles.row, i < card.rows.length - 1 && styles.rowBorder]}
           >
-            <Text style={styles.rowLabel}>{r.label}</Text>
+            <Text style={styles.rowLabel}>{toDisplayText(r.label)}</Text>
             <Text
               style={[
                 styles.rowValue,
@@ -90,7 +91,7 @@ export function ProviderCard({
         <View style={styles.actionsRow}>
           {card.actions.map((action) => (
             <TouchableOpacity key={action.label} onPress={action.onClick}>
-              <Text style={styles.actionLink}>{action.label}</Text>
+              <Text style={styles.actionLink}>{toDisplayText(action.label)}</Text>
             </TouchableOpacity>
           ))}
         </View>

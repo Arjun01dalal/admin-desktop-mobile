@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import { asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
@@ -528,7 +529,7 @@ export function BonusWalletFundRequestScreen() {
         />
       }
     >
-      <Text style={styles.title}>Bonus Wallet Fund Request</Text>
+      <Text style={styles.title}>{toDisplayText('Bonus Wallet Fund Request')}</Text>
       <Text style={styles.sub}>{allData ? 'All data' : `${startDate} → ${endDate}`}</Text>
 
       <DetailFilterBar

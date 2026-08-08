@@ -15,6 +15,11 @@ import { CLIENT_NAMES } from '@astro/shared';
 import { colors, spacing } from '../../theme';
 import { floorNum, toNum } from '../../dashboards/mergeMetrics';
 import type { KpiItem, ProviderCardModel, ProviderFilter } from '../../dashboards/types';
+import {
+  metricJyotishLabel,
+  RISK_CARD_TITLES,
+  RISK_NAV_MAP,
+} from '../../dashboards/jyotish/jyotishMapping';
 import { useRiskDashboardData, type RiskFilters } from '../../dashboards/useRiskDashboardData';
 import { FilterBar } from '../../dashboards/ui/FilterBar';
 import { KpiGrid } from '../../dashboards/ui/KpiGrid';
@@ -23,7 +28,7 @@ import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail'
 import { todayIST } from '../../utils/dates';
 
 function row(label: string, value: unknown) {
-  return { label, value: floorNum(value) };
+  return { label: metricJyotishLabel(label), value: floorNum(value) };
 }
 
 export function RiskAnalysisScreen() {
@@ -34,7 +39,7 @@ export function RiskAnalysisScreen() {
   const [startDate, setStartDate] = useState(t);
   const [endDate, setEndDate] = useState(t);
   const [appClientName, setAppClientName] = useState('');
-  const [filterBy, setFilterBy] = useState<ProviderFilter>('All');
+  const [filterBy, setFilterBy] = useState<ProviderFilter>('Ashwini');
   const [applied, setApplied] = useState<RiskFilters>({
     startDate: t,
     endDate: t,
@@ -69,40 +74,15 @@ export function RiskAnalysisScreen() {
   );
 
   const navCards = useMemo<KpiItem[]>(
-    () => [
-      {
-        id: 'liveMatch',
-        label: 'Live Match Total',
+    () =>
+      RISK_NAV_MAP.map((item) => ({
+        id: item.id,
+        label: item.jyotish,
         value: '',
         headingOnly: true,
-        href: '/liveMatchTotal',
+        href: item.href,
         state: dateState,
-      },
-      {
-        id: 'liveMatchMaster',
-        label: 'Live Match Total (Master)',
-        value: '',
-        headingOnly: true,
-        href: '/masterLiveMatchTotal',
-        state: dateState,
-      },
-      {
-        id: 'liveMatchBoth',
-        label: 'Live Match Total (Master & Laxmi)',
-        value: '',
-        headingOnly: true,
-        href: '/bothLiveMatchTotal',
-        state: dateState,
-      },
-      {
-        id: 'liveMatchAaa',
-        label: 'Live Match Total (AAA & Master AAA)',
-        value: '',
-        headingOnly: true,
-        href: '/bothMasterAddPage',
-        state: dateState,
-      },
-    ],
+      })),
     [dateState],
   );
 
@@ -118,8 +98,8 @@ export function RiskAnalysisScreen() {
     return [
       {
         id: 'jetfair',
-        title: 'Jetfair Platform Details',
-        filters: ['All'],
+        title: 'Jyeshtha Details',
+        filters: ['Ashwini'],
         loading,
         href: '/falconRateManagement',
         search: `?${dateQuery}&type=jetfair`,
@@ -134,8 +114,8 @@ export function RiskAnalysisScreen() {
       },
       {
         id: 'falcon',
-        title: 'Falcon Platform Details',
-        filters: ['All'],
+        title: 'Phalguni Details',
+        filters: ['Ashwini'],
         loading,
         href: '/falconRateManagement',
         search: `?${dateQuery}&type=falcon`,
@@ -150,8 +130,8 @@ export function RiskAnalysisScreen() {
       },
       {
         id: 'aaa',
-        title: 'AAA Exch Details',
-        filters: ['All'],
+        title: 'Ascendant Details',
+        filters: ['Ashwini'],
         loading,
         href: '/exchangeRateManagement',
         search: `?${dateQuery}`,
@@ -166,8 +146,8 @@ export function RiskAnalysisScreen() {
       },
       {
         id: 'masterAaa',
-        title: 'Master AAA Book',
-        filters: ['All'],
+        title: RISK_CARD_TITLES.masterAaaBook.jyotish,
+        filters: ['Ashwini'],
         loading,
         href: '/masterDashboard',
         state: dateState,
@@ -181,7 +161,7 @@ export function RiskAnalysisScreen() {
         ],
       },
     ];
-  }, [bundle, loading]);
+  }, [bundle, loading, dateQuery, dateState]);
 
   return (
     <ScrollView
@@ -196,7 +176,9 @@ export function RiskAnalysisScreen() {
       }
     >
       <Text style={styles.title}>Risk Analysis</Text>
-      <Text style={styles.description}>Live match books and exchange risk metrics.</Text>
+      <Text style={styles.description}>
+        Gochar books and Exaltation risk metrics.
+      </Text>
 
       <FilterBar
         startDate={startDate}

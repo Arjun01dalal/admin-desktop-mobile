@@ -35,6 +35,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
@@ -806,7 +807,7 @@ export function WithdrawalFundScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>Withdrawal Fund</Text>
+      <Text style={styles.title}>{toDisplayText('Withdrawal Fund')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Amount: {formatAmount(totalAmount)}
       </Text>

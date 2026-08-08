@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
@@ -194,7 +195,7 @@ export function CasinoSwitchScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>Casino Switch</Text>
+      <Text style={styles.title}>{toDisplayText('Casino Switch')}</Text>
       <Text style={styles.sub}>{rows.length} providers</Text>
 
       <View style={styles.addRow}>

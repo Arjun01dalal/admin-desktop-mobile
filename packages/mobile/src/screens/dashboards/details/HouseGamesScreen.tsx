@@ -18,6 +18,7 @@ import {
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { monthStartIST, todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
@@ -320,7 +321,7 @@ export function HouseGamesScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>House Games</Text>
+      <Text style={styles.title}>{toDisplayText('House Games')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Tap a row to see all details
       </Text>

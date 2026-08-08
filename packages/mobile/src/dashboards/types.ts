@@ -2,22 +2,23 @@
 
 export type DashboardMode = 'main' | 'vip' | 'combined';
 
+/** Filter By — Astro / Jyotish display names (also used as filter values). */
 export type ProviderFilter =
-  | 'All'
-  | 'Exchange'
-  | 'Casino'
-  | 'Qtech'
-  | 'WCO'
-  | 'SportBook'
-  | 'BetConstruct'
-  | 'Jetfair'
-  | 'Falcon'
-  | 'AAA Exchange'
-  | 'Satta Matka'
-  | 'Crazy Wheel'
-  | 'Plutus Gaming'
-  | 'Indian Diva'
-  | 'Ludo';
+  | 'Ashwini'
+  | 'Exaltation'
+  | 'Chandra'
+  | 'Ketu'
+  | 'Vakra'
+  | 'Shani'
+  | 'Budha'
+  | 'Jyeshtha'
+  | 'Phalguni'
+  | 'Ascendant'
+  | 'Shatabhisha'
+  | 'Chitra'
+  | 'Pushya'
+  | 'Indu'
+  | 'Lagna';
 
 export type MetricRow = {
   label: string;
@@ -34,7 +35,7 @@ export type CardAction = {
 export type ProviderCardModel = {
   id: string;
   title: string;
-  /** ProviderLists values that show this card. */
+  /** Provider filter names that show this card. */
   filters: ProviderFilter[];
   /** Hide on VIP mode when false. */
   showOnVip?: boolean;
@@ -62,7 +63,7 @@ export type KpiItem = {
   href?: string;
   /** Optional react-router location state when navigating via href. */
   state?: Record<string, unknown>;
-  /** Heading-only nav card (Master Data / Live Match Total). */
+  /** Heading-only nav card (Master Data / Panchang / Live Match Total / Gochar). */
   headingOnly?: boolean;
 };
 

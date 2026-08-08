@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 
 export type SheetField = {
   label: string;
@@ -68,7 +69,7 @@ export function RowDetailSheet({
           <View style={styles.handle} />
           <View style={styles.headerRow}>
             <Text style={styles.title} numberOfLines={1}>
-              {title}
+              {toDisplayText(title)}
             </Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={styles.close}>✕</Text>
@@ -103,7 +104,7 @@ export function RowDetailSheet({
                         a.tone === 'warning' && styles.actionBtnTextWarning,
                       ]}
                     >
-                      {a.label}
+                      {toDisplayText(a.label)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -113,21 +114,23 @@ export function RowDetailSheet({
             {fields.map((f) =>
               f.multiline ? (
                 <View key={f.label} style={styles.fieldBlock}>
-                  <Text style={styles.label}>{f.label}</Text>
+                  <Text style={styles.label}>{toDisplayText(f.label)}</Text>
                   <Text style={[styles.blockValue, f.color ? { color: f.color } : null]} selectable>
-                    {f.value || '—'}
+                    {f.value ? toDisplayText(f.value) : '—'}
                   </Text>
                 </View>
               ) : (
               <View key={f.label} style={styles.fieldRow}>
-                <Text style={styles.label}>{f.label}</Text>
+                <Text style={styles.label}>{toDisplayText(f.label)}</Text>
                 {f.badgeColor ? (
                   <View style={[styles.valueBadge, { backgroundColor: f.badgeColor }]}>
-                    <Text style={styles.valueBadgeText}>{f.value || '—'}</Text>
+                    <Text style={styles.valueBadgeText}>
+                      {f.value ? toDisplayText(f.value) : '—'}
+                    </Text>
                   </View>
                 ) : (
                   <Text style={[styles.value, f.color ? { color: f.color } : null]} selectable>
-                    {f.value || '—'}
+                    {f.value ? toDisplayText(f.value) : '—'}
                   </Text>
                 )}
               </View>
@@ -135,7 +138,7 @@ export function RowDetailSheet({
             )}
             {action ? (
               <TouchableOpacity style={styles.singleActionBtn} onPress={action.onPress}>
-                <Text style={styles.singleActionText}>{action.label}</Text>
+                <Text style={styles.singleActionText}>{toDisplayText(action.label)}</Text>
               </TouchableOpacity>
             ) : null}
           </ScrollView>

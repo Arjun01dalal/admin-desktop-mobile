@@ -1,11 +1,19 @@
-/** Active Exchange panel — main Dashboard only (port of desktop ActiveExchangePanel). */
+/** Active Exaltation panel — main Dashboard only (port of desktop ActiveExchangePanel). */
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { secureApi } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
 import { Button } from '../../components/UI';
+import {
+  PANEL_LABELS,
+  activeExchangeJyotishLabel,
+} from '../jyotish/jyotishMapping';
 
-const EXCHANGES = ['AAA', 'FALCON', 'JETFAIR'] as const;
+const EXCHANGES = [
+  { original: 'AAA', jyotish: 'Ascendant' },
+  { original: 'FALCON', jyotish: 'Phalguni' },
+  { original: 'JETFAIR', jyotish: 'Jyeshtha' },
+] as const;
 
 type Props = {
   activeExchangeName?: string;
@@ -23,7 +31,7 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
   const update = async () => {
     setConfirming(false);
     if (!targetExchange) {
-      setMessage({ text: 'Choose an exchange type', error: true });
+      setMessage({ text: 'Choose an exaltation type', error: true });
       return;
     }
     setSaving(true);
@@ -33,10 +41,10 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
         exchangeName: targetExchange,
       });
       if (!res.ok) {
-        setMessage({ text: res.message || 'Failed to update exchange', error: true });
+        setMessage({ text: res.message || 'Failed to update exaltation', error: true });
         return;
       }
-      setMessage({ text: res.message || 'Exchange updated', error: false });
+      setMessage({ text: res.message || 'Exaltation updated', error: false });
       setSelected('');
       onUpdated?.();
     } finally {
@@ -46,27 +54,29 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
 
   return (
     <View style={styles.panel}>
-      <Text style={styles.title}>Active Exchange</Text>
+      <Text style={styles.title}>{PANEL_LABELS.title}</Text>
       <Text style={styles.currentLabel}>
-        Active Exchange Name:{' '}
-        <Text style={styles.currentValue}>{activeExchangeName || '—'}</Text>
+        {PANEL_LABELS.activeName}:{' '}
+        <Text style={styles.currentValue}>
+          {activeExchangeJyotishLabel(activeExchangeName)}
+        </Text>
       </Text>
 
       <View style={styles.chipRow}>
-        {EXCHANGES.map((name) => {
-          const active = selected === name;
+        {EXCHANGES.map((ex) => {
+          const active = selected === ex.original;
           return (
             <TouchableOpacity
-              key={name}
+              key={ex.original}
               onPress={() => {
-                setSelected(active ? '' : name);
+                setSelected(active ? '' : ex.original);
                 setConfirming(false);
                 setMessage(null);
               }}
               style={[styles.chip, active && styles.chipActive]}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                {name}
+                {ex.jyotish}
               </Text>
             </TouchableOpacity>
           );
@@ -76,7 +86,7 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
       {confirming ? (
         <View style={styles.confirmRow}>
           <Text style={styles.confirmText}>
-            Switch active exchange to {targetExchange}?
+            Switch active exaltation to {activeExchangeJyotishLabel(targetExchange)}?
           </Text>
           <View style={styles.confirmButtons}>
             <Button
@@ -99,7 +109,7 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
           onPress={() => {
             setMessage(null);
             if (!targetExchange) {
-              setMessage({ text: 'Choose an exchange type', error: true });
+              setMessage({ text: 'Choose an exaltation type', error: true });
               return;
             }
             setConfirming(true);

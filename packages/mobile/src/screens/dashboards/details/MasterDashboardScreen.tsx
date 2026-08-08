@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { colors, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { secureApi } from '../../../api/client';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
 import type { ProviderCardModel } from '../../../dashboards/types';
@@ -109,7 +110,7 @@ export function MasterDashboardScreen() {
       {
         id: 'wco',
         title: 'WCO Platform Details',
-        filters: ['All'],
+        filters: ['Ashwini'],
         loading,
         rows: [
           row('Total Bet Amount', bet),
@@ -130,7 +131,7 @@ export function MasterDashboardScreen() {
       {
         id: 'falcon',
         title: 'Falcon Platform Details',
-        filters: ['All'],
+        filters: ['Ashwini'],
         loading,
         rows: [
           row('Total Bet Amount', falcon.payin),
@@ -143,7 +144,7 @@ export function MasterDashboardScreen() {
       {
         id: 'masterAaa',
         title: 'AAA Exch Details',
-        filters: ['All'],
+        filters: ['Ashwini'],
         loading,
         rows: [
           row('Total Bet Amount', masterAaa.totalVolume),
@@ -157,7 +158,7 @@ export function MasterDashboardScreen() {
       {
         id: 'satta',
         title: 'Satta Matka Bets Today',
-        filters: ['All'],
+        filters: ['Ashwini'],
         loading,
         rows: [
           row('Total Bet Amount', satta.sattaMatkaTotalBetAmount),
@@ -182,7 +183,7 @@ export function MasterDashboardScreen() {
         />
       }
     >
-      <Text style={styles.title}>Master Dashboard</Text>
+      <Text style={styles.title}>{toDisplayText('Master Dashboard')}</Text>
       <Text style={styles.description}>Master / VIP exchange books (fairbets).</Text>
       <Text style={styles.dates}>
         {startDate} → {endDate}

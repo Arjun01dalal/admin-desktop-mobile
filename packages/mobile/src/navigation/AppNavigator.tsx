@@ -12,6 +12,7 @@ import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
 import { canAccessNavItem } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
+import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { OpsDashboardScreen } from '../screens/dashboards/OpsDashboardScreen';
@@ -159,7 +160,7 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
       {items.map((item) => (
         <DrawerItem
           key={item.id}
-          label={item.label}
+          label={toDisplayText(item.label)}
           focused={current === screenNameFor(item)}
           activeTintColor={colors.primary}
           inactiveTintColor={colors.muted}
@@ -186,13 +187,14 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
       >
         {items.map((item) => {
           const Impl = IMPLEMENTED[item.path];
+          const title = toDisplayText(item.label);
           return (
             <Drawer.Screen
               key={item.id}
               name={screenNameFor(item)}
-              options={{ title: item.label }}
+              options={{ title }}
             >
-              {() => (Impl ? <Impl /> : <PlaceholderScreen title={item.label} />)}
+              {() => (Impl ? <Impl /> : <PlaceholderScreen title={title} />)}
             </Drawer.Screen>
           );
         })}
@@ -237,7 +239,7 @@ export function AppNavigator() {
           <RootStack.Screen
             key={route.path}
             name={route.path}
-            options={{ title: route.title }}
+            options={{ title: toDisplayText(route.title) }}
           >
             {() => <route.Component />}
           </RootStack.Screen>

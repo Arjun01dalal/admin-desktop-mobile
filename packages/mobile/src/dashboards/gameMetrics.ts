@@ -1,5 +1,6 @@
 import type { GameRow, MetricRow } from './types';
 import { floorNum, toNum } from './mergeMetrics';
+import { metricJyotishLabel } from './constants';
 
 function asGames(raw: unknown): GameRow[] {
   if (Array.isArray(raw)) return raw as GameRow[];
@@ -32,12 +33,12 @@ export function buildGameMetricRows(
     const bet = toNum(selected.totalBetAmount);
     const win = toNum(selected.totalWinningAmount);
     const rows: MetricRow[] = [
-      { label: 'Total Bet Amount', value: floorNum(bet) },
-      { label: 'Total Win Amount', value: floorNum(win) },
-      { label: 'Total Bets', value: floorNum(selected.totalBets) },
-      { label: 'Total Wins', value: floorNum(selected.totalWins) },
-      { label: 'Total Profit', value: floorNum(bet - win) },
-      { label: 'RTP', value: selected.RTP ?? 0 },
+      { label: metricJyotishLabel('Total Bet Amount'), value: floorNum(bet) },
+      { label: metricJyotishLabel('Total Win Amount'), value: floorNum(win) },
+      { label: metricJyotishLabel('Total Bets'), value: floorNum(selected.totalBets) },
+      { label: metricJyotishLabel('Total Wins'), value: floorNum(selected.totalWins) },
+      { label: metricJyotishLabel('Total Profit'), value: floorNum(bet - win) },
+      { label: metricJyotishLabel('RTP'), value: selected.RTP ?? 0 },
     ];
     return rows;
   }
@@ -59,11 +60,14 @@ export function buildGameMetricRows(
   );
 
   return [
-    { label: 'Total Bet Amount', value: floorNum(totals.bet) },
-    { label: 'Total Win Amount', value: floorNum(totals.win) },
-    { label: 'Total Bets', value: floorNum(totals.bets) },
-    { label: 'Total Wins', value: floorNum(totals.wins) },
-    { label: 'Total Profit', value: floorNum(totals.bet - totals.win) },
+    { label: metricJyotishLabel('Total Bet Amount'), value: floorNum(totals.bet) },
+    { label: metricJyotishLabel('Total Win Amount'), value: floorNum(totals.win) },
+    { label: metricJyotishLabel('Total Bets'), value: floorNum(totals.bets) },
+    { label: metricJyotishLabel('Total Wins'), value: floorNum(totals.wins) },
+    {
+      label: metricJyotishLabel('Total Profit'),
+      value: floorNum(totals.bet - totals.win),
+    },
   ];
 }
 

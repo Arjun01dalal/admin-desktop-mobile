@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
@@ -350,7 +351,7 @@ export function PlayerRtpScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>Players RTP</Text>
+      <Text style={styles.title}>{toDisplayText('Players RTP')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · {rows.length.toLocaleString('en-IN')} rows
       </Text>

@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission, canAccessNavItem } from '../../../auth/permissions';
@@ -333,7 +334,7 @@ export function CasinoTopupBalanceScreen() {
   if (!canView) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Casino Top-up Balance</Text>
+        <Text style={styles.title}>{toDisplayText('Casino Top-up Balance')}</Text>
         <View style={styles.mutedBox}>
           <Text style={styles.mutedText}>You do not have permission to view this page.</Text>
         </View>
@@ -391,7 +392,7 @@ export function CasinoTopupBalanceScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>Casino Top-up Balance</Text>
+      <Text style={styles.title}>{toDisplayText('Casino Top-up Balance')}</Text>
 
       {error ? (
         <View style={styles.errorBox}>

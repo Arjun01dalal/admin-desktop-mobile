@@ -35,6 +35,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { buildBotDialoutSetting } from '../../../utils/dialerHelpers';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
@@ -78,22 +79,6 @@ function paymentMethod(gw: unknown, mid: unknown): string {
   const m = mid != null && mid !== '' ? String(mid) : '';
   if (!g && !m) return '—';
   return m ? `${g} - ${m}` : g;
-}
-
-/** Desktop parity — users/toolbarHelpers languageByState. */
-function languageByState(state?: string): string {
-  const map: Record<string, string> = {
-    Maharashtra: 'Marathi',
-    Gujarat: 'Gujarati',
-    'Tamil Nadu': 'Tamil',
-    Karnataka: 'Kannada',
-    Telangana: 'Telugu',
-    'Andhra Pradesh': 'Telugu',
-    Kerala: 'Malayalam',
-    'West Bengal': 'Bengali',
-    Punjab: 'Punjabi',
-  };
-  return map[String(state || '')] || 'Hindi';
 }
 
 function statusBadge(status: unknown): string | undefined {
@@ -323,25 +308,20 @@ export function UniqueDepositPendingScreen() {
       void (async () => {
         setBusy(true);
         try {
-          const state = row.userState || row.state || '';
-          const setting: Record<string, unknown> = {
-            botId: 1,
-            reason: 'Unique Pending Deposit',
-            language: languageByState(state),
-            phone_number: mobile,
-          };
-          if (row.clientName) setting.app_name = row.clientName;
-          if (row.userName) setting.client_name = String(row.userName).replace(/_/g, ' ').trim();
-          const id = row._id || row.userId;
-          if (id) setting.id = id;
-          if (state) setting.state = state;
-          const city = row.userCity || row.city;
-          if (city) setting.city = city;
-
           const res = await secureApi<unknown>('callLogs.addToBotDialer', {
             userId: admin?._id,
             created_by: admin?.name,
-            dialout_settings: [setting],
+            dialout_settings: [
+              buildBotDialoutSetting(
+                {
+                  ...row,
+                  _id: row._id || row.userId,
+                  name: row.userName,
+                },
+                1,
+                'Unique Pending Deposit',
+              ),
+            ],
           });
           if (!res.ok || res.success === false) {
             Alert.alert(res.message || 'Bot call failed');

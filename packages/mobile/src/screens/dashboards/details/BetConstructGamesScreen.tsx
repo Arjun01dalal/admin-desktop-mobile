@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
@@ -228,7 +229,7 @@ export function BetConstructGamesScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>BetConstruct Games</Text>
+      <Text style={styles.title}>{toDisplayText('BetConstruct Games')}</Text>
       <Text style={styles.sub}>Total: {total.toLocaleString('en-IN')}</Text>
 
       <View style={styles.searchRow}>

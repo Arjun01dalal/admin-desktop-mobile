@@ -2,6 +2,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { colors, radius, spacing } from '../../theme';
+import { toDisplayText } from '../jyotish/jyotishMapping';
 import type { KpiItem } from '../types';
 
 function formatValue(item: KpiItem): string {
@@ -28,12 +29,13 @@ export function KpiGrid({
   return (
     <View style={styles.grid}>
       {items.map((item) => {
+        const label = toDisplayText(item.label);
         const tappable =
           !!onItemPress && !!item.href && (isItemTappable ? isItemTappable(item) : true);
         const body = (
           <>
             <Text style={[styles.label, tappable && styles.labelLink]} numberOfLines={2}>
-              {item.label}
+              {label}
             </Text>
             {!item.headingOnly && <Text style={styles.value}>{formatValue(item)}</Text>}
           </>
@@ -50,7 +52,7 @@ export function KpiGrid({
             activeOpacity={0.7}
             onPress={() => onItemPress?.(item)}
             accessibilityRole="button"
-            accessibilityLabel={item.label}
+            accessibilityLabel={label}
           >
             {body}
           </TouchableOpacity>

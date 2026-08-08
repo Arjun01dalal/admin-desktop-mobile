@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../theme';
+import { toDisplayText } from '../jyotish/jyotishMapping';
 
 export type DataTableColumn<Row> = {
   key: string;
@@ -89,7 +90,7 @@ export function DataTable<Row>({
                     style={[styles.headText, col.align === 'right' && styles.right, col.align === 'center' && styles.center]}
                     numberOfLines={2}
                   >
-                    {col.label}
+                    {toDisplayText(col.label)}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -103,7 +104,7 @@ export function DataTable<Row>({
                   ]}
                   numberOfLines={2}
                 >
-                  {col.label}
+                  {toDisplayText(col.label)}
                 </Text>
               ),
             )}
@@ -122,14 +123,15 @@ export function DataTable<Row>({
           {loading && rows.length === 0 ? (
             <ActivityIndicator style={styles.spinner} color={colors.primary} />
           ) : rows.length === 0 ? (
-            <Text style={styles.empty}>{emptyMessage}</Text>
+            <Text style={styles.empty}>{toDisplayText(emptyMessage)}</Text>
           ) : (
             rows.map((row, index) => {
               const cells = columns.map((col) => {
-                  const value = col.render(row, index);
+                  const value = toDisplayText(col.render(row, index));
                   const color = col.color?.(row);
                   const badgeBg = col.badge?.(row);
                   const sub = col.subtext?.(row);
+                  const subMapped = sub ? toDisplayText(sub) : undefined;
                   const textStyle = [
                     styles.cell,
                     { width: col.width },
@@ -144,9 +146,9 @@ export function DataTable<Row>({
                           <Text style={styles.badgeText} numberOfLines={1}>
                             {value}
                           </Text>
-                          {sub ? (
+                          {subMapped ? (
                             <Text style={styles.badgeSub} numberOfLines={1}>
-                              {sub}
+                              {subMapped}
                             </Text>
                           ) : null}
                         </View>
@@ -209,7 +211,7 @@ export function DataTable<Row>({
                   ]}
                   numberOfLines={1}
                 >
-                  {i === 0 ? footer.label : footer.cells[col.key] ?? ''}
+                  {i === 0 ? toDisplayText(footer.label) : toDisplayText(footer.cells[col.key] ?? '')}
                 </Text>
               ))}
             </View>

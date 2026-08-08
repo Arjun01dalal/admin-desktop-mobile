@@ -20,7 +20,8 @@ import {
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
-import { todayIST, formatDisplayDate } from '../../../utils/dates';
+import { todayIST } from '../../../utils/dates';
+import { mapUsersToBotSettings } from '../../../utils/dialerHelpers';
 
 type BotUser = {
   _id?: string;
@@ -91,51 +92,6 @@ const INDIA_STATES = [
   'Dadra and Nagar Haveli and Daman and Diu',
   'Lakshadweep',
 ] as const;
-
-/** Mirror desktop languageByState (users/toolbarHelpers). */
-function languageByState(state?: string): string {
-  const map: Record<string, string> = {
-    Maharashtra: 'Marathi',
-    Gujarat: 'Gujarati',
-    'Tamil Nadu': 'Tamil',
-    Karnataka: 'Kannada',
-    Telangana: 'Telugu',
-    'Andhra Pradesh': 'Telugu',
-    Kerala: 'Malayalam',
-    'West Bengal': 'Bengali',
-    Punjab: 'Punjabi',
-  };
-  return map[String(state || '')] || 'Hindi';
-}
-
-/** Mirror desktop mapUsersToBotSettings (users/toolbarHelpers). */
-function mapUsersToBotSettings(
-  rows: BotUser[],
-  botId: string,
-  reason: string,
-): Record<string, unknown>[] {
-  const bot = Number.parseInt(botId, 10) || 1;
-  return rows.map((item) => {
-    const obj: Record<string, unknown> = { botId: bot };
-    if (item.mobile) obj.phone_number = item.mobile;
-    if (item.clientName) obj.app_name = item.clientName;
-    obj.language = languageByState(item.state);
-    const clientName = String(item.name || '')
-      .replace(/_/g, ' ')
-      .trim();
-    if (clientName) obj.client_name = clientName;
-    if (item._id) obj.id = item._id;
-    if (item.state) obj.state = item.state;
-    if (item.city) obj.city = item.city;
-    if (item.email) obj.email = item.email;
-    if (item.activeUser) {
-      const lastPlayed = formatDisplayDate(item.activeUser);
-      if (lastPlayed) obj.last_played_date = lastPlayed;
-    }
-    if (reason) obj.reason = reason;
-    return obj;
-  });
-}
 
 function asBotMap(raw: unknown): Record<string, BotUser[]> {
   if (!raw || typeof raw !== 'object') return {};

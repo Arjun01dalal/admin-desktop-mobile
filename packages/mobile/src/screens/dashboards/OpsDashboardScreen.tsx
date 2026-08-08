@@ -55,12 +55,12 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
   const [startDate, setStartDate] = useState(t);
   const [endDate, setEndDate] = useState(t);
   const [appClientName, setAppClientName] = useState('');
-  const [filterBy, setFilterBy] = useState<ProviderFilter>('All');
+  const [filterBy, setFilterBy] = useState<ProviderFilter>('Ashwini');
   const [applied, setApplied] = useState<DashboardFilters>({
     startDate: t,
     endDate: t,
     appClientName: '',
-    filterBy: 'All',
+    filterBy: 'Ashwini',
   });
 
   const apply = useCallback(
@@ -72,8 +72,8 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
     setStartDate(d);
     setEndDate(d);
     setAppClientName('');
-    setFilterBy('All');
-    setApplied({ startDate: d, endDate: d, appClientName: '', filterBy: 'All' });
+    setFilterBy('Ashwini');
+    setApplied({ startDate: d, endDate: d, appClientName: '', filterBy: 'Ashwini' });
   }, []);
 
   const { bundle, loading, error, reload, reloadLudo, reloadActiveExchange } =
@@ -146,7 +146,7 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
   const visibleCards = useMemo(
     () =>
       providerCards.filter((card) => {
-        if (applied.filterBy !== 'All' && !card.filters.includes(applied.filterBy)) {
+        if (applied.filterBy !== 'Ashwini' && !card.filters.includes(applied.filterBy)) {
           return false;
         }
         if (mode === 'vip' && card.showOnVip === false) return false;

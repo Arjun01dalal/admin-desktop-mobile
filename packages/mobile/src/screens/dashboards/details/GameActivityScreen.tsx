@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
+import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import {
   gameCount,
@@ -213,7 +214,7 @@ export function GameActivityScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>Games Activity</Text>
+      <Text style={styles.title}>{toDisplayText('Games Activity')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Tap a provider to see its games
       </Text>
