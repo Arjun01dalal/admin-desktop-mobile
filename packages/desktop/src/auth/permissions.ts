@@ -190,14 +190,12 @@ const DASHBOARD_MOBILES = new Set([
 /** Hard menu allowlists by Role_ID — when set, only these nav ids can appear
  *  (plus any item whose Responsibility is granted — see canAccessNavItem). */
 const ROLE_NAV_ALLOWLIST: Record<string, readonly string[]> = {
-  // caller / caller_new
+  // caller / caller_new — Bot Performance + State wise Registration hidden
   '68945961c99bca8bbc8b61ed': [
     'welcome',
     'callerResponsibility',
     'callLogs',
-    'botPerformance',
     'newRegisters',
-    'stateWiseRegistration',
     'users',
     'mobileApp',
   ],
@@ -205,9 +203,7 @@ const ROLE_NAV_ALLOWLIST: Record<string, readonly string[]> = {
     'welcome',
     'callerResponsibility',
     'callLogs',
-    'botPerformance',
     'newRegisters',
-    'stateWiseRegistration',
     'users',
     'mobileApp',
   ],
@@ -215,9 +211,7 @@ const ROLE_NAV_ALLOWLIST: Record<string, readonly string[]> = {
     'welcome',
     'callerResponsibility',
     'callLogs',
-    'botPerformance',
     'newRegisters',
-    'stateWiseRegistration',
     'users',
     'mobileApp',
   ],
@@ -520,12 +514,29 @@ function isFullAccessNavRole(user: StoredUser | null): boolean {
   return false;
 }
 
+/** True for plain Caller roles (not Caller Head). */
+export function isCallerRole(user: StoredUser | null = getSessionUser()): boolean {
+  const roleId = getRoleId(user);
+  if (roleId && CALLER_HEAD_ROLE_IDS.has(roleId)) return false;
+  if (roleId && CALLER_ROLE_IDS.has(roleId)) return true;
+  const name = getRoleName(user);
+  return roleNameVariants(name).some((v) => v === 'caller' || v === 'caller_new');
+}
+
 /** Final nav visibility: Role_ID allowlist + Responsibilities + dashboard Role_ID gate. */
 export function canAccessNavItem(
   item: { id: string; permission?: string },
   user: StoredUser | null = getSessionUser(),
 ): boolean {
-  // Always show Bot Performance (laxminarayan App.tsx mounts it without Responsibility).
+  // Callers must not see these tabs (even if Responsibilities / legacy unlocks say otherwise).
+  if (
+    isCallerRole(user) &&
+    (item.id === 'botPerformance' || item.id === 'stateWiseRegistration')
+  ) {
+    return false;
+  }
+
+  // Always show Bot Performance for non-callers (laxminarayan App.tsx mounts it without Responsibility).
   if (item.id === 'botPerformance') return true;
 
   // Full / dev / QA access — show the complete menu without waiting on new Responsibility rows.

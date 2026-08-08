@@ -114,14 +114,32 @@ const DIALER_SERVER_MAP = {
 };
 const ALLOWED_DIALER_PREFIXES = new Set(['api', 'api2']);
 
-function dialerBaseUrl(serverId) {
-  const key = String(serverId ?? '').trim();
-  let prefix = DIALER_SERVER_MAP[key];
+/**
+ * Resolve dialer host (laxminarayan CallingBtn + Users addDialerCalls).
+ * Prefer campaign id: K_3001 / 3001 → api.ganesha999.com; 1011 → api2.
+ * Fall back to admin/campaign serverId map.
+ */
+function dialerPrefixFromCampaignId(campaignId) {
+  const raw = String(campaignId ?? '').trim();
+  if (!raw) return null;
+  // K_3001 → 3001; keep leading digits after optional letter prefix
+  const stripped = raw.replace(/^[A-Za-z]+_/i, '');
+  if (/^3/.test(stripped)) return 'api';
+  if (/^1/.test(stripped)) return 'api2';
+  return null;
+}
+
+function dialerBaseUrl(serverId, campaignId) {
+  let prefix = dialerPrefixFromCampaignId(campaignId);
   if (!prefix) {
-    if (key.startsWith('49.')) prefix = 'api2';
-    else if (key.startsWith('3.')) prefix = 'api';
-    else if (key.startsWith('1.')) prefix = 'api2';
-    else prefix = DIALER_SERVER_MAP.default;
+    const key = String(serverId ?? '').trim();
+    prefix = DIALER_SERVER_MAP[key];
+    if (!prefix) {
+      if (key.startsWith('49.')) prefix = 'api2';
+      else if (key.startsWith('3.')) prefix = 'api';
+      else if (key.startsWith('1.')) prefix = 'api2';
+      else prefix = DIALER_SERVER_MAP.default;
+    }
   }
   if (!ALLOWED_DIALER_PREFIXES.has(prefix)) {
     return null;
@@ -175,7 +193,7 @@ async function addToDialer(payload = {}) {
     return { ok: false, message: 'No valid phone numbers to add to dialer' };
   }
 
-  const url = dialerBaseUrl(serverId);
+  const url = dialerBaseUrl(serverId, campaignName || numericId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   try {
@@ -252,7 +270,7 @@ async function externalDialerBatch(payload = {}) {
     return { ok: false, message: 'No valid phone numbers selected' };
   }
 
-  const url = dialerBaseUrl(serverId);
+  const url = dialerBaseUrl(serverId, campaignId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   // Prefer explicit list id; otherwise 5-digit random like web panel.
@@ -319,7 +337,9 @@ async function externalDialerSingle(payload = {}) {
     return { ok: false, message: 'Dialer extension ID not found for this admin' };
   }
 
-  const url = dialerBaseUrl(serverId);
+  // Call button uses extension as campaign_id (laxmi CallingBtn).
+  // 3xxx → api.ganesha999.com; 1xxx → api2.ganesha999.com
+  const url = dialerBaseUrl(serverId, numericId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   try {

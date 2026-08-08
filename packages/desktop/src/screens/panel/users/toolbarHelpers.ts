@@ -1,4 +1,3 @@
-import { formatDisplayDate } from '@/utils/dates';
 import type { UserType } from './constants';
 import type { UserRow } from './utils';
 
@@ -21,19 +20,97 @@ export function reasonForUserType(type: UserType): string {
   }
 }
 
+/** Laxminarayan `stateLanguageMap` — lowercase language codes for add-to-dialer. */
+const STATE_LANGUAGE_MAP: Record<string, string> = {
+  Maharashtra: 'hindi',
+  Gujarat: 'gujarati',
+  Karnataka: 'kannada',
+  'Tamil Nadu': 'tamil',
+  Telangana: 'telugu',
+  'Andhra Pradesh': 'telugu',
+  Kerala: 'malayalam',
+  'West Bengal': 'bengali',
+  Punjab: 'punjabi',
+  Haryana: 'hindi',
+  'Uttar Pradesh': 'hindi',
+  'Madhya Pradesh': 'hindi',
+  Rajasthan: 'hindi',
+  Bihar: 'hindi',
+  Chhattisgarh: 'hindi',
+  Jharkhand: 'hindi',
+  Uttarakhand: 'hindi',
+  'Himachal Pradesh': 'hindi',
+  Delhi: 'hindi',
+  'Jammu and Kashmir': 'urdu',
+  Ladakh: 'hindi',
+  Goa: 'konkani',
+  Odisha: 'odia',
+  Tripura: 'bengali',
+  Assam: 'assamese',
+  Meghalaya: 'hindi',
+  Manipur: 'meitei',
+  Nagaland: 'english',
+  Mizoram: 'mizo',
+  'Arunachal Pradesh': 'english',
+  Sikkim: 'nepali',
+  Puducherry: 'tamil',
+  Chandigarh: 'hindi',
+  'Andaman and Nicobar Islands': 'hindi',
+  Lakshadweep: 'malayalam',
+  'Dadra and Nagar Haveli and Daman and Diu': 'gujarati',
+};
+
 export function languageByState(state?: string): string {
-  const map: Record<string, string> = {
-    Maharashtra: 'Marathi',
-    Gujarat: 'Gujarati',
-    'Tamil Nadu': 'Tamil',
-    Karnataka: 'Kannada',
-    Telangana: 'Telugu',
-    'Andhra Pradesh': 'Telugu',
-    Kerala: 'Malayalam',
-    'West Bengal': 'Bengali',
-    Punjab: 'Punjabi',
+  return STATE_LANGUAGE_MAP[String(state || '')] || 'hindi';
+}
+
+/**
+ * One dialout_settings row for `POST /SubAdmin/add-to-dialer`
+ * (laxminarayan CallingBtn.initiateBotCall — strip empty/null/undefined only).
+ */
+export function buildBotDialoutSetting(
+  item: UserRow,
+  botId: string | number | undefined,
+  reason: string,
+): Record<string, unknown> {
+  let lastPlayed: string | undefined;
+  if (item.activeUser) {
+    const raw = String(item.activeUser);
+    // Laxmi: DD-MM-YYYY → reverse join then toLocaleDateString('en-GB', long month)
+    const parsed =
+      raw.includes('-') && raw.length <= 10
+        ? new Date(raw.split('-').reverse().join('-'))
+        : new Date(raw);
+    lastPlayed = Number.isNaN(parsed.getTime())
+      ? 'Invalid Date'
+      : parsed.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
+  }
+
+  const bot = Number.parseInt(String(botId ?? '1'), 10);
+  const raw: Record<string, unknown> = {
+    phone_number: item.mobile || item.userMobile,
+    app_name: item.clientName,
+    language: languageByState(String(item.state || '')),
+    // Keep underscores — matches live curl / laxmi (do not replace with spaces).
+    client_name: item.name || item.userName,
+    id: item._id,
+    state: item.state,
+    city: item.city,
+    last_played_date: lastPlayed,
+    email: item.email,
+    reason: reason || 'User List',
+    botId: Number.isFinite(bot) && bot > 0 ? bot : 1,
   };
-  return map[String(state || '')] || 'Hindi';
+
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      ([, value]) => value !== '' && value !== null && value !== undefined,
+    ),
+  );
 }
 
 /** Map users → SubAdmin/add-to-dialer dialout_settings (laxminarayan addToDialer). */
@@ -42,27 +119,7 @@ export function mapUsersToBotSettings(
   botId: string,
   reason: string,
 ): Record<string, unknown>[] {
-  const bot = Number.parseInt(botId, 10) || 1;
-  return rows.map((item) => {
-    const obj: Record<string, unknown> = { botId: bot };
-    if (item.mobile) obj.phone_number = item.mobile;
-    if (item.clientName) obj.app_name = item.clientName;
-    obj.language = languageByState(item.state);
-    const clientName = String(item.name || '')
-      .replace(/_/g, ' ')
-      .trim();
-    if (clientName) obj.client_name = clientName;
-    if (item._id) obj.id = item._id;
-    if (item.state) obj.state = item.state;
-    if (item.city) obj.city = item.city;
-    if (item.email) obj.email = item.email;
-    if (item.activeUser) {
-      const lastPlayed = formatDisplayDate(item.activeUser);
-      if (lastPlayed) obj.last_played_date = lastPlayed;
-    }
-    if (reason) obj.reason = reason;
-    return obj;
-  });
+  return rows.map((item) => buildBotDialoutSetting(item, botId, reason));
 }
 
 /** Leads for external dialer batch (laxminarayan addDialerCalls). */

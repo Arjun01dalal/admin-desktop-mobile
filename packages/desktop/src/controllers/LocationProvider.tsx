@@ -38,6 +38,9 @@ type OsFailure = {
   message: string;
 };
 
+const LOCATION_OFF_MESSAGE =
+  'Location is turned off. Turn Location ON in System Settings to use the panel.';
+
 function tryOsLocation(timeoutMs = 5000): Promise<Coords> {
   return new Promise((resolve, reject: (err: OsFailure) => void) => {
     if (!navigator.geolocation) {
@@ -67,8 +70,7 @@ function tryOsLocation(timeoutMs = 5000): Promise<Coords> {
         if (err.code === err.POSITION_UNAVAILABLE) {
           reject({
             kind: 'unavailable',
-            message:
-              'Location Services unavailable. Turn Location ON in System Settings, or continue with network location.',
+            message: LOCATION_OFF_MESSAGE,
           });
           return;
         }
@@ -108,6 +110,10 @@ async function tryNetworkLocation(): Promise<{
   };
 }
 
+function isHardLocationOff(failure: OsFailure): boolean {
+  return failure.kind === 'denied' || failure.kind === 'unavailable';
+}
+
 type Props = {
   children: ReactNode;
 };
@@ -127,6 +133,15 @@ export function LocationProvider({ children }: Props) {
   useEffect(() => {
     coordsRef.current = coords;
   }, [coords]);
+
+  const blockForLocationOff = useCallback((message: string) => {
+    setCoords(null);
+    setAddress(null);
+    setSource(null);
+    setError(message);
+    setDialogOpen(true);
+    hadLocationRef.current = false;
+  }, []);
 
   const markSuccess = useCallback((next: Coords, nextSource: LocationSource, nextAddress?: AddressInfo | null) => {
     setCoords(next);
@@ -174,18 +189,13 @@ export function LocationProvider({ children }: Props) {
           } catch (osErr) {
             const failure = osErr as OsFailure;
 
-            // Hard deny → show settings popup (user must allow)
-            if (failure.kind === 'denied') {
-              setCoords(null);
-              setAddress(null);
-              setSource(null);
-              setError(failure.message);
-              setDialogOpen(true);
-              hadLocationRef.current = false;
+            // Location off / permission denied → hard block (no network bypass)
+            if (isHardLocationOff(failure)) {
+              blockForLocationOff(failure.message);
               throw new Error(failure.message);
             }
 
-            // Timeout / unavailable is very common in Electron on macOS.
+            // Timeout is common in Electron on macOS even when Location is ON.
             // Fall through to network location so the app is not stuck.
           }
 
@@ -217,7 +227,7 @@ export function LocationProvider({ children }: Props) {
       inflightRef.current = run;
       return run;
     },
-    [markSuccess],
+    [blockForLocationOff, markSuccess],
   );
 
   const openLocationSettings = useCallback(() => {
@@ -227,6 +237,19 @@ export function LocationProvider({ children }: Props) {
   useEffect(() => {
     requestLocation({ force: true }).catch(() => {});
   }, [requestLocation]);
+
+  // While the block dialog is open, keep checking so the panel unlocks
+  // as soon as Location is turned back on (no need to tap Try again).
+  useEffect(() => {
+    if (!dialogOpen) return;
+
+    const poll = () => {
+      requestLocation({ force: true }).catch(() => {});
+    };
+
+    const id = window.setInterval(poll, 2500);
+    return () => window.clearInterval(id);
+  }, [dialogOpen, requestLocation]);
 
   // Recheck when returning to the app only if we still have no location
   useEffect(() => {
@@ -248,6 +271,35 @@ export function LocationProvider({ children }: Props) {
     };
   }, [requestLocation]);
 
+  // While using the panel with a location, detect if Location Services are turned off.
+  useEffect(() => {
+    if (!coords) return;
+
+    let cancelled = false;
+
+    const watch = async () => {
+      try {
+        await tryOsLocation(5000);
+      } catch (osErr) {
+        if (cancelled) return;
+        const failure = osErr as OsFailure;
+        if (isHardLocationOff(failure)) {
+          blockForLocationOff(failure.message);
+        }
+        // Timeouts while Location is still ON are ignored — keep existing coords.
+      }
+    };
+
+    const id = window.setInterval(() => {
+      void watch();
+    }, 12_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [coords, blockForLocationOff]);
+
   const value = useMemo<LocationContextValue>(
     () => ({
       coords,
@@ -262,16 +314,18 @@ export function LocationProvider({ children }: Props) {
     [coords, address, source, error, loading, requestLocation, openLocationSettings],
   );
 
+  const blocked = dialogOpen && !coords;
+
   return (
     <LocationContext.Provider value={value}>
       {children}
       <LocationEnableDialog
-        open={dialogOpen && !coords}
+        open={blocked}
         loading={loading}
         error={error}
         onEnable={() => {
           requestLocation({ force: true }).catch(() => {
-            toast.error('Still no location. Turn on Location + internet, then retry.');
+            toast.error('Still no location. Turn on Location, then retry.');
           });
         }}
         onOpenSettings={openLocationSettings}

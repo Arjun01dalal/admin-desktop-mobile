@@ -196,37 +196,41 @@ export function UsersToolbar(props: UsersToolbarProps) {
             Global User : {props.globalCount}
           </Button>
         )}
-        <TextField
-          select
-          label="Select Bot ID"
-          size="small"
-          value={props.botId}
-          onChange={(e) => props.onBotId(e.target.value)}
-          sx={fieldSx}
-        >
-          <MenuItem value="">Select Bot ID</MenuItem>
-          {BOT_ID_OPTIONS.map((id) => (
-            <MenuItem key={id} value={id}>
-              {id}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          label="Campaign List"
-          size="small"
-          value={props.campaignId}
-          onChange={(e) => props.onCampaignId(e.target.value)}
-          sx={{ ...fieldSx, minWidth: 160 }}
-        >
-          <MenuItem value="">Campaign List</MenuItem>
-          {campaignOptions.map((c) => (
-            <MenuItem key={c.value} value={c.value}>
-              {c.label}
-            </MenuItem>
-          ))}
-        </TextField>
-        {props.canAddToBot && (
+        {!props.isCaller && (
+          <TextField
+            select
+            label="Select Bot ID"
+            size="small"
+            value={props.botId}
+            onChange={(e) => props.onBotId(e.target.value)}
+            sx={fieldSx}
+          >
+            <MenuItem value="">Select Bot ID</MenuItem>
+            {BOT_ID_OPTIONS.map((id) => (
+              <MenuItem key={id} value={id}>
+                {id}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+        {!props.isCaller && (
+          <TextField
+            select
+            label="Campaign List"
+            size="small"
+            value={props.campaignId}
+            onChange={(e) => props.onCampaignId(e.target.value)}
+            sx={{ ...fieldSx, minWidth: 160 }}
+          >
+            <MenuItem value="">Campaign List</MenuItem>
+            {campaignOptions.map((c) => (
+              <MenuItem key={c.value} value={c.value}>
+                {c.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+        {props.canAddToBot && !props.isCaller && (
           <Button
             sx={orangeBtnSx}
             disabled={props.dialerLoading}
@@ -254,7 +258,7 @@ export function UsersToolbar(props: UsersToolbarProps) {
             Add User Data
           </Button>
         )}
-        {props.canAddToDialer && (
+        {props.canAddToDialer && !props.isCaller && (
           <Button
             sx={orangeBtnSx}
             disabled={props.dialerLoading}

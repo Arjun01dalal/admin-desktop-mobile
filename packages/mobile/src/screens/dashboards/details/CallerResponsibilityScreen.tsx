@@ -223,8 +223,16 @@ export function CallerResponsibilityScreen() {
     const cols: DataTableColumn<CallerRow>[] = [
       { key: 'sr', label: 'SR. No', width: 60, render: (_r, i) => String(i + 1) },
       { key: 'pseudo', label: 'Pseudo Name', width: 130, render: (r) => String(r.subAdminName ?? 'Company') },
-      { key: 'real', label: 'Real Name', width: 130, render: (r) => displayName(r.realName) },
     ];
+    // Callers must not see employee real names — Pseudo Name only.
+    if (!isCaller) {
+      cols.push({
+        key: 'real',
+        label: 'Real Name',
+        width: 130,
+        render: (r) => displayName(r.realName),
+      });
+    }
     if (showLocation) {
       cols.push({ key: 'office', label: 'Office Location', width: 110, render: (r) => cellText(r.officeLocation) });
     }

@@ -187,9 +187,25 @@ function allowDevTools() {
 
 /**
  * Minimal app menu — never include View / Toggle Developer Tools / Inspect.
- * Windows/Linux: no window menu bar. macOS: app menu only (About / Quit).
+ * Always keep Edit roles (copy/paste/cut/selectAll) so callers can paste into
+ * search fields — Windows/Linux ignore Ctrl+C/V without these menu roles.
+ * Windows/Linux: menu bar stays hidden via autoHideMenuBar on the BrowserWindow.
+ * macOS: app menu + Edit.
  */
 function installApplicationMenu() {
+  const editMenu = {
+    label: 'Edit',
+    submenu: [
+      { role: 'undo' },
+      { role: 'redo' },
+      { type: 'separator' },
+      { role: 'cut' },
+      { role: 'copy' },
+      { role: 'paste' },
+      { role: 'selectAll' },
+    ],
+  };
+
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
@@ -205,11 +221,13 @@ function installApplicationMenu() {
             { role: 'quit' },
           ],
         },
+        editMenu,
       ]),
     );
     return;
   }
-  Menu.setApplicationMenu(null);
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate([editMenu]));
 }
 
 function isDevtoolsShortcut(input) {
@@ -230,6 +248,27 @@ function hardenWebContents(wc) {
     if (!allowDevTools() && isDevtoolsShortcut(input)) {
       event.preventDefault();
     }
+  });
+
+  // Right-click paste/copy in inputs (search filters) — needed when menu bar is hidden.
+  wc.on('context-menu', (_event, params) => {
+    if (!params.isEditable && !params.selectionText) return;
+    const template = [];
+    if (params.isEditable) {
+      template.push(
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut', enabled: params.editFlags?.canCut !== false },
+        { role: 'copy', enabled: params.editFlags?.canCopy !== false },
+        { role: 'paste', enabled: params.editFlags?.canPaste !== false },
+        { role: 'selectAll', enabled: params.editFlags?.canSelectAll !== false },
+      );
+    } else if (params.selectionText) {
+      template.push({ role: 'copy' });
+    }
+    if (!template.length) return;
+    Menu.buildFromTemplate(template).popup({ window: BrowserWindow.fromWebContents(wc) || undefined });
   });
 
   wc.on('devtools-opened', () => {

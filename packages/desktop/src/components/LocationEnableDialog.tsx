@@ -30,7 +30,16 @@ export function LocationEnableDialog({
     <Dialog
       open={open}
       disableEscapeKeyDown
+      hideBackdrop={false}
       onClose={() => undefined}
+      slotProps={{
+        backdrop: {
+          sx: {
+            backgroundColor: 'rgba(0, 0, 0, 0.72)',
+            pointerEvents: 'auto',
+          },
+        },
+      }}
       PaperProps={{
         sx: {
           bgcolor: '#2b2b30',
@@ -55,14 +64,14 @@ export function LocationEnableDialog({
         >
           <MyLocationIcon fontSize="small" />
         </Box>
-        Enable Location
+        Location Required
       </DialogTitle>
 
       <DialogContent>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          We could not get your device location. On Electron/macOS, GPS often times out.
-          Turn <strong>Location</strong> ON in Settings (allow Electron), or ensure you are
-          online — we will use network location automatically.
+        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)', mb: 1.5 }}>
+          Location is turned off. You cannot use the panel until Location is ON.
+          Turn it on in System Settings — this alert will close automatically once
+          location is available.
         </Typography>
         {error && (
           <Typography variant="caption" color="error" display="block">

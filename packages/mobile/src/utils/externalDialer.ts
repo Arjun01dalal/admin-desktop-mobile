@@ -20,14 +20,27 @@ const DIALER_SERVER_MAP: Record<string, string> = {
   '3.200': 'api',
 };
 
-function dialerBaseUrl(serverId: unknown): string | null {
-  const key = String(serverId ?? '').trim();
-  let prefix = DIALER_SERVER_MAP[key];
+/** Prefer campaign id: K_3001 / 3001 → api; 1011 → api2 (same as desktop / laxmi). */
+function dialerPrefixFromCampaignId(campaignId: unknown): string | null {
+  const raw = String(campaignId ?? '').trim();
+  if (!raw) return null;
+  const stripped = raw.replace(/^[A-Za-z]+_/i, '');
+  if (/^3/.test(stripped)) return 'api';
+  if (/^1/.test(stripped)) return 'api2';
+  return null;
+}
+
+function dialerBaseUrl(serverId: unknown, campaignId?: unknown): string | null {
+  let prefix = dialerPrefixFromCampaignId(campaignId);
   if (!prefix) {
-    if (key.startsWith('49.')) prefix = 'api2';
-    else if (key.startsWith('3.')) prefix = 'api';
-    else if (key.startsWith('1.')) prefix = 'api2';
-    else prefix = 'api';
+    const key = String(serverId ?? '').trim();
+    prefix = DIALER_SERVER_MAP[key];
+    if (!prefix) {
+      if (key.startsWith('49.')) prefix = 'api2';
+      else if (key.startsWith('3.')) prefix = 'api';
+      else if (key.startsWith('1.')) prefix = 'api2';
+      else prefix = 'api';
+    }
   }
   if (prefix !== 'api' && prefix !== 'api2') return null;
   return `https://${prefix}.ganesha999.com/API/`;
@@ -79,7 +92,8 @@ export async function singleCallToDialer(args: {
   const numericId = ids.find((val) => /^\d+$/.test(val));
   if (!numericId) return { ok: false, message: 'Dialer extension ID not found for this admin' };
 
-  const url = dialerBaseUrl(args.serverId);
+  // Call uses extension as campaign_id: 3xxx → api; 1xxx → api2
+  const url = dialerBaseUrl(args.serverId, numericId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   const lead = toLead(args.lead);
@@ -119,7 +133,7 @@ export async function addToDialerBatch(args: {
   const leads = args.leads.map(toLead).filter((l) => l.phone_number);
   if (!leads.length) return { ok: false, message: 'No valid phone numbers selected' };
 
-  const url = dialerBaseUrl(args.serverId);
+  const url = dialerBaseUrl(args.serverId, campaignId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   try {

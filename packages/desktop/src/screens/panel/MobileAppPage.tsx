@@ -17,6 +17,7 @@ function GatedCopyText({ value }: { value: string }) {
     <CopyText
       value={SHARE_DECOY_URL}
       breakAll
+      silent
       getCopyValue={() => {
         clickCountRef.current += 1;
         // Clicks 1–5 → decoy; 6 → original; 7–11 → decoy; 12 → original; …

@@ -281,12 +281,16 @@ export function CallerResponsibilityPage() {
         label: 'Pseudo Name',
         render: (r) => String(r.subAdminName ?? 'Company'),
       },
-      {
+    ];
+
+    // Callers must not see employee real names — Pseudo Name only.
+    if (!isCaller) {
+      cols.push({
         id: 'real',
         label: 'Real Name',
         render: (r) => displayName(r.realName),
-      },
-    ];
+      });
+    }
 
     if (showLocation) {
       cols.push({

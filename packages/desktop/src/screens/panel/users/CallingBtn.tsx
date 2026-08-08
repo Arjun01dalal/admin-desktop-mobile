@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -14,7 +14,7 @@ import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { getStoredUser } from '@/utils/dates';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
-import { languageByState } from './toolbarHelpers';
+import { buildBotDialoutSetting } from './toolbarHelpers';
 import type { UserRow } from './utils';
 
 type CallingAdmin = {
@@ -52,7 +52,17 @@ export function CallingBtn({
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const listId = extensionIds(admin).join(', ') || '—';
+
+  const ids = useMemo(() => extensionIds(admin), [admin]);
+  const numericCampaignId = useMemo(
+    () => ids.find((val) => /^\d+$/.test(val)) || '',
+    [ids],
+  );
+  // Same values posted by externalDialerSingle / laxmi sendData
+  const dialerListId = numericCampaignId ? `9${numericCampaignId}` : '—';
+  const dialerListName = `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`;
+  const dialerCampaignId = numericCampaignId || '—';
+  const dialerCampaignLabel = campaignName?.trim() || dialerCampaignId;
 
   const mobile = String(item.mobile || item.userMobile || '');
 
@@ -61,6 +71,10 @@ export function CallingBtn({
 
   /** Manual Call — external dialer single lead (laxminarayan sendData). */
   const sendData = async () => {
+    if (!numericCampaignId) {
+      toast.error('Dialer extension / campaign ID not found for this admin');
+      return;
+    }
     setBusy(true);
     try {
       const res = await secureApi('callLogs.externalDialerSingle', {
@@ -73,7 +87,7 @@ export function CallingBtn({
           app_name: item.clientName,
           caller_user_id: item._id,
         },
-        extensionId: extensionIds(admin),
+        extensionId: ids,
         adminName: admin?.name || 'ADMIN',
         serverId: admin?.serverId,
       });
@@ -88,41 +102,14 @@ export function CallingBtn({
     }
   };
 
-  /** Bot Call — SubAdmin/add-to-dialer (laxminarayan initiateBotCall). */
+  /** Bot Call — POST /SubAdmin/add-to-dialer (laxminarayan initiateBotCall). */
   const initiateBotCall = async () => {
     setBusy(true);
     try {
-      const setting: Record<string, unknown> = {
-        botId: Number.parseInt(String(botId || '1'), 10) || 1,
-        reason: reasonList || 'User List',
-        language: languageByState(String(item.state || '')),
-      };
-      if (mobile) setting.phone_number = mobile;
-      if (item.clientName) setting.app_name = item.clientName;
-      if (item.name) setting.client_name = String(item.name).replace(/_/g, ' ').trim();
-      if (item._id) setting.id = item._id;
-      if (item.state) setting.state = item.state;
-      if (item.city) setting.city = item.city;
-      if (item.email) setting.email = item.email;
-      if (item.activeUser) {
-        const raw = String(item.activeUser);
-        // Support already-formatted or ISO dates
-        const parsed = raw.includes('-') && raw.length <= 10
-          ? new Date(raw.split('-').reverse().join('-'))
-          : new Date(raw);
-        if (!Number.isNaN(parsed.getTime())) {
-          setting.last_played_date = parsed.toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          });
-        }
-      }
-
       const res = await secureApi('callLogs.addToBotDialer', {
         userId: admin?._id,
         created_by: admin?.name,
-        dialout_settings: [setting],
+        dialout_settings: [buildBotDialoutSetting(item, botId, reasonList)],
       });
       if (!res.ok) {
         toast.error(res.message || 'Bot call failed');
@@ -200,16 +187,24 @@ export function CallingBtn({
             }}
           >
             <Typography variant="caption" sx={{ color: '#777', fontWeight: 500 }}>
+              CAMPAIGN ID
+            </Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: 18, color: '#1976d2', mb: 1.5 }}>
+              {dialerCampaignLabel}
+            </Typography>
+
+            <Typography variant="caption" sx={{ color: '#777', fontWeight: 500 }}>
               LIST ID
             </Typography>
             <Typography sx={{ fontWeight: 700, fontSize: 18, color: '#1976d2', mb: 1.5 }}>
-              {listId}
+              {dialerListId}
             </Typography>
+
             <Typography variant="caption" sx={{ color: '#777', fontWeight: 500 }}>
-              CAMPAIGN
+              LIST NAME
             </Typography>
             <Typography sx={{ fontWeight: 600, fontSize: 15 }}>
-              {campaignName || 'ABNorth'}
+              {dialerListName}
             </Typography>
           </Box>
           <Typography sx={{ textAlign: 'center', mt: 2, fontSize: 13, color: 'text.secondary' }}>
@@ -224,7 +219,7 @@ export function CallingBtn({
             fullWidth
             variant="contained"
             onClick={() => void sendData()}
-            disabled={busy}
+            disabled={busy || !numericCampaignId}
             sx={{ fontWeight: 600 }}
           >
             Submit

@@ -695,6 +695,7 @@ export function CopyText({
   breakAll = false,
   onClick,
   getCopyValue,
+  silent = false,
 }: {
   value: string;
   breakAll?: boolean;
@@ -702,6 +703,8 @@ export function CopyText({
   onClick?: () => void;
   /** Override clipboard text (e.g. gated / decoy copy). Defaults to `value`. */
   getCopyValue?: () => string;
+  /** When true, skip the "Copied" toast. */
+  silent?: boolean;
 }) {
   if (!value) return <>—</>;
 
@@ -733,7 +736,7 @@ export function CopyText({
         onClick={(e) => {
           e.stopPropagation();
           const text = getCopyValue ? getCopyValue() : value;
-          void copyToClipboard(text);
+          void copyToClipboard(text, { silent });
         }}
         aria-label="Copy"
       >
