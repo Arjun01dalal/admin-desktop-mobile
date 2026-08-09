@@ -22,6 +22,7 @@ import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import { todayIST } from '../../../utils/dates';
 import { mapUsersToBotSettings } from '../../../utils/dialerHelpers';
+import { DateField } from '../../../components/DateField';
 
 type BotUser = {
   _id?: string;
@@ -250,27 +251,11 @@ export function BotDataScreen() {
         <View style={styles.rowTwo}>
           <View style={styles.field}>
             <Text style={styles.label}>From Date</Text>
-            <TextInput
-              style={styles.input}
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.input} value={startDate} onChange={setStartDate} />
           </View>
           <View style={styles.field}>
             <Text style={styles.label}>To Date</Text>
-            <TextInput
-              style={styles.input}
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.input} value={endDate} onChange={setEndDate} />
           </View>
         </View>
 

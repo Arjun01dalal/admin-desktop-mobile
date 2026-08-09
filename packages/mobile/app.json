@@ -37,7 +37,8 @@
         {
           "locationWhenInUsePermission": "This app records your location while you are signed in for security and audit purposes."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

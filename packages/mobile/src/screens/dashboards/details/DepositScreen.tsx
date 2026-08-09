@@ -30,6 +30,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { SlipOcrWebView, extractUtrFromText } from './utrOcr';
+import { DateField } from '../../../components/DateField';
 
 type DepositRow = {
   _id: string;
@@ -709,13 +710,7 @@ export function DepositScreen() {
               />
 
               <Text style={styles.fieldLabel}>Payment Date (YYYY-MM-DD)</Text>
-              <TextInput
-                style={styles.input}
-                value={sDate}
-                onChangeText={setSDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.muted}
-              />
+              <DateField style={styles.input} value={sDate} onChange={setSDate} />
 
               <Text style={styles.fieldLabel}>UTR No</Text>
               <TouchableOpacity

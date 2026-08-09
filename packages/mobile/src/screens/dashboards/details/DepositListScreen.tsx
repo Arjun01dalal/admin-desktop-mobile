@@ -31,6 +31,7 @@ import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { DateField } from '../../../components/DateField';
 
 type MidTotal = { mid?: string; amount?: number | string; count?: number | string };
 
@@ -433,27 +434,11 @@ export function DepositListScreen() {
         <View style={styles.datesRow}>
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>From</Text>
-            <TextInput
-              style={styles.dateInput}
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.dateInput} value={startDate} onChange={setStartDate} />
           </View>
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>To</Text>
-            <TextInput
-              style={styles.dateInput}
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.dateInput} value={endDate} onChange={setEndDate} />
           </View>
           <TouchableOpacity
             style={styles.applyBtn}
