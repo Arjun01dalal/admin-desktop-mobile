@@ -307,6 +307,88 @@ function detailText(r: Rec): string {
   return bits.join(' · ') || '—';
 }
 
+/** Desktop parity: parse betAmountsByCategory payload into {name, amount} bars. */
+function parseChartPayload(raw: unknown): { name: string; amount: number }[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  let map = raw as Rec;
+  if (
+    map.data &&
+    typeof map.data === 'object' &&
+    !Array.isArray(map.data) &&
+    !('betAmount' in (map.data as object))
+  ) {
+    const inner = map.data as Rec;
+    const innerKeys = Object.keys(inner);
+    if (
+      innerKeys.some((k) => ['casino', 'exchange', 'sattamatka'].includes(k.toLowerCase())) ||
+      innerKeys.some((k) => {
+        const v = inner[k];
+        return v != null && typeof v === 'object' && 'betAmount' in (v as object);
+      })
+    ) {
+      map = inner;
+    }
+  }
+  if (map.payload && typeof map.payload === 'object' && !Array.isArray(map.payload)) {
+    map = map.payload as Rec;
+  }
+  const skip = new Set(['success', 'message', 'status', 'token', 'payload', 'data']);
+  const preferred = ['casino', 'exchange', 'sattamatka'];
+  const entries = Object.entries(map).filter(([k, v]) => !skip.has(k) && v != null);
+  const byLower = new Map(entries.map(([k, v]) => [k.toLowerCase(), { key: k, value: v }] as const));
+  const ordered: string[] = [];
+  for (const p of preferred) {
+    const hit = byLower.get(p);
+    if (hit) ordered.push(hit.key);
+  }
+  for (const [k] of entries) if (!ordered.includes(k)) ordered.push(k);
+  return ordered.map((key) => {
+    const v = byLower.get(key.toLowerCase())?.value;
+    let amount = 0;
+    if (typeof v === 'number') amount = v;
+    else if (typeof v === 'string') amount = Number(v.replace(/,/g, '')) || 0;
+    else if (v && typeof v === 'object') {
+      const o = v as Rec;
+      amount = Number(o.betAmount ?? o.BetAmount ?? o.amount ?? o.Amount ?? 0) || 0;
+    }
+    return { name: key.toUpperCase(), amount };
+  });
+}
+
+const BAR_COLORS = ['#4fc3f7', '#ffb74d', '#81c784', '#e57373', '#ba68c8', '#f06292'];
+
+/** Bet Amount Overview bars (desktop chart, RN Views version). */
+function BetAmountChart({ data }: { data: { name: string; amount: number }[] }) {
+  if (!data.length) return null;
+  const max = Math.max(...data.map((d) => d.amount), 1);
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>Bet Amount Overview</Text>
+      {data.map((d, i) => (
+        <View key={d.name} style={styles.chartRow}>
+          <Text style={styles.chartLabel} numberOfLines={1}>
+            {d.name}
+          </Text>
+          <View style={styles.chartTrack}>
+            <View
+              style={[
+                styles.chartBar,
+                {
+                  width: `${Math.max(d.amount > 0 ? 2 : 0, (d.amount / max) * 100)}%`,
+                  backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.chartValue} numberOfLines={1}>
+            {Math.floor(d.amount).toLocaleString('en-IN')}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function WalletTab({ userId }: { userId: string }) {
   const [rows, setRows] = useState<Rec[]>([]);
   const [page, setPage] = useState(1);
@@ -315,6 +397,22 @@ function WalletTab({ userId }: { userId: string }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [txType, setTxType] = useState<'' | 'CR' | 'DR'>('');
+  const [chartData, setChartData] = useState<{ name: string; amount: number }[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const res = await secureApi('userReport.betAmountsByCategory', {
+        userId: String(userId),
+        startDate: startDate || '',
+        endDate: endDate || '',
+      });
+      if (alive) setChartData(res.ok ? parseChartPayload(res.data) : []);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId, startDate, endDate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -375,6 +473,7 @@ function WalletTab({ userId }: { userId: string }) {
 
   return (
     <View>
+      <BetAmountChart data={chartData} />
       <View style={styles.filterRow}>
         <View style={styles.dateWrap}>
           <DateField value={startDate} onChange={(v) => { setStartDate(v); setPage(1); }} placeholder="From" />
@@ -1426,4 +1525,25 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   submitBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  chartCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(3),
+  },
+  chartTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', marginBottom: spacing(2) },
+  chartRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing(1.5) },
+  chartLabel: { color: colors.muted, fontSize: 11, width: 92 },
+  chartTrack: {
+    flex: 1,
+    height: 14,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    marginHorizontal: spacing(2),
+  },
+  chartBar: { height: '100%', borderRadius: radius.sm },
+  chartValue: { color: colors.foreground, fontSize: 11, fontWeight: '700', width: 76, textAlign: 'right' },
 });
