@@ -5,7 +5,7 @@
  * we keep a plain TextInput there (workspace preview only).
  */
 import React, { useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, radius, spacing } from '../theme';
 
@@ -52,17 +52,40 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', style }
           {value || placeholder}
         </Text>
       </TouchableOpacity>
-      {open ? (
+      {open && Platform.OS === 'android' ? (
         <DateTimePicker
           value={parseYmd(value)}
           mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display="default"
           onChange={(event, selected) => {
             setOpen(false);
             if (event.type === 'dismissed' || !selected) return;
             onChange(toYmd(selected));
           }}
         />
+      ) : null}
+      {Platform.OS === 'ios' ? (
+        <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+          <View style={styles.backdrop}>
+            <View style={styles.pickerCard}>
+              <DateTimePicker
+                value={parseYmd(value)}
+                mode="date"
+                display="inline"
+                themeVariant="dark"
+                accentColor={colors.primary}
+                onChange={(event, selected) => {
+                  if (!selected) return;
+                  onChange(toYmd(selected));
+                  setOpen(false);
+                }}
+              />
+              <TouchableOpacity style={styles.doneBtn} onPress={() => setOpen(false)}>
+                <Text style={styles.doneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       ) : null}
     </>
   );
@@ -80,4 +103,25 @@ const styles = StyleSheet.create({
   },
   valueText: { color: colors.foreground, fontSize: 13 },
   placeholderText: { color: colors.muted, fontSize: 13 },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing(4),
+  },
+  pickerCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3),
+  },
+  doneBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    marginTop: spacing(2),
+  },
+  doneText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
 });
