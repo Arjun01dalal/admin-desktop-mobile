@@ -654,47 +654,58 @@ function FundTab({ userId }: { userId: string }) {
   }, [load]);
 
   const columns = useMemo<DataTableColumn<Rec>[]>(() => {
+    const updatedByName = (r: Rec) => {
+      const u = r.updatedBy;
+      return u && typeof u === 'object' ? display((u as Rec).name) : display(u);
+    };
     if (type === 'withdrawal') {
       return [
-        { key: 'ptype', label: 'Type', width: 90, render: (r) => display(r.paymentType ?? r.type) },
+        { key: 'ptype', label: 'Payment Type', width: 100, render: (r) => display(r.paymentType ?? r.type) },
+        { key: 'dp', label: 'DP Id', width: 110, render: (r) => display(r.dp_id ?? r.userId) },
         { key: 'amount', label: 'Amount', width: 90, render: (r) => floorNum(num(r.amount)).toLocaleString('en-IN') },
         { key: 'status', label: 'Status', width: 90, render: (r) => display(r.status) },
-        { key: 'txn', label: 'Transaction', width: 140, render: (r) => display(r.transactionId ?? r.orderId) },
-        { key: 'account', label: 'Account', width: 130, render: (r) => display(r.accountNo) },
-        { key: 'holder', label: 'Holder', width: 120, render: (r) => display(r.accountHolderName) },
+        { key: 'txn', label: 'Transaction Id', width: 140, render: (r) => display(r.transactionId ?? r.orderId) },
+        { key: 'mobile', label: 'Mobile', width: 110, render: (r) => display(r.mobile) },
+        { key: 'account', label: 'Account No', width: 130, render: (r) => display(r.accountNo) },
+        { key: 'holder', label: 'Account Holder', width: 130, render: (r) => display(r.accountHolderName) },
+        { key: 'orderId', label: 'Order Id', width: 140, render: (r) => display(r.orderId) },
         { key: 'ifsc', label: 'IFSC', width: 100, render: (r) => display(r.ifsc ?? r.IfscCode) },
-        { key: 'bank', label: 'Bank', width: 110, render: (r) => display(r.userBankName ?? r.bankName) },
-        { key: 'provider', label: 'Provider', width: 110, render: (r) => display(r.withdrewalProviderName) },
-        { key: 'created', label: 'Created On', width: 140, render: (r) => when(r) },
+        { key: 'ubank', label: 'User Bank', width: 110, render: (r) => display(r.userBankName) },
+        { key: 'bank', label: 'Bank', width: 110, render: (r) => display(r.bankName) },
+        { key: 'provider', label: 'Provider', width: 120, render: (r) => display(r.withdrewalProviderName) },
+        { key: 'commission', label: 'Commission', width: 90, render: (r) => floorNum(num(r.CommissionAmount ?? r.commission)).toLocaleString('en-IN') },
+        { key: 'created', label: 'Date/Time', width: 140, render: (r) => when(r) },
       ];
     }
     if (type === 'coin') {
       return [
-        { key: 'ptype', label: 'Type', width: 90, render: (r) => display(r.paymentType ?? r.type) },
-        { key: 'amount', label: 'Amount', width: 90, render: (r) => floorNum(num(r.balance ?? r.amount)).toLocaleString('en-IN') },
-        {
-          key: 'updatedBy',
-          label: 'Updated By',
-          width: 120,
-          render: (r) => {
-            const u = r.updatedBy;
-            return u && typeof u === 'object' ? display((u as Rec).name) : display(u);
-          },
-        },
+        { key: 'ptype', label: 'Payment Type', width: 100, render: (r) => display(r.paymentType ?? r.type) },
+        { key: 'uid', label: 'User Id', width: 110, render: (r) => display(r.userId) },
+        { key: 'amount', label: 'Balance', width: 90, render: (r) => floorNum(num(r.balance ?? r.amount)).toLocaleString('en-IN') },
+        { key: 'updatedBy', label: 'Updated By', width: 120, render: updatedByName },
         { key: 'reason', label: 'Reason', width: 130, render: (r) => display(r.reason) },
         { key: 'tag', label: 'Tag', width: 90, render: (r) => display(r.tag) },
         { key: 'remark', label: 'Remark', width: 140, render: (r) => display(r.remark) },
-        { key: 'created', label: 'Created On', width: 140, render: (r) => when(r) },
+        { key: 'created', label: 'Date/Time', width: 140, render: (r) => when(r) },
       ];
     }
     return [
-      { key: 'ptype', label: 'Type', width: 90, render: (r) => display(r.paymentType ?? r.type) },
+      { key: 'ptype', label: 'Payment Type', width: 100, render: (r) => display(r.paymentType ?? r.type) },
       { key: 'amount', label: 'Amount', width: 90, render: (r) => floorNum(num(r.amount)).toLocaleString('en-IN') },
-      { key: 'status', label: 'Status', width: 90, render: (r) => display(r.status) },
       { key: 'orderId', label: 'Order Id', width: 150, render: (r) => display(r.orderId ?? r.order_id) },
+      { key: 'orderKey', label: 'Order Key Id', width: 150, render: (r) => display(r.orderKeyId) },
       { key: 'gateway', label: 'Gateway', width: 110, render: (r) => display(r.paymentGatewayName ?? r.gateway) },
       { key: 'mid', label: 'MID', width: 100, render: (r) => display(r.mid) },
-      { key: 'created', label: 'Created On', width: 140, render: (r) => when(r) },
+      { key: 'name', label: 'User Name', width: 120, render: (r) => display(r.userName ?? r.name) },
+      { key: 'status', label: 'Status', width: 90, render: (r) => display(r.status) },
+      { key: 'email', label: 'Email', width: 150, render: (r) => display(r.email ?? r.userEmail) },
+      { key: 'mobile', label: 'Mobile', width: 110, render: (r) => display(r.mobile ?? r.userMobile) },
+      { key: 'city', label: 'City', width: 100, render: (r) => display(r.city ?? r.userCity) },
+      { key: 'state', label: 'State', width: 100, render: (r) => display(r.state ?? r.userState) },
+      { key: 'lat', label: 'Latitude', width: 90, render: (r) => display(r.latitude) },
+      { key: 'lng', label: 'Longitude', width: 90, render: (r) => display(r.longitude) },
+      { key: 'updatedBy', label: 'Updated By', width: 120, render: updatedByName },
+      { key: 'created', label: 'Date/Time', width: 140, render: (r) => when(r) },
     ];
   }, [type]);
 
