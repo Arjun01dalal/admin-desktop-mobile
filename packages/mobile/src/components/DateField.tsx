@@ -76,6 +76,7 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', style }
                 maximumDate={new Date()}
                 themeVariant="dark"
                 accentColor={colors.primary}
+                style={styles.iosPicker}
                 onChange={(event, selected) => {
                   if (!selected) return;
                   onChange(toYmd(selected));
@@ -116,7 +117,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
-    padding: spacing(3),
+    padding: spacing(2),
+  },
+  iosPicker: {
+    transform: [{ scale: 0.85 }],
+    marginVertical: -spacing(4),
   },
   doneBtn: {
     backgroundColor: colors.primary,
