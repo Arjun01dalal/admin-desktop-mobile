@@ -119,6 +119,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_Users,
   },
   {
+    id: 'createUser',
+    label: 'Create User',
+    path: '/create-user',
+    permission: Permissions.create_new_user,
+  },
+  {
     id: 'loginReport',
     label: 'Login Report',
     path: '/login-report',

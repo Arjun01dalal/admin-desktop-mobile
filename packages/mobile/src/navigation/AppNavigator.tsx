@@ -10,6 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
+import { CreateUserScreen } from '../screens/CreateUserScreen';
 import { useRevealCodes } from '../context/useRevealCodes';
 import { TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -146,6 +147,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/bonus-wallet': BonusWalletRequestsScreen as AnyScreen,
   '/DepositApprovedReport': DepositApprovedReportScreen as AnyScreen,
   '/unique_deposit_pending': UniqueDepositPendingScreen as AnyScreen,
+  '/create-user': CreateUserScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {
