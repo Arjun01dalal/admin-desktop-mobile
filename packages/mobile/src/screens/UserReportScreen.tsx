@@ -13,7 +13,8 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { getSessionUser } from '../auth/permissions';
 import { colors, radius, spacing } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import { DataTable, type DataTableColumn } from '../dashboards/ui/DataTable';
@@ -67,7 +68,28 @@ function when(r: Rec): string {
   })}`;
 }
 
-const TABS = ['Wallet History', 'Game History', 'Fund Request'] as const;
+/** Desktop USER_REPORT_TABS parity. */
+const TABS = [
+  'Wallet History',
+  'Game History',
+  'Starline History',
+  'King Bazar History',
+  'Instant Worli History',
+  'Qtech History',
+  'JetFair History',
+  'Falcon History',
+  'Remove Bonus Coins',
+  'Fund Request',
+  'Qtech Provider History',
+  'Qtech Missing Bets',
+  'Jetfair Provider History',
+  'SM Provider History',
+  'Qtech Bet Details',
+  'Crazzy Wheel',
+  'Settle SM Bets',
+  'Settle Jetfair Bets',
+  'Player RTP',
+] as const;
 type Tab = (typeof TABS)[number];
 
 /* ------------------------------ summary card ------------------------------ */
@@ -177,11 +199,54 @@ export function UserReportScreen() {
         ))}
       </ScrollView>
 
-      {tab === 'Wallet History' ? <WalletTab userId={userId} /> : null}
-      {tab === 'Game History' ? <GameTab userId={userId} /> : null}
-      {tab === 'Fund Request' ? <FundTab userId={userId} /> : null}
+      <TabBody tab={tab} userId={userId} />
     </ScrollView>
   );
+}
+
+function TabBody({ tab, userId }: { tab: Tab; userId: string }) {
+  switch (tab) {
+    case 'Wallet History':
+      return <WalletTab userId={userId} />;
+    case 'Game History':
+      return <GameTab userId={userId} />;
+    case 'Fund Request':
+      return <FundTab userId={userId} />;
+    case 'Starline History':
+      return <MatkaTab userId={userId} variant="starline" />;
+    case 'King Bazar History':
+      return <MatkaTab userId={userId} variant="king" />;
+    case 'Instant Worli History':
+      return <MatkaTab userId={userId} variant="worli" />;
+    case 'Crazzy Wheel':
+      return <MatkaTab userId={userId} variant="crazy" />;
+    case 'Qtech History':
+      return <QtechTab userId={userId} />;
+    case 'JetFair History':
+      return <ExchangeTab userId={userId} variant="jetfair" />;
+    case 'Falcon History':
+      return <ExchangeTab userId={userId} variant="falcon" />;
+    case 'Remove Bonus Coins':
+      return <RemoveBonusTab userId={userId} />;
+    case 'Qtech Provider History':
+      return <ProviderTab userId={userId} kind="qtech" />;
+    case 'Qtech Missing Bets':
+      return <ProviderTab userId={userId} kind="missing" />;
+    case 'Jetfair Provider History':
+      return <ProviderTab userId={userId} kind="jetfair" />;
+    case 'SM Provider History':
+      return <ProviderTab userId={userId} kind="sm" />;
+    case 'Qtech Bet Details':
+      return <QtechBetDetailsTab userId={userId} />;
+    case 'Settle SM Bets':
+      return <SettleTab userId={userId} kind="sm" />;
+    case 'Settle Jetfair Bets':
+      return <SettleTab userId={userId} kind="jetfair" />;
+    case 'Player RTP':
+      return <PlayerRtpLink userId={userId} />;
+    default:
+      return null;
+  }
 }
 
 /* --------------------------------- pager ---------------------------------- */
@@ -580,6 +645,688 @@ function FundTab({ userId }: { userId: string }) {
   );
 }
 
+/* -------------------------------- matka tab -------------------------------- */
+
+type MatkaVariant = 'starline' | 'king' | 'worli' | 'crazy';
+
+const MATKA_ACTION: Record<MatkaVariant, string> = {
+  starline: 'userReport.starlineHistory',
+  king: 'userReport.kingBazarHistory',
+  worli: 'userReport.instantWorliHistory',
+  crazy: 'userReport.crazyWheelHistory',
+};
+
+function MatkaTab({ userId, variant }: { userId: string; variant: MatkaVariant }) {
+  const [rows, setRows] = useState<Rec[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [resultDate, setResultDate] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const filter: Rec = { customer_id: userId };
+      if (resultDate) filter.result_date = resultDate;
+      const res = await secureApi(MATKA_ACTION[variant] as Parameters<typeof secureApi>[0], {
+        itemsPerPage: 20,
+        pageNo: page,
+        filter,
+      });
+      setRows(res.ok ? listOf(res.data, 'items') : []);
+      setTotalPages(res.ok ? pagesOf(res.data) : 1);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, variant, page, resultDate]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const columns = useMemo<DataTableColumn<Rec>[]>(() => {
+    const cols: DataTableColumn<Rec>[] = [
+      { key: 'txn', label: 'Txn Id', width: 130, render: (r) => display(r.transaction_id) },
+      { key: 'bazar', label: 'Bazar', width: 110, render: (r) => display(r.bazar_name) },
+    ];
+    if (variant === 'crazy') {
+      cols.push(
+        { key: 'round', label: 'Round', width: 110, render: (r) => display(r.round_id ?? r.roundId) },
+        { key: 'titles', label: 'Title', width: 110, render: (r) => display(r.titles ?? r.game_name) },
+      );
+    } else {
+      cols.push({ key: 'gameName', label: 'Game', width: 110, render: (r) => display(r.game_name) });
+    }
+    cols.push(
+      { key: 'game', label: 'Number', width: 80, render: (r) => display(r.game) },
+      { key: 'resultDate', label: 'Result Date', width: 100, render: (r) => display(r.result_date) },
+      { key: 'point', label: 'Point', width: 70, render: (r) => display(r.point) },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 80,
+        render: (r) => GAME_STATUS[String(r.status ?? '')] ?? display(r.status),
+        color: (r) =>
+          String(r.status) === 'W'
+            ? colors.success
+            : String(r.status) === 'L'
+              ? colors.destructive
+              : undefined,
+      },
+      { key: 'win', label: 'Winning', width: 80, render: (r) => display(r.winning_point) },
+      { key: 'commission', label: 'Commission', width: 90, render: (r) => display(r.commission) },
+      { key: 'bet', label: 'Bet Time', width: 140, render: (r) => when(r) },
+    );
+    return cols;
+  }, [variant]);
+
+  return (
+    <View>
+      <View style={styles.filterRow}>
+        <View style={styles.dateWrap}>
+          <DateField value={resultDate} onChange={(v) => { setResultDate(v); setPage(1); }} placeholder="Result date" />
+        </View>
+      </View>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r._id ?? i)}
+        loading={loading}
+        emptyMessage="No history"
+      />
+      <Pager page={page} totalPages={totalPages} onPage={setPage} />
+    </View>
+  );
+}
+
+/* -------------------------------- qtech tab -------------------------------- */
+
+function QtechTab({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<Rec[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<'' | 'W' | 'L' | 'R'>('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const filter: Rec = { userId };
+      if (status) filter.status = status;
+      const res = await secureApi('userReport.qtechHistory', {
+        itemsPerPage: 20,
+        pageNo: page,
+        filter,
+      });
+      setRows(res.ok ? listOf(res.data, 'items') : []);
+      setTotalPages(res.ok ? pagesOf(res.data) : 1);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, page, status]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const columns = useMemo<DataTableColumn<Rec>[]>(
+    () => [
+      { key: 'txn', label: 'Txn Id', width: 140, render: (r) => display(r.transactionId) },
+      { key: 'round', label: 'Round', width: 120, render: (r) => display(r.roundId) },
+      { key: 'game', label: 'Game', width: 110, render: (r) => display(r.gameId) },
+      { key: 'category', label: 'Category', width: 100, render: (r) => display(r.category) },
+      { key: 'amount', label: 'Amount', width: 80, render: (r) => display(r.amount) },
+      { key: 'win', label: 'Winning', width: 80, render: (r) => display(r.wining ?? r.winning) },
+      { key: 'rollback', label: 'Rollback', width: 80, render: (r) => display(r.rollBackAmount ?? r.rollBack) },
+      { key: 'commission', label: 'Commission', width: 90, render: (r) => display(r.commissionAmount ?? r.commission) },
+      { key: 'afterComm', label: 'After Comm.', width: 90, render: (r) => display(r.amountAfterCommission) },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 80,
+        render: (r) => display(r.status),
+        color: (r) =>
+          String(r.status) === 'W'
+            ? colors.success
+            : String(r.status) === 'L'
+              ? colors.destructive
+              : undefined,
+      },
+      { key: 'created', label: 'Created On', width: 140, render: (r) => when(r) },
+    ],
+    [],
+  );
+
+  return (
+    <View>
+      <View style={styles.chipRowPlain}>
+        {(
+          [
+            ['', 'All'],
+            ['W', 'Win'],
+            ['L', 'Loss'],
+            ['R', 'Rollback'],
+          ] as const
+        ).map(([v, label]) => (
+          <TouchableOpacity
+            key={label}
+            style={[styles.chip, status === v && styles.chipActive]}
+            onPress={() => {
+              setStatus(v);
+              setPage(1);
+            }}
+          >
+            <Text style={[styles.chipText, status === v && styles.chipTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r._id ?? i)}
+        loading={loading}
+        emptyMessage="No Qtech history"
+      />
+      <Pager page={page} totalPages={totalPages} onPage={setPage} />
+    </View>
+  );
+}
+
+/* ------------------------------ exchange tab ------------------------------ */
+
+function ExchangeTab({ userId, variant }: { userId: string; variant: 'jetfair' | 'falcon' }) {
+  const [rows, setRows] = useState<Rec[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const filter: Rec =
+        variant === 'jetfair' ? { clientUsername: userId } : { userId };
+      const res = await secureApi(
+        variant === 'jetfair' ? 'userReport.jetfairHistory' : 'userReport.falconHistory',
+        { itemsPerPage: 20, pageNo: page, filter },
+      );
+      setRows(res.ok ? listOf(res.data, 'items') : []);
+      setTotalPages(res.ok ? pagesOf(res.data) : 1);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, variant, page]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const pick = (r: Rec, ...keys: string[]): string => {
+    for (const k of keys) {
+      if (r[k] !== undefined && r[k] !== null && r[k] !== '') return String(r[k]);
+    }
+    return '—';
+  };
+
+  const columns = useMemo<DataTableColumn<Rec>[]>(
+    () => [
+      { key: 'txn', label: 'Txn Id', width: 140, render: (r) => pick(r, 'transactionId', 'TransactionID') },
+      { key: 'code', label: 'Txn Code', width: 110, render: (r) => pick(r, 'transactionCode', 'TransactionCode') },
+      { key: 'type', label: 'Type', width: 90, render: (r) => pick(r, 'transactionType', 'TransactionType') },
+      { key: 'market', label: 'Market', width: 130, render: (r) => pick(r, 'marketName', 'Marketname') },
+      { key: 'runner', label: 'Runner', width: 120, render: (r) => pick(r, 'runnerName', 'Runnername') },
+      { key: 'gameName', label: 'Game', width: 110, render: (r) => pick(r, 'gameName', 'GameName', 'gameMarket') },
+      { key: 'rate', label: 'Rate', width: 70, render: (r) => pick(r, 'rate', 'Rate') },
+      { key: 'stake', label: 'Stake', width: 80, render: (r) => pick(r, 'stake', 'Stake') },
+      { key: 'betType', label: 'Bet Type', width: 90, render: (r) => pick(r, 'betType', 'BetType') },
+      { key: 'betStatus', label: 'Bet Status', width: 90, render: (r) => pick(r, 'betStatus', 'BetStatus') },
+      { key: 'betPL', label: 'Bet P/L', width: 90, render: (r) => pick(r, 'betPL', 'BetPL') },
+      { key: 'netPL', label: 'Net P/L', width: 90, render: (r) => pick(r, 'netPL', 'NetPL') },
+      { key: 'commission', label: 'Commission', width: 90, render: (r) => pick(r, 'commission', 'commissionAmount') },
+      {
+        key: 'created',
+        label: 'Created On',
+        width: 140,
+        render: (r) => {
+          const raw = (r.createdOn ?? r.CreatedOn ?? r.createdAt) as string | undefined;
+          return raw ? formatDisplayDate(raw) : '—';
+        },
+      },
+    ],
+    [],
+  );
+
+  return (
+    <View>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r._id ?? i)}
+        loading={loading}
+        emptyMessage="No exchange history"
+      />
+      <Pager page={page} totalPages={totalPages} onPage={setPage} />
+    </View>
+  );
+}
+
+/* ---------------------------- remove bonus tab ---------------------------- */
+
+function RemoveBonusTab({ userId }: { userId: string }) {
+  const [amount, setAmount] = useState('');
+  const [remark, setRemark] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const submit = useCallback(async () => {
+    setMsg('');
+    if (!amount.trim() || !remark.trim()) {
+      setMsg('Amount and remark are required');
+      return;
+    }
+    setBusy(true);
+    try {
+      const admin = (getSessionUser() ?? {}) as Rec;
+      const res = await secureApi('userReport.removeBonus', {
+        bonusBy: {
+          name: String(admin.name ?? ''),
+          _id: String(admin._id ?? ''),
+          type: 'remove bonus',
+          transaction: 'credit',
+        },
+        userId,
+        amount: amount.trim(),
+        type: 'remove bonus',
+        remark: remark.trim(),
+      });
+      setMsg(res.message || (res.ok ? 'Bonus removed' : 'Failed to remove bonus'));
+      if (res.ok) {
+        setAmount('');
+        setRemark('');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [userId, amount, remark]);
+
+  return (
+    <View style={styles.formCard}>
+      <Text style={styles.formLabel}>Amount</Text>
+      <TextInput
+        style={styles.input}
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="number-pad"
+        placeholder="Bonus amount to remove"
+        placeholderTextColor={colors.muted}
+      />
+      <Text style={styles.formLabel}>Remark</Text>
+      <TextInput
+        style={styles.input}
+        value={remark}
+        onChangeText={setRemark}
+        placeholder="Reason / remark"
+        placeholderTextColor={colors.muted}
+      />
+      <TouchableOpacity
+        style={[styles.submitBtn, busy && styles.pagerBtnDisabled]}
+        onPress={() => void submit()}
+        disabled={busy}
+      >
+        <Text style={styles.submitBtnText}>{busy ? 'Removing…' : 'Remove Bonus'}</Text>
+      </TouchableOpacity>
+      {msg ? <Text style={styles.muted}>{msg}</Text> : null}
+    </View>
+  );
+}
+
+/* ----------------------------- provider tabs ------------------------------ */
+
+type ProviderKind = 'qtech' | 'missing' | 'jetfair' | 'sm';
+
+function todayYmdIST(): string {
+  return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
+}
+
+function providerList(data: unknown): Rec[] {
+  const obj = unwrap(data);
+  for (const k of [
+    'items',
+    'providerBets',
+    'provider',
+    'providersDetail',
+    'platformBets',
+    'platform',
+    'plateformDetails',
+    'missingInProvider',
+    'missingProviders',
+    'providerMissing',
+    'missingInPlatform',
+    'missingPlatforms',
+    'platformMissing',
+    'list',
+  ]) {
+    if (Array.isArray(obj[k])) return obj[k] as Rec[];
+  }
+  return Array.isArray(data) ? (data as Rec[]) : [];
+}
+
+const SM_MARKET_CODES = ['301', '401', '501', '701', '801'] as const;
+
+function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
+  const [rows, setRows] = useState<Rec[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState(todayYmdIST());
+  const [endDate, setEndDate] = useState(todayYmdIST());
+  const [marketId, setMarketId] = useState('');
+  const [marketCode, setMarketCode] = useState('301');
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMsg('');
+    try {
+      let res;
+      if (kind === 'qtech' || kind === 'missing') {
+        res = await secureApi(
+          kind === 'qtech' ? 'userReport.qtechStoreBet' : 'userReport.qtechMissingBets',
+          {
+            userId,
+            startDate,
+            endDate,
+            size: 100,
+            itemsPerPage: 100,
+            pageNo: 1,
+            filter: { userId, providerName: 'Qtech' },
+          },
+        );
+      } else if (kind === 'jetfair') {
+        if (!marketId.trim()) {
+          setRows([]);
+          setMsg('Enter Market ID and tap Load');
+          return;
+        }
+        res = await secureApi('userReport.jetfairMapping', { userId, marketId: marketId.trim() });
+      } else {
+        res = await secureApi('userReport.smMapping', {
+          userId,
+          resultDate: startDate,
+          marketCode,
+        });
+      }
+      setRows(res.ok ? providerList(res.data) : []);
+      if (!res.ok) setMsg(res.message || 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, kind, startDate, endDate, marketId, marketCode]);
+
+  useEffect(() => {
+    if (kind !== 'jetfair') void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
+
+  const pick = (r: Rec, ...keys: string[]): string => {
+    for (const k of keys) {
+      if (r[k] !== undefined && r[k] !== null && r[k] !== '') return String(r[k]);
+    }
+    return '—';
+  };
+
+  const columns = useMemo<DataTableColumn<Rec>[]>(() => {
+    if (kind === 'sm') {
+      return [
+        { key: 'gameName', label: 'Game', width: 110, render: (r) => pick(r, 'game_name', 'gameName') },
+        { key: 'bazar', label: 'Bazar', width: 110, render: (r) => pick(r, 'game', 'bazar_name') },
+        { key: 'status', label: 'Status', width: 80, render: (r) => pick(r, 'status') },
+        { key: 'win', label: 'Winning', width: 80, render: (r) => pick(r, 'winning_point', 'winningPoint') },
+        { key: 'commission', label: 'Commission', width: 90, render: (r) => pick(r, 'commission') },
+        { key: 'txn', label: 'Txn Id', width: 140, render: (r) => pick(r, 'transaction_id', 'transactionId') },
+        { key: 'resultDate', label: 'Result Date', width: 100, render: (r) => pick(r, 'result_date', 'resultDate') },
+      ];
+    }
+    if (kind === 'jetfair') {
+      return [
+        { key: 'runner', label: 'Runner', width: 130, render: (r) => pick(r, 'runnerName', 'Runnername') },
+        { key: 'hub', label: 'Hub', width: 90, render: (r) => pick(r, 'hub') },
+        { key: 'stake', label: 'Stake', width: 80, render: (r) => pick(r, 'stake', 'Stake') },
+        { key: 'rate', label: 'Rate', width: 70, render: (r) => pick(r, 'rate', 'Rate') },
+        { key: 'won', label: 'Won?', width: 70, render: (r) => pick(r, 'isBetWon', 'IsBetWon') },
+        { key: 'back', label: 'Back?', width: 70, render: (r) => pick(r, 'isback', 'Isback') },
+        { key: 'netPL', label: 'Net P/L', width: 90, render: (r) => pick(r, 'netPL', 'NetPL') },
+        {
+          key: 'created',
+          label: 'Created On',
+          width: 120,
+          render: (r) => {
+            const raw = (r.createdOn ?? r.CreatedOn) as string | undefined;
+            return raw ? formatDisplayDate(raw) : '—';
+          },
+        },
+      ];
+    }
+    return [
+      { key: 'round', label: 'Round', width: 130, render: (r) => pick(r, 'roundId', 'round_id') },
+      { key: 'status', label: 'Status', width: 90, render: (r) => pick(r, 'status') },
+      { key: 'bet', label: 'Bet', width: 80, render: (r) => pick(r, 'totalBet', 'betAmount', 'amount') },
+      { key: 'payout', label: 'Payout', width: 80, render: (r) => pick(r, 'totalPayout', 'winAmount', 'payout') },
+      { key: 'bonusBet', label: 'Bonus Bet', width: 80, render: (r) => pick(r, 'totalBonusBet', 'bonusBet') },
+      { key: 'game', label: 'Game', width: 100, render: (r) => pick(r, 'gameId') },
+      { key: 'category', label: 'Category', width: 100, render: (r) => pick(r, 'gameCategory', 'category') },
+      { key: 'provider', label: 'Provider', width: 100, render: (r) => pick(r, 'gameProvider', 'providerName') },
+      { key: 'device', label: 'Device', width: 80, render: (r) => pick(r, 'device') },
+      { key: 'initiated', label: 'Initiated', width: 140, render: (r) => pick(r, 'initiated', 'initiatedAt') },
+      { key: 'completed', label: 'Completed', width: 140, render: (r) => pick(r, 'completed', 'completedAt') },
+    ];
+  }, [kind]);
+
+  return (
+    <View>
+      {kind === 'qtech' || kind === 'missing' ? (
+        <View style={styles.filterRow}>
+          <View style={styles.dateWrap}>
+            <DateField value={startDate} onChange={setStartDate} placeholder="From" />
+          </View>
+          <View style={styles.dateWrap}>
+            <DateField value={endDate} onChange={setEndDate} placeholder="To" />
+          </View>
+        </View>
+      ) : null}
+      {kind === 'sm' ? (
+        <View>
+          <View style={styles.filterRow}>
+            <View style={styles.dateWrap}>
+              <DateField value={startDate} onChange={setStartDate} placeholder="Result date" />
+            </View>
+          </View>
+          <View style={styles.chipRowPlain}>
+            {SM_MARKET_CODES.map((code) => (
+              <TouchableOpacity
+                key={code}
+                style={[styles.chip, marketCode === code && styles.chipActive]}
+                onPress={() => setMarketCode(code)}
+              >
+                <Text style={[styles.chipText, marketCode === code && styles.chipTextActive]}>
+                  {code}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ) : null}
+      {kind === 'jetfair' ? (
+        <View style={styles.filterRow}>
+          <TextInput
+            style={styles.input}
+            value={marketId}
+            onChangeText={setMarketId}
+            placeholder="Market ID"
+            placeholderTextColor={colors.muted}
+          />
+        </View>
+      ) : null}
+      <TouchableOpacity
+        style={[styles.submitBtn, loading && styles.pagerBtnDisabled]}
+        onPress={() => void load()}
+        disabled={loading}
+      >
+        <Text style={styles.submitBtnText}>{loading ? 'Loading…' : 'Load'}</Text>
+      </TouchableOpacity>
+      {msg ? <Text style={styles.muted}>{msg}</Text> : null}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r._id ?? i)}
+        loading={loading}
+        emptyMessage="No records"
+      />
+    </View>
+  );
+}
+
+/* --------------------------- qtech bet details ---------------------------- */
+
+function QtechBetDetailsTab({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<Rec[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState(todayYmdIST());
+  const [endDate, setEndDate] = useState(todayYmdIST());
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await secureApi('userReport.qtechRtp', {
+        userId,
+        startDate: startDate || todayYmdIST(),
+        endDate: endDate || todayYmdIST(),
+      });
+      const obj = unwrap(res.ok ? res.data : {});
+      setRows(Array.isArray(obj) ? (obj as Rec[]) : Array.isArray(obj.games) ? (obj.games as Rec[]) : providerList(res.data));
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, startDate, endDate]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const columns = useMemo<DataTableColumn<Rec>[]>(
+    () => [
+      { key: 'game', label: 'Game', width: 150, render: (r) => display(r.gameName ?? r.gameId) },
+      { key: 'bets', label: 'Total Bets', width: 90, render: (r) => display(r.totalBets) },
+      { key: 'wins', label: 'Total Wins', width: 90, render: (r) => display(r.totalWins) },
+      { key: 'amount', label: 'Bet Amount', width: 100, render: (r) => display(r.totalAmount) },
+      { key: 'winAmount', label: 'Win Amount', width: 100, render: (r) => display(r.winAmount) },
+    ],
+    [],
+  );
+
+  return (
+    <View>
+      <View style={styles.filterRow}>
+        <View style={styles.dateWrap}>
+          <DateField value={startDate} onChange={setStartDate} placeholder="From" />
+        </View>
+        <View style={styles.dateWrap}>
+          <DateField value={endDate} onChange={setEndDate} placeholder="To" />
+        </View>
+      </View>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        keyFor={(r, i) => String(r.gameId ?? i)}
+        loading={loading}
+        emptyMessage="No bet details"
+      />
+    </View>
+  );
+}
+
+/* ------------------------------- settle tabs ------------------------------ */
+
+function SettleTab({ userId, kind }: { userId: string; kind: 'sm' | 'jetfair' }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [json, setJson] = useState('');
+
+  const submit = useCallback(async () => {
+    setMsg('');
+    setBusy(true);
+    try {
+      if (kind === 'sm') {
+        const res = await secureApi('userReport.settleSmBets', { userId });
+        setMsg(res.message || (res.ok ? 'SM bets settled' : 'Failed to settle'));
+      } else {
+        let payload: Rec;
+        try {
+          payload = JSON.parse(json) as Rec;
+        } catch {
+          setMsg('Invalid JSON');
+          return;
+        }
+        const res = await secureApi('userReport.settleJetfair', payload);
+        setMsg(res.message || (res.ok ? 'Jetfair market settled' : 'Failed to settle'));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [userId, kind, json]);
+
+  return (
+    <View style={styles.formCard}>
+      {kind === 'jetfair' ? (
+        <>
+          <Text style={styles.formLabel}>Settlement JSON</Text>
+          <TextInput
+            style={[styles.input, styles.jsonInput]}
+            value={json}
+            onChangeText={setJson}
+            placeholder='{"marketId": "..."}'
+            placeholderTextColor={colors.muted}
+            multiline
+          />
+        </>
+      ) : (
+        <Text style={styles.muted}>Settle all pending SM bets for this user.</Text>
+      )}
+      <TouchableOpacity
+        style={[styles.submitBtn, busy && styles.pagerBtnDisabled]}
+        onPress={() => void submit()}
+        disabled={busy}
+      >
+        <Text style={styles.submitBtnText}>
+          {busy ? 'Settling…' : kind === 'sm' ? 'Settle SM Bets' : 'Settle Jetfair Market'}
+        </Text>
+      </TouchableOpacity>
+      {msg ? <Text style={styles.muted}>{msg}</Text> : null}
+    </View>
+  );
+}
+
+/* ------------------------------- player RTP ------------------------------- */
+
+function PlayerRtpLink({ userId }: { userId: string }) {
+  const navigation = useNavigation<{
+    navigate: (name: string, params?: object) => void;
+  }>();
+  return (
+    <View style={styles.formCard}>
+      <Text style={styles.muted}>Player RTP report opens on its own page.</Text>
+      <TouchableOpacity
+        style={styles.submitBtn}
+        onPress={() =>
+          navigation.navigate('panel', {
+            screen: 'playerRtp',
+            params: { id: userId, fromUserReport: true },
+          })
+        }
+      >
+        <Text style={styles.submitBtnText}>Open Player RTP</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 /* --------------------------------- styles --------------------------------- */
 
 const styles = StyleSheet.create({
@@ -659,4 +1406,23 @@ const styles = StyleSheet.create({
   pagerBtnDisabled: { opacity: 0.4 },
   pagerBtnText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   pagerText: { color: colors.muted, fontSize: 12 },
+  formCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(3),
+    gap: spacing(2),
+  },
+  formLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  jsonInput: { minHeight: 100, textAlignVertical: 'top' },
+  submitBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: spacing(1),
+    marginBottom: spacing(2),
+  },
+  submitBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
 });
