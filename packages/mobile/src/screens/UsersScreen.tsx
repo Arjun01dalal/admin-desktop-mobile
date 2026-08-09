@@ -21,7 +21,7 @@ import {
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
-import { DataTable, type DataTableColumn } from '../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../dashboards/ui/DataTable';
 import { pickLastActivity } from '../dashboards/userRowUtils';
 import { secureApi } from '../api/client';
 import { getSessionUser, hasPermission, isCallerRole } from '../auth/permissions';
@@ -321,7 +321,6 @@ function BlockUserModal({
 /* --------------------------------- screen --------------------------------- */
 
 const PAGE_SIZE = 25;
-const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance', 'blocked', 'role']);
 
 export function UsersScreen() {
   const canShowMobile = hasPermission('show_mobile');
@@ -792,15 +791,73 @@ export function UsersScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id ?? i)}
-        loading={loading}
-        emptyMessage="No users found"
-        onRowPress={(row) => setSelected(row)}
-        hint="Tap a row to see all details"
-      />
+      <View style={styles.cardList}>
+        {loading && !rows.length ? (
+          <Text style={styles.cardEmpty}>Loading…</Text>
+        ) : !rows.length ? (
+          <Text style={styles.cardEmpty}>No users found</Text>
+        ) : (
+          rows.map((r, i) => {
+            const blocked = isBlocked(r);
+            const name = display(r.name);
+            const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+            const app = appCodeForName(r.clientName);
+            const mobileVal = !hideContact || canShowMobile ? display(r.mobile) : '';
+            const sub =
+              userType === 'Sub_Admin'
+                ? display(r.Role_Name)
+                : [mobileVal !== '—' ? mobileVal : '', display(r.city) !== '—' ? display(r.city) : '']
+                    .filter(Boolean)
+                    .join(' · ') || '—';
+            return (
+              <TouchableOpacity
+                key={String(r._id ?? i)}
+                style={styles.userCard}
+                onPress={() => setSelected(r)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.avatar, blocked && styles.avatarBlocked]}>
+                  <Text style={[styles.avatarText, blocked && styles.avatarTextBlocked]}>
+                    {initial}
+                  </Text>
+                </View>
+                <View style={styles.userCardMid}>
+                  <Text style={styles.userCardName} numberOfLines={1}>
+                    {name}
+                  </Text>
+                  <Text style={styles.userCardSub} numberOfLines={1}>
+                    {sub}
+                  </Text>
+                  <View style={styles.userCardTags}>
+                    {app ? (
+                      <View style={styles.tagApp}>
+                        <Text style={styles.tagAppText}>{app}</Text>
+                      </View>
+                    ) : null}
+                    <View style={[styles.tagStatus, blocked ? styles.tagBlocked : styles.tagActive]}>
+                      <Text
+                        style={[
+                          styles.tagStatusText,
+                          blocked ? styles.tagBlockedText : styles.tagActiveText,
+                        ]}
+                      >
+                        {blocked ? 'Blocked' : 'Active'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.userCardRight}>
+                  <Text style={styles.userCardBalance}>
+                    ₹{floorNum(r.balance ?? 0).toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={styles.userCardIdx}>#{(page - 1) * pageSize + i + 1}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
+        {rows.length ? <Text style={styles.cardHint}>Tap a card to see all details</Text> : null}
+      </View>
 
       <RowDetailSheet
         visible={selected !== null}
@@ -955,6 +1012,122 @@ const styles = StyleSheet.create({
   dialerMsg: {
     color: colors.muted,
     fontSize: 12,
+  },
+  cardList: {
+    marginTop: spacing(3),
+    gap: spacing(2),
+  },
+  cardEmpty: {
+    color: colors.muted,
+    textAlign: 'center',
+    paddingVertical: spacing(6),
+    fontSize: 13,
+  },
+  cardHint: {
+    color: colors.muted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: spacing(1),
+  },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(3),
+    gap: spacing(3),
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(245, 179, 1, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 179, 1, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarBlocked: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  avatarText: {
+    color: colors.primary,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  avatarTextBlocked: {
+    color: colors.destructive,
+  },
+  userCardMid: {
+    flex: 1,
+    gap: 2,
+  },
+  userCardName: {
+    color: colors.foreground,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  userCardSub: {
+    color: colors.muted,
+    fontSize: 12,
+  },
+  userCardTags: {
+    flexDirection: 'row',
+    gap: spacing(1.5),
+    marginTop: spacing(1),
+  },
+  tagApp: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tagAppText: {
+    color: colors.foreground,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tagStatus: {
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderWidth: 1,
+  },
+  tagActive: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+  },
+  tagBlocked: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  tagStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tagActiveText: {
+    color: colors.success,
+  },
+  tagBlockedText: {
+    color: colors.destructive,
+  },
+  userCardRight: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  userCardBalance: {
+    color: colors.foreground,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  userCardIdx: {
+    color: colors.muted,
+    fontSize: 10,
   },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
