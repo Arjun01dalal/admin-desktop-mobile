@@ -57,6 +57,7 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', style }
           value={parseYmd(value)}
           mode="date"
           display="default"
+          maximumDate={new Date()}
           onChange={(event, selected) => {
             setOpen(false);
             if (event.type === 'dismissed' || !selected) return;
@@ -72,6 +73,7 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', style }
                 value={parseYmd(value)}
                 mode="date"
                 display="inline"
+                maximumDate={new Date()}
                 themeVariant="dark"
                 accentColor={colors.primary}
                 onChange={(event, selected) => {
