@@ -33,6 +33,25 @@ import {
 } from './dashboards/details/DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
 import { CreateUserScreen } from './CreateUserScreen';
+import { mapUsersToBotSettings } from '../utils/dialerHelpers';
+import { CAMPAIGN_LIST } from '../utils/campaignList';
+import { addToDialerBatch } from '../utils/externalDialer';
+
+/** Desktop parity: reason tag sent with add-to-bot per user type. */
+function reasonForUserType(type: UserType): string {
+  switch (type) {
+    case 'Non_Performing_User':
+      return 'non_performing';
+    case 'Todays_Active':
+      return 'today_active_user';
+    case 'Active_User':
+      return 'active_user';
+    case 'In_Active_Deposit':
+      return 'inactive';
+    default:
+      return 'Daily User';
+  }
+}
 
 /* ---------------------------------- types --------------------------------- */
 
@@ -344,6 +363,78 @@ export function UsersScreen() {
   const [blockRow, setBlockRow] = useState<Row | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
+  // Global Add-to-Bot / Add-to-Dialer (desktop UsersToolbar parity).
+  const canAddToBot = !isCaller && hasPermission('add_to_bot');
+  const canAddToDialer = !isCaller && hasPermission('add_to_dilaler');
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [botId, setBotId] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+  const [dialerBusy, setDialerBusy] = useState(false);
+  const [dialerMsg, setDialerMsg] = useState('');
+
+  const handleAddToBot = useCallback(async () => {
+    setDialerMsg('');
+    if (!botId.trim()) {
+      setDialerMsg('Bot ID should not be empty.');
+      return;
+    }
+    if (!rows.length) {
+      setDialerMsg('No users available for bot');
+      return;
+    }
+    setDialerBusy(true);
+    try {
+      const adminRec = (admin ?? {}) as Record<string, unknown>;
+      const res = await secureApi('callLogs.addToBotDialer', {
+        userId: adminRec._id,
+        created_by: adminRec.name,
+        dialout_settings: mapUsersToBotSettings(rows, botId.trim(), reasonForUserType(userType)),
+      });
+      setDialerMsg(res.ok ? res.message || 'Call Initiated Successfully.' : res.message || 'Failed to add to bot');
+    } finally {
+      setDialerBusy(false);
+    }
+  }, [admin, botId, rows, userType]);
+
+  const handleAddToDialer = useCallback(async () => {
+    setDialerMsg('');
+    if (!campaignId) {
+      setDialerMsg('Campaign Name should not be empty');
+      return;
+    }
+    if (!rows.length) {
+      setDialerMsg('No users available for dialer');
+      return;
+    }
+    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
+    setDialerBusy(true);
+    try {
+      const res = await addToDialerBatch({
+        campaignId,
+        serverId: campaign?.serverId,
+        leads: rows.map((r) => ({
+          _id: String(r._id || ''),
+          name: r.name,
+          mobile: r.mobile,
+          city: r.city,
+          state: r.state,
+          clientName: r.clientName,
+        })),
+      });
+      if (res.ok) {
+        const adminRec = (admin ?? {}) as Record<string, unknown>;
+        await secureApi('ops.savePerformanceData', {
+          subAdminId: adminRec._id,
+          dialledUserIds: rows.map((r) => r._id).filter(Boolean),
+          extensionId: campaignId,
+        });
+      }
+      setDialerMsg(res.message || (res.ok ? 'Dialer call queued' : 'Dialer call failed'));
+    } finally {
+      setDialerBusy(false);
+    }
+  }, [admin, campaignId, rows]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -624,6 +715,78 @@ export function UsersScreen() {
         }}
       />
 
+      {canAddToBot || canAddToDialer ? (
+        <View style={styles.dialerCard}>
+          <TouchableOpacity style={styles.dialerToggle} onPress={() => setDialerOpen((v) => !v)}>
+            <Text style={styles.dialerToggleText}>
+              Add to Bot / Dialer {dialerOpen ? '▲' : '▼'}
+            </Text>
+          </TouchableOpacity>
+          {dialerOpen ? (
+            <View style={styles.dialerBody}>
+              {canAddToBot ? (
+                <View style={styles.dialerRow}>
+                  <TextInput
+                    style={styles.dialerInput}
+                    value={botId}
+                    onChangeText={setBotId}
+                    placeholder="Bot ID"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="number-pad"
+                  />
+                  <TouchableOpacity
+                    style={[styles.dialerBtn, (dialerBusy || !rows.length) && styles.dialerBtnDisabled]}
+                    onPress={() => void handleAddToBot()}
+                    disabled={dialerBusy || !rows.length}
+                  >
+                    <Text style={styles.dialerBtnText}>
+                      {dialerBusy ? 'Sending…' : `Add to Bot (${rows.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              {canAddToDialer ? (
+                <>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipRow}
+                  >
+                    {CAMPAIGN_LIST.map((c) => {
+                      const id = c.id.trim();
+                      return (
+                        <TouchableOpacity
+                          key={id}
+                          style={[styles.chip, campaignId === id && styles.chipActive]}
+                          onPress={() => setCampaignId(campaignId === id ? '' : id)}
+                        >
+                          <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
+                            {c.name} ({id})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <TouchableOpacity
+                    style={[
+                      styles.dialerBtn,
+                      (dialerBusy || !rows.length || !campaignId) && styles.dialerBtnDisabled,
+                    ]}
+                    onPress={() => void handleAddToDialer()}
+                    disabled={dialerBusy || !rows.length || !campaignId}
+                  >
+                    <Text style={styles.dialerBtnText}>
+                      {dialerBusy ? 'Sending…' : `Add to Dialer (${rows.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+              {dialerMsg ? <Text style={styles.dialerMsg}>{dialerMsg}</Text> : null}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
@@ -737,6 +900,63 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12 },
   chipTextActive: { color: colors.primaryForeground, fontWeight: '700' },
+  dialerCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing(3),
+    overflow: 'hidden',
+  },
+  dialerToggle: {
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(3),
+  },
+  dialerToggleText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  dialerBody: {
+    paddingHorizontal: spacing(3),
+    paddingBottom: spacing(3),
+    gap: spacing(2),
+  },
+  dialerRow: {
+    flexDirection: 'row',
+    gap: spacing(2),
+    alignItems: 'center',
+  },
+  dialerInput: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.foreground,
+    paddingHorizontal: spacing(2),
+    paddingVertical: 8,
+    fontSize: 13,
+  },
+  dialerBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing(3),
+    alignItems: 'center',
+  },
+  dialerBtnDisabled: {
+    opacity: 0.45,
+  },
+  dialerBtnText: {
+    color: colors.primaryForeground,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  dialerMsg: {
+    color: colors.muted,
+    fontSize: 12,
+  },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
