@@ -834,6 +834,16 @@ export function UsersScreen() {
                         <Text style={styles.tagAppText}>{app}</Text>
                       </View>
                     ) : null}
+                    {display(r.empCode) !== '—' ? (
+                      <View style={styles.tagApp}>
+                        <Text style={styles.tagAppText}>Emp {display(r.empCode)}</Text>
+                      </View>
+                    ) : null}
+                    {display(r.state) !== '—' ? (
+                      <View style={styles.tagApp}>
+                        <Text style={styles.tagAppText}>{display(r.state)}</Text>
+                      </View>
+                    ) : null}
                     <View style={[styles.tagStatus, blocked ? styles.tagBlocked : styles.tagActive]}>
                       <Text
                         style={[
@@ -851,6 +861,18 @@ export function UsersScreen() {
                     ₹{floorNum(r.balance ?? 0).toLocaleString('en-IN')}
                   </Text>
                   <Text style={styles.userCardIdx}>#{(page - 1) * pageSize + i + 1}</Text>
+                  {showBlockAction ? (
+                    <TouchableOpacity
+                      style={[styles.blockBtn, blocked ? styles.blockBtnUnblock : null]}
+                      onPress={() => setBlockRow(r)}
+                    >
+                      <Text
+                        style={[styles.blockBtnText, blocked ? styles.blockBtnUnblockText : null]}
+                      >
+                        {blocked ? 'Unblock' : 'Block'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </TouchableOpacity>
             );
@@ -1128,6 +1150,27 @@ const styles = StyleSheet.create({
   userCardIdx: {
     color: colors.muted,
     fontSize: 10,
+  },
+  blockBtn: {
+    marginTop: spacing(1),
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.5)',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  blockBtnText: {
+    color: colors.destructive,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  blockBtnUnblock: {
+    borderColor: 'rgba(34, 197, 94, 0.5)',
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+  },
+  blockBtnUnblockText: {
+    color: colors.success,
   },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
