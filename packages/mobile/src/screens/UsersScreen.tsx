@@ -573,7 +573,7 @@ export function UsersScreen() {
       });
     }
     cols.push(
-      { key: 'appName', label: 'App Code', width: 70, render: (r) => appCodeForName(r.clientName) },
+      { key: 'appName', label: 'App', width: 48, render: (r) => appCodeForName(r.clientName) },
       { key: 'empCode', label: 'Emp Code', width: 70, render: (r) => display(r.empCode) },
       { key: 'playIn', label: 'In', width: 60, render: (r) => display(r.played) },
       { key: 'kyc', label: 'Kyc', width: 60, render: (r) => (r.kyc ? 'Yes' : 'No') },
@@ -592,8 +592,7 @@ export function UsersScreen() {
       {
         key: 'balance',
         label: 'Balance',
-        width: 80,
-        align: 'right',
+        width: 90,
         render: (r) => floorNum(r.balance ?? 0).toLocaleString('en-IN'),
       },
       {
