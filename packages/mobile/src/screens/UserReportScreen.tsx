@@ -17,7 +17,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { getSessionUser } from '../auth/permissions';
 import { colors, radius, spacing } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
-import { DataTable, type DataTableColumn } from '../dashboards/ui/DataTable';
+import { type DataTableColumn } from '../dashboards/ui/DataTable';
+import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
 import { secureApi } from '../api/client';
 import { formatDisplayDate } from '../utils/dates';
 import { DateField } from '../components/DateField';
@@ -402,7 +403,7 @@ function WalletTab({ userId }: { userId: string }) {
           </TouchableOpacity>
         ))}
       </View>
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -504,7 +505,7 @@ function GameTab({ userId }: { userId: string }) {
           </TouchableOpacity>
         ))}
       </View>
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -633,7 +634,7 @@ function FundTab({ userId }: { userId: string }) {
           />
         </View>
       ) : null}
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -727,7 +728,7 @@ function MatkaTab({ userId, variant }: { userId: string; variant: MatkaVariant }
           <DateField value={resultDate} onChange={(v) => { setResultDate(v); setPage(1); }} placeholder="Result date" />
         </View>
       </View>
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -820,7 +821,7 @@ function QtechTab({ userId }: { userId: string }) {
           </TouchableOpacity>
         ))}
       </View>
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -897,7 +898,7 @@ function ExchangeTab({ userId, variant }: { userId: string; variant: 'jetfair' |
 
   return (
     <View>
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -1172,7 +1173,7 @@ function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
         <Text style={styles.submitBtnText}>{loading ? 'Loading…' : 'Load'}</Text>
       </TouchableOpacity>
       {msg ? <Text style={styles.muted}>{msg}</Text> : null}
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -1231,7 +1232,7 @@ function QtechBetDetailsTab({ userId }: { userId: string }) {
           <DateField value={endDate} onChange={setEndDate} placeholder="To" />
         </View>
       </View>
-      <DataTable
+      <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r.gameId ?? i)}
