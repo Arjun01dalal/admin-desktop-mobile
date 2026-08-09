@@ -21,6 +21,7 @@ import {
 import { colors, radius, spacing } from '../../theme';
 import { toDisplayText } from '../jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from './DataTable';
+import { RowDetailSheet, type SheetField } from '../../screens/dashboards/details/RowDetailSheet';
 
 const TABLET_MIN_WIDTH = 768;
 
@@ -54,6 +55,21 @@ function CardList<Row>({
   onRowPress,
   rowBg,
 }: Props<Row>) {
+  const [sheetRow, setSheetRow] = React.useState<{ row: Row; index: number } | null>(null);
+
+  const openSheet = (row: Row, index: number) => setSheetRow({ row, index });
+
+  const sheetFields: SheetField[] = React.useMemo(() => {
+    if (!sheetRow) return [];
+    const { row, index } = sheetRow;
+    return columns.slice(1).map((col) => ({
+      label: toDisplayText(col.label),
+      value: toDisplayText(col.render(row, index)),
+      color: col.color?.(row),
+      badgeColor: col.badge?.(row),
+    }));
+  }, [sheetRow, columns]);
+
   if (loading && rows.length === 0) {
     return (
       <View style={styles.stateCard}>
@@ -70,6 +86,9 @@ function CardList<Row>({
   }
 
   const [titleCol, ...restCols] = columns;
+  // Compact card shows the title plus a couple of key fields; the full field
+  // set opens in a bottom sheet on tap.
+  const previewCols = restCols.slice(0, 2);
 
   return (
     <View style={styles.list}>
@@ -77,87 +96,72 @@ function CardList<Row>({
         const bg = rowBg?.(row);
         const titleValue = toDisplayText(titleCol.render(row, index));
         const body = (
-          <>
-            <View style={styles.cardHead}>
-              <View style={styles.cardHeadLeft}>
-                <Text style={styles.cardHeadLabel}>{toDisplayText(titleCol.label)}</Text>
-                {titleCol.onCellPress ? (
-                  <TouchableOpacity onPress={() => titleCol.onCellPress?.(row)}>
-                    <Text style={[styles.cardTitle, styles.link]} numberOfLines={2}>
-                      {titleValue}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text
-                    style={[styles.cardTitle, titleCol.color?.(row) ? { color: titleCol.color(row) } : null]}
-                    numberOfLines={2}
-                  >
+          <View style={styles.cardRow}>
+            <View style={styles.cardMain}>
+              {titleCol.onCellPress ? (
+                <TouchableOpacity onPress={() => titleCol.onCellPress?.(row)}>
+                  <Text style={[styles.cardTitle, styles.link]} numberOfLines={1}>
                     {titleValue}
                   </Text>
-                )}
-              </View>
-              <Text style={styles.rowNo}>#{index + 1}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text
+                  style={[styles.cardTitle, titleCol.color?.(row) ? { color: titleCol.color(row) } : null]}
+                  numberOfLines={1}
+                >
+                  {titleValue}
+                </Text>
+              )}
+              <Text style={styles.cardSub} numberOfLines={1}>
+                {previewCols
+                  .map((col) => `${toDisplayText(col.label)}: ${toDisplayText(col.render(row, index))}`)
+                  .join('  ·  ')}
+              </Text>
             </View>
-            <View style={styles.fieldGrid}>
-              {restCols.map((col) => {
-                const value = toDisplayText(col.render(row, index));
-                const color = col.color?.(row);
-                const badgeBg = col.badge?.(row);
-                const sub = col.subtext?.(row);
-                return (
-                  <View key={col.key} style={styles.field}>
-                    <Text style={styles.fieldLabel} numberOfLines={1}>
-                      {toDisplayText(col.label)}
+            <View style={styles.cardRight}>
+              {(() => {
+                const badgeCol = restCols.find((c) => c.badge?.(row));
+                if (badgeCol) {
+                  return (
+                    <View style={[styles.badge, { backgroundColor: badgeCol.badge?.(row) }]}>
+                      <Text style={styles.badgeText} numberOfLines={1}>
+                        {toDisplayText(badgeCol.render(row, index))}
+                      </Text>
+                    </View>
+                  );
+                }
+                const colorCol = restCols.find((c) => c.color?.(row));
+                if (colorCol) {
+                  return (
+                    <Text style={[styles.cardTitle, { color: colorCol.color?.(row) }]} numberOfLines={1}>
+                      {toDisplayText(colorCol.render(row, index))}
                     </Text>
-                    {badgeBg ? (
-                      <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-                        <Text style={styles.badgeText} numberOfLines={1}>
-                          {value}
-                        </Text>
-                      </View>
-                    ) : col.onCellPress ? (
-                      <TouchableOpacity onPress={() => col.onCellPress?.(row)}>
-                        <Text style={[styles.fieldValue, styles.link]} numberOfLines={3}>
-                          {value}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text
-                        style={[styles.fieldValue, color ? { color, fontWeight: '700' } : null]}
-                        numberOfLines={3}
-                      >
-                        {value}
-                      </Text>
-                    )}
-                    {sub ? (
-                      <Text style={styles.fieldSub} numberOfLines={1}>
-                        {toDisplayText(sub)}
-                      </Text>
-                    ) : null}
-                  </View>
-                );
-              })}
+                  );
+                }
+                return null;
+              })()}
+              <Text style={styles.rowNo}>#{index + 1} ›</Text>
             </View>
-          </>
-        );
-        const cardStyle = [styles.card, bg ? { backgroundColor: bg } : null];
-        if (onRowPress) {
-          return (
-            <TouchableOpacity
-              key={keyFor(row, index)}
-              style={cardStyle}
-              onPress={() => onRowPress(row, index)}
-            >
-              {body}
-            </TouchableOpacity>
-          );
-        }
-        return (
-          <View key={keyFor(row, index)} style={cardStyle}>
-            {body}
           </View>
         );
+        const cardStyle = [styles.card, bg ? { backgroundColor: bg } : null];
+        return (
+          <TouchableOpacity
+            key={keyFor(row, index)}
+            style={cardStyle}
+            onPress={() => (onRowPress ? onRowPress(row, index) : openSheet(row, index))}
+          >
+            {body}
+          </TouchableOpacity>
+        );
       })}
+
+      <RowDetailSheet
+        visible={sheetRow != null}
+        title={sheetRow ? toDisplayText(titleCol.render(sheetRow.row, sheetRow.index)) : ''}
+        fields={sheetFields}
+        onClose={() => setSheetRow(null)}
+      />
 
       {footer && rows.length > 0 ? (
         <View style={[styles.card, styles.footerCard]}>
@@ -189,7 +193,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing(3),
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(3),
   },
   footerCard: { borderColor: colors.primary },
   stateCard: {
@@ -200,15 +205,11 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginTop: spacing(3),
   },
-  cardHead: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: spacing(2),
-  },
-  cardHeadLeft: { flex: 1, paddingRight: spacing(2) },
-  cardHeadLabel: { color: colors.muted, fontSize: 10, marginBottom: 2 },
+  cardRow: { flexDirection: 'row', alignItems: 'center' },
+  cardMain: { flex: 1, paddingRight: spacing(2) },
+  cardRight: { alignItems: 'flex-end', gap: 2 },
   cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  cardSub: { color: colors.muted, fontSize: 11, marginTop: 2 },
   rowNo: { color: colors.muted, fontSize: 11 },
   fieldGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   field: { width: '50%', paddingRight: spacing(2), marginBottom: spacing(2) },
