@@ -24,7 +24,7 @@ import { floorNum } from '../dashboards/mergeMetrics';
 import { DataTable, type DataTableColumn } from '../dashboards/ui/DataTable';
 import { pickLastActivity } from '../dashboards/userRowUtils';
 import { secureApi } from '../api/client';
-import { getSessionUser, hasPermission } from '../auth/permissions';
+import { getSessionUser, hasPermission, isCallerRole } from '../auth/permissions';
 import { formatDisplayDate, todayIST } from '../utils/dates';
 import {
   DetailFilterBar,
@@ -112,12 +112,35 @@ function isBlocked(r: Row): boolean {
   return Boolean(r.blockUser ?? r.block);
 }
 
+/** Per-type filter allowlists (desktop buildUserFilter parity — APIs reject unknown keys). */
 function searchFieldsFor(type: UserType, hideContact: boolean): readonly SearchFieldOption[] {
   if (type === 'Sub_Admin') {
     return [
       { key: 'name', label: 'Name' },
       { key: 'mobile', label: 'Mobile' },
     ];
+  }
+  if (type === 'LAXMI_999_Users') {
+    return [
+      { key: 'dp_id', label: 'Dp Id' },
+      { key: 'userId', label: 'User Id' },
+      { key: 'mobile', label: 'Mobile' },
+      { key: 'city', label: 'City' },
+      { key: 'state', label: 'State' },
+    ];
+  }
+  if (type === 'Non_Performing_Active_User') {
+    return [{ key: 'empCode', label: 'Emp Code' }];
+  }
+  if (type === 'Active_User' || type === 'Todays_Active') {
+    const fields: SearchFieldOption[] = [{ key: 'name', label: 'Name' }];
+    if (!hideContact) fields.push({ key: 'mobile', label: 'Mobile' });
+    fields.push(
+      { key: 'city', label: 'City' },
+      { key: 'state', label: 'State' },
+      { key: 'played', label: 'In (E/C/S)' },
+    );
+    return fields;
   }
   const fields: SearchFieldOption[] = [
     { key: 'name', label: 'Name' },
@@ -131,7 +154,11 @@ function searchFieldsFor(type: UserType, hideContact: boolean): readonly SearchF
       { key: 'email', label: 'Email' },
     );
   }
-  fields.push({ key: 'city', label: 'City' }, { key: 'state', label: 'State' });
+  fields.push(
+    { key: 'city', label: 'City' },
+    { key: 'state', label: 'State' },
+    { key: 'deviceType', label: 'Device' },
+  );
   if (type === 'User' || type === 'Non_Performing_User') {
     fields.push({ key: 'empCode', label: 'Emp Code' }, { key: 'played', label: 'In (E/C/S)' });
   }
@@ -280,8 +307,9 @@ const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance', 'block
 export function UsersScreen() {
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
-  const isCaller = !hasPermission('View_Subadmin_User') && hasPermission('contact_visibility_none');
-  const canCreate = hasPermission('create_new_user');
+  const admin = useMemo(() => getSessionUser(), []);
+  const isCaller = useMemo(() => isCallerRole(admin), [admin]);
+  const canCreate = !isCaller && hasPermission('create_new_user');
 
   const typeOptions = useMemo(
     () =>
@@ -320,18 +348,60 @@ export function UsersScreen() {
     setLoading(true);
     setError(null);
     try {
+      // Filter: per-type allowlists come from searchFieldsFor; uniqueUser is
+      // required by every type except Sub_Admin / LAXMI (desktop parity).
       const filter: Record<string, unknown> = {};
-      if (appClientName) filter.clientName = appClientName;
+      if (userType !== 'Sub_Admin' && userType !== 'LAXMI_999_Users') {
+        filter.uniqueUser = false;
+      }
+      if (appClientName && userType !== 'Sub_Admin' && userType !== 'LAXMI_999_Users') {
+        filter.clientName = appClientName;
+      }
       if (appliedSearch.text.trim()) filter[appliedSearch.field] = appliedSearch.text.trim();
       if (blockFilter && userType === 'User') filter.blockUser = blockFilter === 'block';
+
+      // Operator scoping (desktop UsersPage): allotted apps + per-app states.
+      const adminRec = (admin ?? {}) as Record<string, unknown>;
+      const allottedApps = (adminRec.clientName || adminRec.allotedApps) as
+        | string
+        | string[]
+        | undefined;
+      const app = userType !== 'User' && allottedApps ? { app: allottedApps } : {};
+      let withAppState: Record<string, unknown> = {};
+      const aws = adminRec.appWithState;
+      if (
+        userType !== 'User' &&
+        userType !== 'Sub_Admin' &&
+        aws &&
+        typeof aws === 'object' &&
+        !Array.isArray(aws)
+      ) {
+        const map = aws as Record<string, unknown>;
+        const scoped: Record<string, string[]> = {};
+        if (appClientName && Array.isArray(map[appClientName])) {
+          scoped[appClientName] = [...(map[appClientName] as string[])];
+        } else {
+          for (const [key, states] of Object.entries(map)) {
+            if (Array.isArray(states)) scoped[key] = [...(states as string[])];
+          }
+        }
+        if (Object.keys(scoped).length > 0) withAppState = { appWithState: scoped };
+      }
 
       let payload: Record<string, unknown>;
       switch (userType) {
         case 'Sub_Admin':
-          payload = { pageNo: page, itemPerPage: pageSize, filter };
+          payload = { pageNo: page, itemPerPage: pageSize, ...(Object.keys(filter).length ? { filter } : {}) };
           break;
         case 'Non_Performing_User':
-          payload = { pageNo: page, itemPerPage: pageSize, filter };
+          payload = {
+            pageNo: page,
+            itemPerPage: pageSize,
+            filter,
+            ...(dates ? { startDate: dates.start, endDate: dates.end } : {}),
+            ...app,
+            ...withAppState,
+          };
           break;
         case 'Non_Performing_Active_User':
           payload = { filter };
@@ -345,15 +415,20 @@ export function UsersScreen() {
             itemsPerPage: pageSize,
             filter,
             ...(dates ? { activeUserStartDate: dates.start, activeUserEndDate: dates.end } : {}),
+            ...app,
+            ...withAppState,
           };
           break;
         default:
+          // User / Todays_Active / In_Active_Deposit
           payload = {
             pageNo: page,
             itemsPerPage: pageSize,
             filter,
             ...(dates ? { startDate: dates.start, endDate: dates.end } : {}),
-            ...(userType === 'User' ? { activeUserStart: '', activeUserEnd: '' } : {}),
+            ...(userType === 'User'
+              ? { activeUserStart: '', activeUserEnd: '' }
+              : { ...app, ...withAppState }),
           };
       }
       const res = await secureApi(TYPE_ACTION[userType], payload);
@@ -371,7 +446,7 @@ export function UsersScreen() {
     } finally {
       setLoading(false);
     }
-  }, [appClientName, appliedSearch, blockFilter, dates, page, pageSize, userType]);
+  }, [admin, appClientName, appliedSearch, blockFilter, dates, page, pageSize, userType]);
 
   useEffect(() => {
     void load();
