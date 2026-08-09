@@ -24,6 +24,7 @@ import { floorNum } from '../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../dashboards/ui/DataTable';
 import { pickLastActivity } from '../dashboards/userRowUtils';
 import { secureApi } from '../api/client';
+import { useNavigation } from '@react-navigation/native';
 import { getSessionUser, hasPermission, isCallerRole } from '../auth/permissions';
 import { formatDisplayDate, todayIST } from '../utils/dates';
 import {
@@ -327,6 +328,8 @@ export function UsersScreen() {
   const hideContact = hasPermission('contact_visibility_none');
   const admin = useMemo(() => getSessionUser(), []);
   const isCaller = useMemo(() => isCallerRole(admin), [admin]);
+  const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
+  const canOpenReport = hasPermission('wallet_history');
   const canCreate = !isCaller && hasPermission('create_new_user');
 
   const typeOptions = useMemo(
@@ -822,7 +825,19 @@ export function UsersScreen() {
                   </Text>
                 </View>
                 <View style={styles.userCardMid}>
-                  <Text style={styles.userCardName} numberOfLines={1}>
+                  <Text
+                    style={[styles.userCardName, canOpenReport && r._id ? styles.userCardNameLink : null]}
+                    numberOfLines={1}
+                    onPress={
+                      canOpenReport && r._id
+                        ? () =>
+                            navigation.navigate('/user-report', {
+                              userId: String(r._id),
+                              userName: name,
+                            })
+                        : undefined
+                    }
+                  >
                     {name}
                   </Text>
                   <Text style={styles.userCardSub} numberOfLines={1}>
@@ -1091,6 +1106,10 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: '700',
     fontSize: 14,
+  },
+  userCardNameLink: {
+    color: '#4fc3f7',
+    textDecorationLine: 'underline',
   },
   userCardSub: {
     color: colors.muted,
