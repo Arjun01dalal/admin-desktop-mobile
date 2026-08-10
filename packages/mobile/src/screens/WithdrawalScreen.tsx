@@ -367,6 +367,8 @@ export function WithdrawalScreen() {
     null,
   );
   const [provider, setProvider] = useState('');
+  // Collapsible tools section (keeps the list visible without scrolling).
+  const [toolsOpen, setToolsOpen] = useState(false);
   // Desktop toolbar parity: Sort checkbox, Bank Amount + Mid Name filters.
   const [sortChecked, setSortChecked] = useState(false);
   const [bankAmtDraft, setBankAmtDraft] = useState('');
@@ -1318,8 +1320,19 @@ export function WithdrawalScreen() {
         ))}
       </ScrollView>
 
-      {/* Desktop toolbar parity: Sort, Bank Amount, Mid Name, downloads, Add Bene List */}
+      {/* Collapsible tools: Sort, Bank Amount, Mid Name, downloads, Add Bene List */}
       <View style={styles.toolsRow}>
+        <TouchableOpacity
+          style={[styles.chip, toolsOpen && styles.chipActive]}
+          onPress={() => setToolsOpen((v) => !v)}
+        >
+          <Text style={[styles.chipText, toolsOpen && styles.chipTextActive]}>
+            Tools {toolsOpen ? '▲' : '▼'}
+            {!toolsOpen && (sortChecked || bankAmt || midFilter) ? ' •' : ''}
+          </Text>
+        </TouchableOpacity>
+        {toolsOpen ? (
+          <>
         <TouchableOpacity
           style={[styles.chip, sortChecked && styles.chipActive]}
           onPress={() => {
@@ -1364,8 +1377,10 @@ export function WithdrawalScreen() {
             <Text style={styles.chipText}>Add Bene List</Text>
           </TouchableOpacity>
         ) : null}
+          </>
+        ) : null}
       </View>
-      {midFilterOpen ? (
+      {toolsOpen && midFilterOpen ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
           <TouchableOpacity
             style={[styles.chip, midFilter === '' && styles.chipActive]}
@@ -1394,7 +1409,7 @@ export function WithdrawalScreen() {
           ))}
         </ScrollView>
       ) : null}
-      {perms.download ? (
+      {toolsOpen && perms.download ? (
         <View style={styles.toolsRow}>
           <TouchableOpacity style={styles.bulkBtn} onPress={downloadData}>
             <Text style={styles.bulkBtnText}>Download Data</Text>
