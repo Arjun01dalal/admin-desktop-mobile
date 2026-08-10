@@ -1321,7 +1321,7 @@ export function WithdrawalScreen() {
       </ScrollView>
 
       {/* Collapsible tools: Sort, Bank Amount, Mid Name, downloads, Add Bene List */}
-      <View style={styles.toolsRow}>
+      <View style={[styles.toolsRow, { justifyContent: 'flex-end' }]}>
         <TouchableOpacity
           style={[styles.chip, toolsOpen && styles.chipActive]}
           onPress={() => setToolsOpen((v) => !v)}
@@ -1331,8 +1331,9 @@ export function WithdrawalScreen() {
             {!toolsOpen && (sortChecked || bankAmt || midFilter) ? ' •' : ''}
           </Text>
         </TouchableOpacity>
-        {toolsOpen ? (
-          <>
+      </View>
+      {toolsOpen ? (
+        <View style={styles.toolsRow}>
         <TouchableOpacity
           style={[styles.chip, sortChecked && styles.chipActive]}
           onPress={() => {
@@ -1377,9 +1378,8 @@ export function WithdrawalScreen() {
             <Text style={styles.chipText}>Add Bene List</Text>
           </TouchableOpacity>
         ) : null}
-          </>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
       {toolsOpen && midFilterOpen ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
           <TouchableOpacity
