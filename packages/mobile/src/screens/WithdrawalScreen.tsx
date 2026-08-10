@@ -85,6 +85,24 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Desktop parity: fixed gateway list used in the Manual Approved / QR popups. */
+const GATEWAY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'bramhadev', label: 'Bramhadev' },
+  { value: 'jk Bank', label: 'J&K Bank' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'kotak', label: 'Kotak' },
+  { value: 'OFS-HDFC', label: 'OFS-HDFC' },
+  { value: 'OFS-AXIS', label: 'OFS-AXIS' },
+  { value: 'axis', label: 'Axis' },
+  { value: 'payok', label: 'Pay Ok' },
+  { value: 'uco', label: 'Uco' },
+  { value: 'ansin-ecommerce-JK', label: 'Ansin-Ecommerce-JK' },
+  { value: 'OFS-ansin', label: 'OFS-ansin' },
+  { value: 'digitech', label: 'Digitech' },
+  { value: 'rpf', label: 'Royal Pets' },
+  { value: 'shyam-trading', label: 'SHYAM-TRADING' },
+];
+
 /** Desktop UPIQR parity: build the UPI payment query string. */
 function buildUpiQuery(r: Rec): string {
   const params = new URLSearchParams();
@@ -328,6 +346,16 @@ export function WithdrawalScreen() {
   const qrRef = React.useRef<{ toDataURL: (cb: (data: string) => void) => void } | null>(null);
   // Desktop parity: default withdrawal provider = first active payout account.
   const [defaultGateway, setDefaultGateway] = useState('');
+  // Manual Approved / QR gateway list: desktop's fixed options + any extra API gateways.
+  const gatewayOptions = useMemo(() => {
+    const known = new Set(GATEWAY_OPTIONS.map((g) => g.value.toLowerCase()));
+    return [
+      ...GATEWAY_OPTIONS,
+      ...gateways
+        .filter((g) => !known.has(g.toLowerCase()))
+        .map((g) => ({ value: g, label: g })),
+    ];
+  }, [gateways]);
   // Approve modal with withdrawal-provider selection (desktop per-row gateway dropdown parity).
   const [approveTarget, setApproveTarget] = useState<{ row: Rec | null; bulk: boolean } | null>(
     null,
@@ -1425,40 +1453,35 @@ export function WithdrawalScreen() {
             </View>
             <Text style={styles.modalSub}>Gateway</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {gateways.map((g) => (
+              {gatewayOptions.map((g) => (
                 <TouchableOpacity
-                  key={g}
-                  style={[styles.chip, gateway === g && styles.chipActive]}
+                  key={g.value}
+                  style={[styles.chip, gateway === g.value && styles.chipActive]}
                   onPress={() => {
                     // Desktop parity: changing gateway resets the MID selection.
-                    if (g !== gateway) setMid('');
-                    setGateway(g);
+                    if (g.value !== gateway) setMid('');
+                    setGateway(g.value);
                   }}
                 >
-                  <Text style={[styles.chipText, gateway === g && styles.chipTextActive]}>
-                    {g}
+                  <Text style={[styles.chipText, gateway === g.value && styles.chipTextActive]}>
+                    {g.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <Text style={styles.modalSub}>MID</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {mids
-                .filter((m) => !gateway || !m.gateway || m.gateway === gateway)
-                .map((m) => (
-                  <TouchableOpacity
-                    key={m.label}
-                    style={[styles.chip, mid === m.mid && styles.chipActive]}
-                    onPress={() => {
-                      setMid(m.mid);
-                      if (!gateway && m.gateway) setGateway(m.gateway);
-                    }}
-                  >
-                    <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
-                      {m.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              {mids.map((m) => (
+                <TouchableOpacity
+                  key={m.label}
+                  style={[styles.chip, mid === m.mid && styles.chipActive]}
+                  onPress={() => setMid(m.mid)}
+                >
+                  <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </ScrollView>
             {modalErr ? <Text style={styles.modalErr}>{modalErr}</Text> : null}
             <View style={styles.modalActions}>
@@ -1519,14 +1542,18 @@ export function WithdrawalScreen() {
               <>
                 <Text style={styles.modalSub}>Gateway</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {gateways.map((g) => (
+                  {gatewayOptions.map((g) => (
                     <TouchableOpacity
-                      key={g}
-                      style={[styles.chip, gateway === g && styles.chipActive]}
-                      onPress={() => setGateway(g)}
+                      key={g.value}
+                      style={[styles.chip, gateway === g.value && styles.chipActive]}
+                      onPress={() => {
+                        // Desktop parity: changing gateway resets the MID selection.
+                        if (g.value !== gateway) setMid('');
+                        setGateway(g.value);
+                      }}
                     >
-                      <Text style={[styles.chipText, gateway === g && styles.chipTextActive]}>
-                        {g}
+                      <Text style={[styles.chipText, gateway === g.value && styles.chipTextActive]}>
+                        {g.label}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1537,10 +1564,7 @@ export function WithdrawalScreen() {
                     <TouchableOpacity
                       key={m.label}
                       style={[styles.chip, mid === m.mid && styles.chipActive]}
-                      onPress={() => {
-                        setMid(m.mid);
-                        if (!gateway && m.gateway) setGateway(m.gateway);
-                      }}
+                      onPress={() => setMid(m.mid)}
                     >
                       <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
                         {m.label}
