@@ -692,8 +692,8 @@ function FundTab({ userId }: { userId: string }) {
     return [
       { key: 'ptype', label: 'Payment Type', width: 100, render: (r) => display(r.paymentType ?? r.type) },
       { key: 'amount', label: 'Amount', width: 90, render: (r) => floorNum(num(r.amount)).toLocaleString('en-IN') },
+      { key: 'orderKey', label: 'Order Key Id', width: 150, render: (r) => display(r.orderKeyId ?? r.order_key_id ?? r.orderKey ?? r.orderkeyid) },
       { key: 'orderId', label: 'Order Id', width: 150, render: (r) => display(r.orderId ?? r.order_id) },
-      { key: 'orderKey', label: 'Order Key Id', width: 150, render: (r) => display(r.orderKeyId) },
       { key: 'gateway', label: 'Gateway', width: 110, render: (r) => display(r.paymentGatewayName ?? r.gateway) },
       { key: 'mid', label: 'MID', width: 100, render: (r) => display(r.mid) },
       { key: 'name', label: 'User Name', width: 120, render: (r) => display(r.userName ?? r.name) },
@@ -1123,6 +1123,14 @@ function providerList(data: unknown): Rec[] {
 
 const SM_MARKET_CODES = ['301', '401', '501', '701', '801'] as const;
 
+type ProviderTotals = {
+  providerBet: number;
+  providerWin: number;
+  platformComm: number;
+  platformBet: number;
+  platformWin: number;
+};
+
 function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
   const [rows, setRows] = useState<Rec[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1131,6 +1139,8 @@ function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
   const [marketId, setMarketId] = useState('');
   const [marketCode, setMarketCode] = useState('301');
   const [msg, setMsg] = useState('');
+  const [totals, setTotals] = useState<ProviderTotals | null>(null);
+  const [betCount, setBetCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1164,8 +1174,19 @@ function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
           marketCode,
         });
       }
-      setRows(res.ok ? providerList(res.data) : []);
+      const list = res.ok ? providerList(res.data) : [];
+      setRows(list);
       if (!res.ok) setMsg(res.message || 'Failed to load');
+      // Desktop parity: summary totals + bet count come alongside the list.
+      const nested = unwrap(res.ok ? res.data : {});
+      setTotals({
+        providerBet: num(nested.totalBetAmountProvider ?? nested.providerBetAmount ?? 0),
+        providerWin: num(nested.totalWinAmountProvider ?? nested.providerWinAmount ?? 0),
+        platformComm: num(nested.platformCommissionAmount ?? nested.commissionAmount ?? 0),
+        platformBet: num(nested.platformBetAmount ?? nested.totalPlatformBet ?? 0),
+        platformWin: num(nested.platformWinAmount ?? nested.totalPlatformWin ?? 0),
+      });
+      setBetCount(num(nested.totalBets ?? nested.totalNumberOfBets ?? list.length) || list.length);
     } finally {
       setLoading(false);
     }
@@ -1283,6 +1304,27 @@ function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
         <Text style={styles.submitBtnText}>{loading ? 'Loading…' : 'Load'}</Text>
       </TouchableOpacity>
       {msg ? <Text style={styles.muted}>{msg}</Text> : null}
+      {totals && kind !== 'jetfair' ? (
+        <View style={styles.summaryGrid}>
+          {(
+            [
+              ['Total Bet Amount Provider', totals.providerBet],
+              ['Total Win Amount Provider', totals.providerWin],
+              ['Platform Commission Amount', totals.platformComm],
+              ['Platform Bet Amount', totals.platformBet],
+              ['Platform Win Amount', totals.platformWin],
+            ] as [string, number][]
+          ).map(([label, value]) => (
+            <View key={label} style={[styles.summaryCard, styles.summaryCardCompact]}>
+              <Text style={styles.summaryLabel}>{label}</Text>
+              <Text style={styles.summaryValue}>₹{floorNum(value).toLocaleString('en-IN')}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <Text style={styles.muted}>
+        {kind === 'missing' ? 'Total Missing Bets' : 'Total Number of bets'}: {betCount}
+      </Text>
       <ResponsiveTable
         columns={columns}
         rows={rows}
