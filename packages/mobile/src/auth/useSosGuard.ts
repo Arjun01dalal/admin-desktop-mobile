@@ -19,7 +19,9 @@ import React, {
 import { getSosBlock, isSosFlagEnabled, type SosBlockInfo } from '@astro/shared';
 import { secureApi } from '../api/client';
 
-const POLL_MS = 30_000;
+// Fast poll so a desktop-raised SOS sirens on mobile within ~10s (and vice
+// versa desktop's own sosMonitor polls the same server flag).
+const POLL_MS = 10_000;
 
 type SosState = {
   sosEnabled: boolean;
