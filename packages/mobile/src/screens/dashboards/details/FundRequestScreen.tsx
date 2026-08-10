@@ -461,8 +461,8 @@ export function FundRequestScreen() {
     { key: 'new-user', label: 'New User Deposit', bucket: newUserDeposit, tone: 'green', show: canViewDeposit },
     { key: 'old-user', label: 'Old User Deposit', bucket: oldUserDeposit, tone: 'green', show: canViewDeposit },
     { key: 'transfer-main', label: 'Transfer to Main Wallet', bucket: transferMainWallet, tone: 'green', show: canViewBonusWallet },
-    { key: 'w-hold', label: 'Withdrawal on Hold', bucket: wOnHold, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'on hold', onPress: () => openDrill('withdrawal', 'on hold') },
-    { key: 'w-approved', label: 'Withdrawal Approved', bucket: wApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved', onPress: () => openDrill('withdrawal', 'Approved') },
+    { key: 'w-hold', label: 'Refund on Hold', bucket: wOnHold, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'on hold', onPress: () => openDrill('withdrawal', 'on hold') },
+    { key: 'w-approved', label: 'Refund Approved', bucket: wApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved', onPress: () => openDrill('withdrawal', 'Approved') },
     { key: 'w-today', label: "Today's Withdrawal Approved", bucket: wTodayApproved, tone: 'blue', show: canViewWithdrawal, onPress: () => openDrill('withdrawal', 'Approved') },
     { key: 'w-old', label: 'Old Withdrawal Approved', bucket: wOldApproved, tone: 'blue', show: canViewWithdrawal, onPress: () => openDrill('withdrawal', 'Approved') },
     { key: 'unique', label: 'Unique Deposit Pending', bucket: uniquePending, tone: 'yellow', show: canViewDeposit },
@@ -635,7 +635,7 @@ export function FundRequestScreen() {
             <Text style={styles.backLink}>‹ Back to Fund Requests</Text>
           </TouchableOpacity>
           <Text style={styles.sectionTitle}>
-            {drillType === 'deposit' ? 'Deposit' : 'Withdrawal'} Transactions ({total})
+            {drillType === 'deposit' ? 'Deposit' : 'Refund'} Transactions ({total})
           </Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing(2) }}>

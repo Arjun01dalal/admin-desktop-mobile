@@ -422,7 +422,7 @@ export function WithdrawalScreen() {
       if (app) payload.app = app;
       const res = await secureApi('withdrawals.transactions', payload);
       if (!res.ok) {
-        setMsg(res.message || 'Failed to load withdrawals');
+        setMsg(res.message || 'Failed to load refunds');
         setRows([]);
         setTotalPages(1);
         return;
@@ -1741,7 +1741,7 @@ export function WithdrawalScreen() {
                 ? `Bulk Approve (${bulkIds.length})`
                 : `Approve — ₹${fmtAmount(approveTarget?.row?.amount)}`}
             </Text>
-            <Text style={styles.modalSub}>Withdrawal Provider</Text>
+            <Text style={styles.modalSub}>Refund Provider</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {gateways.map((g) => (
                 <TouchableOpacity
@@ -1770,7 +1770,7 @@ export function WithdrawalScreen() {
                 onPress={() => {
                   if (!approveTarget) return;
                   if (!provider) {
-                    setModalErr('Select a withdrawal provider');
+                    setModalErr('Select a refund provider');
                     return;
                   }
                   const t = approveTarget;

@@ -276,7 +276,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'withdrawalProviders',
-    label: 'Withdrawal Providers',
+    label: 'Refund Providers',
     path: '/payout-accounts',
     permission: Permissions.View_PayOut_Accounts,
   },
@@ -342,7 +342,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'withdrawalFund',
-    label: 'Withdrawal Fund',
+    label: 'Refund Fund',
     path: '/withdrawal-fund',
     permission: Permissions.withdrawal_fund,
   },

@@ -661,7 +661,7 @@ export function WithdrawalFundScreen() {
             const s = payload?.summary;
             setBucketBackView('mids');
             openBucket({
-              title: `${m.mid} — Withdrawals`,
+              title: `${m.mid} — Refunds`,
               rows: m.withdrawals,
               totalAmount: m.totalAmount,
               count: m.withdrawals?.length || m.count || 0,
@@ -807,7 +807,7 @@ export function WithdrawalFundScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>{toDisplayText('Withdrawal Fund')}</Text>
+      <Text style={styles.title}>{toDisplayText('Refund Fund')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Amount: {formatAmount(totalAmount)}
       </Text>

@@ -163,9 +163,9 @@ export function UserReportScreen() {
     ? [
         ['Balance', summary.balance],
         ['Total Deposit', summary.totalDeposit],
-        ['Total Withdrawal', summary.totalWithdrawal],
+        ['Total Refund', summary.totalWithdrawal],
         ['Bonus Wallet', summary.bonusWalletBalance],
-        ['Pending Withdrawal', summary.pendingWithdrawal],
+        ['Pending Refund', summary.pendingWithdrawal],
         ['Exposure', summary.exposure],
         ['Referral Earning', summary.referralEarning],
         ['Own Earning', summary.ownEarning],
