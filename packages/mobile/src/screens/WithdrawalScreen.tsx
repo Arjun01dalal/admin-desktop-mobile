@@ -30,7 +30,7 @@ import {
 import * as Location from 'expo-location';
 import { appCodeForName } from '@astro/shared';
 import { secureApi } from '../api/client';
-import { getSessionUser } from '../auth/permissions';
+import { getSessionUser, hasPermission, Permissions } from '../auth/permissions';
 import { colors, radius, spacing } from '../theme';
 import { type DataTableColumn } from '../dashboards/ui/DataTable';
 import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
@@ -289,6 +289,21 @@ export function WithdrawalScreen() {
   const [mid, setMid] = useState('');
   const [gateways, setGateways] = useState<string[]>([]);
   const [mids, setMids] = useState<{ label: string; mid: string; gateway: string }[]>([]);
+  // Bot validation results modal (desktop ValidationModal parity).
+  const [validationRow, setValidationRow] = useState<Rec | null>(null);
+
+  // Desktop permission parity (login Responsibilities).
+  const perms = useMemo(
+    () => ({
+      actions: hasPermission(Permissions.withdrawals_button),
+      checksDisabled: hasPermission(Permissions.Disable_Withdrawals_Check),
+      reject: hasPermission(Permissions.View_Reject),
+      reverse: hasPermission(Permissions.View_Reverse),
+      showAll: hasPermission(Permissions.show_all_withdrawal),
+      showMobile: hasPermission(Permissions.show_mobile) && !hasPermission('contact_visibility_none'),
+    }),
+    [],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -296,6 +311,8 @@ export function WithdrawalScreen() {
     try {
       const filter: Rec = {};
       if (status) filter.status = status;
+      // Desktop IN PROGRESS isolation: without show_all_withdrawal, only own locked rows.
+      if (status === 'IN PROGRESS' && !perms.showAll && admin?.name) filter.name = admin.name;
       if (applied.text.trim()) filter[applied.field] = applied.text.trim();
       const payload: Rec = {
         type: 'withdrawal',
@@ -319,7 +336,7 @@ export function WithdrawalScreen() {
     } finally {
       setLoading(false);
     }
-  }, [admin, status, applied, pageSize, page, startDate, endDate]);
+  }, [admin, status, applied, pageSize, page, startDate, endDate, perms.showAll]);
 
   const loadSummary = useCallback(async () => {
     const res = await secureApi('withdrawals.fundRequest', { startDate, endDate });
@@ -443,8 +460,9 @@ export function WithdrawalScreen() {
     async (r: Rec, newStatus: string, reasonText: string, gw: string, midSel: string) => {
       // Desktop rules: non-Approved needs remark; statuses other than
       // Approved/Reverse/on hold need gateway + MID.
+      // Desktop parity: only Approved and Reverse are exempt from gateway/MID.
       const needsRemark = newStatus !== 'Approved';
-      const needsGateway = !['Approved', 'Reverse', 'on hold'].includes(newStatus);
+      const needsGateway = !['Approved', 'Reverse'].includes(newStatus);
       if (needsRemark && !reasonText.trim()) {
         Alert.alert('Remark is required');
         return;
@@ -514,7 +532,12 @@ export function WithdrawalScreen() {
         width: 80,
         render: (r) => display(appCodeForName(String(r.clientName || '')) || r.clientName),
       },
-      { key: 'mobile', label: 'Mobile', width: 110, render: (r) => display(r.userMobile ?? r.mobile) },
+      {
+        key: 'mobile',
+        label: 'Mobile',
+        width: 110,
+        render: (r) => (perms.showMobile ? display(r.userMobile ?? r.mobile) : '••••••••'),
+      },
       { key: 'state', label: 'State', width: 100, render: (r) => display(r.state) },
       { key: 'city', label: 'City', width: 100, render: (r) => display(r.city) },
       {
@@ -552,6 +575,13 @@ export function WithdrawalScreen() {
         width: 100,
         render: (r) =>
           r.validationCheckedAt ? `${num(r.passedPoints)}/${num(r.totalPoints)}` : '—',
+        // Desktop threshold: >= 13 passed points is a good bot score.
+        color: (r) =>
+          r.validationCheckedAt
+            ? Number(r.passedPoints) >= 13
+              ? colors.success
+              : colors.destructive
+            : undefined,
       },
       {
         key: 'lockBy',
@@ -616,21 +646,31 @@ export function WithdrawalScreen() {
         render: (r) => (r.createdOn ? formatDisplayTime(String(r.createdOn)) : '—'),
       },
     ],
-    [],
+    [perms.showMobile],
   );
 
   /** Desktop row-action parity: lock/unlock, checks, status changes. */
   const sheetActions = (r: Rec): SheetAction[] => {
     const acts: SheetAction[] = [];
+    if (r.validationCheckedAt) {
+      acts.push({
+        label: `Bot Validation (${num(r.passedPoints)}/${num(r.totalPoints)})`,
+        tone: 'default',
+        onPress: () => setValidationRow(r),
+      });
+    }
+    // Desktop: all mutation buttons live behind withdrawals_button.
+    if (!perms.actions) return acts;
     const checkFirst = checkOf(r, 'checkBy');
     const checkSecond = checkOf(r, 'crossCheckBy');
-    if (!checkFirst) {
+    const checksAllowed = !perms.checksDisabled && !isTerminal(r);
+    if (!checkFirst && checksAllowed) {
       acts.push(
         { label: 'Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'first', true) },
         { label: 'Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'first', false) },
       );
     }
-    if (!checkSecond) {
+    if (!checkSecond && checksAllowed) {
       acts.push(
         { label: 'Cross Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'second', true) },
         { label: 'Cross Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'second', false) },
@@ -652,6 +692,16 @@ export function WithdrawalScreen() {
           ]),
       });
       acts.push({
+        label: 'Manual Approved',
+        tone: 'primary',
+        onPress: () => {
+          setRemark('');
+          setGateway('');
+          setMid('');
+          setStatusModal({ row: r, status: 'Manual Approved' });
+        },
+      });
+      acts.push({
         label: 'On Hold',
         tone: 'warning',
         onPress: () => {
@@ -663,26 +713,30 @@ export function WithdrawalScreen() {
       });
     }
     if (canRejectRow(r)) {
-      acts.push({
-        label: 'Reject',
-        tone: 'warning',
-        onPress: () => {
-          setRemark('');
-          setGateway('');
-          setMid('');
-          setStatusModal({ row: r, status: 'Rejected' });
-        },
-      });
-      acts.push({
-        label: 'Reverse',
-        tone: 'warning',
-        onPress: () => {
-          setRemark('');
-          setGateway('');
-          setMid('');
-          setStatusModal({ row: r, status: 'Reverse' });
-        },
-      });
+      if (perms.reject) {
+        acts.push({
+          label: 'Reject',
+          tone: 'warning',
+          onPress: () => {
+            setRemark('');
+            setGateway('');
+            setMid('');
+            setStatusModal({ row: r, status: 'Rejected' });
+          },
+        });
+      }
+      if (perms.reverse) {
+        acts.push({
+          label: 'Reverse',
+          tone: 'warning',
+          onPress: () => {
+            setRemark('');
+            setGateway('');
+            setMid('');
+            setStatusModal({ row: r, status: 'Reverse' });
+          },
+        });
+      }
     }
     return acts;
   };
@@ -789,6 +843,61 @@ export function WithdrawalScreen() {
         actions={selected ? sheetActions(selected) : undefined}
         note={actionBusy ? 'Working…' : undefined}
       />
+
+      {/* Bot validation results (desktop ValidationModal parity) */}
+      <Modal
+        visible={validationRow !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setValidationRow(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.validationCard]}>
+            <Text style={styles.modalTitle}>
+              Validation Results ({num(validationRow?.passedPoints)}/{num(validationRow?.totalPoints)})
+            </Text>
+            <ScrollView style={styles.validationList}>
+              {(Array.isArray(validationRow?.validationResults)
+                ? (validationRow?.validationResults as Rec[])
+                : []
+              ).map((v, i) => (
+                <View key={String(v._id ?? i)} style={styles.validationItem}>
+                  <View style={styles.validationHead}>
+                    <Text style={styles.validationName}>
+                      {display(v.point)} · {display(v.name)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.validationStatus,
+                        { color: v.passed ? colors.success : colors.destructive },
+                      ]}
+                    >
+                      {v.passed ? 'Passed' : 'Failed'}
+                    </Text>
+                  </View>
+                  {v.reason ? <Text style={styles.validationReason}>{display(v.reason)}</Text> : null}
+                  {v.details && typeof v.details === 'object' ? (
+                    <Text style={styles.validationDetails}>
+                      {Object.entries(v.details as Rec)
+                        .map(([k, val]) => `${k}: ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`)
+                        .join('\n')}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+              {!Array.isArray(validationRow?.validationResults) ||
+              (validationRow?.validationResults as Rec[]).length === 0 ? (
+                <Text style={styles.validationReason}>No validation details available.</Text>
+              ) : null}
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.pagerBtn} onPress={() => setValidationRow(null)}>
+                <Text style={styles.pagerBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Status-change modal (remark + gateway/MID when required) */}
       <Modal
@@ -992,4 +1101,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  validationCard: { maxHeight: '85%' },
+  validationList: { marginTop: spacing(2) },
+  validationItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: spacing(2),
+  },
+  validationHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+  },
+  validationName: { color: colors.foreground, fontSize: 13, fontWeight: '600', flex: 1 },
+  validationStatus: { fontSize: 12, fontWeight: '700' },
+  validationReason: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+  validationDetails: { color: colors.muted, fontSize: 11, marginTop: spacing(1) },
 });
