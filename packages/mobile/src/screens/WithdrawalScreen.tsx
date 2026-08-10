@@ -659,27 +659,35 @@ export function WithdrawalScreen() {
         onPress: () => setValidationRow(r),
       });
     }
-    // Desktop: all mutation buttons live behind withdrawals_button.
-    if (!perms.actions) return acts;
     const checkFirst = checkOf(r, 'checkBy');
     const checkSecond = checkOf(r, 'crossCheckBy');
-    const checksAllowed = !perms.checksDisabled && !isTerminal(r);
+    // Desktop: check column hidden only for Cancel/Rejected/Reverse/Failed,
+    // and checks are NOT behind withdrawals_button.
+    const checksAllowed =
+      !perms.checksDisabled &&
+      !['Cancel', 'Rejected', 'Reverse', 'Failed'].includes(String(r.status || ''));
     if (!checkFirst && checksAllowed) {
       acts.push(
         { label: 'Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'first', true) },
         { label: 'Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'first', false) },
       );
     }
-    if (!checkSecond && checksAllowed) {
+    // Desktop: cross-check buttons appear only after first check is OK.
+    if (!checkSecond && checksAllowed && Boolean(checkFirst?.status)) {
       acts.push(
         { label: 'Cross Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'second', true) },
         { label: 'Cross Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'second', false) },
       );
     }
-    if (canUnlockRow(r)) {
-      acts.push({ label: 'Unlock', tone: 'warning', onPress: () => void doLock(r, false) });
-    } else if (canLockRow(r)) {
-      acts.push({ label: 'Lock', tone: 'primary', onPress: () => void doLock(r, true) });
+    // Lock/Unlock + status buttons live behind withdrawals_button (desktop).
+    if (!perms.actions) return acts;
+    // Desktop: lock/unlock toggle shown only when both checks are OK.
+    if (bothChecksOk(r)) {
+      if (r.status === 'Lock' || r.status === 'IN PROGRESS') {
+        acts.push({ label: 'Unlock', tone: 'warning', onPress: () => void doLock(r, false) });
+      } else if (!isTerminal(r)) {
+        acts.push({ label: 'Lock', tone: 'primary', onPress: () => void doLock(r, true) });
+      }
     }
     if (canShowApproveAction(r)) {
       acts.push({
