@@ -208,7 +208,16 @@ function canRejectRow(r: Rec): boolean {
 
 type Geo = { city: string; state: string; lat: string; long: string };
 
-/** Desktop requireWithdrawalGeo parity: lat/long + city/state or abort. */
+/**
+ * Never call Alert.alert while a Modal is open/animating — RN freezes all
+ * touches (the "cards stop responding" bug). Always close sheets first and
+ * show alerts after a short delay.
+ */
+function notify(title: string, message?: string): void {
+  setTimeout(() => Alert.alert(title, message), 450);
+}
+
+/** Desktop requireWithdrawalGeo parity: lat/long + city/state or abort (no alert here). */
 async function requireGeo(): Promise<Geo | null> {
   try {
     if (Platform.OS === 'web') throw new Error('unsupported');
@@ -226,13 +235,9 @@ async function requireGeo(): Promise<Geo | null> {
     } catch {
       /* fall through */
     }
-    if (!city || !state) {
-      Alert.alert('Location Information Missing');
-      return null;
-    }
+    if (!city || !state) return null;
     return { city, state, lat: String(latitude), long: String(longitude) };
   } catch {
-    Alert.alert('Location Information Missing');
     return null;
   }
 }
@@ -284,6 +289,7 @@ export function WithdrawalScreen() {
   const [actionBusy, setActionBusy] = useState(false);
   // Status-change modal (Rejected / on hold / Reverse need remark; some need gateway+MID).
   const [statusModal, setStatusModal] = useState<{ row: Rec; status: string } | null>(null);
+  const [modalErr, setModalErr] = useState('');
   const [remark, setRemark] = useState('');
   const [gateway, setGateway] = useState('');
   const [mid, setMid] = useState('');
@@ -396,12 +402,17 @@ export function WithdrawalScreen() {
 
   const doLock = useCallback(
     async (r: Rec, lock: boolean) => {
+      // Close the sheet first — alerts over an open Modal freeze touches.
+      setSelected(null);
       setActionBusy(true);
       try {
         let res;
         if (lock) {
           const geo = await requireGeo();
-          if (!geo) return;
+          if (!geo) {
+            notify('Location Information Missing');
+            return;
+          }
           res = await secureApi('withdrawals.lock', {
             transactionId: txnIdOf(r),
             updatedBy: {
@@ -416,10 +427,10 @@ export function WithdrawalScreen() {
           res = await secureApi('withdrawals.unlock', { transactionId: txnIdOf(r) });
         }
         if (!res.ok) {
-          Alert.alert(res.message || 'Action failed');
+          notify(res.message || 'Action failed');
           return;
         }
-        Alert.alert(lock ? 'Locked' : 'Unlocked');
+        notify(lock ? 'Locked' : 'Unlocked');
         afterAction();
       } finally {
         setActionBusy(false);
@@ -430,10 +441,15 @@ export function WithdrawalScreen() {
 
   const doCheck = useCallback(
     async (r: Rec, check: 'first' | 'second', ok: boolean) => {
+      // Close the sheet first — alerts over an open Modal freeze touches.
+      setSelected(null);
       setActionBusy(true);
       try {
         const geo = await requireGeo();
-        if (!geo) return;
+        if (!geo) {
+          notify('Location Information Missing');
+          return;
+        }
         const res = await secureApi('withdrawals.check', {
           transactionId: txnIdOf(r),
           check,
@@ -445,7 +461,7 @@ export function WithdrawalScreen() {
           },
         });
         if (!res.ok) {
-          Alert.alert(res.message || 'Check failed');
+          notify(res.message || 'Check failed');
           return;
         }
         afterAction();
@@ -458,23 +474,29 @@ export function WithdrawalScreen() {
 
   const doStatusUpdate = useCallback(
     async (r: Rec, newStatus: string, reasonText: string, gw: string, midSel: string) => {
-      // Desktop rules: non-Approved needs remark; statuses other than
-      // Approved/Reverse/on hold need gateway + MID.
-      // Desktop parity: only Approved and Reverse are exempt from gateway/MID.
+      // Desktop parity: only Approved and Reverse are exempt from gateway/MID;
+      // non-Approved statuses need a remark.
       const needsRemark = newStatus !== 'Approved';
       const needsGateway = !['Approved', 'Reverse'].includes(newStatus);
       if (needsRemark && !reasonText.trim()) {
-        Alert.alert('Remark is required');
+        setModalErr('Remark is required');
         return;
       }
       if (needsGateway && (!gw || !midSel)) {
-        Alert.alert('Gateway and MID are required');
+        setModalErr('Gateway and MID are required');
         return;
       }
+      setModalErr('');
+      // Close modals before any alert can fire (touch-freeze guard).
+      setStatusModal(null);
+      setSelected(null);
       setActionBusy(true);
       try {
         const geo = await requireGeo();
-        if (!geo) return;
+        if (!geo) {
+          notify('Location Information Missing');
+          return;
+        }
         const payload: Rec = {
           transactionId: txnIdOf(r),
           reason: newStatus === 'Approved' ? 'Approved' : reasonText.trim(),
@@ -493,10 +515,10 @@ export function WithdrawalScreen() {
         if (midSel) payload.mid = midSel;
         const res = await secureApi('withdrawals.statusUpdate', payload);
         if (!res.ok) {
-          Alert.alert(res.message || 'Status update failed');
+          notify(res.message || 'Status update failed');
           return;
         }
-        Alert.alert(`Status updated: ${newStatus}`);
+        notify(`Status updated: ${newStatus}`);
         afterAction();
       } finally {
         setActionBusy(false);
@@ -649,6 +671,16 @@ export function WithdrawalScreen() {
     [perms.showMobile],
   );
 
+  /** Close the sheet, then open the status modal (touch-freeze guard). */
+  const openStatusModal = (r: Rec, statusName: string) => {
+    setRemark('');
+    setGateway('');
+    setMid('');
+    setModalErr('');
+    setSelected(null);
+    setTimeout(() => setStatusModal({ row: r, status: statusName }), 350);
+  };
+
   /** Desktop row-action parity: lock/unlock, checks, status changes. */
   const sheetActions = (r: Rec): SheetAction[] => {
     const acts: SheetAction[] = [];
@@ -656,7 +688,11 @@ export function WithdrawalScreen() {
       acts.push({
         label: `Bot Validation (${num(r.passedPoints)}/${num(r.totalPoints)})`,
         tone: 'default',
-        onPress: () => setValidationRow(r),
+        onPress: () => {
+          // Close the sheet before opening another Modal (touch-freeze guard).
+          setSelected(null);
+          setTimeout(() => setValidationRow(r), 350);
+        },
       });
     }
     const checkFirst = checkOf(r, 'checkBy');
@@ -693,31 +729,28 @@ export function WithdrawalScreen() {
       acts.push({
         label: 'Approve',
         tone: 'primary',
-        onPress: () =>
-          Alert.alert('Approve withdrawal?', `₹${fmtAmount(r.amount)} — confirm approve`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Approve', onPress: () => void doStatusUpdate(r, 'Approved', '', '', '') },
-          ]),
+        onPress: () => {
+          // Close the sheet before showing the confirm alert (touch-freeze guard).
+          setSelected(null);
+          setTimeout(
+            () =>
+              Alert.alert('Approve withdrawal?', `₹${fmtAmount(r.amount)} — confirm approve`, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Approve', onPress: () => void doStatusUpdate(r, 'Approved', '', '', '') },
+              ]),
+            450,
+          );
+        },
       });
       acts.push({
         label: 'Manual Approved',
         tone: 'primary',
-        onPress: () => {
-          setRemark('');
-          setGateway('');
-          setMid('');
-          setStatusModal({ row: r, status: 'Manual Approved' });
-        },
+        onPress: () => openStatusModal(r, 'Manual Approved'),
       });
       acts.push({
         label: 'On Hold',
         tone: 'warning',
-        onPress: () => {
-          setRemark('');
-          setGateway('');
-          setMid('');
-          setStatusModal({ row: r, status: 'on hold' });
-        },
+        onPress: () => openStatusModal(r, 'on hold'),
       });
     }
     if (canRejectRow(r)) {
@@ -725,24 +758,14 @@ export function WithdrawalScreen() {
         acts.push({
           label: 'Reject',
           tone: 'warning',
-          onPress: () => {
-            setRemark('');
-            setGateway('');
-            setMid('');
-            setStatusModal({ row: r, status: 'Rejected' });
-          },
+          onPress: () => openStatusModal(r, 'Rejected'),
         });
       }
       if (perms.reverse) {
         acts.push({
           label: 'Reverse',
           tone: 'warning',
-          onPress: () => {
-            setRemark('');
-            setGateway('');
-            setMid('');
-            setStatusModal({ row: r, status: 'Reverse' });
-          },
+          onPress: () => openStatusModal(r, 'Reverse'),
         });
       }
     }
@@ -961,6 +984,7 @@ export function WithdrawalScreen() {
                 </ScrollView>
               </>
             ) : null}
+            {modalErr ? <Text style={styles.modalErr}>{modalErr}</Text> : null}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.pagerBtn}
@@ -1085,6 +1109,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   modalSub: { color: colors.muted, fontSize: 12, marginTop: spacing(2), marginBottom: spacing(1) },
+  modalErr: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
   modalInput: {
     borderColor: colors.border,
     borderWidth: 1,
