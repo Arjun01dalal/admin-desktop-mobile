@@ -912,17 +912,37 @@ export function UsersScreen() {
         }
         onClose={() => setSelected(null)}
         actions={
-          showBlockAction && selected
+          selected
             ? [
-                {
-                  label: isBlocked(selected) ? 'Unblock User' : 'Block User',
-                  tone: isBlocked(selected) ? ('primary' as const) : ('warning' as const),
-                  onPress: () => {
-                    const row = selected;
-                    setSelected(null);
-                    setBlockRow(row);
-                  },
-                },
+                ...(canOpenReport && selected._id
+                  ? [
+                      {
+                        label: 'View Details',
+                        tone: 'primary' as const,
+                        onPress: () => {
+                          const row = selected;
+                          setSelected(null);
+                          navigation.navigate('/user-report', {
+                            userId: String(row._id),
+                            userName: display(row.name),
+                          });
+                        },
+                      },
+                    ]
+                  : []),
+                ...(showBlockAction
+                  ? [
+                      {
+                        label: isBlocked(selected) ? 'Unblock User' : 'Block User',
+                        tone: isBlocked(selected) ? ('primary' as const) : ('warning' as const),
+                        onPress: () => {
+                          const row = selected;
+                          setSelected(null);
+                          setBlockRow(row);
+                        },
+                      },
+                    ]
+                  : []),
               ]
             : undefined
         }
