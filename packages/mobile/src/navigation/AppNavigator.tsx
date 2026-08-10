@@ -25,7 +25,8 @@ import {
   canShowSos,
   isSosExemptRole,
 } from '../auth/permissions';
-import { useSosGuard } from '../auth/useSosGuard';
+import { SosProvider, useSos } from '../auth/useSosGuard';
+import { SosAlertOverlay } from '../components/SosAlertOverlay';
 import { secureApi } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
@@ -262,10 +263,7 @@ function RevealHeaderButton() {
 function SosHeaderButton() {
   const { user, logout } = useAuth();
   const [busy, setBusy] = useState(false);
-  const { sosEnabled, setSosEnabled, refresh } = useSosGuard(true, () => {
-    Alert.alert('SOS activated', 'Returning to login.');
-    logout();
-  });
+  const { sosEnabled, setSosEnabled, refresh, markOriginator } = useSos();
   const sosExempt = isSosExemptRole();
   if (!(canShowSos() || (sosEnabled && sosExempt))) return null;
 
@@ -284,6 +282,7 @@ function SosHeaderButton() {
         return;
       }
       setSosEnabled(true);
+      markOriginator(); // No local siren/popup for the device that pressed SOS.
       if (!sosExempt) {
         Alert.alert('SOS', 'SOS alert sent. Support will contact you shortly.');
         logout();
@@ -409,6 +408,7 @@ export function AppNavigator() {
   );
 
   return (
+    <SosProvider enabled={!!user}>
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <NavigationContainer
       theme={{
@@ -450,7 +450,9 @@ export function AppNavigator() {
         ))}
       </RootStack.Navigator>
       </NavigationContainer>
+      {user ? <SosAlertOverlay /> : null}
     </View>
+    </SosProvider>
   );
 }
 
