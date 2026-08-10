@@ -328,6 +328,11 @@ export function WithdrawalScreen() {
   const qrRef = React.useRef<{ toDataURL: (cb: (data: string) => void) => void } | null>(null);
   // Desktop parity: default withdrawal provider = first active payout account.
   const [defaultGateway, setDefaultGateway] = useState('');
+  // Approve modal with withdrawal-provider selection (desktop per-row gateway dropdown parity).
+  const [approveTarget, setApproveTarget] = useState<{ row: Rec | null; bulk: boolean } | null>(
+    null,
+  );
+  const [provider, setProvider] = useState('');
 
   // Desktop permission parity (login Responsibilities).
   const perms = useMemo(
@@ -438,6 +443,7 @@ export function WithdrawalScreen() {
     setSelected(null);
     setStatusModal(null);
     setQrRow(null);
+    setApproveTarget(null);
     void load();
     void loadSummary();
   }, [load, loadSummary]);
@@ -515,7 +521,14 @@ export function WithdrawalScreen() {
   );
 
   const doStatusUpdate = useCallback(
-    async (r: Rec, newStatus: string, reasonText: string, gw: string, midSel: string) => {
+    async (
+      r: Rec,
+      newStatus: string,
+      reasonText: string,
+      gw: string,
+      midSel: string,
+      providerSel?: string,
+    ) => {
       // Desktop parity: only Approved and Reverse are exempt from gateway/MID;
       // non-Approved statuses need a remark.
       const needsRemark = newStatus !== 'Approved';
@@ -552,8 +565,8 @@ export function WithdrawalScreen() {
         };
         // Desktop parity: Approve without an explicit gateway still sends the
         // default payout-account provider as withdrewalProviderName.
-        const provider = gw || defaultGateway;
-        if (provider) payload.withdrewalProviderName = provider;
+        const providerName = gw || providerSel || defaultGateway;
+        if (providerName) payload.withdrewalProviderName = providerName;
         if (gw) payload.gatewayName = gw;
         if (midSel) payload.mid = midSel;
         const res = await secureApi('withdrawals.statusUpdate', payload);
@@ -618,7 +631,7 @@ export function WithdrawalScreen() {
   }, []);
 
   const doBulk = useCallback(
-    async (kind: 'lock' | 'unlock' | 'approve') => {
+    async (kind: 'lock' | 'unlock' | 'approve', providerSel?: string) => {
       const rowsSel = Object.values(bulkSel);
       if (rowsSel.length === 0) {
         notify('No refunds selected');
@@ -659,7 +672,7 @@ export function WithdrawalScreen() {
                   _id: admin?._id || '',
                 },
               })),
-              withdrewalProviderName: gateway || defaultGateway,
+              withdrewalProviderName: providerSel || gateway || defaultGateway,
               state: geo.state,
               city: geo.city,
               lat: geo.lat,
@@ -738,7 +751,14 @@ export function WithdrawalScreen() {
       Alert.alert('No refunds selected', 'Bulk mode me cards pe tap karke select karo.');
       return;
     }
-    const label = kind === 'lock' ? 'Lock' : kind === 'unlock' ? 'Unlock' : 'Approve';
+    if (kind === 'approve') {
+      // Provider must be chosen before bulk approve (desktop paymentGateway parity).
+      setProvider(defaultGateway);
+      setModalErr('');
+      setApproveTarget({ row: null, bulk: true });
+      return;
+    }
+    const label = kind === 'lock' ? 'Lock' : 'Unlock';
     Alert.alert(`Bulk ${label}?`, `You are about to ${label.toLowerCase()} ${n} refund(s).`, [
       { text: 'Cancel', style: 'cancel' },
       { text: label, onPress: () => void doBulk(kind) },
@@ -965,16 +985,11 @@ export function WithdrawalScreen() {
         label: 'Approve',
         tone: 'primary',
         onPress: () => {
-          // Close the sheet before showing the confirm alert (touch-freeze guard).
+          // Close the sheet before opening the provider-select modal (touch-freeze guard).
+          setProvider(defaultGateway);
+          setModalErr('');
           setSelected(null);
-          setTimeout(
-            () =>
-              Alert.alert('Approve withdrawal?', `₹${fmtAmount(r.amount)} — confirm approve`, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Approve', onPress: () => void doStatusUpdate(r, 'Approved', '', '', '') },
-              ]),
-            450,
-          );
+          setTimeout(() => setApproveTarget({ row: r, bulk: false }), 350);
         },
       });
       acts.push({
@@ -1295,6 +1310,72 @@ export function WithdrawalScreen() {
                   <ActivityIndicator size="small" color={colors.primaryForeground} />
                 ) : (
                   <Text style={styles.confirmBtnText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Approve modal with withdrawal-provider selection (desktop gateway dropdown parity) */}
+      <Modal
+        visible={approveTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !actionBusy && setApproveTarget(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {approveTarget?.bulk
+                ? `Bulk Approve (${bulkIds.length})`
+                : `Approve — ₹${fmtAmount(approveTarget?.row?.amount)}`}
+            </Text>
+            <Text style={styles.modalSub}>Withdrawal Provider</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {gateways.map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.chip, provider === g && styles.chipActive]}
+                  onPress={() => setProvider(g)}
+                >
+                  <Text style={[styles.chipText, provider === g && styles.chipTextActive]}>
+                    {g}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {modalErr ? <Text style={styles.modalErr}>{modalErr}</Text> : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.pagerBtn}
+                onPress={() => setApproveTarget(null)}
+                disabled={actionBusy}
+              >
+                <Text style={styles.pagerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, actionBusy && styles.pagerBtnDisabled]}
+                disabled={actionBusy}
+                onPress={() => {
+                  if (!approveTarget) return;
+                  if (!provider) {
+                    setModalErr('Select a withdrawal provider');
+                    return;
+                  }
+                  const t = approveTarget;
+                  setApproveTarget(null);
+                  if (t.bulk) {
+                    void doBulk('approve', provider);
+                  } else if (t.row) {
+                    void doStatusUpdate(t.row, 'Approved', '', '', '', provider);
+                  }
+                }}
+              >
+                {actionBusy ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Approve</Text>
                 )}
               </TouchableOpacity>
             </View>
