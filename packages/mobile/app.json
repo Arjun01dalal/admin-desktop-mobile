@@ -36,7 +36,11 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -64,9 +68,17 @@
       [
         "expo-notifications",
         {
-          "sounds": ["./assets/siren.mp3"]
+          "sounds": [
+            "./assets/siren.mp3"
+          ]
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "676d4bd3-ff79-4e37-9694-dc2d6332a0e2"
+      }
+    },
+    "owner": "arjun1308"
   }
 }
