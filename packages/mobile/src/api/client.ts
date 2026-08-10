@@ -19,6 +19,33 @@ export type ApiResult<T = unknown> = {
   token?: string;
 };
 
+/**
+ * Global auth-failure handler. The API layer cannot touch React state directly,
+ * so AuthProvider registers its logout() here. Invoked whenever the server
+ * rejects the session (HTTP 401 or a "token blacklist"/expired message), so the
+ * user is signed out and returned to the login screen automatically.
+ */
+type AuthFailureHandler = (reason: string) => void;
+let authFailureHandler: AuthFailureHandler | null = null;
+
+export function setAuthFailureHandler(handler: AuthFailureHandler | null): void {
+  authFailureHandler = handler;
+}
+
+/** True when the response signals an invalid/blacklisted/expired session. */
+function isAuthFailure(status: number | undefined, message: string): boolean {
+  if (status === 401) return true;
+  const m = message.toLowerCase();
+  return (
+    m.includes('blacklist') ||
+    m.includes('token expired') ||
+    m.includes('invalid token') ||
+    m.includes('jwt expired') ||
+    m.includes('unauthorized') ||
+    m.includes('unauthenticated')
+  );
+}
+
 function pickMessage(body: unknown, fallback: string): string {
   if (body && typeof body === 'object') {
     const b = body as Record<string, unknown>;
@@ -106,11 +133,11 @@ export async function secureApi<T = unknown>(
       console.log(
         `[api] ${action} failed: HTTP ${res.status} body=${JSON.stringify(json)?.slice(0, 300)}`,
       );
-      return {
-        ok: false,
-        status: res.status,
-        message: pickMessage(json, `Request failed (${res.status})`),
-      };
+      const message = pickMessage(json, `Request failed (${res.status})`);
+      if (isAuthFailure(res.status, message)) {
+        authFailureHandler?.(message);
+      }
+      return { ok: false, status: res.status, message };
     }
 
     // Mirrors electron/secure/index.cjs execute() exactly.
@@ -148,6 +175,13 @@ export async function secureApi<T = unknown>(
         data?.data ??
         data?.payload ??
         data);
+
+    // Some backends return HTTP 200 with success:false + a blacklist/expired
+    // message instead of a 401. Catch that here too.
+    const okMessage = typeof data?.message === 'string' ? data.message : '';
+    if (data?.success === false && isAuthFailure(undefined, okMessage)) {
+      authFailureHandler?.(okMessage);
+    }
 
     return {
       ok: true,

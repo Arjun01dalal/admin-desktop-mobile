@@ -7,7 +7,7 @@ import React, {
   useState,
 } from 'react';
 import * as Location from 'expo-location';
-import { secureApi } from '../api/client';
+import { secureApi, setAuthFailureHandler } from '../api/client';
 import { appStorage, hydrateStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
 import type { AuthUser } from '../types/auth';
@@ -65,6 +65,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUser(null);
   }, []);
+
+  // Auto-logout when the API reports an invalid/blacklisted/expired session
+  // (HTTP 401 or a token-blacklist message from any secureApi call).
+  useEffect(() => {
+    setAuthFailureHandler((reason) => {
+      console.log(`[auth] session rejected (${reason}); logging out`);
+      logout();
+    });
+    return () => setAuthFailureHandler(null);
+  }, [logout]);
 
   const value = useMemo(
     () => ({ ready, token, user, login, logout }),

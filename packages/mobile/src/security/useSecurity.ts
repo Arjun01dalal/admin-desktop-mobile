@@ -6,7 +6,7 @@
  *
  * On web everything degrades to a no-op so the UI still renders.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { enableScreenshotBlock, disableScreenshotBlock } from './screenshot';
 import { useRaspThreats } from './raspGuard';
@@ -16,6 +16,8 @@ export type SecurityStatus = {
   threats: ThreatKind[];
   /** True when a blocking threat (root/hook/tamper/emulator/VPN) is active. */
   blocked: boolean;
+  /** Re-queries the current network/VPN state (for the "Check again" button). */
+  refresh: () => Promise<void>;
 };
 
 const BLOCKING: ThreatKind[] = [
@@ -27,7 +29,7 @@ const BLOCKING: ThreatKind[] = [
 ];
 
 /** Independent NetInfo VPN detector (native only). Toggles on/off with the network. */
-function useNetInfoVpn(): boolean {
+function useNetInfoVpn(): { vpn: boolean; refresh: () => Promise<void> } {
   const [vpn, setVpn] = useState(false);
 
   useEffect(() => {
@@ -54,7 +56,21 @@ function useNetInfoVpn(): boolean {
     };
   }, []);
 
-  return vpn;
+  // Forces a fresh read (used by the "Check again" button so the user can
+  // disable their VPN and re-enter the app without restarting).
+  const refresh = useCallback(async () => {
+    if (Platform.OS === 'web') return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const NetInfo = require('@react-native-community/netinfo').default;
+      const state = await NetInfo.refresh();
+      setVpn(state?.type === 'vpn');
+    } catch {
+      /* NetInfo unavailable */
+    }
+  }, []);
+
+  return { vpn, refresh };
 }
 
 export function useSecurity(): SecurityStatus {
@@ -72,12 +88,12 @@ export function useSecurity(): SecurityStatus {
   }, []);
 
   const { threats: raspThreats } = useRaspThreats();
-  const netVpn = useNetInfoVpn();
+  const { vpn: netVpn, refresh } = useNetInfoVpn();
 
   const threats = netVpn && !raspThreats.includes('systemVPN')
     ? [...raspThreats, 'systemVPN' as ThreatKind]
     : raspThreats;
 
   const blocked = threats.some((t) => BLOCKING.includes(t));
-  return { threats, blocked };
+  return { threats, blocked, refresh };
 }
