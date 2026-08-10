@@ -11,6 +11,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { LocationRequiredGate } from './src/security/LocationRequiredGate';
 import { SecurityGate } from './src/security/SecurityGate';
 import { useLiveLocation } from './src/security/useLiveLocation';
+import { UpdateGate } from './src/updates/UpdateGate';
 import { colors } from './src/theme';
 
 function Root() {
@@ -53,6 +54,7 @@ export default function App() {
         <AuthProvider>
           <StatusBar style="light" />
           <Root />
+          <UpdateGate />
         </AuthProvider>
       </SecurityGate>
     </SafeAreaProvider>
