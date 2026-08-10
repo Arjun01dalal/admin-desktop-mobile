@@ -1275,51 +1275,6 @@ export function WithdrawalScreen() {
         ))}
       </ScrollView>
 
-      <DetailFilterBar
-        startDate={draftStart}
-        endDate={draftEnd}
-        loading={loading}
-        onStartDateChange={setDraftStart}
-        onEndDateChange={setDraftEnd}
-        onApply={() => {
-          setStartDate(draftStart);
-          setEndDate(draftEnd);
-          setPage(1);
-        }}
-        pageSize={pageSize}
-        onPageSizeChange={(v) => {
-          setPageSize(v);
-          setPage(1);
-        }}
-        searchFields={SEARCH_FIELDS}
-        searchField={searchField}
-        onSearchFieldChange={setSearchField}
-        searchText={searchDraft}
-        onSearchTextChange={setSearchDraft}
-        onSearchSubmit={() => {
-          setApplied({ field: searchField, text: searchDraft });
-          setPage(1);
-        }}
-      />
-
-      {/* Status filter chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
-        {STATUSES.map((s) => (
-          <TouchableOpacity
-            key={s || 'all'}
-            style={[styles.chip, status === s && styles.chipActive]}
-            onPress={() => {
-              setStatus(s);
-              setPage(1);
-            }}
-          >
-            <Text style={[styles.chipText, status === s && styles.chipTextActive]}>
-              {s || 'All'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
       {/* Collapsible tools: Sort, Bank Amount, Mid Name, downloads, Add Bene List */}
       <View style={[styles.toolsRow, { justifyContent: 'flex-end' }]}>
         <TouchableOpacity
@@ -1422,6 +1377,51 @@ export function WithdrawalScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+          setPage(1);
+        }}
+        pageSize={pageSize}
+        onPageSizeChange={(v) => {
+          setPageSize(v);
+          setPage(1);
+        }}
+        searchFields={SEARCH_FIELDS}
+        searchField={searchField}
+        onSearchFieldChange={setSearchField}
+        searchText={searchDraft}
+        onSearchTextChange={setSearchDraft}
+        onSearchSubmit={() => {
+          setApplied({ field: searchField, text: searchDraft });
+          setPage(1);
+        }}
+      />
+
+      {/* Status filter chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
+        {STATUSES.map((s) => (
+          <TouchableOpacity
+            key={s || 'all'}
+            style={[styles.chip, status === s && styles.chipActive]}
+            onPress={() => {
+              setStatus(s);
+              setPage(1);
+            }}
+          >
+            <Text style={[styles.chipText, status === s && styles.chipTextActive]}>
+              {s || 'All'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {msg ? <Text style={styles.muted}>{msg}</Text> : null}
 
