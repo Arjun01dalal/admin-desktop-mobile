@@ -14,7 +14,7 @@
  * status update, bulk actions, beneficiary dialogs — desktop-only for now.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
@@ -367,6 +367,7 @@ export function WithdrawalScreen() {
     null,
   );
   const [provider, setProvider] = useState('');
+  const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   // Collapsible tools section (keeps the list visible without scrolling).
   const [toolsOpen, setToolsOpen] = useState(false);
   // Desktop toolbar parity: Sort checkbox, Bank Amount + Mid Name filters.
@@ -1151,6 +1152,20 @@ export function WithdrawalScreen() {
   /** Desktop row-action parity: lock/unlock, checks, status changes. */
   const sheetActions = (r: Rec): SheetAction[] => {
     const acts: SheetAction[] = [];
+    // Open the full user report page for this customer.
+    if (r.dp_id) {
+      acts.push({
+        label: 'Show User Details',
+        tone: 'default',
+        onPress: () => {
+          setSelected(null);
+          navigation.navigate('/user-report', {
+            userId: String(r.dp_id),
+            userName: String(r.accountHolderName ?? r.userName ?? ''),
+          });
+        },
+      });
+    }
     if (r.validationCheckedAt) {
       acts.push({
         label: `Bot Validation (${num(r.passedPoints)}/${num(r.totalPoints)})`,
