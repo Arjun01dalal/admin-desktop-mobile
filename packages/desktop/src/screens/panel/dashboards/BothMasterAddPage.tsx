@@ -165,7 +165,7 @@ export function BothMasterAddPage() {
             if (!team1 || !team2) return null;
             return (
               <Grid item xs={12} sm={6} md={4} key={`${matchItem.match}-${index}`}>
-                <Paper sx={{ p: 2, bgcolor: '#1a1a1f', height: '100%' }}>
+                <Paper sx={{ p: 2, bgcolor: 'background.paper', height: '100%' }}>
                   <Typography
                     variant="subtitle1"
                     fontWeight={800}

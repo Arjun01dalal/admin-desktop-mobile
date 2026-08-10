@@ -202,7 +202,7 @@ export function MasterFlowPage() {
         sx={{
           p: 2,
           mb: 2,
-          bgcolor: '#1a1a1f',
+          bgcolor: 'background.paper',
           width: '100%',
           maxWidth: '100%',
           minWidth: 0,

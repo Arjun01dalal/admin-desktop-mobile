@@ -39,7 +39,7 @@ export const BeneficiarySelect = memo(function BeneficiarySelect({
         }}
         MenuProps={{
           PaperProps: {
-            sx: { maxHeight: 220, bgcolor: '#1a1a1f' },
+            sx: { maxHeight: 220, bgcolor: 'background.paper' },
           },
         }}
       >

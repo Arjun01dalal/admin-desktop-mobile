@@ -12,6 +12,16 @@ import { appCodeForName } from '@/constants/clientNames';
 import { DEPOSIT_STATES, PLAY_IN_OPTIONS } from './constants';
 import { useNewRegistersFilters } from './FiltersContext';
 
+const filterSelectSx = {
+  minWidth: 96,
+  '& .MuiInputBase-root': {
+    fontSize: 11,
+    bgcolor: 'background.paper',
+    height: 30,
+  },
+  '& .MuiInputLabel-root': { fontSize: 11 },
+};
+
 export function NameFilter() {
   const { searchName, setSearchName, applyFilters } = useNewRegistersFilters();
   return (
@@ -43,7 +53,7 @@ export function UserComesFromFilter() {
       value={userComesFrom}
       onChange={(e) => setUserComesFrom(e.target.value)}
       onSearch={applyFilters}
-      placeholder="User Comes from"
+      placeholder="From"
     />
   );
 }
@@ -55,7 +65,7 @@ export function BalanceFilter() {
       value={searchBalance}
       onChange={(e) => setSearchBalance(e.target.value)}
       onSearch={applyFilters}
-      placeholder="Search by Balance"
+      placeholder="Bal"
     />
   );
 }
@@ -69,9 +79,14 @@ export function EmptyRecordFilter() {
           size="small"
           checked={showEmptyRecord}
           onChange={(e) => setShowEmptyRecord(e.target.checked)}
+          sx={{ p: 0.5 }}
         />
       }
-      label={<Typography variant="caption">Show Empty Record</Typography>}
+      label={
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+          Show Empty
+        </Typography>
+      }
       sx={{ m: 0, whiteSpace: 'nowrap' }}
     />
   );
@@ -85,7 +100,7 @@ export function AppNameFilter() {
       size="small"
       value={appClientName}
       onChange={(e) => setAppClientName(e.target.value)}
-      sx={{ minWidth: 90 }}
+      sx={filterSelectSx}
     >
       <MenuItem value="">All</MenuItem>
       {appOptions.map((name) => (
@@ -103,11 +118,10 @@ export function PlayInFilter() {
     <TextField
       select
       size="small"
-      label="Select In"
       value={searchPlayInStatus}
       onChange={(e) => setSearchPlayInStatus(e.target.value)}
-      sx={{ minWidth: 110 }}
-      InputLabelProps={{ shrink: true }}
+      sx={{ ...filterSelectSx, minWidth: 100 }}
+      SelectProps={{ displayEmpty: true }}
     >
       <MenuItem value="">All</MenuItem>
       {PLAY_IN_OPTIONS.map((opt) => (
@@ -174,7 +188,7 @@ export function CityFilter() {
       value={searchCity}
       onChange={(e) => setSearchCity(e.target.value)}
       onSearch={applyFilters}
-      placeholder="Search by city"
+      placeholder="City"
     />
   );
 }
@@ -182,17 +196,17 @@ export function CityFilter() {
 export function StateFilter() {
   const { selectedState, setSelectedState, applyFilters } = useNewRegistersFilters();
   return (
-    <Stack spacing={0.5} alignItems="flex-start">
+    <Stack spacing={0.5} alignItems="stretch" sx={{ minWidth: 120 }}>
       <TextField
         select
         size="small"
-        SelectProps={{ multiple: true }}
+        SelectProps={{ multiple: true, displayEmpty: true }}
         value={selectedState}
         onChange={(e) => {
           const value = e.target.value;
           setSelectedState(typeof value === 'string' ? value.split(',') : value);
         }}
-        sx={{ minWidth: 140 }}
+        sx={{ ...filterSelectSx, minWidth: 120 }}
       >
         {DEPOSIT_STATES.map((state) => (
           <MenuItem key={state} value={state}>
@@ -200,7 +214,12 @@ export function StateFilter() {
           </MenuItem>
         ))}
       </TextField>
-      <Button size="small" onClick={applyFilters}>
+      <Button
+        size="small"
+        variant="text"
+        onClick={applyFilters}
+        sx={{ textTransform: 'none', fontSize: 11, py: 0, minHeight: 0 }}
+      >
         Search
       </Button>
     </Stack>

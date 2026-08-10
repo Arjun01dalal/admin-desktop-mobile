@@ -157,7 +157,7 @@ export function FundsMidPage() {
         <Typography variant="h5" fontWeight={700} mb={2}>
           Funds — MID
         </Typography>
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             No MID data. Open a gateway name from Funds.
           </Typography>

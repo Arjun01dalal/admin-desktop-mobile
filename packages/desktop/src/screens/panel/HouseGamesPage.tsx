@@ -71,7 +71,7 @@ export function HouseGamesPage() {
         {toDisplayText('House Krida')}
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflow: 'auto' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', overflow: 'auto' }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
           <TextField
             type="date"

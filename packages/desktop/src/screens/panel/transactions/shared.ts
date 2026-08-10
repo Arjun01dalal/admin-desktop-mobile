@@ -37,7 +37,7 @@ export const toolbarBoxSx = {
   mb: 1.5,
   p: 1.5,
   borderRadius: 1.5,
-  bgcolor: '#1a1a1f',
+  bgcolor: 'background.paper',
   border: '1px solid rgba(255,255,255,0.08)',
 } as const;
 
@@ -62,7 +62,7 @@ export const chipSx = {
 
 export const kpiCardSx = {
   p: 2,
-  bgcolor: '#1a1a1f',
+  bgcolor: 'background.paper',
   border: '1px solid rgba(255,255,255,0.08)',
   cursor: 'pointer',
   transition: 'border-color 0.15s ease',

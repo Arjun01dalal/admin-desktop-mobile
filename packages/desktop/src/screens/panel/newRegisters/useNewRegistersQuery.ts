@@ -2,7 +2,13 @@ import { startTransition, useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
-import type { NewRegistersAdmin, UserRow, UsersListResponse } from './types';
+import type {
+  ActiveStatusFilter,
+  NewRegistrationFilter,
+  NewRegistersAdmin,
+  UserRow,
+  UsersListResponse,
+} from './types';
 
 export type NewRegistersQueryFilters = {
   searchName: string;
@@ -20,15 +26,12 @@ export type NewRegistersQueryFilters = {
   searchReferralCodeUser: string;
   searchMobile: string;
   showEmptyRecord: boolean;
+  /** Match admin-panel-domains NewRegisterUsers toolbar filters. */
+  activeStatus: ActiveStatusFilter;
+  newRegistration: NewRegistrationFilter;
+  otherState: boolean;
+  nonPerforming: boolean;
 };
-
-/** Normalize numeric emp codes so "21" and "021" match. */
-function normalizeEmpCode(value: unknown): string {
-  const s = String(value ?? '').trim();
-  if (!s) return '';
-  if (/^\d+$/.test(s)) return s.padStart(3, '0');
-  return s;
-}
 
 export function useNewRegistersQuery(
   admin: NewRegistersAdmin | null | undefined,
@@ -45,7 +48,6 @@ export function useNewRegistersQuery(
 
   const buildFilter = useCallback(() => {
     const f = columnFilters;
-    const empCode = normalizeEmpCode(admin?.empCode);
     const filter: Record<string, unknown> = {
       name: f.searchName || undefined,
       _id: f.searchDpId || undefined,
@@ -60,18 +62,26 @@ export function useNewRegistersQuery(
       referredCode: f.searchReferred || undefined,
       referralCodeUser: f.searchReferralCodeUser || undefined,
       mobile: f.searchMobile || undefined,
-      // Login has empCode → only own records (same as laxminarayan)
-      empCode: empCode || undefined,
     };
 
-    if (f.selectedState.length > 0) {
+    // Match reference: Other State clears multi-select and sends state:"other"
+    if (f.otherState) {
+      filter.state = 'other';
+    } else if (f.selectedState.length > 0) {
       filter.state = f.selectedState;
     }
+
+    if (f.activeStatus === 'Active') filter.active = true;
+    else if (f.activeStatus === 'InActive') filter.active = false;
+
+    if (f.nonPerforming) filter.nonPerforming = true;
+
+    // empCode filter intentionally omitted — same as reference (commented out).
 
     return Object.fromEntries(
       Object.entries(filter).filter(([, v]) => v !== undefined && v !== ''),
     );
-  }, [columnFilters, admin?.empCode]);
+  }, [columnFilters]);
 
   const load = useCallback(
     async (pageNo = page) => {
@@ -79,13 +89,14 @@ export function useNewRegistersQuery(
       begin();
       setLoading(true);
       try {
-        const empCode = normalizeEmpCode(admin?.empCode);
         const payload: Record<string, unknown> = {
           itemsPerPage,
           pageNo,
           filter: buildFilter(),
           startDate,
           endDate,
+          // Top-level flag — admin-panel-domains NewRegisterUsers
+          newRegistration: columnFilters.newRegistration === 'True',
         };
 
         if (admin?.clientName || admin?.allotedApps) {
@@ -103,7 +114,6 @@ export function useNewRegistersQuery(
         const data = (res.data || {}) as UsersListResponse & {
           payload?: UsersListResponse;
         };
-        // Prefer `items` (same as laxminarayan fetchUserGetAll) over `users`
         const nested =
           data.payload &&
           typeof data.payload === 'object' &&
@@ -117,6 +127,7 @@ export function useNewRegistersQuery(
             data.items ||
             data.users ||
             [];
+
         if (columnFilters.showEmptyRecord) {
           list = list.filter(
             (row) =>
@@ -124,12 +135,24 @@ export function useNewRegistersQuery(
               !(row as { lastActivity?: unknown }).lastActivity,
           );
         }
-        // Client-side guard if API returns all even when empCode is sent
-        if (empCode) {
-          list = list.filter(
-            (row) => normalizeEmpCode(row.empCode) === empCode,
+
+        // accessibleStates client filter (reference parity)
+        const states =
+          admin?.accessibleStates?.map((s) => String(s).toLowerCase()) ?? [];
+        if (states.length > 0) {
+          list = list.filter((item) =>
+            states.includes(String(item?.state || '').toLowerCase()),
           );
         }
+
+        // Empty userComesFrom last
+        list = [...list].sort((a, b) => {
+          const aEmpty = !String(a.userComesFrom || '').trim();
+          const bEmpty = !String(b.userComesFrom || '').trim();
+          if (aEmpty === bEmpty) return 0;
+          return aEmpty ? 1 : -1;
+        });
+
         const apiTotal = Number(
           nested.total ?? nested.count ?? data.total ?? data.count ?? 0,
         );
@@ -149,9 +172,10 @@ export function useNewRegistersQuery(
       endDate,
       admin?.clientName,
       admin?.allotedApps,
-      admin?.empCode,
+      admin?.accessibleStates,
       buildFilter,
       columnFilters.showEmptyRecord,
+      columnFilters.newRegistration,
       isCurrent,
       next,
       begin,
@@ -161,7 +185,15 @@ export function useNewRegistersQuery(
 
   useEffect(() => {
     void load(page);
-  }, [page, itemsPerPage, columnFilters.showEmptyRecord]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    page,
+    itemsPerPage,
+    columnFilters.showEmptyRecord,
+    columnFilters.activeStatus,
+    columnFilters.newRegistration,
+    columnFilters.otherState,
+    columnFilters.nonPerforming,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { rows, total, loading, load };
 }

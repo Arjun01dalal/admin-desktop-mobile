@@ -76,7 +76,7 @@ function ColumnSearch({
       }}
       sx={{
         minWidth: 140,
-        '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+        '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
       }}
     />
   );
@@ -274,7 +274,7 @@ export function NewDepositsPage() {
         New Deposits
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             type="date"

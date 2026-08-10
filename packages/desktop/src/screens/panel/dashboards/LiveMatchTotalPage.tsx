@@ -359,7 +359,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       )}
 
       {!loading && groupedData.length === 0 && !error && (
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             No live match book data for this date range.
           </Typography>
@@ -389,7 +389,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                         lg={4}
                         key={`${match.matchName}-${match.code || index}`}
                       >
-                        <Paper sx={{ p: 2, bgcolor: '#1a1a1f', borderRadius: 2 }}>
+                        <Paper sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
                           <Typography
                             variant="h6"
                             align="center"

@@ -58,7 +58,7 @@ export function QrApproveDialog({
       onClose={() => !saving && onClose()}
       fullWidth
       maxWidth="xs"
-      PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+      PaperProps={{ sx: { bgcolor: 'background.paper' } }}
     >
       <DialogTitle>QR Code Approve</DialogTitle>
       <DialogContent>

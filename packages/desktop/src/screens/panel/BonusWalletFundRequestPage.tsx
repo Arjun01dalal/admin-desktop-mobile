@@ -46,7 +46,7 @@ const dateFieldSx = {
 
 const kpiCardSx = {
   p: 2.5,
-  bgcolor: '#1a1a1f',
+  bgcolor: 'background.paper',
   border: '1px solid rgba(255,255,255,0.08)',
   cursor: 'pointer',
   transition: 'border-color 0.15s ease',
@@ -147,7 +147,7 @@ export function BonusWalletFundRequestPage() {
           mb: 2,
           p: 1.5,
           borderRadius: 1.5,
-          bgcolor: '#1a1a1f',
+          bgcolor: 'background.paper',
           border: '1px solid rgba(255,255,255,0.08)',
         }}
       >

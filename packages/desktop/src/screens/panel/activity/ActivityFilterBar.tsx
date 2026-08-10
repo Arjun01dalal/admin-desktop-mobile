@@ -69,7 +69,16 @@ export function ActivityFilterBar({
 }: ActivityFilterBarProps) {
   useRevealCodes();
   return (
-    <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflow: 'auto' }}>
+    <Paper
+      sx={{
+        p: 2,
+        mb: 2,
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
+        overflow: 'auto',
+      }}
+    >
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
         <TextField
           type="date"

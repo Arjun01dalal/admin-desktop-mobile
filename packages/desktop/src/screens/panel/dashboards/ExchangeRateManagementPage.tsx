@@ -66,7 +66,7 @@ export function ExchangeRateManagementPage() {
       )}
 
       {!loading && rows.length === 0 && (
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">No AAA exchange data</Typography>
         </Paper>
       )}
@@ -94,7 +94,7 @@ export function ExchangeRateManagementPage() {
               (typeof v === 'number' || typeof v === 'string'),
           );
           return (
-            <Paper key={`${name}-${index}`} sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+            <Paper key={`${name}-${index}`} sx={{ p: 2, bgcolor: 'background.paper' }}>
               <Typography variant="subtitle1" fontWeight={800} mb={1}>
                 {name}
               </Typography>

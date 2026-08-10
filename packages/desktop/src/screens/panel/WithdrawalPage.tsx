@@ -1792,7 +1792,7 @@ export function WithdrawalPage() {
         onClose={() => !bulkBusy && setBulkManualOpen(false)}
         fullWidth
         maxWidth="xs"
-        PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+        PaperProps={{ sx: { bgcolor: 'background.paper' } }}
       >
         <DialogTitle>Bulk Manual Approve</DialogTitle>
         <DialogContent>

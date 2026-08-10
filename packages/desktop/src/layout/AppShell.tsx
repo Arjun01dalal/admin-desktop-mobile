@@ -29,8 +29,10 @@ import { getBackPath } from './backPaths';
 import { AstroLogo } from '@/components/AstroLogo';
 import { BackButton } from '@/components/BackButton';
 import { RevealCodesOtpModal } from '@/components/RevealCodesOtpModal';
+import { ThemeModeMenu } from '@/components/ThemeModeMenu';
 import { secureApi } from '@/api/secureClient';
 import { useRevealCodes } from '@/context/useRevealCodes';
+import { useTheme } from '@mui/material/styles';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import {
   buildSosEnablePayload,
@@ -52,6 +54,12 @@ type Props = {
 };
 
 export function AppShell({ onLogout }: Props) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const shellBg = isDark ? '#0f0f12' : '#f0f0f2';
+  const barBg = isDark ? '#1a1a1f' : '#ffffff';
+  const drawerBg = isDark ? '#15151a' : '#ffffff';
+  const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
   const navigate = useNavigate();
   const location = useLocation();
   const [sosOpen, setSosOpen] = useState(false);
@@ -264,14 +272,15 @@ export function AppShell({ onLogout }: Props) {
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', bgcolor: '#0f0f12' }}>
+    <Box sx={{ display: 'flex', height: '100vh', bgcolor: shellBg }}>
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
           zIndex: (t) => t.zIndex.drawer + 1,
-          bgcolor: '#1a1a1f',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          bgcolor: barBg,
+          color: 'text.primary',
+          borderBottom: `1px solid ${borderColor}`,
         }}
       >
         <Toolbar sx={{ gap: 2 }}>
@@ -333,6 +342,8 @@ export function AppShell({ onLogout }: Props) {
               : 'Reveal codes'}
           </Button>
 
+          <ThemeModeMenu />
+
           <Typography variant="body2" color="text.secondary">
             {user?.name || user?.mobile || 'Admin'}
           </Typography>
@@ -357,8 +368,8 @@ export function AppShell({ onLogout }: Props) {
           [`& .MuiDrawer-paper`]: {
             width: DRAWER_WIDTH,
             boxSizing: 'border-box',
-            bgcolor: '#15151a',
-            borderRight: '1px solid rgba(255,255,255,0.08)',
+            bgcolor: drawerBg,
+            borderRight: `1px solid ${borderColor}`,
             pt: 8,
             display: 'flex',
             flexDirection: 'column',
@@ -371,8 +382,8 @@ export function AppShell({ onLogout }: Props) {
             px: 1.25,
             py: 1,
             flexShrink: 0,
-            bgcolor: '#15151a',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            bgcolor: drawerBg,
+            borderBottom: `1px solid ${borderColor}`,
             position: 'sticky',
             top: 0,
             zIndex: 1,
@@ -387,18 +398,23 @@ export function AppShell({ onLogout }: Props) {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ fontSize: 18, color: 'rgba(255,255,255,0.45)' }} />
+                  <SearchIcon
+                    sx={{
+                      fontSize: 18,
+                      color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
+                    }}
+                  />
                 </InputAdornment>
               ),
             }}
             sx={{
               '& .MuiInputBase-root': {
-                bgcolor: '#1a1a1f',
+                bgcolor: isDark ? '#1a1a1f' : '#f5f5f7',
                 fontSize: 13,
                 borderRadius: 1.5,
               },
               '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'rgba(255,255,255,0.12)',
+                borderColor: borderColor,
               },
               '&:hover .MuiOutlinedInput-notchedOutline': {
                 borderColor: 'rgba(255,159,10,0.45)',
@@ -418,14 +434,19 @@ export function AppShell({ onLogout }: Props) {
             py: 0.75,
             '&::-webkit-scrollbar': { width: 6 },
             '&::-webkit-scrollbar-thumb': {
-              bgcolor: 'rgba(255,255,255,0.2)',
+              bgcolor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
               borderRadius: 8,
             },
           }}
         >
           {filteredNavItems.length === 0 && (
             <Typography
-              sx={{ px: 2, py: 1.5, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}
+              sx={{
+                px: 2,
+                py: 1.5,
+                fontSize: 13,
+                color: 'text.secondary',
+              }}
             >
               No menu found
             </Typography>
@@ -463,7 +484,7 @@ export function AppShell({ onLogout }: Props) {
           p: 3,
           pt: 11,
           overflow: 'auto',
-          bgcolor: '#0f0f12',
+          bgcolor: shellBg,
           minWidth: 0,
         }}
       >

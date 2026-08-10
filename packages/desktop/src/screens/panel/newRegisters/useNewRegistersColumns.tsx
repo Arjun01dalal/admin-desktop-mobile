@@ -1,11 +1,13 @@
 import { useMemo, type Dispatch, type SetStateAction } from 'react';
-import { Button } from '@mui/material';
+import { Box, Button, Stack, Typography } from '@mui/material';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import { Link as RouterLink } from 'react-router-dom';
 import { hasPermission } from '@/auth/permissions';
-import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { CopyText, type CommonTableColumn } from '@/components/CommonTable';
-import { appCodeForName } from '@/constants/clientNames';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
-import { maskMobile } from '@/screens/panel/shared';
+import { CallingBtn } from '@/screens/panel/users/CallingBtn';
 import {
   AadharFilter,
   AccNoFilter,
@@ -23,9 +25,12 @@ import {
   StateFilter,
   UserComesFromFilter,
 } from './ColumnFilters';
-import type { UserRow } from './types';
+import type {
+  RegistrationCallLog,
+  RegistrationComment,
+  UserRow,
+} from './types';
 import {
-  formatAadharAddress,
   nestedDpId,
   nestedName,
   pickAadharNumber,
@@ -36,9 +41,79 @@ import {
   pickUserBankName,
 } from './utils';
 
-/** Columns hidden from caller / caller_new roles. */
+const actionStackSx = {
+  minWidth: 118,
+  py: 0.25,
+  gap: 0.75,
+};
+
+const actionBtnSx = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 0.5,
+  borderRadius: 1,
+  px: 1.25,
+  py: 0.5,
+  fontSize: 11,
+  fontWeight: 600,
+  lineHeight: 1.2,
+  textTransform: 'none' as const,
+  minWidth: 0,
+  whiteSpace: 'nowrap',
+  boxShadow: 'none',
+  '&:hover': { boxShadow: 'none' },
+  '& .MuiButton-startIcon': { mr: 0.5, ml: 0 },
+  '& .MuiButton-startIcon > *:nth-of-type(1)': { fontSize: 14 },
+};
+
+
+function AadharAddressCell({ row }: { row: UserRow }) {
+  const addr = (row.aadharAddress ||
+    (row as { aadhaarAddress?: Record<string, unknown> }).aadhaarAddress ||
+    {}) as Record<string, unknown>;
+  if (!row.kyc || !Object.keys(addr).length) return <>{'-'}</>;
+
+  const line = (label: string, key: string) =>
+    addr[key] != null && String(addr[key]).trim() !== '' ? (
+      <Typography
+        key={key}
+        component="span"
+        variant="caption"
+        sx={{ display: 'inline', mr: 1, fontSize: 12 }}
+      >
+        {label} : <strong>{String(addr[key])}</strong>
+      </Typography>
+    ) : null;
+
+  return (
+    <Box sx={{ textAlign: 'left', lineHeight: 1.45, py: 0.5, minWidth: 220 }}>
+      <Box>
+        {line('Country', 'country')}
+        {line('Dist', 'dist')}
+        {line('House', 'house')}
+      </Box>
+      <Box>
+        {line('Landmark', 'landmark')}
+        {line('Loc', 'loc')}
+      </Box>
+      <Box>
+        {line('Po', 'po')}
+        {line('State', 'state')}
+        {line('Street', 'street')}
+        {line('Subdist', 'subdist')}
+        {line('Vtc', 'vtc')}
+        {line('Pin', 'pin')}
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * Sensitive columns hidden for caller / caller_new roles.
+ * Comment, Call Logs, and Mobile+Call stay visible (Laxmi New Registers parity).
+ */
 const CALLER_HIDDEN_COLUMN_IDS = new Set([
-  'mobile',
   'userBankName',
   'accountNumber',
   'aadharNumber',
@@ -54,11 +129,27 @@ const CALLER_HIDDEN_COLUMN_IDS = new Set([
   'kyc',
 ]);
 
+export function registrationComments(row: UserRow): RegistrationComment[] {
+  const raw =
+    row.newRegistrationComments || row.registrationComments || row.comments || [];
+  return Array.isArray(raw) ? raw : [];
+}
+
+export function registrationCallLogs(row: UserRow): RegistrationCallLog[] {
+  const raw = row.callLogsForNewRegistration || row.callLogs || [];
+  return Array.isArray(raw) ? raw : [];
+}
+
 export type UseNewRegistersColumnsParams = {
   page: number;
   itemsPerPage: number;
   setBlockTarget: Dispatch<SetStateAction<UserRow | null>>;
   isCaller?: boolean;
+  appVersions?: Record<string, string>;
+  onAddComment: (row: UserRow) => void;
+  onViewComments: (row: UserRow) => void;
+  onViewCallLogs: (row: UserRow) => void;
+  onCallSuccess?: () => void;
 };
 
 export function useNewRegistersColumns({
@@ -66,9 +157,15 @@ export function useNewRegistersColumns({
   itemsPerPage,
   setBlockTarget,
   isCaller = false,
+  appVersions = {},
+  onAddComment,
+  onViewComments,
+  onViewCallLogs,
+  onCallSuccess,
 }: UseNewRegistersColumnsParams): CommonTableColumn<UserRow>[] {
   const rowOffset = (page - 1) * itemsPerPage;
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
+  const canBlock = hasPermission('withdrawals_button');
 
   return useMemo<CommonTableColumn<UserRow>[]>(() => {
     const cols: CommonTableColumn<UserRow>[] = [
@@ -77,19 +174,42 @@ export function useNewRegistersColumns({
         label: '#',
         width: 56,
         align: 'center',
+        stickyLeft: true,
         filter: null,
         render: (_row, index) => rowOffset + index + 1,
       },
       {
         id: 'name',
         label: 'Name',
+        width: 140,
+        stickyLeft: true,
         filter: <NameFilter />,
-        render: (row) => String(row.name || '-'),
+        render: (row) => {
+          const name = String(row.name || '-');
+          if (!row._id || name === '-') return name;
+          return (
+            <Typography
+              component={RouterLink}
+              to={`/users/report/${row._id}/${encodeURIComponent(name)}`}
+              variant="body2"
+              sx={{ color: 'warning.main', fontWeight: 600, textDecoration: 'none' }}
+            >
+              {name}
+            </Typography>
+          );
+        },
       },
       {
         id: 'dpId',
         label: 'DP ID',
+        width: 260,
+        stickyLeft: true,
         filter: <DpIdFilter />,
+        cellSx: {
+          whiteSpace: 'nowrap',
+          fontSize: 12,
+          letterSpacing: 0,
+        },
         render: (row) => <CopyText value={String(row._id || '')} />,
       },
       {
@@ -101,35 +221,58 @@ export function useNewRegistersColumns({
             From
           </>
         ),
+        width: 88,
+        headSx: { maxWidth: 88, width: 88 },
         filter: <UserComesFromFilter />,
-        render: (row) => String(row.userComesFrom || 'Company'),
+        cellSx: {
+          maxWidth: 88,
+          width: 88,
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          fontSize: 12,
+        },
+        render: (row) => String(row.userComesFrom || '-'),
       },
       {
         id: 'balance',
         label: 'Balance',
+        width: 72,
         align: 'right',
+        headSx: { maxWidth: 72, width: 72 },
         filter: <BalanceFilter />,
-        render: (row) => formatAmount(Math.floor(Number(row.balance) || 0)),
+        cellSx: { maxWidth: 72, width: 72, fontSize: 12 },
+        render: (row) => {
+          const n = Number(row.balance);
+          return Number.isFinite(n) ? Math.floor(n) : '-';
+        },
       },
       {
         id: 'lastActivity',
         label: (
           <>
-            Last
-            <br />
-            Activity
+            Last <br /> Activity
           </>
         ),
+        width: 100,
+        headSx: { maxWidth: 100, width: 100 },
         filter: <EmptyRecordFilter />,
-        render: (row) => pickLastActivity(row),
+        cellSx: {
+          maxWidth: 100,
+          width: 100,
+          whiteSpace: 'normal',
+          lineHeight: 1.25,
+          fontSize: 11,
+        },
+        render: (row) => {
+          const v = pickLastActivity(row);
+          return v === '-' ? '' : v;
+        },
       },
       {
         id: 'userBankName',
         label: (
           <>
-            User Bank
-            <br />
-            Name
+            User Bank <br /> Name
           </>
         ),
         filter: null,
@@ -139,17 +282,15 @@ export function useNewRegistersColumns({
         id: 'appName',
         label: (
           <>
-            App
-            <br />
-            Code
+            App <br /> Name
           </>
         ),
         filter: <AppNameFilter />,
-        render: (row) => appCodeForName(pickAppName(row)),
+        render: (row) => String(pickAppName(row) || '-'),
       },
       {
         id: 'playIn',
-        label: 'In',
+        label: 'Play In',
         filter: <PlayInFilter />,
         render: (row) => pickPlayIn(row),
       },
@@ -157,9 +298,7 @@ export function useNewRegistersColumns({
         id: 'encryptedDpId',
         label: (
           <>
-            User Encrypted
-            <br />
-            Dp Id
+            User Encrypted <br /> Dp Id
           </>
         ),
         filter: null,
@@ -169,17 +308,22 @@ export function useNewRegistersColumns({
         id: 'mobile',
         label: (
           <>
-            Mobile
-            <br />
-            Phone
+            Mobile <br /> Phone
           </>
         ),
+        width: 150,
         filter: canShowMobile ? <MobileFilter /> : null,
-        render: (row) => {
-          const mob = String(row.mobile || '');
-          if (!canShowMobile) return maskMobile(mob, false);
-          return mob ? <CopyText value={mob} /> : '—';
-        },
+        cellSx: { whiteSpace: 'normal', overflow: 'visible' },
+        // Always show CallingBtn (Call dialer). Number masking is inside the button.
+        render: (row) => (
+          <CallingBtn
+            item={row as never}
+            campaignName="OM south"
+            hideBotCall
+            isNewRegistration
+            onSuccess={onCallSuccess}
+          />
+        ),
       },
       {
         id: 'kyc',
@@ -220,7 +364,16 @@ export function useNewRegistersColumns({
       {
         id: 'city',
         label: 'City',
+        width: 80,
+        headSx: { maxWidth: 80, width: 80 },
         filter: <CityFilter />,
+        cellSx: {
+          maxWidth: 80,
+          width: 80,
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          fontSize: 12,
+        },
         render: (row) => String(row.city || '-'),
       },
       {
@@ -311,9 +464,7 @@ export function useNewRegistersColumns({
         id: 'playerAppVersion',
         label: (
           <>
-            User App
-            <br />
-            Version
+            Player App <br /> Version
           </>
         ),
         filter: null,
@@ -323,13 +474,14 @@ export function useNewRegistersColumns({
         id: 'appVersion',
         label: (
           <>
-            App
-            <br />
-            Version
+            App <br /> Version
           </>
         ),
         filter: null,
-        render: () => '-',
+        render: (row) => {
+          const name = String(row.clientName || pickAppName(row) || '');
+          return name ? String(appVersions[name] || '') : '';
+        },
       },
       {
         id: 'created',
@@ -347,25 +499,132 @@ export function useNewRegistersColumns({
         id: 'bonusBalance',
         label: (
           <>
-            Free Points
-            <br />
-            Bonus
+            Bonus <br /> Balance
           </>
         ),
         align: 'right',
         filter: null,
-        render: (row) => formatAmount(row.bonusWalletBalance),
+        render: (row) => {
+          const n = Number(row.bonusWalletBalance);
+          return Number.isFinite(n) ? n : '-';
+        },
       },
       {
         id: 'action',
         label: 'Action',
+        width: 100,
         filter: null,
+        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'middle' },
         render: (row) => {
+          if (!canBlock) return '';
           const blocked = Boolean(row.blockUser || row.block);
           return (
-            <Button size="small" onClick={() => setBlockTarget(row)}>
-              {blocked ? 'Unblock' : 'Block'}
+            <Button
+              size="small"
+              variant="contained"
+              color="primary"
+              onClick={() => setBlockTarget(row)}
+              sx={actionBtnSx}
+            >
+              {blocked ? 'Un Block' : 'Block'}
             </Button>
+          );
+        },
+      },
+      {
+        id: 'comments',
+        label: (
+          <>
+            Add <br /> Comment
+          </>
+        ),
+        width: 132,
+        filter: null,
+        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'middle' },
+        render: (row) => {
+          const count = registrationComments(row).length;
+          return (
+            <Stack alignItems="stretch" sx={actionStackSx}>
+              <Button
+                size="small"
+                variant="contained"
+                color="primary"
+                startIcon={<ChatBubbleOutlineIcon />}
+                onClick={() => onAddComment(row)}
+                sx={actionBtnSx}
+              >
+                Comment
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={<VisibilityIcon />}
+                onClick={() => onViewComments(row)}
+                sx={{
+                  ...actionBtnSx,
+                  borderColor: 'divider',
+                  color: 'text.primary',
+                  bgcolor: 'transparent',
+                  '&:hover': {
+                    borderColor: 'text.secondary',
+                    bgcolor: 'action.hover',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                View All{count > 0 ? ` (${count})` : ''}
+              </Button>
+            </Stack>
+          );
+        },
+      },
+      {
+        id: 'callLogs',
+        label: (
+          <>
+            Call <br /> Logs
+          </>
+        ),
+        width: 132,
+        filter: null,
+        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'middle' },
+        render: (row) => {
+          const logs = registrationCallLogs(row);
+          const count = logs.length;
+          const latest = count > 0 ? logs[count - 1] : null;
+          return (
+            <Stack alignItems="stretch" sx={actionStackSx}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ textAlign: 'center', fontSize: 11, lineHeight: 1.3 }}
+              >
+                {count > 0
+                  ? `Last: ${latest?.who?.userName || '-'}`
+                  : 'No calls yet'}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={<VisibilityIcon />}
+                onClick={() => onViewCallLogs(row)}
+                sx={{
+                  ...actionBtnSx,
+                  borderColor: 'divider',
+                  color: 'text.primary',
+                  bgcolor: 'transparent',
+                  '&:hover': {
+                    borderColor: 'text.secondary',
+                    bgcolor: 'action.hover',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                View Logs{count > 0 ? ` (${count})` : ''}
+              </Button>
+            </Stack>
           );
         },
       },
@@ -373,25 +632,34 @@ export function useNewRegistersColumns({
         id: 'blockReason',
         label: (
           <>
-            Block User
-            <br />
-            Reason
+            Block User <br /> Reason
           </>
         ),
         filter: null,
-        render: (row) => String(row.blockUserReason || '-'),
+        render: (row) => String(row.blockUserReason || ''),
       },
       {
         id: 'aadharAddress',
         label: 'Aadhar Address',
         width: 280,
-        cellSx: { whiteSpace: 'normal', minWidth: 260 },
+        cellSx: { whiteSpace: 'normal', minWidth: 260, overflow: 'visible' },
         filter: null,
-        render: (row) => formatAadharAddress(row),
+        render: (row) => <AadharAddressCell row={row} />,
       },
     ];
 
     if (!isCaller) return cols;
     return cols.filter((col) => !CALLER_HIDDEN_COLUMN_IDS.has(col.id));
-  }, [rowOffset, setBlockTarget, isCaller, canShowMobile]);
+  }, [
+    rowOffset,
+    setBlockTarget,
+    isCaller,
+    canShowMobile,
+    canBlock,
+    appVersions,
+    onAddComment,
+    onViewComments,
+    onViewCallLogs,
+    onCallSuccess,
+  ]);
 }

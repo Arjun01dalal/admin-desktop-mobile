@@ -308,7 +308,7 @@ export function FeedbackPage() {
         </Typography>
       ) : null}
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflowX: 'auto' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', overflowX: 'auto' }}>
         <Stack
           direction="row"
           spacing={2}

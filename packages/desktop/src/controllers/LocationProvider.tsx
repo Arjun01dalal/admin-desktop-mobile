@@ -187,20 +187,18 @@ export function LocationProvider({ children }: Props) {
 
             return gps;
           } catch (osErr) {
+            // Electron/macOS often reports PERMISSION_DENIED or UNAVAILABLE even when
+            // system Location is on (app not granted / no GPS). Fall through to IP
+            // geo lookup instead of hard-blocking every time.
             const failure = osErr as OsFailure;
-
-            // Location off / permission denied → hard block (no network bypass)
-            if (isHardLocationOff(failure)) {
-              blockForLocationOff(failure.message);
-              throw new Error(failure.message);
+            if (failure.kind === 'timeout') {
+              // expected — quiet fallthrough
             }
-
-            // Timeout is common in Electron on macOS even when Location is ON.
-            // Fall through to network location so the app is not stuck.
           }
 
-          // 2) Network location via geoip-lite (main process)
-          const { coords: netCoords, address: netAddress } = await tryNetworkLocation();
+          // 2) Network location via geoip-lite (main process) — no OS GPS popup needed
+          const { coords: netCoords, address: netAddress } =
+            await tryNetworkLocation();
           markSuccess(netCoords, 'network', netAddress);
           return netCoords;
         } catch (err) {
@@ -271,7 +269,8 @@ export function LocationProvider({ children }: Props) {
     };
   }, [requestLocation]);
 
-  // While using the panel with a location, detect if Location Services are turned off.
+  // Soft recheck: if OS GPS later says denied, do NOT wipe a working network location.
+  // Only clear when we can confirm both GPS and network are unavailable.
   useEffect(() => {
     if (!coords) return;
 
@@ -283,22 +282,33 @@ export function LocationProvider({ children }: Props) {
       } catch (osErr) {
         if (cancelled) return;
         const failure = osErr as OsFailure;
-        if (isHardLocationOff(failure)) {
-          blockForLocationOff(failure.message);
+        if (!isHardLocationOff(failure)) return;
+
+        // GPS denied/unavailable — verify network still works before blocking.
+        try {
+          const { coords: netCoords, address: netAddress } =
+            await tryNetworkLocation();
+          if (cancelled) return;
+          markSuccess(netCoords, 'network', netAddress);
+        } catch {
+          if (cancelled) return;
+          blockForLocationOff(
+            failure.message ||
+              'Location is unavailable. Check Location Services and internet.',
+          );
         }
-        // Timeouts while Location is still ON are ignored — keep existing coords.
       }
     };
 
     const id = window.setInterval(() => {
       void watch();
-    }, 12_000);
+    }, 30_000);
 
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [coords, blockForLocationOff]);
+  }, [coords, blockForLocationOff, markSuccess]);
 
   const value = useMemo<LocationContextValue>(
     () => ({

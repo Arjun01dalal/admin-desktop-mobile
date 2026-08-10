@@ -353,7 +353,7 @@ export function WithdrawUserDataPage() {
         onClose={() => setCommentOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+        PaperProps={{ sx: { bgcolor: 'background.paper' } }}
       >
         <DialogTitle>Add Comment</DialogTitle>
         <DialogContent>

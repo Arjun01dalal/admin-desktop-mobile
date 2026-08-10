@@ -29,6 +29,11 @@ type CallingBtnProps = {
   reasonList?: string;
   botId?: string;
   campaignName?: string;
+  /** Hide Bot Call button (New Registers parity). */
+  hideBotCall?: boolean;
+  /** Log call via /User/call-logs-for-new-registration before dialer. */
+  isNewRegistration?: boolean;
+  onSuccess?: () => void;
 };
 
 function extensionIds(admin: CallingAdmin | null): string[] {
@@ -47,6 +52,9 @@ export function CallingBtn({
   reasonList = 'User List',
   botId = '1',
   campaignName,
+  hideBotCall = false,
+  isNewRegistration = false,
+  onSuccess,
 }: CallingBtnProps) {
   const admin = getStoredUser<CallingAdmin>();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
@@ -77,6 +85,20 @@ export function CallingBtn({
     }
     setBusy(true);
     try {
+      if (isNewRegistration && item._id) {
+        const logRes = await secureApi('users.callLogsForNewRegistration', {
+          _id: item._id,
+          who: {
+            userId: admin?._id,
+            userName: admin?.name,
+          },
+        });
+        if (!logRes.ok) {
+          toast.error(logRes.message || 'Failed to log call');
+          return;
+        }
+      }
+
       const res = await secureApi('callLogs.externalDialerSingle', {
         details: {
           client_name: item.name || item.userName,
@@ -97,6 +119,7 @@ export function CallingBtn({
       }
       toast.success(res.message || 'Data sent successfully');
       setOpen(false);
+      onSuccess?.();
     } finally {
       setBusy(false);
     }
@@ -122,54 +145,54 @@ export function CallingBtn({
   };
 
   return (
-    <Stack alignItems="center" spacing={0.75} sx={{ py: 0.25, maxWidth: '100%' }}>
+    <Stack alignItems="center" spacing={0.5} sx={{ py: 0.25, maxWidth: '100%' }}>
       <Typography
         component="span"
-        sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.2 }}
+        sx={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, color: 'text.primary' }}
       >
         {canShowMobile ? mobile || '—' : mobile ? '**********' : '—'}
       </Typography>
-      <Stack direction="row" spacing={0.75}>
+      <Stack direction="row" spacing={0.5}>
         <Button
           size="small"
           variant="contained"
+          color="warning"
           disabled={busy || !mobile}
           onClick={handleOpen}
           sx={{
-            minWidth: 52,
+            minWidth: 48,
             px: 1,
-            py: 0.25,
+            py: 0.2,
             fontSize: 10,
             fontWeight: 700,
             textTransform: 'uppercase',
-            bgcolor: '#f1a144',
-            color: '#000',
             boxShadow: 'none',
-            '&:hover': { bgcolor: '#e09030', boxShadow: 'none' },
+            '&:hover': { boxShadow: 'none' },
           }}
         >
           Call
         </Button>
-        <Button
-          size="small"
-          variant="contained"
-          disabled={busy || !mobile}
-          onClick={() => void initiateBotCall()}
-          sx={{
-            minWidth: 68,
-            px: 1,
-            py: 0.25,
-            fontSize: 10,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            bgcolor: '#f1a144',
-            color: '#000',
-            boxShadow: 'none',
-            '&:hover': { bgcolor: '#e09030', boxShadow: 'none' },
-          }}
-        >
-          Bot Call
-        </Button>
+        {!hideBotCall && (
+          <Button
+            size="small"
+            variant="contained"
+            color="warning"
+            disabled={busy || !mobile}
+            onClick={() => void initiateBotCall()}
+            sx={{
+              minWidth: 64,
+              px: 1,
+              py: 0.2,
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              boxShadow: 'none',
+              '&:hover': { boxShadow: 'none' },
+            }}
+          >
+            Bot Call
+          </Button>
+        )}
       </Stack>
 
       <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
@@ -179,31 +202,45 @@ export function CallingBtn({
         <DialogContent>
           <Box
             sx={{
-              bgcolor: '#f5f7fb',
+              bgcolor: 'action.hover',
               borderRadius: 2,
               p: 2,
               mt: 1,
-              color: '#111',
+              border: '1px solid',
+              borderColor: 'divider',
             }}
           >
-            <Typography variant="caption" sx={{ color: '#777', fontWeight: 500 }}>
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', fontWeight: 500 }}
+            >
               CAMPAIGN ID
             </Typography>
-            <Typography sx={{ fontWeight: 700, fontSize: 18, color: '#1976d2', mb: 1.5 }}>
+            <Typography
+              sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}
+            >
               {dialerCampaignLabel}
             </Typography>
 
-            <Typography variant="caption" sx={{ color: '#777', fontWeight: 500 }}>
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', fontWeight: 500 }}
+            >
               LIST ID
             </Typography>
-            <Typography sx={{ fontWeight: 700, fontSize: 18, color: '#1976d2', mb: 1.5 }}>
+            <Typography
+              sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}
+            >
               {dialerListId}
             </Typography>
 
-            <Typography variant="caption" sx={{ color: '#777', fontWeight: 500 }}>
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', fontWeight: 500 }}
+            >
               LIST NAME
             </Typography>
-            <Typography sx={{ fontWeight: 600, fontSize: 15 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: 15, color: 'text.primary' }}>
               {dialerListName}
             </Typography>
           </Box>

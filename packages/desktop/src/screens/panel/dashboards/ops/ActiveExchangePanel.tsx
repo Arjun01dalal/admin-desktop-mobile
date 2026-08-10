@@ -55,11 +55,11 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
       sx={{
         p: 2.5,
         mb: 2,
-        bgcolor: '#1a1a1f',
+        bgcolor: 'background.paper',
         width: '100%',
         maxWidth: '100%',
         border: '1px solid',
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: 'divider',
       }}
     >
       <Typography variant="h6" fontWeight={800} mb={1}>

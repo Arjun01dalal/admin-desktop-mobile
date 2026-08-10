@@ -270,6 +270,26 @@ module.exports = {
   'users.addToDialer': {
     type: 'local',
   },
+  // New Registers — comment + call-log (admin-panel-domains NewRegisterUsers)
+  'users.addNewRegistrationComment': {
+    method: 'POST',
+    path: '/User/add-new-registration-comment',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'users.callLogsForNewRegistration': {
+    method: 'POST',
+    path: '/User/call-logs-for-new-registration',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  // Caller Details — laxminarayan update-alternate-mobile
+  'users.updateAlternateMobile': {
+    method: 'POST',
+    path: '/User/update-alternate-mobile',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'users.coinRemovalUsers': {
     method: 'POST',
     path: '/User/coinRemovalUsers',

@@ -33,9 +33,28 @@ function isCallerRole(): boolean {
 }
 
 /**
+ * Mask large amounts: decimal after first 4 digits, round to 2 places.
+ * 318463.62 → 3184.64, 31846362 → 3184.64
+ */
+export function formatMaskedAmount(amt: unknown): string {
+  const num = Number(amt);
+  if (!Number.isFinite(num)) return '-';
+  if (num === 0) return '0';
+
+  const sign = num < 0 ? '-' : '';
+  const abs = Math.abs(num);
+  const intDigits = String(Math.trunc(abs));
+  if (intDigits.length < 5) {
+    return `${sign}${Number.isInteger(abs) ? abs : abs.toFixed(2)}`;
+  }
+  const digits = abs.toFixed(2).replace('.', '');
+  const masked = Number(`${digits.slice(0, 4)}.${digits.slice(4)}`);
+  return `${sign}${masked.toFixed(2)}`;
+}
+
+/**
  * Format amount for display.
- * Callers only: if integer part has 5+ digits, keep first 4 and append `..`
- * (e.g. 123456 → 1234..). Other roles see the full amount.
+ * Callers: use formatMaskedAmount. Other roles see the full amount.
  */
 export function formatAmount(amt: unknown): number | string {
   const num = Number(amt);
@@ -43,12 +62,7 @@ export function formatAmount(amt: unknown): number | string {
   if (num === 0) return 0;
 
   if (isCallerRole()) {
-    const sign = num < 0 ? '-' : '';
-    const absInt = Math.trunc(Math.abs(num));
-    const digits = String(absInt);
-    if (digits.length >= 5) {
-      return `${sign}${digits.slice(0, 4)}..`;
-    }
+    return formatMaskedAmount(num);
   }
 
   return Number.isInteger(num) ? num : Number(num.toFixed(2));

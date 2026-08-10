@@ -115,7 +115,7 @@ export function BeneListDialog({ open, initialBanks, onClose, onSuccess }: Props
       onClose={() => !saving && onClose()}
       fullWidth
       maxWidth="sm"
-      PaperProps={{ sx: { bgcolor: '#1a1a1f', borderRadius: 2 } }}
+      PaperProps={{ sx: { bgcolor: 'background.paper', borderRadius: 2 } }}
     >
       <DialogTitle>Available Banks</DialogTitle>
       <DialogContent>

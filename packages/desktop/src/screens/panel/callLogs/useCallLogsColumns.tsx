@@ -34,13 +34,17 @@ const STATUS_CHIP_SX = {
 } as const;
 
 const actionBtnSx = {
-  fontSize: 12,
-  py: 0.55,
-  px: 1.5,
+  fontSize: 11,
+  py: 0.35,
+  px: 1.1,
   minWidth: 0,
   whiteSpace: 'nowrap',
   fontWeight: 700,
-  lineHeight: 1.3,
+  lineHeight: 1.25,
+  borderRadius: '999px',
+  boxShadow: 'none',
+  flexShrink: 0,
+  '&:hover': { boxShadow: 'none' },
 } as const;
 
 export type UseCallLogsColumnsParams = {
@@ -238,23 +242,28 @@ export function useCallLogsColumns({
       },
     );
 
-    if (!isCaller) {
-      cols.push({
-        id: 'comment',
-        label: 'Comment',
-        width: 120,
-        filter: <CommentFilter />,
-        cellSx: { whiteSpace: 'normal', maxWidth: 140 },
-        render: (row) => String(row.comments || '-'),
-      });
-    }
+    cols.push({
+      id: 'comment',
+      label: 'Comment',
+      width: 120,
+      filter: <CommentFilter />,
+      cellSx: { whiteSpace: 'normal', maxWidth: 140 },
+      render: (row) => String(row.comments || '-'),
+    });
 
     cols.push({
       id: 'action',
       label: 'Action',
-      width: 250,
+      width: 340,
       filter: null,
-      cellSx: { whiteSpace: 'nowrap', maxWidth: 270, px: 1 },
+      cellSx: {
+        whiteSpace: 'normal',
+        overflow: 'visible',
+        textOverflow: 'clip',
+        px: 1,
+        py: 1,
+        verticalAlign: 'middle',
+      },
       render: (row) => {
         const status = String(row.status || '');
         if (status === 'queued') return null;
@@ -278,15 +287,18 @@ export function useCallLogsColumns({
         return (
           <Stack
             direction="row"
+            useFlexGap
             spacing={0.75}
             alignItems="center"
             justifyContent="center"
-            flexWrap="nowrap"
+            flexWrap="wrap"
+            sx={{ gap: 0.75, maxWidth: 320, mx: 'auto' }}
           >
             {showViewSummary ? (
               <Button
                 size="small"
                 variant="outlined"
+                color="warning"
                 sx={actionBtnSx}
                 onClick={() => void onViewSummary(row)}
               >
@@ -296,6 +308,7 @@ export function useCallLogsColumns({
               <Button
                 size="small"
                 variant="outlined"
+                color="warning"
                 sx={actionBtnSx}
                 onClick={() => void onBotCall([row])}
               >
@@ -311,16 +324,15 @@ export function useCallLogsColumns({
             >
               Connect Dialer
             </Button>
-            {!isCaller && (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={actionBtnSx}
-                onClick={() => onOpenComment(row)}
-              >
-                Comment
-              </Button>
-            )}
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              sx={actionBtnSx}
+              onClick={() => onOpenComment(row)}
+            >
+              Comment
+            </Button>
           </Stack>
         );
       },

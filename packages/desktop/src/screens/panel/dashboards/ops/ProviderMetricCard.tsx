@@ -25,11 +25,11 @@ export function ProviderMetricCard({ card, onClick }: Props) {
       onClick={onClick}
       sx={{
         p: 2,
-        bgcolor: '#1a1a1f',
+        bgcolor: 'background.paper',
         height: '100%',
         cursor: onClick ? 'pointer' : 'default',
         border: '1px solid',
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: 'divider',
         transition: 'border-color 0.15s ease',
         '&:hover': onClick ? { borderColor: 'warning.main' } : undefined,
       }}

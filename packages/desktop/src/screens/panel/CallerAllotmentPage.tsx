@@ -53,7 +53,7 @@ type CallerHeadOption = { id: string; name: string };
 
 const fieldSx = {
   minWidth: 110,
-  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+  '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
 };
 
 /** Matches old UI outlined action buttons. */

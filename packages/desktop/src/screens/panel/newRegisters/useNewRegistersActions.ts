@@ -8,7 +8,7 @@ import type { NewRegistersAdmin, UserRow } from './types';
 const MAX_REMARK_LENGTH = 500;
 
 export function useNewRegistersActions(
-  _admin: NewRegistersAdmin | null | undefined,
+  admin: NewRegistersAdmin | null | undefined,
   load: (pageNo?: number) => Promise<void>,
   page: number,
 ) {
@@ -37,6 +37,31 @@ export function useNewRegistersActions(
     [load, page],
   );
 
+  const addComment = useCallback(
+    async (userId: string, comment: string) => {
+      if (!userId || !comment.trim()) {
+        toast.error('Please enter a comment');
+        return false;
+      }
+      const res = await secureApi('users.addNewRegistrationComment', {
+        _id: userId,
+        comment: comment.trim(),
+        who: {
+          userId: admin?._id,
+          userName: admin?.name,
+        },
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to add comment');
+        return false;
+      }
+      toast.success('Comment added successfully');
+      await load(page);
+      return true;
+    },
+    [admin?._id, admin?.name, load, page],
+  );
+
   const addToDialer = useCallback(
     async (campaignId: string, rows: UserRow[]) => {
       const selectedCampaignId = String(campaignId || '').trim();
@@ -49,7 +74,6 @@ export function useNewRegistersActions(
         return false;
       }
 
-      // Match web NewRegisterUsers: resolve campaign by id or name.
       const campaign = CAMPAIGN_LIST.find(
         (c) =>
           c.id.trim() === selectedCampaignId ||
@@ -70,9 +94,6 @@ export function useNewRegistersActions(
 
       setDialerLoading(true);
       try {
-        // Same payload shape as admin-panel-domains NewRegisterUsers.addToDialer:
-        // campaign_id = campaign.id, list_name = campaign.name, random list_id,
-        // server from campaign.serverId (49.206.26.7 → api2, 3.200 → api).
         const res = await secureApi('callLogs.externalDialerBatch', {
           campaignId: campaign.id,
           campaign_id: campaign.id,
@@ -115,5 +136,5 @@ export function useNewRegistersActions(
     [],
   );
 
-  return { dialerLoading, toggleBlock, addToDialer };
+  return { dialerLoading, toggleBlock, addComment, addToDialer };
 }

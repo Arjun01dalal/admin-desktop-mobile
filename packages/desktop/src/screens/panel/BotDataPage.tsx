@@ -172,7 +172,7 @@ export function BotDataPage() {
           mb: 1.5,
           p: 1.5,
           borderRadius: 1.5,
-          bgcolor: '#1a1a1f',
+          bgcolor: 'background.paper',
           border: '1px solid rgba(255,255,255,0.08)',
         }}
       >
@@ -373,7 +373,7 @@ export function BotDataPage() {
               key={card.botId}
               sx={{
                 p: 1.5,
-                bgcolor: '#1a1a1f',
+                bgcolor: 'background.paper',
                 border: '1px solid rgba(255,159,10,0.35)',
                 borderRadius: 1.5,
               }}

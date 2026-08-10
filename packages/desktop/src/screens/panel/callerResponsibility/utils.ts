@@ -13,6 +13,8 @@ export type StoredCallerUser = {
   Role_ID?: string;
   empCode?: string;
   Responsibilities?: string[];
+  extensionId?: string[] | string;
+  serverId?: string | number;
 };
 
 export function roundAmt(value: unknown): number | string {

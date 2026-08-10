@@ -29,25 +29,28 @@ export function TableSearchBar({
         p: '0 2px',
         display: 'flex',
         alignItems: 'center',
-        bgcolor: '#f4f6f8',
-        border: '1px solid #c5ccd6',
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
         borderRadius: 1,
         width,
         maxWidth: '100%',
         minWidth: 0,
-        height: 34,
+        height: 30,
         boxSizing: 'border-box',
-        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)',
       }}
     >
       <InputBase
         sx={{
           ml: 0.75,
           flex: 1,
-          fontSize: 12,
-          color: '#1a1a1f',
+          fontSize: 11,
+          color: 'text.primary',
           '& input': { p: 0, color: 'inherit' },
-          '& input::placeholder': { color: '#7a8494', opacity: 1 },
+          '& input::placeholder': {
+            color: 'text.secondary',
+            opacity: 0.85,
+          },
         }}
         placeholder={placeholder}
         value={value}
@@ -58,9 +61,9 @@ export function TableSearchBar({
         size="small"
         onClick={onSearch}
         aria-label="search"
-        sx={{ color: '#4a5568', p: 0.5 }}
+        sx={{ color: 'text.secondary', p: 0.4 }}
       >
-        <SearchIcon sx={{ fontSize: 16 }} />
+        <SearchIcon sx={{ fontSize: 15 }} />
       </IconButton>
     </Paper>
   );

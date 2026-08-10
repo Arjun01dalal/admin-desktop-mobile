@@ -83,7 +83,7 @@ export function UsersToolbar(props: UsersToolbarProps) {
   );
 
   return (
-    <Stack spacing={1.5} sx={{ p: 2, bgcolor: '#1a1a1f', borderRadius: 1, mb: 2 }}>
+    <Stack spacing={1.5} sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, mb: 2 }}>
       <Stack direction="row" spacing={1.25} alignItems="flex-end" flexWrap="wrap" useFlexGap>
         {props.showDates !== false && (
           <>

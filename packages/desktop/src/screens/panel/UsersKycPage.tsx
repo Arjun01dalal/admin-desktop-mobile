@@ -56,7 +56,7 @@ const EMPTY_FILTERS = EMPTY_KYC_FILTERS;
 
 const filterFieldSx = {
   minWidth: 110,
-  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+  '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
 };
 
 const orangeBtnSx = {
@@ -904,7 +904,7 @@ export function UsersKycPage() {
         </Typography>
       ) : null}
 
-      <Paper sx={{ p: 2, pt: 3, mb: 2, bgcolor: '#1a1a1f', overflow: 'visible' }}>
+      <Paper sx={{ p: 2, pt: 3, mb: 2, bgcolor: 'background.paper', overflow: 'visible' }}>
         <Box sx={{ overflowX: 'auto', overflowY: 'visible', pb: 0.25 }}>
         <Stack
           direction="row"
