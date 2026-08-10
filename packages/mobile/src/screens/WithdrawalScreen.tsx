@@ -349,10 +349,16 @@ export function WithdrawalScreen() {
   // Manual Approved / QR gateway list: desktop's fixed options + any extra API gateways.
   const gatewayOptions = useMemo(() => {
     const known = new Set(GATEWAY_OPTIONS.map((g) => g.value.toLowerCase()));
+    // User request: never show Zappay or Wasabi in this list.
+    const excluded = ['zappay', 'wasabi'];
     return [
       ...GATEWAY_OPTIONS,
       ...gateways
-        .filter((g) => !known.has(g.toLowerCase()))
+        .filter(
+          (g) =>
+            !known.has(g.toLowerCase()) &&
+            !excluded.some((x) => g.toLowerCase().includes(x)),
+        )
         .map((g) => ({ value: g, label: g })),
     ];
   }, [gateways]);
