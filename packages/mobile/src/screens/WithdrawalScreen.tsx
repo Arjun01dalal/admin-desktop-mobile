@@ -29,6 +29,7 @@ import {
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
+import QRCode from 'react-native-qrcode-svg';
 import { appCodeForName } from '@astro/shared';
 import { secureApi } from '../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../auth/permissions';
@@ -78,6 +79,20 @@ function display(v: unknown): string {
 function num(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Desktop UPIQR parity: build a upi://pay deep link for the QR code. */
+function buildUpiUrl(r: Rec): string {
+  const params = new URLSearchParams();
+  params.set('pa', String(r.upiId ?? ''));
+  if (r.amount !== undefined && r.amount !== null) params.set('am', String(r.amount));
+  params.set('cu', 'INR');
+  params.set(
+    'tn',
+    `Note:${String(r.accountHolderName ?? '').slice(0, 6)}-${String(r.dp_id ?? '').slice(-6)}`,
+  );
+  params.set('tr', `ORD-${Date.now()}`);
+  return `upi://pay?${params.toString()}`;
 }
 
 function fmtAmount(v: unknown): string {
@@ -302,6 +317,9 @@ export function WithdrawalScreen() {
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkSel, setBulkSel] = useState<Record<string, Rec>>({});
   const [bulkManualOpen, setBulkManualOpen] = useState(false);
+  // QR Code approve modal (desktop UPIQR popup parity).
+  const [qrRow, setQrRow] = useState<Rec | null>(null);
+  const qrUrl = useMemo(() => (qrRow ? buildUpiUrl(qrRow) : ''), [qrRow]);
 
   // Desktop permission parity (login Responsibilities).
   const perms = useMemo(
@@ -409,6 +427,7 @@ export function WithdrawalScreen() {
   const afterAction = useCallback(() => {
     setSelected(null);
     setStatusModal(null);
+    setQrRow(null);
     void load();
     void loadSummary();
   }, [load, loadSummary]);
@@ -915,6 +934,18 @@ export function WithdrawalScreen() {
         onPress: () => openStatusModal(r, 'Manual Approved'),
       });
       acts.push({
+        label: 'QR Code',
+        tone: 'primary',
+        onPress: () => {
+          // Close the sheet before opening another Modal (touch-freeze guard).
+          setGateway('');
+          setMid('');
+          setModalErr('');
+          setSelected(null);
+          setTimeout(() => setQrRow(r), 350);
+        },
+      });
+      acts.push({
         label: 'On Hold',
         tone: 'warning',
         onPress: () => openStatusModal(r, 'on hold'),
@@ -1215,6 +1246,92 @@ export function WithdrawalScreen() {
                   <ActivityIndicator size="small" color={colors.primaryForeground} />
                 ) : (
                   <Text style={styles.confirmBtnText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* QR Code approve modal (desktop UPIQR popup parity) */}
+      <Modal
+        visible={qrRow !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !actionBusy && setQrRow(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>QR Code — ₹{fmtAmount(qrRow?.amount)}</Text>
+            <View style={{ alignItems: 'center', paddingVertical: spacing(3) }}>
+              {qrUrl ? (
+                <View style={{ backgroundColor: '#fff', padding: spacing(3), borderRadius: radius.md }}>
+                  <QRCode value={qrUrl} size={180} />
+                </View>
+              ) : null}
+              <Text style={[styles.modalSub, { textAlign: 'center' }]}>
+                {String(qrRow?.upiId ?? '')}
+              </Text>
+            </View>
+            <Text style={styles.modalSub}>Gateway</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {gateways.map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.chip, gateway === g && styles.chipActive]}
+                  onPress={() => setGateway(g)}
+                >
+                  <Text style={[styles.chipText, gateway === g && styles.chipTextActive]}>
+                    {g}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={styles.modalSub}>MID</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {mids.map((m) => (
+                <TouchableOpacity
+                  key={m.label}
+                  style={[styles.chip, mid === m.mid && styles.chipActive]}
+                  onPress={() => {
+                    setMid(m.mid);
+                    if (!gateway && m.gateway) setGateway(m.gateway);
+                  }}
+                >
+                  <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {modalErr ? <Text style={styles.modalErr}>{modalErr}</Text> : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.pagerBtn}
+                onPress={() => setQrRow(null)}
+                disabled={actionBusy}
+              >
+                <Text style={styles.pagerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, actionBusy && styles.pagerBtnDisabled]}
+                disabled={actionBusy}
+                onPress={() => {
+                  if (!qrRow) return;
+                  // Desktop QR popup requires gateway + MID before approving.
+                  if (!gateway || !mid) {
+                    setModalErr('Gateway and MID are required');
+                    return;
+                  }
+                  const r = qrRow;
+                  setQrRow(null);
+                  void doStatusUpdate(r, 'Approved', '', gateway, mid);
+                }}
+              >
+                {actionBusy ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Submit to Approve</Text>
                 )}
               </TouchableOpacity>
             </View>
