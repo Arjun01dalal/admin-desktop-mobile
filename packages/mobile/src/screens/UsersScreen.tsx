@@ -1108,8 +1108,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   userCardNameLink: {
-    color: '#4fc3f7',
-    textDecorationLine: 'underline',
+    color: colors.foreground,
   },
   userCardSub: {
     color: colors.muted,
