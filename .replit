@@ -1,0 +1,37 @@
+modules = ["nodejs-24", "python-base-3.13"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd packages/mobile && rm -f .expo/settings.json && for i in 1 2 3 4 5; do npx expo start --web --port 5000 --tunnel && break; echo \"[retry] tunnel start failed, attempt $i\"; rm -f .expo/settings.json; sleep 5; done"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
+[[ports]]
+localPort = 8082
+externalPort = 3001

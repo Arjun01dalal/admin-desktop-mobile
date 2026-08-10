@@ -18,7 +18,7 @@ export function PlaceholderScreen({ title }: { title: string }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     padding: spacing(5),
   },

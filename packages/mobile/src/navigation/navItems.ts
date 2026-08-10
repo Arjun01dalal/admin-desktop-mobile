@@ -119,6 +119,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_Users,
   },
   {
+    id: 'createUser',
+    label: 'Create User',
+    path: '/create-user',
+    permission: Permissions.create_new_user,
+  },
+  {
     id: 'loginReport',
     label: 'Login Report',
     path: '/login-report',
@@ -270,7 +276,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'withdrawalProviders',
-    label: 'Withdrawal Providers',
+    label: 'Refund Providers',
     path: '/payout-accounts',
     permission: Permissions.View_PayOut_Accounts,
   },
@@ -330,13 +336,13 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'withdrawal',
-    label: 'Withdrawal',
+    label: 'Refund',
     path: '/withdrawal',
     permission: Permissions.View_Withdrawals,
   },
   {
     id: 'withdrawalFund',
-    label: 'Withdrawal Fund',
+    label: 'Refund Fund',
     path: '/withdrawal-fund',
     permission: Permissions.withdrawal_fund,
   },

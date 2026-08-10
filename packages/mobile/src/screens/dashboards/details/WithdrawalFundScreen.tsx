@@ -661,7 +661,7 @@ export function WithdrawalFundScreen() {
             const s = payload?.summary;
             setBucketBackView('mids');
             openBucket({
-              title: `${m.mid} — Withdrawals`,
+              title: `${m.mid} — Refunds`,
               rows: m.withdrawals,
               totalAmount: m.totalAmount,
               count: m.withdrawals?.length || m.count || 0,
@@ -807,7 +807,7 @@ export function WithdrawalFundScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>{toDisplayText('Withdrawal Fund')}</Text>
+      <Text style={styles.title}>{toDisplayText('Refund Fund')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Amount: {formatAmount(totalAmount)}
       </Text>
@@ -934,7 +934,7 @@ const styles = StyleSheet.create({
   },
   commentSaveBtnDisabled: { opacity: 0.5 },
   commentSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },

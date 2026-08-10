@@ -584,9 +584,9 @@ export function RolesResponsibilitiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
-  noPerm: { flex: 1, backgroundColor: colors.background, padding: spacing(4) },
+  noPerm: { flex: 1, backgroundColor: 'transparent', padding: spacing(4) },
   noPermText: { color: colors.muted, fontSize: 14 },
   headerRow: { marginBottom: spacing(3) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },

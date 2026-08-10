@@ -4,9 +4,9 @@
  * replaces the UI with a lockout screen instead of the app content.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing } from '../theme';
+import { colors, radius, spacing } from '../theme';
 import { useSecurity } from './useSecurity';
 
 const LABELS: Record<string, string> = {
@@ -18,18 +18,31 @@ const LABELS: Record<string, string> = {
 };
 
 export function SecurityGate({ children }: { children: React.ReactNode }) {
-  const { threats, blocked } = useSecurity();
+  const { threats, blocked, refresh } = useSecurity();
+  const [checking, setChecking] = React.useState(false);
 
   if (!blocked) return <>{children}</>;
 
   const reasons = threats.filter((t) => LABELS[t]).map((t) => LABELS[t]);
+  const vpnOnly = threats.length > 0 && threats.every((t) => t === 'systemVPN');
+
+  const onCheck = async () => {
+    setChecking(true);
+    try {
+      await refresh();
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.icon}>🔒</Text>
-      <Text style={styles.title}>Access blocked</Text>
+      <Text style={styles.icon}>{vpnOnly ? '🛡️' : '🔒'}</Text>
+      <Text style={styles.title}>{vpnOnly ? 'VPN detected' : 'Access blocked'}</Text>
       <Text style={styles.subtitle}>
-        This device does not meet the security requirements to run Astro Admin.
+        {vpnOnly
+          ? 'Please turn off your VPN to continue. Once it is off, tap “Check again”.'
+          : 'This device does not meet the security requirements to run Astro Admin.'}
       </Text>
       <View style={styles.list}>
         {(reasons.length ? reasons : ['Security policy violation']).map((r) => (
@@ -38,6 +51,17 @@ export function SecurityGate({ children }: { children: React.ReactNode }) {
           </Text>
         ))}
       </View>
+      <TouchableOpacity
+        style={[styles.button, checking && styles.buttonDisabled]}
+        onPress={onCheck}
+        disabled={checking}
+      >
+        {checking ? (
+          <ActivityIndicator color={colors.primaryForeground} />
+        ) : (
+          <Text style={styles.buttonText}>Check again</Text>
+        )}
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -45,7 +69,7 @@ export function SecurityGate({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing(5),
@@ -61,4 +85,15 @@ const styles = StyleSheet.create({
   },
   list: { alignSelf: 'stretch', paddingHorizontal: spacing(4) },
   reason: { color: colors.destructive, fontSize: 14, marginBottom: spacing(1) },
+  button: {
+    marginTop: spacing(5),
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(3),
+    paddingHorizontal: spacing(6),
+    minWidth: 180,
+    alignItems: 'center',
+  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 15 },
 });

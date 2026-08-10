@@ -1057,7 +1057,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
   cardDoneBy: { color: '#16a34a', fontSize: 12, fontWeight: '600', marginTop: spacing(1) },
   content: { padding: spacing(4), paddingBottom: spacing(10) },

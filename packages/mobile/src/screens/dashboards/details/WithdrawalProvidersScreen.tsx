@@ -409,7 +409,7 @@ export function WithdrawalProvidersScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>{toDisplayText('Withdrawal Providers')}</Text>
+      <Text style={styles.title}>{toDisplayText('Refund Providers')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · {filtered.length.toLocaleString('en-IN')} providers
       </Text>
@@ -492,7 +492,7 @@ export function WithdrawalProvidersScreen() {
       {/* Add / Edit full provider modal */}
       {renderModalShell(
         formVisible,
-        addOpen ? 'Add Withdrawal Provider' : `Edit — ${formRow?.name || ''}`,
+        addOpen ? 'Add Refund Provider' : `Edit — ${formRow?.name || ''}`,
         () => {
           setAddOpen(false);
           setFormRow(null);
@@ -574,7 +574,7 @@ export function WithdrawalProvidersScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },

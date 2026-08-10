@@ -17,6 +17,7 @@ import { colors, radius, spacing } from '../../theme';
 import { PROVIDER_FILTERS } from '../constants';
 import type { ProviderFilter } from '../types';
 import { daysAgoIST, monthStartIST, todayIST } from '../../utils/dates';
+import { DateField } from '../../components/DateField';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -117,27 +118,11 @@ export function FilterBar(props: Props) {
         <View style={styles.datesRow}>
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>From</Text>
-            <TextInput
-              style={styles.dateInput}
-              value={startDate}
-              onChangeText={onStartDateChange}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.dateInput} value={startDate} onChange={onStartDateChange} />
           </View>
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>To</Text>
-            <TextInput
-              style={styles.dateInput}
-              value={endDate}
-              onChangeText={onEndDateChange}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.dateInput} value={endDate} onChange={onEndDateChange} />
           </View>
         </View>
       )}

@@ -1,0 +1,277 @@
+.select-withdrawal {
+  width: 100px;
+}
+
+.ver {
+  vertical-align: middle;
+}
+
+.withdraw-select {
+  width: 150px;
+}
+
+.withdraw-approved-clr {
+  background-color: #84d184 !important;
+  color: black;
+}
+
+.withdraw-pending-clr {
+  background-color: #fff !important;
+  color: black;
+}
+
+.withdraw-rejected-clr {
+  background-color: #ff7e7e !important;
+  color: black;
+}
+.withdraw-Failed-clr {
+  background-color: #ff7e7e !important;
+  color: black;
+}
+.withdraw-onhold-clr {
+  background-color: #f6d08b !important;
+  color: black;
+}
+.withdraw-bot-clr {
+  background-color: #d2f6d2 !important;
+  color: black;
+}
+.withdraw-reverse-clr {
+  background-color: #f2f2ad !important;
+  color: black;
+}
+
+.lock-btn {
+  padding: 4px !important;
+  background: #f1a144 !important;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 3px;
+}
+
+.btn-withdraw.disabled_ {
+  background: #ffd4a3d4 !important;
+  filter: blur(0.7px);
+}
+.dropDownBtn {
+  padding: 0px 1px;
+  width: 22px;
+  margin-left: 20px;
+  margin-bottom: 5px;
+  height: 22px;
+  border: 1px solid #ccc;
+  border-radius: "6px";
+  background: "white";
+}
+
+/* dqwew */
+
+.withdrawal-table-wrapper {
+}
+
+/* Freeze sticky columns; rest scrolls horizontally */
+.withdrawal-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.withdrawal-table-scroll .table.table-view {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+}
+
+.withdrawal-table-scroll .wd-sticky {
+  background-color: #fff;
+}
+
+/* Mobile: only User Name is fixed */
+@media (max-width: 767.98px) {
+  .withdrawal-table-scroll .wd-sticky-index,
+  .withdrawal-table-scroll .wd-sticky-bank {
+    position: static;
+    left: auto;
+    box-shadow: none;
+    min-width: unset;
+    max-width: unset;
+    width: auto;
+  }
+
+  .withdrawal-table-scroll .wd-sticky-user {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 120px;
+    max-width: 160px;
+    box-shadow: 6px 0 8px -6px rgba(0, 0, 0, 0.35);
+  }
+
+  .withdrawal-table-scroll thead .wd-sticky-user {
+    z-index: 4;
+    background-color: #f1a144 !important;
+  }
+
+  .withdrawal-table-scroll thead tr.bg-table .wd-sticky-user {
+    background-color: #f8f9fa !important;
+  }
+
+  .withdrawal-table-scroll tr.withdraw-approved-clr > .wd-sticky-user {
+    background-color: #84d184 !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-pending-clr > .wd-sticky-user {
+    background-color: #fff !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-rejected-clr > .wd-sticky-user,
+  .withdrawal-table-scroll tr.withdraw-Failed-clr > .wd-sticky-user {
+    background-color: #ff7e7e !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-onhold-clr > .wd-sticky-user {
+    background-color: #f6d08b !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-bot-clr > .wd-sticky-user {
+    background-color: #d2f6d2 !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-reverse-clr > .wd-sticky-user {
+    background-color: #f2f2ad !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-Cancel-clr > .wd-sticky-user {
+    background-color: rgba(233, 0, 0, 0.58) !important;
+    color: #fff;
+  }
+}
+
+/* Tablet & Desktop: fix index + User Name + Name (Send to Bank) */
+@media (min-width: 768px) {
+  .withdrawal-table-scroll .wd-sticky {
+    position: sticky;
+    z-index: 2;
+  }
+
+  .withdrawal-table-scroll thead .wd-sticky {
+    z-index: 4;
+    background-color: #f1a144 !important;
+  }
+
+  .withdrawal-table-scroll thead tr.bg-table .wd-sticky {
+    background-color: #f8f9fa !important;
+  }
+
+  .withdrawal-table-scroll .wd-sticky-index {
+    left: 0;
+    min-width: 48px;
+    width: 48px;
+  }
+
+  .withdrawal-table-scroll .wd-sticky-user {
+    left: 48px;
+    min-width: 140px;
+    max-width: 180px;
+  }
+
+  .withdrawal-table-scroll .wd-sticky-bank {
+    left: 188px;
+    min-width: 150px;
+    max-width: 180px;
+    box-shadow: 6px 0 8px -6px rgba(0, 0, 0, 0.35);
+  }
+
+  .withdrawal-table-scroll tr.withdraw-approved-clr > .wd-sticky {
+    background-color: #84d184 !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-pending-clr > .wd-sticky {
+    background-color: #fff !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-rejected-clr > .wd-sticky,
+  .withdrawal-table-scroll tr.withdraw-Failed-clr > .wd-sticky {
+    background-color: #ff7e7e !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-onhold-clr > .wd-sticky {
+    background-color: #f6d08b !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-bot-clr > .wd-sticky {
+    background-color: #d2f6d2 !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-reverse-clr > .wd-sticky {
+    background-color: #f2f2ad !important;
+  }
+  .withdrawal-table-scroll tr.withdraw-Cancel-clr > .wd-sticky {
+    background-color: rgba(233, 0, 0, 0.58) !important;
+    color: #fff;
+  }
+}
+
+.withdrawal-table tbody td,
+.nested-table tbody td,
+.inner-table tbody td {
+  padding: 12px;
+  border-top: none;
+  border-bottom: 1px solid #f1f1f1;
+  vertical-align: middle;
+}
+
+.provider-row,
+.gateway-row,
+.mid-row {
+  background: #fff;
+  transition: all 0.2s ease-in-out;
+}
+
+.provider-row:hover,
+.gateway-row:hover,
+.mid-row:hover {
+  background: #f8fbff;
+}
+
+.provider-row td:first-child,
+.gateway-row td:first-child,
+.mid-row td:first-child {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.provider-row td:last-child,
+.gateway-row td:last-child,
+.mid-row td:last-child {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.nested-card,
+.inner-card {
+  background: #ffffff;
+  border: 1px solid #ececec;
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 4px;
+}
+
+.nested-table,
+.inner-table {
+  margin-bottom: 0;
+}
+
+.arrow-icon {
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.upload-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f1f4f9;
+  transition: 0.2s ease;
+}
+
+.upload-btn:hover {
+  background: #dde7f5;
+}

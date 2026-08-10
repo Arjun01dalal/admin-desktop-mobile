@@ -136,7 +136,7 @@ export function ProfitLossScreen() {
       { key: 'deposite', label: 'Deposite', width: 100, align: 'right', render: (r) => fmt(r.deposite) },
       { key: 'betAmount', label: 'Bet Amount', width: 100, align: 'right', render: (r) => fmt(r.betAmount) },
       { key: 'winAmount', label: 'Win Amount', width: 100, align: 'right', render: (r) => fmt(r.totalProfit) },
-      { key: 'withdraw', label: 'Withdraw', width: 100, align: 'right', render: (r) => fmt(r.withdrawl) },
+      { key: 'withdraw', label: 'Refund', width: 100, align: 'right', render: (r) => fmt(r.withdrawl) },
       { key: 'bonus', label: 'Bonus', width: 90, align: 'right', render: (r) => fmt(r.bonus ?? 0) },
       { key: 'endBalance', label: 'End Balance', width: 110, align: 'right', render: (r) => fmt(r.balance) },
     ],
@@ -267,7 +267,7 @@ export function ProfitLossScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },

@@ -31,6 +31,7 @@ import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { DateField } from '../../../components/DateField';
 
 type MidTotal = { mid?: string; amount?: number | string; count?: number | string };
 
@@ -307,14 +308,14 @@ export function DepositListScreen() {
       },
       {
         key: 'withdrawal',
-        label: 'Withdrawal',
+        label: 'Refund',
         width: mainW.withdrawal,
         align: 'right',
         render: (r) => formatAmt(r.approvedWithdrawalAmount),
       },
       {
         key: 'withdrawalCount',
-        label: 'Withdrawal Count',
+        label: 'Refund Count',
         width: 120,
         align: 'right',
         render: (r) => String(num(r.approvedWithdrawalCount)),
@@ -334,7 +335,7 @@ export function DepositListScreen() {
       value: String(normalizeMids(sheetRow.approvedDepositAmountByMid).length),
     });
     fields.push({
-      label: 'Withdrawal MID Count',
+      label: 'Refund MID Count',
       value: String(normalizeMids(sheetRow.approvedWithdrawalAmountByMid).length),
     });
     return fields;
@@ -358,11 +359,11 @@ export function DepositListScreen() {
     }
     if (wit.length) {
       acts.push({
-        label: `Withdrawal MIDs (${wit.length})`,
+        label: `Refund MIDs (${wit.length})`,
         tone: 'default',
         onPress: () =>
           openMidBreakdown(
-            `${display(sheetRow.name)} — Withdrawal MIDs`,
+            `${display(sheetRow.name)} — Refund MIDs`,
             sheetRow.approvedWithdrawalAmountByMid,
           ),
       });
@@ -433,27 +434,11 @@ export function DepositListScreen() {
         <View style={styles.datesRow}>
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>From</Text>
-            <TextInput
-              style={styles.dateInput}
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.dateInput} value={startDate} onChange={setStartDate} />
           </View>
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>To</Text>
-            <TextInput
-              style={styles.dateInput}
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateField style={styles.dateInput} value={endDate} onChange={setEndDate} />
           </View>
           <TouchableOpacity
             style={styles.applyBtn}
@@ -601,7 +586,7 @@ export function DepositListScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },

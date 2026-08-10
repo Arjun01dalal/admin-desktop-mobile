@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import {
   createDrawerNavigator,
@@ -7,10 +7,27 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { AppBackground } from '../components/AppBackground';
+import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
+import { CreateUserScreen } from '../screens/CreateUserScreen';
+import { UsersScreen } from '../screens/UsersScreen';
+import { WithdrawalScreen } from '../screens/WithdrawalScreen';
+import { useRevealCodes } from '../context/useRevealCodes';
+import { TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
-import { canAccessNavItem } from '../auth/permissions';
+import {
+  buildSosEnablePayload,
+  canAccessNavItem,
+  canShowSos,
+  isSosExemptRole,
+} from '../auth/permissions';
+import { SosProvider, useSos } from '../auth/useSosGuard';
+import { SosAlertOverlay } from '../components/SosAlertOverlay';
+import { secureApi } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
@@ -72,7 +89,7 @@ import { BonusWalletFundRequestScreen } from '../screens/dashboards/details/Bonu
 import { BonusWalletRequestsScreen } from '../screens/dashboards/details/BonusWalletRequestsScreen';
 import { DepositApprovedReportScreen } from '../screens/dashboards/details/DepositApprovedReportScreen';
 import { UniqueDepositPendingScreen } from '../screens/dashboards/details/UniqueDepositPendingScreen';
-import { colors } from '../theme';
+import { colors, radius, spacing } from '../theme';
 
 const Drawer = createDrawerNavigator();
 const RootStack = createNativeStackNavigator();
@@ -141,6 +158,9 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/bonus-wallet': BonusWalletRequestsScreen as AnyScreen,
   '/DepositApprovedReport': DepositApprovedReportScreen as AnyScreen,
   '/unique_deposit_pending': UniqueDepositPendingScreen as AnyScreen,
+  '/create-user': CreateUserScreen as AnyScreen,
+  '/users': UsersScreen as AnyScreen,
+  '/withdrawal': WithdrawalScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {
@@ -151,13 +171,31 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   const { items, ...rest } = props;
   const { logout, user } = useAuth();
   const current = rest.state.routes[rest.state.index]?.name;
+  const [menuQuery, setMenuQuery] = useState('');
+  const visibleItems = menuQuery.trim()
+    ? items.filter((item) =>
+        toDisplayText(item.label).toLowerCase().includes(menuQuery.trim().toLowerCase()),
+      )
+    : items;
   return (
     <DrawerContentScrollView {...rest} style={{ backgroundColor: colors.surface }}>
       <View style={styles.drawerHeader}>
-        <Text style={styles.drawerTitle}>Astro Admin</Text>
+        <Text style={styles.drawerTitle}>Astro</Text>
         {user?.name ? <Text style={styles.drawerSub}>{user.name}</Text> : null}
       </View>
-      {items.map((item) => (
+      <TextInput
+        style={styles.drawerSearch}
+        value={menuQuery}
+        onChangeText={setMenuQuery}
+        placeholder="🔍 Search menu…"
+        placeholderTextColor={colors.muted}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      {visibleItems.length === 0 ? (
+        <Text style={styles.drawerNoMatch}>No menu found</Text>
+      ) : null}
+      {visibleItems.map((item) => (
         <DrawerItem
           key={item.id}
           label={toDisplayText(item.label)}
@@ -172,6 +210,156 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
   );
 }
 
+/**
+ * Per-screen wrapper: opaque cosmic background behind every screen so
+ * navigation transitions never show screens overlapping through
+ * transparent roots.
+ */
+function Screened({ children }: { children: React.ReactNode }) {
+  // Top inset is handled by the navigation header; bottom edge keeps content
+  // clear of the home-indicator / gesture bar (and notch edges in landscape).
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <AppBackground />
+      <SafeAreaView edges={['bottom', 'left', 'right']} style={{ flex: 1 }}>
+        {children}
+      </SafeAreaView>
+    </View>
+  );
+}
+
+/** Header icon-only toggle for reveal codes (👁 = locked, 🙈 = revealed). */
+function RevealHeaderButton() {
+  const reveal = useRevealCodes();
+  const [otpOpen, setOtpOpen] = useState(false);
+  return (
+    <>
+      <TouchableOpacity
+        style={styles.headerIconBtn}
+        onPress={() => {
+          // Before the hour expires: tap again reverses to secret/Jyotish names.
+          if (reveal.active) {
+            reveal.clear();
+            return;
+          }
+          setOtpOpen(true);
+        }}
+        accessibilityLabel={reveal.active ? 'Hide original names' : 'Reveal original names'}
+      >
+        <Text style={styles.headerIconText}>{reveal.active ? '🙈' : '👁'}</Text>
+      </TouchableOpacity>
+      <RevealCodesOtpModal visible={otpOpen} onClose={() => setOtpOpen(false)} />
+    </>
+  );
+}
+
+/**
+ * Header SOS button (desktop AppShell parity).
+ * - Tap → confirm alert → `auth.sosFlag` enable payload by role.
+ * - Non-exempt roles are logged out after sending; exempt roles see the
+ *   lock state and can "Unblock" (enabled:false, type:all).
+ * - Guard polls get-sos-flag and kicks non-exempt users when SOS activates.
+ */
+function SosHeaderButton() {
+  const { user, logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const { sosEnabled, setSosEnabled, refresh, markOriginator } = useSos();
+  const sosExempt = isSosExemptRole();
+  if (!(canShowSos() || (sosEnabled && sosExempt))) return null;
+
+  const sendSos = async () => {
+    if (busy) return;
+    const built = buildSosEnablePayload();
+    if (!built.ok) {
+      Alert.alert('SOS', built.message);
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await secureApi('auth.sosFlag', built.payload);
+      if (!res.ok) {
+        Alert.alert('SOS', res.message || 'Failed to send SOS alert');
+        return;
+      }
+      setSosEnabled(true);
+      markOriginator(); // No local siren/popup for the device that pressed SOS.
+      if (!sosExempt) {
+        Alert.alert('SOS', 'SOS alert sent. Support will contact you shortly.');
+        logout();
+      } else {
+        await refresh();
+        Alert.alert('SOS', 'SOS alert sent. Support will contact you shortly.');
+      }
+    } catch (err) {
+      Alert.alert('SOS', err instanceof Error ? err.message : 'Failed to send SOS alert');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unblockUsers = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await secureApi('auth.sosFlag', { enabled: false, type: 'all' });
+      if (!res.ok) {
+        Alert.alert('SOS', res.message || 'Failed to unblock users');
+        return;
+      }
+      setSosEnabled(false);
+      await refresh();
+      Alert.alert('SOS', 'Users unblocked. SOS lock cleared.');
+    } catch (err) {
+      Alert.alert('SOS', err instanceof Error ? err.message : 'Failed to unblock users');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.sosBtn, sosEnabled && styles.sosBtnActive]}
+      disabled={busy}
+      accessibilityLabel={sosEnabled ? 'Unblock users' : 'Send SOS alert'}
+      onPress={() => {
+        if (sosEnabled) {
+          Alert.alert('Unblock users', 'Clear the SOS lock for everyone?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Unblock', style: 'destructive', onPress: () => void unblockUsers() },
+          ]);
+          return;
+        }
+        Alert.alert(
+          'SOS',
+          `Emergency support — use only when you need immediate help from the admin team.\n\nLogged in as ${String(
+            user?.name || user?.mobile || 'Admin',
+          )}.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Send SOS', style: 'destructive', onPress: () => void sendSos() },
+          ],
+        );
+      }}
+    >
+      <Text style={styles.sosBtnText}>{busy ? '…' : sosEnabled ? 'Unblock' : 'SOS'}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/** Header logout button (🚪) — quick logout without opening the drawer. */
+function LogoutHeaderButton() {
+  const { logout } = useAuth();
+  return (
+    <TouchableOpacity
+      style={styles.headerIconBtn}
+      onPress={logout}
+      accessibilityLabel="Logout"
+    >
+      <MaterialIcons name="logout" size={22} color="#ffffff" />
+    </TouchableOpacity>
+  );
+}
+
 function PanelDrawer({ items }: { items: NavItem[] }) {
   return (
     <Drawer.Navigator
@@ -181,6 +369,15 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <SosHeaderButton />
+              <RevealHeaderButton />
+              <LogoutHeaderButton />
+            </View>
+          ),
+          drawerType: 'front',
+          overlayColor: 'rgba(0,0,0,0.55)',
           drawerStyle: { backgroundColor: colors.surface },
           sceneStyle: { backgroundColor: colors.background },
         }}
@@ -194,7 +391,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
               name={screenNameFor(item)}
               options={{ title }}
             >
-              {() => (Impl ? <Impl /> : <PlaceholderScreen title={title} />)}
+              {() => <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>}
             </Drawer.Screen>
           );
         })}
@@ -211,7 +408,9 @@ export function AppNavigator() {
   );
 
   return (
-    <NavigationContainer
+    <SosProvider enabled={!!user}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <NavigationContainer
       theme={{
         ...DarkTheme,
         colors: {
@@ -230,6 +429,7 @@ export function AppNavigator() {
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
           contentStyle: { backgroundColor: colors.background },
+          animation: 'slide_from_right',
         }}
       >
         <RootStack.Screen name="panel" options={{ headerShown: false }}>
@@ -241,11 +441,18 @@ export function AppNavigator() {
             name={route.path}
             options={{ title: toDisplayText(route.title) }}
           >
-            {() => <route.Component />}
+            {() => (
+              <Screened>
+                <route.Component />
+              </Screened>
+            )}
           </RootStack.Screen>
         ))}
       </RootStack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+      {user ? <SosAlertOverlay /> : null}
+    </View>
+    </SosProvider>
   );
 }
 
@@ -259,4 +466,38 @@ const styles = StyleSheet.create({
   },
   drawerTitle: { color: colors.primary, fontSize: 18, fontWeight: '700' },
   drawerSub: { color: colors.muted, fontSize: 13, marginTop: 4 },
+  drawerSearch: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    fontSize: 13,
+    marginHorizontal: spacing(3),
+    marginBottom: spacing(2),
+  },
+  headerIconBtn: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  },
+  headerIconText: { fontSize: 18 },
+  sosBtn: {
+    backgroundColor: colors.destructive,
+    borderRadius: 6,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    marginRight: spacing(1),
+  },
+  sosBtnActive: {
+    backgroundColor: colors.success,
+  },
+  sosBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  drawerNoMatch: {
+    color: colors.muted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginVertical: spacing(3),
+  },
 });

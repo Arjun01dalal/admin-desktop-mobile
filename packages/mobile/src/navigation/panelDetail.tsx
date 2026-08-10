@@ -16,6 +16,7 @@ import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/Playe
 import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameActivityDetailsScreen';
 import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstructGamesScreen';
 import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
+import { UserReportScreen } from '../screens/UserReportScreen';
 
 export type PanelDetailParams = Record<string, unknown>;
 
@@ -118,6 +119,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/leaderboardCustomerCount',
     title: 'Caller Customers',
     Component: LeaderboardCustomerListScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/user-report',
+    title: 'User Report',
+    Component: UserReportScreen as PanelDetailRoute['Component'],
   },
 ];
 

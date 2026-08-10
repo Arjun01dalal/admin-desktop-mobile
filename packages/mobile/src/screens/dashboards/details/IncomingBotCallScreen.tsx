@@ -31,6 +31,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { DateField } from '../../../components/DateField';
 
 type IncomingCall = {
   sid: string;
@@ -314,15 +315,7 @@ export function IncomingBotCallScreen() {
       <View style={styles.filterWrap}>
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Since Date (UTC) · YYYY-MM-DD</Text>
-          <TextInput
-            style={styles.input}
-            value={draftSince}
-            onChangeText={setDraftSince}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <DateField style={styles.input} value={draftSince} onChange={setDraftSince} />
         </View>
         <View style={styles.searchGrid}>
           <TextInput
@@ -428,7 +421,7 @@ export function IncomingBotCallScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700', marginBottom: spacing(3) },
   filterWrap: {

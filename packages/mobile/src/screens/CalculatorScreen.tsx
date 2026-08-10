@@ -104,7 +104,7 @@ export function CalculatorScreen({ onUnlock }: { onUnlock: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   display: {
     flex: 1,
     justifyContent: 'flex-end',

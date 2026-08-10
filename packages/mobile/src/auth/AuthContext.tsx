@@ -7,9 +7,10 @@ import React, {
   useState,
 } from 'react';
 import * as Location from 'expo-location';
-import { secureApi } from '../api/client';
+import { secureApi, setAuthFailureHandler } from '../api/client';
 import { appStorage, hydrateStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
+import { registerSosPush } from '../push/sosPush';
 import type { AuthUser } from '../types/auth';
 
 type AuthState = {
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           setUser(JSON.parse(raw) as AuthUser);
           setToken(t);
+          void registerSosPush(); // APK builds: closed-app SOS siren push.
         } catch {
           /* corrupted session — stay logged out */
         }
@@ -55,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setToken(newToken);
     setUser(newUser);
+    void registerSosPush(); // APK builds: enable closed-app SOS siren push.
   }, []);
 
   const logout = useCallback(() => {
@@ -65,6 +68,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUser(null);
   }, []);
+
+  // Auto-logout when the API reports an invalid/blacklisted/expired session
+  // (HTTP 401 or a token-blacklist message from any secureApi call).
+  useEffect(() => {
+    setAuthFailureHandler((reason) => {
+      console.log(`[auth] session rejected (${reason}); logging out`);
+      logout();
+    });
+    return () => setAuthFailureHandler(null);
+  }, [logout]);
 
   const value = useMemo(
     () => ({ ready, token, user, login, logout }),
