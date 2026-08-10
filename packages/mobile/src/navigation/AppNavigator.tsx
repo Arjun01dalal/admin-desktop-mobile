@@ -13,6 +13,7 @@ import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
 import { CreateUserScreen } from '../screens/CreateUserScreen';
 import { UsersScreen } from '../screens/UsersScreen';
+import { WithdrawalScreen } from '../screens/WithdrawalScreen';
 import { useRevealCodes } from '../context/useRevealCodes';
 import { TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -151,6 +152,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/unique_deposit_pending': UniqueDepositPendingScreen as AnyScreen,
   '/create-user': CreateUserScreen as AnyScreen,
   '/users': UsersScreen as AnyScreen,
+  '/withdrawal': WithdrawalScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {
