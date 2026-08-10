@@ -99,6 +99,117 @@ async function publish(title, message, headers = {}) {
   }
 }
 
+/* ------------------- Expo push to mobile APKs (closed-app siren) -------- */
+// Mobile APKs publish `EXPO_TOKEN=<ExponentPushToken[...]>` to the ntfy topic
+// after login. We collect them here and, when SOS flips, send an Expo push
+// with the "sos" channel so the phone sirens even when the app is closed.
+const TOKENS_FILE = path.join(__dirname, 'expo-tokens.json');
+
+function loadTokens() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
+    return Array.isArray(arr) ? arr.filter((t) => typeof t === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+let expoTokens = loadTokens();
+
+function saveTokens() {
+  try {
+    fs.writeFileSync(TOKENS_FILE, JSON.stringify(expoTokens, null, 2));
+  } catch (err) {
+    console.warn('[sos-push] token save failed:', err?.message || err);
+  }
+}
+
+function addToken(token) {
+  const t = String(token || '').trim();
+  if (!/^(ExponentPushToken\[.+\]|ExpoPushToken\[.+\])$/.test(t)) return;
+  if (expoTokens.includes(t)) return;
+  expoTokens.push(t);
+  saveTokens();
+  console.log('[sos-push] registered mobile token (total:', expoTokens.length, ')');
+}
+
+async function sendExpoPush(title, body, active) {
+  if (expoTokens.length === 0) return;
+  const messages = expoTokens.map((to) => ({
+    to,
+    title,
+    body,
+    priority: 'high',
+    sound: active ? 'siren.mp3' : 'default', // iOS custom sound
+    channelId: active ? 'sos' : 'default', // Android siren channel
+    data: { sos: active ? 'active' : 'clear' },
+  }));
+  try {
+    const res = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(messages),
+    });
+    const json = await res.json().catch(() => ({}));
+    // Drop tokens Expo reports as dead (DeviceNotRegistered).
+    const tickets = Array.isArray(json?.data) ? json.data : [];
+    const dead = [];
+    tickets.forEach((ticket, i) => {
+      if (ticket?.details?.error === 'DeviceNotRegistered') dead.push(expoTokens[i]);
+    });
+    if (dead.length) {
+      expoTokens = expoTokens.filter((t) => !dead.includes(t));
+      saveTokens();
+    }
+    console.log('[sos-push] expo push sent to', messages.length, 'device(s)');
+  } catch (err) {
+    console.warn('[sos-push] expo push failed:', err?.message || err);
+  }
+}
+
+// Subscribe to the ntfy topic (websocket) to collect mobile tokens.
+function startTokenCollector() {
+  let ws = null;
+  let timer = null;
+  const wsUrl = `${SERVER.replace(/^https:/i, 'wss:')}/${encodeURIComponent(TOPIC)}/ws`;
+
+  const reconnect = () => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      connect();
+    }, 5000);
+  };
+
+  const connect = () => {
+    try {
+      const WebSocket = require('ws');
+      ws = new WebSocket(wsUrl);
+      ws.on('open', () => console.log('[sos-push] token collector subscribed'));
+      ws.on('message', (data) => {
+        try {
+          const msg = JSON.parse(Buffer.isBuffer(data) ? data.toString('utf8') : String(data));
+          if (msg?.event !== 'message') return;
+          const m = String(msg.message || '').match(/EXPO_TOKEN=(\S+)/);
+          if (m) addToken(m[1]);
+        } catch {
+          /* ignore */
+        }
+      });
+      ws.on('close', () => {
+        ws = null;
+        reconnect();
+      });
+      ws.on('error', () => {});
+    } catch (err) {
+      console.warn('[sos-push] token collector failed:', err?.message || err);
+      reconnect();
+    }
+  };
+
+  connect();
+}
+
 let lastActive = null;
 
 async function tick() {
@@ -114,12 +225,14 @@ async function tick() {
     if (active) {
       await publish('SOS ALERT', 'SOS_ACTIVE — Emergency SOS has been activated.');
       console.log('[sos-push] published SOS ACTIVE');
+      await sendExpoPush('🚨 SOS ALERT', 'Emergency SOS has been activated. Open the app now.', true);
     } else {
       await publish('SOS cleared', 'SOS_CLEAR — SOS lock has been cleared.', {
         Tags: 'white_check_mark',
         Priority: 'default',
       });
       console.log('[sos-push] published SOS CLEAR');
+      await sendExpoPush('SOS cleared', 'SOS lock has been cleared.', false);
     }
     lastActive = active;
   } catch (err) {
@@ -127,6 +240,7 @@ async function tick() {
   }
 }
 
+startTokenCollector();
 console.log('[sos-push] relay started');
 console.log('[sos-push] topic=', TOPIC, 'server=', SERVER, 'pollMs=', POLL_MS);
 void tick();
