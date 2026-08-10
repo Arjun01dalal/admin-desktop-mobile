@@ -8,6 +8,7 @@ import {
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
 import { CreateUserScreen } from '../screens/CreateUserScreen';
@@ -251,7 +252,7 @@ function LogoutHeaderButton() {
       onPress={logout}
       accessibilityLabel="Logout"
     >
-      <Text style={[styles.headerIconText, { color: colors.destructive }]}>🚪</Text>
+      <MaterialIcons name="logout" size={22} color="#ffffff" />
     </TouchableOpacity>
   );
 }
