@@ -336,7 +336,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'withdrawal',
-    label: 'Withdrawal',
+    label: 'Refund',
     path: '/withdrawal',
     permission: Permissions.View_Withdrawals,
   },

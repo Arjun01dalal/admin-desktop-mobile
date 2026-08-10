@@ -14,6 +14,7 @@
  * status update, bulk actions, beneficiary dialogs — desktop-only for now.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
@@ -297,6 +298,10 @@ export function WithdrawalScreen() {
   const [mids, setMids] = useState<{ label: string; mid: string; gateway: string }[]>([]);
   // Bot validation results modal (desktop ValidationModal parity).
   const [validationRow, setValidationRow] = useState<Rec | null>(null);
+  // Bulk selection mode (desktop bulk lock/unlock/approve/manual approve).
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSel, setBulkSel] = useState<Record<string, Rec>>({});
+  const [bulkManualOpen, setBulkManualOpen] = useState(false);
 
   // Desktop permission parity (login Responsibilities).
   const perms = useMemo(
@@ -356,6 +361,14 @@ export function WithdrawalScreen() {
   useEffect(() => {
     void loadSummary();
   }, [loadSummary]);
+
+  // Refresh whenever the screen regains focus (e.g. after actions elsewhere).
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+      void loadSummary();
+    }, [load, loadSummary]),
+  );
 
   // Gateway + MID lookups (desktop loadLookups parity).
   useEffect(() => {
@@ -527,6 +540,143 @@ export function WithdrawalScreen() {
     [admin, afterAction],
   );
 
+  /* ------------------------------ bulk actions ------------------------------ */
+
+  const bulkIds = useMemo(() => Object.keys(bulkSel), [bulkSel]);
+
+  const clearBulk = useCallback(() => {
+    setBulkSel({});
+    setBulkMode(false);
+  }, []);
+
+  const doBulk = useCallback(
+    async (kind: 'lock' | 'unlock' | 'approve') => {
+      const rowsSel = Object.values(bulkSel);
+      if (rowsSel.length === 0) {
+        notify('No refunds selected');
+        return;
+      }
+      setActionBusy(true);
+      try {
+        let res;
+        if (kind === 'unlock') {
+          res = await secureApi('withdrawals.bulkUnlock', {
+            transactionId: rowsSel.map((r) => txnIdOf(r)),
+          });
+        } else {
+          const geo = await requireGeo();
+          if (!geo) {
+            notify('Location Information Missing');
+            return;
+          }
+          if (kind === 'lock') {
+            res = await secureApi('withdrawals.bulkLock', {
+              transactionId: rowsSel.map((r) => txnIdOf(r)),
+              updatedBy: {
+                name: admin?.name || '',
+                userId: admin?._id || admin?.userId || '',
+                status: 'true',
+                date: new Date().toISOString(),
+                ...geo,
+              },
+            });
+          } else {
+            // Desktop bulk-Approve payload shape.
+            res = await secureApi('withdrawals.bulkApprove', {
+              transactionId: rowsSel.map((r) => ({
+                transactionId: txnIdOf(r),
+                updatedBy: {
+                  name: admin?.name || '',
+                  status: 'Approved',
+                  _id: admin?._id || '',
+                },
+              })),
+              withdrewalProviderName: gateway,
+              state: geo.state,
+              city: geo.city,
+              lat: geo.lat,
+              long: geo.long,
+            });
+          }
+        }
+        if (!res.ok) {
+          notify(res.message || 'Bulk action failed');
+          return;
+        }
+        notify(
+          kind === 'lock'
+            ? 'Bulk Lock successfully'
+            : kind === 'unlock'
+              ? 'Bulk UnLock successfully'
+              : 'Bulk Approved successfully',
+        );
+        clearBulk();
+        afterAction();
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [admin, bulkSel, gateway, afterAction, clearBulk],
+  );
+
+  const doBulkManual = useCallback(async () => {
+    const rowsSel = Object.values(bulkSel);
+    if (rowsSel.length === 0) {
+      notify('No refunds selected');
+      return;
+    }
+    if (!gateway || !mid) {
+      setModalErr('Gateway and MID are required');
+      return;
+    }
+    setModalErr('');
+    setBulkManualOpen(false);
+    setActionBusy(true);
+    try {
+      const geo = await requireGeo();
+      if (!geo) {
+        notify('Location Information Missing');
+        return;
+      }
+      // Desktop bulk-manual-approved payload shape.
+      const res = await secureApi('withdrawals.bulkManualApprove', {
+        state: geo.state,
+        city: geo.city,
+        lat: geo.lat,
+        long: geo.long,
+        gatewayName: gateway,
+        mid,
+        transactionId: rowsSel.map((r) => ({
+          transactionId: txnIdOf(r),
+          name: admin?.name || '',
+          _id: admin?._id || '',
+        })),
+      });
+      if (!res.ok) {
+        notify(res.message || 'Bulk manual approve failed');
+        return;
+      }
+      notify('Bulk Manual Approved successfully');
+      clearBulk();
+      afterAction();
+    } finally {
+      setActionBusy(false);
+    }
+  }, [admin, bulkSel, gateway, mid, afterAction, clearBulk]);
+
+  const confirmBulk = (kind: 'lock' | 'unlock' | 'approve') => {
+    const n = bulkIds.length;
+    if (n === 0) {
+      Alert.alert('No refunds selected', 'Bulk mode me cards pe tap karke select karo.');
+      return;
+    }
+    const label = kind === 'lock' ? 'Lock' : kind === 'unlock' ? 'Unlock' : 'Approve';
+    Alert.alert(`Bulk ${label}?`, `You are about to ${label.toLowerCase()} ${n} refund(s).`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: label, onPress: () => void doBulk(kind) },
+    ]);
+  };
+
   const columns = useMemo<DataTableColumn<Rec>[]>(
     () => [
       {
@@ -671,6 +821,23 @@ export function WithdrawalScreen() {
     [perms.showMobile],
   );
 
+  /** Confirm before lock/unlock (sheet closed first — touch-freeze guard). */
+  const confirmLock = (r: Rec, lock: boolean) => {
+    setSelected(null);
+    setTimeout(
+      () =>
+        Alert.alert(
+          lock ? 'Lock refund?' : 'Unlock refund?',
+          `You are ${lock ? 'locking' : 'unlocking'} this refund of ₹${fmtAmount(r.amount)}.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: lock ? 'Lock' : 'Unlock', onPress: () => void doLock(r, lock) },
+          ],
+        ),
+      450,
+    );
+  };
+
   /** Close the sheet, then open the status modal (touch-freeze guard). */
   const openStatusModal = (r: Rec, statusName: string) => {
     setRemark('');
@@ -720,9 +887,9 @@ export function WithdrawalScreen() {
     // Desktop: lock/unlock toggle shown only when both checks are OK.
     if (bothChecksOk(r)) {
       if (r.status === 'Lock' || r.status === 'IN PROGRESS') {
-        acts.push({ label: 'Unlock', tone: 'warning', onPress: () => void doLock(r, false) });
+        acts.push({ label: 'Unlock', tone: 'warning', onPress: () => confirmLock(r, false) });
       } else if (!isTerminal(r)) {
-        acts.push({ label: 'Lock', tone: 'primary', onPress: () => void doLock(r, true) });
+        acts.push({ label: 'Lock', tone: 'primary', onPress: () => confirmLock(r, true) });
       }
     }
     if (canShowApproveAction(r)) {
@@ -787,7 +954,7 @@ export function WithdrawalScreen() {
         />
       }
     >
-      <Text style={styles.title}>Withdrawal</Text>
+      <Text style={styles.title}>Refund</Text>
 
       {/* Summary chips (desktop parity, not clickable) */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryRow}>
@@ -848,14 +1015,75 @@ export function WithdrawalScreen() {
 
       {msg ? <Text style={styles.muted}>{msg}</Text> : null}
 
+      {/* Bulk actions (desktop Bulk Lock/UnLock/Approve/Manual Approve) */}
+      {perms.actions ? (
+        <View style={styles.bulkBar}>
+          <TouchableOpacity
+            style={[styles.chip, bulkMode && styles.chipActive]}
+            onPress={() => (bulkMode ? clearBulk() : setBulkMode(true))}
+          >
+            <Text style={[styles.chipText, bulkMode && styles.chipTextActive]}>
+              {bulkMode ? `Bulk: ${bulkIds.length} selected ✕` : 'Bulk Select'}
+            </Text>
+          </TouchableOpacity>
+          {bulkMode ? (
+            <>
+              <TouchableOpacity style={styles.bulkBtn} onPress={() => confirmBulk('lock')}>
+                <Text style={styles.bulkBtnText}>Bulk Lock</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.bulkBtn} onPress={() => confirmBulk('unlock')}>
+                <Text style={styles.bulkBtnText}>Bulk UnLock</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.bulkBtn} onPress={() => confirmBulk('approve')}>
+                <Text style={styles.bulkBtnText}>Bulk Approve</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.bulkBtn}
+                onPress={() => {
+                  if (bulkIds.length === 0) {
+                    Alert.alert('No refunds selected', 'Cards pe tap karke select karo.');
+                    return;
+                  }
+                  setModalErr('');
+                  setBulkManualOpen(true);
+                }}
+              >
+                <Text style={styles.bulkBtnText}>Bulk Manual Approve</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+        </View>
+      ) : null}
+      {bulkMode && bulkIds.length > 0 ? (
+        <Text style={styles.muted}>
+          Selected:{' '}
+          {Object.values(bulkSel)
+            .map((r) => display(r.accountHolderName ?? r.userName))
+            .join(', ')}
+        </Text>
+      ) : null}
+
       <ResponsiveTable
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? r.transactionId ?? i)}
         loading={loading}
         emptyMessage="No withdrawals"
-        hint="Tap a card for details & actions"
-        onRowPress={(r) => setSelected(r)}
+        hint={bulkMode ? 'Tap cards to select/deselect for bulk actions' : 'Tap a card for details & actions'}
+        onRowPress={(r) => {
+          if (bulkMode) {
+            const id = txnIdOf(r);
+            if (!id) return;
+            setBulkSel((prev) => {
+              const next = { ...prev };
+              if (next[id]) delete next[id];
+              else next[id] = r;
+              return next;
+            });
+          } else {
+            setSelected(r);
+          }
+        }}
       />
 
       <RowDetailSheet
@@ -924,6 +1152,70 @@ export function WithdrawalScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.pagerBtn} onPress={() => setValidationRow(null)}>
                 <Text style={styles.pagerBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bulk Manual Approve modal (gateway + MID) */}
+      <Modal
+        visible={bulkManualOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !actionBusy && setBulkManualOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Bulk Manual Approve ({bulkIds.length})</Text>
+            <Text style={styles.modalSub}>Gateway</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {gateways.map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.chip, gateway === g && styles.chipActive]}
+                  onPress={() => setGateway(g)}
+                >
+                  <Text style={[styles.chipText, gateway === g && styles.chipTextActive]}>{g}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={styles.modalSub}>MID</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {mids.map((m) => (
+                <TouchableOpacity
+                  key={m.label}
+                  style={[styles.chip, mid === m.mid && styles.chipActive]}
+                  onPress={() => {
+                    setMid(m.mid);
+                    if (!gateway && m.gateway) setGateway(m.gateway);
+                  }}
+                >
+                  <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {modalErr ? <Text style={styles.modalErr}>{modalErr}</Text> : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.pagerBtn}
+                onPress={() => setBulkManualOpen(false)}
+                disabled={actionBusy}
+              >
+                <Text style={styles.pagerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, actionBusy && styles.pagerBtnDisabled]}
+                disabled={actionBusy}
+                onPress={() => void doBulkManual()}
+              >
+                {actionBusy ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Confirm</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1058,6 +1350,22 @@ const styles = StyleSheet.create({
   summaryChipLabel: { color: colors.muted, fontSize: 11 },
   summaryChipValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   statusRow: { marginTop: spacing(3), marginBottom: spacing(3) },
+  bulkBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginBottom: spacing(3),
+  },
+  bulkBtn: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+  },
+  bulkBtnText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chip: {
     borderColor: colors.border,
     borderWidth: 1,
