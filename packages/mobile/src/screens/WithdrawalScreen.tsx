@@ -15,13 +15,19 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { appCodeForName } from '@astro/shared';
 import { secureApi } from '../api/client';
 import { getSessionUser } from '../auth/permissions';
@@ -32,6 +38,11 @@ import {
   DetailFilterBar,
   type SearchFieldOption,
 } from './dashboards/details/DetailFilterBar';
+import {
+  RowDetailSheet,
+  type SheetAction,
+  type SheetField,
+} from './dashboards/details/RowDetailSheet';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../utils/dates';
 
 type Rec = Record<string, unknown>;
@@ -149,6 +160,83 @@ function parseSummary(data: unknown): Summary {
   ];
 }
 
+/* ------------------------- desktop gating helpers ------------------------- */
+
+const TERMINAL_STATUSES = new Set(['Approved', 'Rejected', 'Reverse', 'Cancel', 'Failed']);
+
+type CheckMark = { status?: string | boolean; name?: string; date?: string };
+
+function checkOf(r: Rec, key: 'checkBy' | 'crossCheckBy'): CheckMark | null {
+  const v = r[key];
+  return v && typeof v === 'object' ? (v as CheckMark) : null;
+}
+
+function bothChecksOk(r: Rec): boolean {
+  return Boolean(checkOf(r, 'checkBy')?.status && checkOf(r, 'crossCheckBy')?.status);
+}
+
+function isTerminal(r: Rec): boolean {
+  return TERMINAL_STATUSES.has(String(r.status || ''));
+}
+
+function canLockRow(r: Rec): boolean {
+  if (isTerminal(r)) return false;
+  if (r.status === 'IN PROGRESS') return false;
+  return bothChecksOk(r);
+}
+
+function canUnlockRow(r: Rec): boolean {
+  return r.status === 'IN PROGRESS' || r.status === 'Lock';
+}
+
+function canShowApproveAction(r: Rec): boolean {
+  if (isTerminal(r)) return false;
+  if (r.status === 'IN PROGRESS') return true;
+  if ((r.status === 'Lock' || r.status === 'Pending') && bothChecksOk(r)) return true;
+  return bothChecksOk(r) || ['on hold', 'Processing', 'IN PROGRESS'].includes(String(r.status || ''));
+}
+
+function canRejectRow(r: Rec): boolean {
+  if (r.status === 'Approved' || r.status === 'Rejected' || r.status === 'Reverse') return false;
+  if (r.status === 'on hold') return true;
+  return (
+    bothChecksOk(r) ||
+    Boolean(checkOf(r, 'checkBy')?.status) ||
+    Boolean(checkOf(r, 'crossCheckBy')?.status)
+  );
+}
+
+type Geo = { city: string; state: string; lat: string; long: string };
+
+/** Desktop requireWithdrawalGeo parity: lat/long + city/state or abort. */
+async function requireGeo(): Promise<Geo | null> {
+  try {
+    if (Platform.OS === 'web') throw new Error('unsupported');
+    const pos =
+      (await Location.getLastKnownPositionAsync()) ??
+      (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+    const { latitude, longitude } = pos.coords;
+    let city = '';
+    let state = '';
+    try {
+      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+      const p = places[0];
+      city = p?.city || p?.subregion || p?.district || '';
+      state = p?.region || '';
+    } catch {
+      /* fall through */
+    }
+    if (!city || !state) {
+      Alert.alert('Location Information Missing');
+      return null;
+    }
+    return { city, state, lat: String(latitude), long: String(longitude) };
+  } catch {
+    Alert.alert('Location Information Missing');
+    return null;
+  }
+}
+
 function statusColor(s: unknown): string | undefined {
   const v = String(s || '').toLowerCase();
   if (v === 'approved' || v === 'manual approved') return colors.success;
@@ -160,7 +248,14 @@ function statusColor(s: unknown): string | undefined {
 export function WithdrawalScreen() {
   // Fresh object per call — read once (infinite-reload guard).
   const admin = useMemo(
-    () => getSessionUser() as { clientName?: string; allotedApps?: string } | null,
+    () =>
+      getSessionUser() as {
+        _id?: string;
+        userId?: string;
+        name?: string;
+        clientName?: string;
+        allotedApps?: string;
+      } | null,
     [],
   );
 
@@ -183,6 +278,17 @@ export function WithdrawalScreen() {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<Summary>([]);
   const [msg, setMsg] = useState('');
+
+  // Row detail sheet + action state.
+  const [selected, setSelected] = useState<Rec | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  // Status-change modal (Rejected / on hold / Reverse need remark; some need gateway+MID).
+  const [statusModal, setStatusModal] = useState<{ row: Rec; status: string } | null>(null);
+  const [remark, setRemark] = useState('');
+  const [gateway, setGateway] = useState('');
+  const [mid, setMid] = useState('');
+  const [gateways, setGateways] = useState<string[]>([]);
+  const [mids, setMids] = useState<{ label: string; mid: string; gateway: string }[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -227,6 +333,159 @@ export function WithdrawalScreen() {
   useEffect(() => {
     void loadSummary();
   }, [loadSummary]);
+
+  // Gateway + MID lookups (desktop loadLookups parity).
+  useEffect(() => {
+    void (async () => {
+      const [midRes, gwRes] = await Promise.all([
+        secureApi('withdrawals.mids', {}),
+        secureApi('withdrawals.payoutAccounts', {}),
+      ]);
+      if (midRes.ok) {
+        const list = listOf(midRes.data) as {
+          mid?: string | number;
+          name?: string;
+          paymentGatewayName?: string;
+        }[];
+        setMids(
+          list
+            .filter((m) => m.mid !== undefined && m.mid !== null)
+            .map((m) => ({
+              label: `${m.paymentGatewayName || m.name || '—'} - ${m.mid}`,
+              mid: String(m.mid),
+              gateway: String(m.paymentGatewayName || m.name || ''),
+            })),
+        );
+      }
+      if (gwRes.ok) {
+        const list = listOf(gwRes.data) as { name?: string }[];
+        setGateways(
+          Array.from(new Set(list.map((g) => g?.name).filter((n): n is string => Boolean(n)))),
+        );
+      }
+    })();
+  }, []);
+
+  /* ------------------------------ row actions ------------------------------ */
+
+  const txnIdOf = (r: Rec) => String(r.transactionId ?? r.orderId ?? '');
+
+  const afterAction = useCallback(() => {
+    setSelected(null);
+    setStatusModal(null);
+    void load();
+    void loadSummary();
+  }, [load, loadSummary]);
+
+  const doLock = useCallback(
+    async (r: Rec, lock: boolean) => {
+      setActionBusy(true);
+      try {
+        let res;
+        if (lock) {
+          const geo = await requireGeo();
+          if (!geo) return;
+          res = await secureApi('withdrawals.lock', {
+            transactionId: txnIdOf(r),
+            updatedBy: {
+              name: admin?.name || '',
+              userId: admin?.userId || admin?._id || '',
+              status: 'true',
+              date: new Date().toISOString(),
+              ...geo,
+            },
+          });
+        } else {
+          res = await secureApi('withdrawals.unlock', { transactionId: txnIdOf(r) });
+        }
+        if (!res.ok) {
+          Alert.alert(res.message || 'Action failed');
+          return;
+        }
+        Alert.alert(lock ? 'Locked' : 'Unlocked');
+        afterAction();
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [admin, afterAction],
+  );
+
+  const doCheck = useCallback(
+    async (r: Rec, check: 'first' | 'second', ok: boolean) => {
+      setActionBusy(true);
+      try {
+        const geo = await requireGeo();
+        if (!geo) return;
+        const res = await secureApi('withdrawals.check', {
+          transactionId: txnIdOf(r),
+          check,
+          updatedBy: {
+            name: admin?.name || '',
+            userId: admin?.userId || admin?._id || '',
+            status: String(ok),
+            ...geo,
+          },
+        });
+        if (!res.ok) {
+          Alert.alert(res.message || 'Check failed');
+          return;
+        }
+        afterAction();
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [admin, afterAction],
+  );
+
+  const doStatusUpdate = useCallback(
+    async (r: Rec, newStatus: string, reasonText: string, gw: string, midSel: string) => {
+      // Desktop rules: non-Approved needs remark; statuses other than
+      // Approved/Reverse/on hold need gateway + MID.
+      const needsRemark = newStatus !== 'Approved';
+      const needsGateway = !['Approved', 'Reverse', 'on hold'].includes(newStatus);
+      if (needsRemark && !reasonText.trim()) {
+        Alert.alert('Remark is required');
+        return;
+      }
+      if (needsGateway && (!gw || !midSel)) {
+        Alert.alert('Gateway and MID are required');
+        return;
+      }
+      setActionBusy(true);
+      try {
+        const geo = await requireGeo();
+        if (!geo) return;
+        const payload: Rec = {
+          transactionId: txnIdOf(r),
+          reason: newStatus === 'Approved' ? 'Approved' : reasonText.trim(),
+          dp_id: r.dp_id,
+          updatedBy: {
+            name: admin?.name || '',
+            _id: admin?._id || admin?.userId || '',
+            status: newStatus,
+            ...geo,
+          },
+        };
+        if (gw) {
+          payload.withdrewalProviderName = gw;
+          payload.gatewayName = gw;
+        }
+        if (midSel) payload.mid = midSel;
+        const res = await secureApi('withdrawals.statusUpdate', payload);
+        if (!res.ok) {
+          Alert.alert(res.message || 'Status update failed');
+          return;
+        }
+        Alert.alert(`Status updated: ${newStatus}`);
+        afterAction();
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [admin, afterAction],
+  );
 
   const columns = useMemo<DataTableColumn<Rec>[]>(
     () => [
@@ -288,12 +547,37 @@ export function WithdrawalScreen() {
       },
       { key: 'mid', label: 'MID', width: 100, render: (r) => display(r.mid) },
       {
+        key: 'checkBot',
+        label: 'Check By Bot',
+        width: 100,
+        render: (r) =>
+          r.validationCheckedAt ? `${num(r.passedPoints)}/${num(r.totalPoints)}` : '—',
+      },
+      {
         key: 'lockBy',
         label: 'Lock By',
         width: 110,
         render: (r) => {
           const l = r.lockBy as Rec | undefined;
           return l && typeof l === 'object' ? display(l.name) : display(l);
+        },
+      },
+      {
+        key: 'checkBy',
+        label: 'Check By',
+        width: 120,
+        render: (r) => {
+          const c = checkOf(r, 'checkBy');
+          return c ? `${c.status === 'true' || c.status === true ? 'OK' : 'Not OK'} · ${display(c.name)}` : '—';
+        },
+      },
+      {
+        key: 'crossCheckBy',
+        label: 'Cross Check By',
+        width: 130,
+        render: (r) => {
+          const c = checkOf(r, 'crossCheckBy');
+          return c ? `${c.status === 'true' || c.status === true ? 'OK' : 'Not OK'} · ${display(c.name)}` : '—';
         },
       },
       {
@@ -334,6 +618,74 @@ export function WithdrawalScreen() {
     ],
     [],
   );
+
+  /** Desktop row-action parity: lock/unlock, checks, status changes. */
+  const sheetActions = (r: Rec): SheetAction[] => {
+    const acts: SheetAction[] = [];
+    const checkFirst = checkOf(r, 'checkBy');
+    const checkSecond = checkOf(r, 'crossCheckBy');
+    if (!checkFirst) {
+      acts.push(
+        { label: 'Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'first', true) },
+        { label: 'Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'first', false) },
+      );
+    }
+    if (!checkSecond) {
+      acts.push(
+        { label: 'Cross Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'second', true) },
+        { label: 'Cross Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'second', false) },
+      );
+    }
+    if (canUnlockRow(r)) {
+      acts.push({ label: 'Unlock', tone: 'warning', onPress: () => void doLock(r, false) });
+    } else if (canLockRow(r)) {
+      acts.push({ label: 'Lock', tone: 'primary', onPress: () => void doLock(r, true) });
+    }
+    if (canShowApproveAction(r)) {
+      acts.push({
+        label: 'Approve',
+        tone: 'primary',
+        onPress: () =>
+          Alert.alert('Approve withdrawal?', `₹${fmtAmount(r.amount)} — confirm approve`, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Approve', onPress: () => void doStatusUpdate(r, 'Approved', '', '', '') },
+          ]),
+      });
+      acts.push({
+        label: 'On Hold',
+        tone: 'warning',
+        onPress: () => {
+          setRemark('');
+          setGateway('');
+          setMid('');
+          setStatusModal({ row: r, status: 'on hold' });
+        },
+      });
+    }
+    if (canRejectRow(r)) {
+      acts.push({
+        label: 'Reject',
+        tone: 'warning',
+        onPress: () => {
+          setRemark('');
+          setGateway('');
+          setMid('');
+          setStatusModal({ row: r, status: 'Rejected' });
+        },
+      });
+      acts.push({
+        label: 'Reverse',
+        tone: 'warning',
+        onPress: () => {
+          setRemark('');
+          setGateway('');
+          setMid('');
+          setStatusModal({ row: r, status: 'Reverse' });
+        },
+      });
+    }
+    return acts;
+  };
 
   return (
     <ScrollView
@@ -417,8 +769,107 @@ export function WithdrawalScreen() {
         keyFor={(r, i) => String(r._id ?? r.transactionId ?? i)}
         loading={loading}
         emptyMessage="No withdrawals"
-        hint="Tap a card to see all details"
+        hint="Tap a card for details & actions"
+        onRowPress={(r) => setSelected(r)}
       />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? display(selected.accountHolderName ?? selected.userName) : ''}
+        fields={
+          selected
+            ? columns.map<SheetField>((c) => ({
+                label: c.label,
+                value: c.render(selected, 0),
+                color: c.color?.(selected),
+              }))
+            : []
+        }
+        onClose={() => (actionBusy ? undefined : setSelected(null))}
+        actions={selected ? sheetActions(selected) : undefined}
+        note={actionBusy ? 'Working…' : undefined}
+      />
+
+      {/* Status-change modal (remark + gateway/MID when required) */}
+      <Modal
+        visible={statusModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !actionBusy && setStatusModal(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{statusModal?.status}</Text>
+            <Text style={styles.modalSub}>Remark (required)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={remark}
+              onChangeText={setRemark}
+              placeholder="Reason…"
+              placeholderTextColor={colors.muted}
+              multiline
+            />
+            {statusModal && !['Approved', 'Reverse', 'on hold'].includes(statusModal.status) ? (
+              <>
+                <Text style={styles.modalSub}>Gateway</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {gateways.map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[styles.chip, gateway === g && styles.chipActive]}
+                      onPress={() => setGateway(g)}
+                    >
+                      <Text style={[styles.chipText, gateway === g && styles.chipTextActive]}>
+                        {g}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <Text style={styles.modalSub}>MID</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {mids.map((m) => (
+                    <TouchableOpacity
+                      key={m.label}
+                      style={[styles.chip, mid === m.mid && styles.chipActive]}
+                      onPress={() => {
+                        setMid(m.mid);
+                        if (!gateway && m.gateway) setGateway(m.gateway);
+                      }}
+                    >
+                      <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
+                        {m.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            ) : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.pagerBtn}
+                onPress={() => setStatusModal(null)}
+                disabled={actionBusy}
+              >
+                <Text style={styles.pagerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, actionBusy && styles.pagerBtnDisabled]}
+                disabled={actionBusy}
+                onPress={() =>
+                  statusModal &&
+                  void doStatusUpdate(statusModal.row, statusModal.status, remark, gateway, mid)
+                }
+              >
+                {actionBusy ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Pager */}
       <View style={styles.pagerRow}>
@@ -465,7 +916,7 @@ const styles = StyleSheet.create({
   },
   summaryChipLabel: { color: colors.muted, fontSize: 11 },
   summaryChipValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  statusRow: { marginBottom: spacing(3) },
+  statusRow: { marginTop: spacing(3), marginBottom: spacing(3) },
   chip: {
     borderColor: colors.border,
     borderWidth: 1,
@@ -497,4 +948,48 @@ const styles = StyleSheet.create({
   pagerBtnDisabled: { opacity: 0.4 },
   pagerBtnText: { color: colors.foreground, fontSize: 13 },
   pagerText: { color: colors.muted, fontSize: 13 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing(5),
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(4),
+  },
+  modalTitle: {
+    color: colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing(2),
+  },
+  modalSub: { color: colors.muted, fontSize: 12, marginTop: spacing(2), marginBottom: spacing(1) },
+  modalInput: {
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    padding: spacing(2),
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing(2),
+    marginTop: spacing(4),
+  },
+  confirmBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(4),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
 });
