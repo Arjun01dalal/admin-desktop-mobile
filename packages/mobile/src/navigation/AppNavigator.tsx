@@ -242,6 +242,20 @@ function RevealHeaderButton() {
   );
 }
 
+/** Header logout button (🚪) — quick logout without opening the drawer. */
+function LogoutHeaderButton() {
+  const { logout } = useAuth();
+  return (
+    <TouchableOpacity
+      style={styles.headerIconBtn}
+      onPress={logout}
+      accessibilityLabel="Logout"
+    >
+      <Text style={styles.headerIconText}>⏻</Text>
+    </TouchableOpacity>
+  );
+}
+
 function PanelDrawer({ items }: { items: NavItem[] }) {
   return (
     <Drawer.Navigator
@@ -251,7 +265,12 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
-          headerRight: () => <RevealHeaderButton />,
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <RevealHeaderButton />
+              <LogoutHeaderButton />
+            </View>
+          ),
           drawerType: 'front',
           overlayColor: 'rgba(0,0,0,0.55)',
           drawerStyle: { backgroundColor: colors.surface },
