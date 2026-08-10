@@ -251,7 +251,7 @@ function LogoutHeaderButton() {
       onPress={logout}
       accessibilityLabel="Logout"
     >
-      <Text style={styles.headerIconText}>⏻</Text>
+      <Text style={[styles.headerIconText, { color: colors.destructive }]}>🚪</Text>
     </TouchableOpacity>
   );
 }
