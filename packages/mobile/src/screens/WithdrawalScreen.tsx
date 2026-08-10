@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -29,7 +30,10 @@ import {
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import QRCode from 'react-native-qrcode-svg';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { appCodeForName } from '@astro/shared';
 import { secureApi } from '../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../auth/permissions';
@@ -81,8 +85,8 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Desktop UPIQR parity: build a upi://pay deep link for the QR code. */
-function buildUpiUrl(r: Rec): string {
+/** Desktop UPIQR parity: build the UPI payment query string. */
+function buildUpiQuery(r: Rec): string {
   const params = new URLSearchParams();
   params.set('pa', String(r.upiId ?? ''));
   if (r.amount !== undefined && r.amount !== null) params.set('am', String(r.amount));
@@ -92,7 +96,7 @@ function buildUpiUrl(r: Rec): string {
     `Note:${String(r.accountHolderName ?? '').slice(0, 6)}-${String(r.dp_id ?? '').slice(-6)}`,
   );
   params.set('tr', `ORD-${Date.now()}`);
-  return `upi://pay?${params.toString()}`;
+  return params.toString();
 }
 
 function fmtAmount(v: unknown): string {
@@ -319,7 +323,11 @@ export function WithdrawalScreen() {
   const [bulkManualOpen, setBulkManualOpen] = useState(false);
   // QR Code approve modal (desktop UPIQR popup parity).
   const [qrRow, setQrRow] = useState<Rec | null>(null);
-  const qrUrl = useMemo(() => (qrRow ? buildUpiUrl(qrRow) : ''), [qrRow]);
+  const qrQuery = useMemo(() => (qrRow ? buildUpiQuery(qrRow) : ''), [qrRow]);
+  const qrUrl = qrQuery ? `upi://pay?${qrQuery}` : '';
+  const qrRef = React.useRef<{ toDataURL: (cb: (data: string) => void) => void } | null>(null);
+  // Desktop parity: default withdrawal provider = first active payout account.
+  const [defaultGateway, setDefaultGateway] = useState('');
 
   // Desktop permission parity (login Responsibilities).
   const perms = useMemo(
@@ -416,6 +424,8 @@ export function WithdrawalScreen() {
         setGateways(
           Array.from(new Set(list.map((g) => g?.name).filter((n): n is string => Boolean(n)))),
         );
+        // Desktop parity: paymentGateway defaults to the first active payout account.
+        if (list[0]?.name) setDefaultGateway(list[0].name);
       }
     })();
   }, []);
@@ -540,10 +550,11 @@ export function WithdrawalScreen() {
             ...geo,
           },
         };
-        if (gw) {
-          payload.withdrewalProviderName = gw;
-          payload.gatewayName = gw;
-        }
+        // Desktop parity: Approve without an explicit gateway still sends the
+        // default payout-account provider as withdrewalProviderName.
+        const provider = gw || defaultGateway;
+        if (provider) payload.withdrewalProviderName = provider;
+        if (gw) payload.gatewayName = gw;
         if (midSel) payload.mid = midSel;
         const res = await secureApi('withdrawals.statusUpdate', payload);
         if (!res.ok) {
@@ -556,8 +567,46 @@ export function WithdrawalScreen() {
         setActionBusy(false);
       }
     },
-    [admin, afterAction],
+    [admin, defaultGateway, afterAction],
   );
+
+  /** Open the payment in PhonePe / GPay with the same UPI params as the QR. */
+  const openUpiApp = useCallback(
+    async (app: 'phonepe' | 'gpay') => {
+      if (!qrQuery) return;
+      const url =
+        app === 'phonepe' ? `phonepe://pay?${qrQuery}` : `tez://upi/pay?${qrQuery}`;
+      try {
+        await Linking.openURL(url);
+      } catch {
+        notify(app === 'phonepe' ? 'PhonePe app not found' : 'GPay app not found');
+      }
+    },
+    [qrQuery],
+  );
+
+  /** Save/share the QR image (PNG) via the system share sheet. */
+  const downloadQr = useCallback(() => {
+    const svg = qrRef.current;
+    if (!svg) return;
+    svg.toDataURL((base64: string) => {
+      void (async () => {
+        try {
+          const uri = `${FileSystem.cacheDirectory}refund-qr-${Date.now()}.png`;
+          await FileSystem.writeAsStringAsync(uri, base64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Save QR' });
+          } else {
+            notify('Sharing not available on this device');
+          }
+        } catch {
+          notify('Could not save QR');
+        }
+      })();
+    });
+  }, []);
 
   /* ------------------------------ bulk actions ------------------------------ */
 
@@ -610,7 +659,7 @@ export function WithdrawalScreen() {
                   _id: admin?._id || '',
                 },
               })),
-              withdrewalProviderName: gateway,
+              withdrewalProviderName: gateway || defaultGateway,
               state: geo.state,
               city: geo.city,
               lat: geo.lat,
@@ -635,7 +684,7 @@ export function WithdrawalScreen() {
         setActionBusy(false);
       }
     },
-    [admin, bulkSel, gateway, afterAction, clearBulk],
+    [admin, bulkSel, gateway, defaultGateway, afterAction, clearBulk],
   );
 
   const doBulkManual = useCallback(async () => {
@@ -1266,12 +1315,32 @@ export function WithdrawalScreen() {
             <View style={{ alignItems: 'center', paddingVertical: spacing(3) }}>
               {qrUrl ? (
                 <View style={{ backgroundColor: '#fff', padding: spacing(3), borderRadius: radius.md }}>
-                  <QRCode value={qrUrl} size={180} />
+                  <QRCode value={qrUrl} size={180} getRef={(c) => (qrRef.current = c)} />
                 </View>
               ) : null}
               <Text style={[styles.modalSub, { textAlign: 'center' }]}>
                 {String(qrRow?.upiId ?? '')}
               </Text>
+              <View style={styles.qrIconRow}>
+                <TouchableOpacity
+                  style={[styles.qrIconBtn, { backgroundColor: '#5f259f' }]}
+                  onPress={() => void openUpiApp('phonepe')}
+                >
+                  <Text style={styles.qrIconText}>Pe</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.qrIconBtn, { backgroundColor: '#1a73e8' }]}
+                  onPress={() => void openUpiApp('gpay')}
+                >
+                  <Text style={styles.qrIconText}>G</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.qrIconBtn, { backgroundColor: colors.surfaceAlt }]}
+                  onPress={downloadQr}
+                >
+                  <MaterialCommunityIcons name="download" size={18} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={styles.modalSub}>Gateway</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1542,6 +1611,17 @@ const styles = StyleSheet.create({
   },
   modalSub: { color: colors.muted, fontSize: 12, marginTop: spacing(2), marginBottom: spacing(1) },
   modalErr: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
+  qrIconRow: { flexDirection: 'row', gap: spacing(3), marginTop: spacing(2) },
+  qrIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  qrIconText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   modalInput: {
     borderColor: colors.border,
     borderWidth: 1,
