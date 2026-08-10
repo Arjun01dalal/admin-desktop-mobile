@@ -531,7 +531,7 @@ export function WithdrawalScreen() {
         }
         const payload: Rec = {
           transactionId: txnIdOf(r),
-          reason: newStatus === 'Approved' ? 'Approved' : reasonText.trim(),
+          reason: newStatus === 'Approved' ? reasonText.trim() || 'Approved' : reasonText.trim(),
           dp_id: r.dp_id,
           updatedBy: {
             name: admin?.name || '',
@@ -1279,7 +1279,11 @@ export function WithdrawalScreen() {
                 <TouchableOpacity
                   key={g}
                   style={[styles.chip, gateway === g && styles.chipActive]}
-                  onPress={() => setGateway(g)}
+                  onPress={() => {
+                    // Desktop parity: changing gateway resets the MID selection.
+                    if (g !== gateway) setMid('');
+                    setGateway(g);
+                  }}
                 >
                   <Text style={[styles.chipText, gateway === g && styles.chipTextActive]}>
                     {g}
@@ -1289,20 +1293,22 @@ export function WithdrawalScreen() {
             </ScrollView>
             <Text style={styles.modalSub}>MID</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {mids.map((m) => (
-                <TouchableOpacity
-                  key={m.label}
-                  style={[styles.chip, mid === m.mid && styles.chipActive]}
-                  onPress={() => {
-                    setMid(m.mid);
-                    if (!gateway && m.gateway) setGateway(m.gateway);
-                  }}
-                >
-                  <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
-                    {m.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {mids
+                .filter((m) => !gateway || !m.gateway || m.gateway === gateway)
+                .map((m) => (
+                  <TouchableOpacity
+                    key={m.label}
+                    style={[styles.chip, mid === m.mid && styles.chipActive]}
+                    onPress={() => {
+                      setMid(m.mid);
+                      if (!gateway && m.gateway) setGateway(m.gateway);
+                    }}
+                  >
+                    <Text style={[styles.chipText, mid === m.mid && styles.chipTextActive]}>
+                      {m.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
             </ScrollView>
             {modalErr ? <Text style={styles.modalErr}>{modalErr}</Text> : null}
             <View style={styles.modalActions}>
@@ -1325,7 +1331,8 @@ export function WithdrawalScreen() {
                   }
                   const r = qrRow;
                   setQrRow(null);
-                  void doStatusUpdate(r, 'Approved', '', gateway, mid);
+                  // Desktop QR parity: reason marks the approval as done via UPI QR.
+                  void doStatusUpdate(r, 'Approved', 'By UPI ID', gateway, mid);
                 }}
               >
                 {actionBusy ? (
