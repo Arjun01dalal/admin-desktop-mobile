@@ -31,6 +31,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-secure-store",
       [
         "expo-location",
@@ -38,7 +39,15 @@
           "locationWhenInUsePermission": "This app records your location while you are signed in for security and audit purposes."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "freerasp-react-native",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ]
     ]
   }
 }
