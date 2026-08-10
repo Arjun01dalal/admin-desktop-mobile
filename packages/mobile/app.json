@@ -15,6 +15,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "vip.astrotalk.panel",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
@@ -22,6 +23,7 @@
       }
     },
     "android": {
+      "package": "vip.astrotalk.panel",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
