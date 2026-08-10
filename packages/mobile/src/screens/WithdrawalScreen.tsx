@@ -367,6 +367,18 @@ export function WithdrawalScreen() {
     null,
   );
   const [provider, setProvider] = useState('');
+  // Desktop toolbar parity: Sort checkbox, Bank Amount + Mid Name filters.
+  const [sortChecked, setSortChecked] = useState(false);
+  const [bankAmtDraft, setBankAmtDraft] = useState('');
+  const [bankAmt, setBankAmt] = useState('');
+  const [midFilter, setMidFilter] = useState('');
+  const [midFilterOpen, setMidFilterOpen] = useState(false);
+  // Add Bene List modal (desktop BeneModal parity — manage available banks).
+  const [beneOpen, setBeneOpen] = useState(false);
+  const [beneBanks, setBeneBanks] = useState<string[]>([]);
+  const [beneInitial, setBeneInitial] = useState<string[]>([]);
+  const [beneInput, setBeneInput] = useState('');
+  const [beneBusy, setBeneBusy] = useState(false);
 
   // Desktop permission parity (login Responsibilities).
   const perms = useMemo(
@@ -377,6 +389,7 @@ export function WithdrawalScreen() {
       reverse: hasPermission(Permissions.View_Reverse),
       showAll: hasPermission(Permissions.show_all_withdrawal),
       showMobile: hasPermission(Permissions.show_mobile) && !hasPermission('contact_visibility_none'),
+      download: hasPermission(Permissions.Download_Withdrawal),
     }),
     [],
   );
@@ -390,6 +403,10 @@ export function WithdrawalScreen() {
       // Desktop IN PROGRESS isolation: without show_all_withdrawal, only own locked rows.
       if (status === 'IN PROGRESS' && !perms.showAll && admin?.name) filter.name = admin.name;
       if (applied.text.trim()) filter[applied.field] = applied.text.trim();
+      // Desktop toolbar filters: sort checkbox, bank amount, mid name.
+      if (sortChecked) filter.sort = true;
+      if (bankAmt.trim()) filter.bankAmt = bankAmt.trim();
+      if (midFilter) filter.mid = midFilter;
       const payload: Rec = {
         type: 'withdrawal',
         itemsPerPage: pageSize,
@@ -412,7 +429,19 @@ export function WithdrawalScreen() {
     } finally {
       setLoading(false);
     }
-  }, [admin, status, applied, pageSize, page, startDate, endDate, perms.showAll]);
+  }, [
+    admin,
+    status,
+    applied,
+    pageSize,
+    page,
+    startDate,
+    endDate,
+    perms.showAll,
+    sortChecked,
+    bankAmt,
+    midFilter,
+  ]);
 
   const loadSummary = useCallback(async () => {
     const res = await secureApi('withdrawals.fundRequest', { startDate, endDate });
@@ -654,6 +683,153 @@ export function WithdrawalScreen() {
       })();
     });
   }, []);
+
+  /* --------------------------- excel/csv downloads --------------------------- */
+
+  /** Build a CSV file from the current rows and open the system share sheet. */
+  const shareCsv = useCallback(async (fileName: string, headers: string[], data: string[][]) => {
+    try {
+      const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const csv = [headers, ...data].map((line) => line.map(esc).join(',')).join('\n');
+      const uri = `${FileSystem.cacheDirectory}${fileName}-${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(uri, csv);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: fileName });
+      } else {
+        notify('Sharing not available on this device');
+      }
+    } catch {
+      notify('Could not create file');
+    }
+  }, []);
+
+  const cell = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+
+  /** Desktop "Download Data" (Withdrawal_Data sheet). */
+  const downloadData = useCallback(() => {
+    void shareCsv(
+      'Withdrawal_Data',
+      ['Sr No', 'Date', 'accountHolderName', 'Name (send to bank)', 'bankName', 'city', 'state', 'status', 'dp_id', 'transactionId', 'Acc No', 'Amount', 'userBankName', 'ifscCode'],
+      rows.map((r, i) => [
+        String(i + 1),
+        r.createdOn ? formatDisplayDate(String(r.createdOn)) : '',
+        cell(r.accountHolderName),
+        cell(r.beneficiaryAccount ?? r.accountHolderName),
+        cell(r.bankName),
+        cell(r.city),
+        cell(r.state),
+        cell(r.status),
+        cell(r.dp_id),
+        cell(r.transactionId),
+        cell(r.accountNo),
+        cell(r.amount),
+        cell(r.userBankName),
+        cell(r.ifscCode),
+      ]),
+    );
+  }, [rows, shareCsv]);
+
+  /** Desktop "Pay OK Data" (pay_ok_sheet). */
+  const downloadPayok = useCallback(() => {
+    void shareCsv(
+      'pay_ok_sheet',
+      ['Bank Name (IFSC)', 'Bank Account', 'Amount(INR)', 'Phone Number', 'AccountName', 'Email'],
+      rows.map((r) => [
+        cell(r.ifscCode),
+        cell(r.accountNo),
+        cell(r.amount),
+        cell(r.userMobile ?? r.mobile),
+        cell(r.accountHolderName),
+        cell(r.email),
+      ]),
+    );
+  }, [rows, shareCsv]);
+
+  /** Desktop "Yes Bank Data" (yes_bank_sheet). */
+  const downloadYesBank = useCallback(() => {
+    void shareCsv(
+      'yes_bank_sheet',
+      ['Sr No', 'Name', 'Transfer Type', 'Acc No', 'Amount', 'IFSC', 'Phone No', 'Remarks'],
+      rows.map((r, i) => [
+        String(i + 1),
+        cell(r.accountHolderName),
+        'NEFT',
+        cell(r.accountNo),
+        cell(r.amount),
+        cell(r.ifscCode),
+        cell(r.userMobile ?? r.mobile),
+        cell(r.transactionId),
+      ]),
+    );
+  }, [rows, shareCsv]);
+
+  /* --------------------------- add bene list (banks) --------------------------- */
+
+  const openBeneModal = useCallback(async () => {
+    setBeneBusy(true);
+    setBeneOpen(true);
+    setBeneInput('');
+    try {
+      const res = await secureApi('withdrawals.availableBanks', {});
+      const obj = res.ok ? unpack(res.data) : {};
+      const banks = Array.isArray(obj.availableBanks)
+        ? (obj.availableBanks as string[]).filter(Boolean)
+        : [];
+      setBeneBanks(banks);
+      setBeneInitial(banks);
+    } finally {
+      setBeneBusy(false);
+    }
+  }, []);
+
+  const saveBeneBanks = useCallback(async () => {
+    const norm = (s: string) => s.trim().toLowerCase();
+    setBeneBusy(true);
+    try {
+      if (beneInitial.length === 0) {
+        // Desktop BeneModal "create" mode.
+        const res = await secureApi('withdrawals.createAvailableBanks', {
+          availableBanks: beneBanks,
+        });
+        if (!res.ok) {
+          notify(res.message || 'Failed to create banks');
+          return;
+        }
+      } else {
+        const added = beneBanks.filter((b) => !beneInitial.some((i) => norm(i) === norm(b)));
+        const removed = beneInitial.filter((b) => !beneBanks.some((c) => norm(c) === norm(b)));
+        if (!added.length && !removed.length) {
+          setBeneOpen(false);
+          notify('No changes to save');
+          return;
+        }
+        if (added.length) {
+          const res = await secureApi('withdrawals.updateAvailableBanks', {
+            action: 'add',
+            names: added,
+          });
+          if (!res.ok) {
+            notify(res.message || 'Failed to add banks');
+            return;
+          }
+        }
+        if (removed.length) {
+          const res = await secureApi('withdrawals.updateAvailableBanks', {
+            action: 'remove',
+            names: removed,
+          });
+          if (!res.ok) {
+            notify(res.message || 'Failed to remove banks');
+            return;
+          }
+        }
+      }
+      setBeneOpen(false);
+      notify('Available banks updated successfully');
+    } finally {
+      setBeneBusy(false);
+    }
+  }, [beneBanks, beneInitial]);
 
   /* ------------------------------ bulk actions ------------------------------ */
 
@@ -1142,6 +1318,96 @@ export function WithdrawalScreen() {
         ))}
       </ScrollView>
 
+      {/* Desktop toolbar parity: Sort, Bank Amount, Mid Name, downloads, Add Bene List */}
+      <View style={styles.toolsRow}>
+        <TouchableOpacity
+          style={[styles.chip, sortChecked && styles.chipActive]}
+          onPress={() => {
+            setSortChecked((v) => !v);
+            setPage(1);
+          }}
+        >
+          <Text style={[styles.chipText, sortChecked && styles.chipTextActive]}>
+            Sort {sortChecked ? '✓' : ''}
+          </Text>
+        </TouchableOpacity>
+        <TextInput
+          style={styles.toolInput}
+          value={bankAmtDraft}
+          onChangeText={setBankAmtDraft}
+          placeholder="Bank Amount"
+          placeholderTextColor={colors.muted}
+          keyboardType="numeric"
+          maxLength={6}
+          returnKeyType="search"
+          onSubmitEditing={() => {
+            setBankAmt(bankAmtDraft);
+            setPage(1);
+          }}
+          onBlur={() => {
+            if (bankAmtDraft !== bankAmt) {
+              setBankAmt(bankAmtDraft);
+              setPage(1);
+            }
+          }}
+        />
+        <TouchableOpacity
+          style={[styles.chip, midFilter !== '' && styles.chipActive]}
+          onPress={() => setMidFilterOpen((v) => !v)}
+        >
+          <Text style={[styles.chipText, midFilter !== '' && styles.chipTextActive]}>
+            {midFilter ? `Mid: ${midFilter}` : 'Mid Name'}
+          </Text>
+        </TouchableOpacity>
+        {perms.actions ? (
+          <TouchableOpacity style={styles.chip} onPress={() => void openBeneModal()}>
+            <Text style={styles.chipText}>Add Bene List</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {midFilterOpen ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
+          <TouchableOpacity
+            style={[styles.chip, midFilter === '' && styles.chipActive]}
+            onPress={() => {
+              setMidFilter('');
+              setMidFilterOpen(false);
+              setPage(1);
+            }}
+          >
+            <Text style={[styles.chipText, midFilter === '' && styles.chipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {mids.map((m) => (
+            <TouchableOpacity
+              key={m.label}
+              style={[styles.chip, midFilter === m.mid && styles.chipActive]}
+              onPress={() => {
+                setMidFilter(m.mid);
+                setMidFilterOpen(false);
+                setPage(1);
+              }}
+            >
+              <Text style={[styles.chipText, midFilter === m.mid && styles.chipTextActive]}>
+                {m.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : null}
+      {perms.download ? (
+        <View style={styles.toolsRow}>
+          <TouchableOpacity style={styles.bulkBtn} onPress={downloadData}>
+            <Text style={styles.bulkBtnText}>Download Data</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.bulkBtn} onPress={downloadPayok}>
+            <Text style={styles.bulkBtnText}>Pay OK Data</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.bulkBtn} onPress={downloadYesBank}>
+            <Text style={styles.bulkBtnText}>Yes Bank Data</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {msg ? <Text style={styles.muted}>{msg}</Text> : null}
 
       {/* Bulk actions (desktop Bulk Lock/UnLock/Approve/Manual Approve) */}
@@ -1344,6 +1610,86 @@ export function WithdrawalScreen() {
                   <ActivityIndicator size="small" color={colors.primaryForeground} />
                 ) : (
                   <Text style={styles.confirmBtnText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Bene List modal (desktop BeneModal parity — manage available banks) */}
+      <Modal
+        visible={beneOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !beneBusy && setBeneOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Bene List</Text>
+            <View style={{ flexDirection: 'row', gap: spacing(2) }}>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginTop: 0 }]}
+                value={beneInput}
+                onChangeText={setBeneInput}
+                placeholder="Bank / account name…"
+                placeholderTextColor={colors.muted}
+              />
+              <TouchableOpacity
+                style={styles.confirmBtn}
+                onPress={() => {
+                  const v = beneInput.trim();
+                  if (!v) return;
+                  if (beneBanks.some((b) => b.trim().toLowerCase() === v.toLowerCase())) {
+                    setBeneInput('');
+                    return;
+                  }
+                  setBeneBanks((prev) => [...prev, v]);
+                  setBeneInput('');
+                }}
+              >
+                <Text style={styles.confirmBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 260, marginTop: spacing(2) }}>
+              {beneBusy && beneBanks.length === 0 ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : beneBanks.length === 0 ? (
+                <Text style={styles.muted}>No banks yet — add one above.</Text>
+              ) : (
+                beneBanks.map((b) => (
+                  <View key={b} style={styles.beneRow}>
+                    <Text style={styles.beneText}>{b}</Text>
+                    <TouchableOpacity
+                      onPress={() => setBeneBanks((prev) => prev.filter((x) => x !== b))}
+                    >
+                      <MaterialCommunityIcons
+                        name="close"
+                        size={18}
+                        color={colors.destructive}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.pagerBtn}
+                onPress={() => setBeneOpen(false)}
+                disabled={beneBusy}
+              >
+                <Text style={styles.pagerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, beneBusy && styles.pagerBtnDisabled]}
+                disabled={beneBusy}
+                onPress={() => void saveBeneBanks()}
+              >
+                {beneBusy ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Save</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1733,6 +2079,33 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   qrIconText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  toolsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginTop: spacing(2),
+  },
+  toolInput: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    minWidth: 110,
+    fontSize: 13,
+  },
+  beneRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing(2),
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  beneText: { color: colors.foreground, fontSize: 13 },
   modalInput: {
     borderColor: colors.border,
     borderWidth: 1,
