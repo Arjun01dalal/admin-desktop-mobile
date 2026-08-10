@@ -7,7 +7,7 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
@@ -19,7 +19,14 @@ import { TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
-import { canAccessNavItem } from '../auth/permissions';
+import {
+  buildSosEnablePayload,
+  canAccessNavItem,
+  canShowSos,
+  isSosExemptRole,
+} from '../auth/permissions';
+import { useSosGuard } from '../auth/useSosGuard';
+import { secureApi } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
@@ -245,6 +252,101 @@ function RevealHeaderButton() {
   );
 }
 
+/**
+ * Header SOS button (desktop AppShell parity).
+ * - Tap → confirm alert → `auth.sosFlag` enable payload by role.
+ * - Non-exempt roles are logged out after sending; exempt roles see the
+ *   lock state and can "Unblock" (enabled:false, type:all).
+ * - Guard polls get-sos-flag and kicks non-exempt users when SOS activates.
+ */
+function SosHeaderButton() {
+  const { user, logout } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const { sosEnabled, setSosEnabled, refresh } = useSosGuard(true, () => {
+    Alert.alert('SOS activated', 'Returning to login.');
+    logout();
+  });
+  const sosExempt = isSosExemptRole();
+  if (!(canShowSos() || (sosEnabled && sosExempt))) return null;
+
+  const sendSos = async () => {
+    if (busy) return;
+    const built = buildSosEnablePayload();
+    if (!built.ok) {
+      Alert.alert('SOS', built.message);
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await secureApi('auth.sosFlag', built.payload);
+      if (!res.ok) {
+        Alert.alert('SOS', res.message || 'Failed to send SOS alert');
+        return;
+      }
+      setSosEnabled(true);
+      if (!sosExempt) {
+        Alert.alert('SOS', 'SOS alert sent. Support will contact you shortly.');
+        logout();
+      } else {
+        await refresh();
+        Alert.alert('SOS', 'SOS alert sent. Support will contact you shortly.');
+      }
+    } catch (err) {
+      Alert.alert('SOS', err instanceof Error ? err.message : 'Failed to send SOS alert');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unblockUsers = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await secureApi('auth.sosFlag', { enabled: false, type: 'all' });
+      if (!res.ok) {
+        Alert.alert('SOS', res.message || 'Failed to unblock users');
+        return;
+      }
+      setSosEnabled(false);
+      await refresh();
+      Alert.alert('SOS', 'Users unblocked. SOS lock cleared.');
+    } catch (err) {
+      Alert.alert('SOS', err instanceof Error ? err.message : 'Failed to unblock users');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.sosBtn, sosEnabled && styles.sosBtnActive]}
+      disabled={busy}
+      accessibilityLabel={sosEnabled ? 'Unblock users' : 'Send SOS alert'}
+      onPress={() => {
+        if (sosEnabled) {
+          Alert.alert('Unblock users', 'Clear the SOS lock for everyone?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Unblock', style: 'destructive', onPress: () => void unblockUsers() },
+          ]);
+          return;
+        }
+        Alert.alert(
+          'SOS',
+          `Emergency support — use only when you need immediate help from the admin team.\n\nLogged in as ${String(
+            user?.name || user?.mobile || 'Admin',
+          )}.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Send SOS', style: 'destructive', onPress: () => void sendSos() },
+          ],
+        );
+      }}
+    >
+      <Text style={styles.sosBtnText}>{busy ? '…' : sosEnabled ? 'Unblock' : 'SOS'}</Text>
+    </TouchableOpacity>
+  );
+}
+
 /** Header logout button (🚪) — quick logout without opening the drawer. */
 function LogoutHeaderButton() {
   const { logout } = useAuth();
@@ -270,6 +372,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerTitleStyle: { fontWeight: '600' },
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <SosHeaderButton />
               <RevealHeaderButton />
               <LogoutHeaderButton />
             </View>
@@ -378,6 +481,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
   },
   headerIconText: { fontSize: 18 },
+  sosBtn: {
+    backgroundColor: colors.destructive,
+    borderRadius: 6,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    marginRight: spacing(1),
+  },
+  sosBtnActive: {
+    backgroundColor: colors.success,
+  },
+  sosBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
   drawerNoMatch: {
     color: colors.muted,
     fontSize: 12,
