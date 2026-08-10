@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "344071214084",
+    "project_id": "astro-admin-panel",
+    "storage_bucket": "astro-admin-panel.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:344071214084:android:46282aad85675e2cae1151",
+        "android_client_info": {
+          "package_name": "vip.astrotalk.panel"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA63Clb0NsXTReatyX7ho5TATG1f-rkYCk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

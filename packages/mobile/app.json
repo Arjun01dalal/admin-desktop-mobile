@@ -16,6 +16,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "vip.astrotalk.panel",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
@@ -24,6 +25,7 @@
     },
     "android": {
       "package": "vip.astrotalk.panel",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
