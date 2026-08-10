@@ -32,7 +32,6 @@ let registered = false;
 /** Call once after login. Safe to call multiple times / in Expo Go. */
 export async function registerSosPush(): Promise<void> {
   if (registered || isExpoGo || Platform.OS === 'web') return;
-  registered = true;
 
   try {
     const Notifications = await import('expo-notifications');
@@ -71,11 +70,14 @@ export async function registerSosPush(): Promise<void> {
     if (!token || !TOPIC) return;
 
     // Register the token with the relay via the shared ntfy topic.
-    await fetch(`${SERVER}/${encodeURIComponent(TOPIC)}`, {
+    // Only mark as registered once the publish actually succeeded, so a
+    // transient failure can be retried on the next login/session restore.
+    const res = await fetch(`${SERVER}/${encodeURIComponent(TOPIC)}`, {
       method: 'POST',
       headers: { Title: 'EXPO_TOKEN', Priority: 'min', Tags: 'mobile' },
       body: `EXPO_TOKEN=${token}`,
     });
+    if (res.ok) registered = true;
   } catch {
     // Push is best-effort — in-app siren/poll remains the fallback.
   }

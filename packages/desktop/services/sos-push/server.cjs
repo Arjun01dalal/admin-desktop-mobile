@@ -135,36 +135,47 @@ function addToken(token) {
 
 async function sendExpoPush(title, body, active) {
   if (expoTokens.length === 0) return;
-  const messages = expoTokens.map((to) => ({
-    to,
-    title,
-    body,
-    priority: 'high',
-    sound: active ? 'siren.mp3' : 'default', // iOS custom sound
-    channelId: active ? 'sos' : 'default', // Android siren channel
-    data: { sos: active ? 'active' : 'clear' },
-  }));
-  try {
-    const res = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(messages),
-    });
-    const json = await res.json().catch(() => ({}));
-    // Drop tokens Expo reports as dead (DeviceNotRegistered).
-    const tickets = Array.isArray(json?.data) ? json.data : [];
-    const dead = [];
-    tickets.forEach((ticket, i) => {
-      if (ticket?.details?.error === 'DeviceNotRegistered') dead.push(expoTokens[i]);
-    });
-    if (dead.length) {
-      expoTokens = expoTokens.filter((t) => !dead.includes(t));
-      saveTokens();
+  // Expo allows max 100 messages per request — send in chunks.
+  const CHUNK = 100;
+  const dead = [];
+  let sent = 0;
+  for (let i = 0; i < expoTokens.length; i += CHUNK) {
+    const batch = expoTokens.slice(i, i + CHUNK);
+    const messages = batch.map((to) => ({
+      to,
+      title,
+      body,
+      priority: 'high',
+      sound: active ? 'siren.mp3' : 'default', // iOS custom sound
+      channelId: active ? 'sos' : 'default', // Android siren channel
+      data: { sos: active ? 'active' : 'clear' },
+    }));
+    try {
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(messages),
+      });
+      if (!res.ok) {
+        console.warn('[sos-push] expo push HTTP', res.status, 'for batch of', batch.length);
+        continue;
+      }
+      const json = await res.json().catch(() => ({}));
+      // Drop tokens Expo reports as dead (DeviceNotRegistered).
+      const tickets = Array.isArray(json?.data) ? json.data : [];
+      tickets.forEach((ticket, k) => {
+        if (ticket?.details?.error === 'DeviceNotRegistered') dead.push(batch[k]);
+      });
+      sent += batch.length;
+    } catch (err) {
+      console.warn('[sos-push] expo push failed:', err?.message || err);
     }
-    console.log('[sos-push] expo push sent to', messages.length, 'device(s)');
-  } catch (err) {
-    console.warn('[sos-push] expo push failed:', err?.message || err);
   }
+  if (dead.length) {
+    expoTokens = expoTokens.filter((t) => !dead.includes(t));
+    saveTokens();
+  }
+  if (sent) console.log('[sos-push] expo push sent to', sent, 'device(s)');
 }
 
 // Subscribe to the ntfy topic (websocket) to collect mobile tokens.
