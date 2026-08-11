@@ -8,4 +8,11 @@ export {
   type SosBlockInfo,
   type SosFlagPayload,
 } from './sos';
+export {
+  extractTokenBlacklistPayload,
+  isAuthFailureMessage,
+  parseTokenBlacklistStatus,
+  type SessionStatus,
+  type TokenBlacklistPayload,
+} from './session';
 export { createAstroApi, type AstroApi } from './createApi';

@@ -46,6 +46,8 @@ export type UsersToolbarProps = {
   total: number;
   loading?: boolean;
   dialerLoading?: boolean;
+  /** Loaded rows that will be pushed (current page until full fetch). */
+  dialerCount?: number;
   showDates?: boolean;
   canRegister?: boolean;
   canAddToBot?: boolean;
@@ -236,7 +238,7 @@ export function UsersToolbar(props: UsersToolbarProps) {
             disabled={props.dialerLoading}
             onClick={props.onAddToBot}
           >
-            Add to Bot
+            Add to Bot{props.dialerCount != null ? ` (${props.dialerCount})` : ''}
           </Button>
         )}
       </Stack>
