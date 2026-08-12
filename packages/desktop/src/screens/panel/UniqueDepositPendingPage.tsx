@@ -730,7 +730,7 @@ export function UniqueDepositPendingPage() {
           mb: 1.5,
           p: 1.5,
           borderRadius: 1.5,
-          bgcolor: '#1a1a1f',
+          bgcolor: 'background.paper',
           border: '1px solid rgba(255,255,255,0.08)',
         }}
       >
@@ -874,7 +874,7 @@ export function UniqueDepositPendingPage() {
         onClose={() => !statusSaving && setStatusOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+        PaperProps={{ sx: { bgcolor: 'background.paper' } }}
       >
         <DialogTitle>Change Status</DialogTitle>
         <DialogContent>
@@ -913,7 +913,7 @@ export function UniqueDepositPendingPage() {
         onClose={() => !otpBusy && setDownloadOpen(false)}
         fullWidth
         maxWidth="xs"
-        PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+        PaperProps={{ sx: { bgcolor: 'background.paper' } }}
       >
         <DialogTitle>Verify OTP to Download</DialogTitle>
         <DialogContent>

@@ -182,7 +182,7 @@ export function PlayerActivityDetailsPage() {
         <Typography variant="h5" fontWeight={700} mb={2}>
           {toDisplayText('Player Activity Details')}
         </Typography>
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             No player selected. Open a UserId from {toDisplayText('Player Activity')}.
           </Typography>

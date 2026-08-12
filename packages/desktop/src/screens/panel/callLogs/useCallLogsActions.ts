@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { pushToBotDialer } from '@/screens/panel/shared/pushToBotDialer';
 import {
   extractDialLeadsFromExcel,
   mapRowToDialSetting,
@@ -48,16 +49,19 @@ export function useCallLogsActions({
       }
       setActionLoading(true);
       try {
-        const res = await secureApi('callLogs.addToBotDialer', {
+        const res = await pushToBotDialer({
           userId: admin?._id,
           created_by: admin?.name,
-          dialout_settings: target.map(mapRowToDialSetting),
+          dialout_settings: target.map(mapRowToDialSetting) as Record<
+            string,
+            unknown
+          >[],
         });
         if (!res.ok) {
           toast.error(res.message || 'Bot call failed');
           return;
         }
-        toast.success(res.message || 'Bot call queued');
+        toast.success(res.message || `Bot call queued (${res.pushed})`);
         clearSelection();
         await load();
       } finally {
@@ -199,14 +203,14 @@ export function useCallLogsActions({
       try {
         const leads = await extractDialLeadsFromExcel(file);
         setActionLoading(true);
-        const res = await secureApi('callLogs.addToBotDialer', {
+        const res = await pushToBotDialer({
           userId: admin?._id,
           created_by: admin?.name,
-          dialout_settings: leads,
+          dialout_settings: leads as unknown as Record<string, unknown>[],
         });
         if (!res.ok) toast.error(res.message || 'Upload dial failed');
         else {
-          toast.success(res.message || 'Uploaded to bot');
+          toast.success(res.message || `Uploaded to bot (${res.pushed})`);
           await load();
         }
       } catch (err) {

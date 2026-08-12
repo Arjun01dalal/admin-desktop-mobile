@@ -96,7 +96,7 @@ export function GameActivityDetailsPage() {
         <Typography variant="h5" fontWeight={700} mb={2}>
           {toDisplayText('Game Activity Details')}
         </Typography>
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             No provider selected. Open a provider from {toDisplayText('Games Activity')}.
           </Typography>

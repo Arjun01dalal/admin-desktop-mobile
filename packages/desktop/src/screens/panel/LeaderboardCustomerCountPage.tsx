@@ -34,7 +34,7 @@ const PER_PAGE_OPTIONS = [250, 500, 750, 1000, 2000];
 
 const fieldSx = {
   minWidth: 140,
-  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+  '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
 };
 
 function unpackPlayers(raw: unknown): { items: CustomerRow[]; totalPages: number } {

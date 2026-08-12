@@ -289,7 +289,7 @@ export function FundsPage() {
             sx={{
               px: 2,
               py: 1,
-              bgcolor: '#1a1a1f',
+              bgcolor: 'background.paper',
               border: '1px solid rgba(255,255,255,0.12)',
             }}
           >

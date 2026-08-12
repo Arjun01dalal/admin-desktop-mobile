@@ -69,9 +69,9 @@ export function LocationEnableDialog({
 
       <DialogContent>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)', mb: 1.5 }}>
-          Location is turned off. You cannot use the panel until Location is ON.
-          Turn it on in System Settings — this alert will close automatically once
-          location is available.
+          We could not determine your location (GPS and network both failed).
+          Turn on Location Services and check your internet — this alert will close
+          automatically once location is available.
         </Typography>
         {error && (
           <Typography variant="caption" color="error" display="block">

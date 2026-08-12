@@ -1,76 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { secureApi } from '@/api/secureClient';
 import { getAuthToken } from '@/utils/authToken';
-import { isJwtExpired, notifySessionExpired } from '@/utils/session';
-
-/** How often we hit check-token-blacklisted while the panel is open (laxminarayan). */
-const TOKEN_CHECK_INTERVAL = 5 * 60 * 1000;
-const LAST_CHECK_KEY = 'token_last_validated_at';
-const VALIDATION_LOCK_KEY = 'token_validation_lock';
-const LOCK_TTL_MS = 15_000;
-
-type BlacklistPayload = {
-  isBlacklisted?: boolean;
-  hasToken?: boolean;
-};
-
-type SessionStatus = 'valid' | 'invalid' | 'unknown';
-
-let inFlightValidation: Promise<SessionStatus> | null = null;
-
-function shouldThisTabRunCheck(): boolean {
-  const now = Date.now();
-  const lastCheck = Number(localStorage.getItem(LAST_CHECK_KEY) || 0);
-
-  if (lastCheck && now - lastCheck < TOKEN_CHECK_INTERVAL) {
-    return false;
-  }
-
-  const lock = localStorage.getItem(VALIDATION_LOCK_KEY);
-  if (lock && now - Number(lock) < LOCK_TTL_MS) {
-    return false;
-  }
-
-  localStorage.setItem(VALIDATION_LOCK_KEY, String(now));
-  return true;
-}
-
-function markCheckComplete(): void {
-  localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
-  localStorage.removeItem(VALIDATION_LOCK_KEY);
-}
-
-async function checkSession(userId: string): Promise<SessionStatus> {
-  const token = getAuthToken();
-  if (!token || !userId) return 'unknown';
-
-  if (isJwtExpired(token)) return 'invalid';
-
-  try {
-    const res = await secureApi<BlacklistPayload>('auth.checkTokenBlacklisted', {
-      _id: userId,
-    });
-
-    if (!res.ok && (res.status === 401 || res.status === 403)) {
-      return 'invalid';
-    }
-
-    const payload = res.data || {};
-    if (payload.isBlacklisted === true || payload.hasToken === false) {
-      return 'invalid';
-    }
-    if (payload.isBlacklisted === false && payload.hasToken === true) {
-      return 'valid';
-    }
-    return 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
+import { notifySessionExpired } from '@/utils/session';
+import {
+  runTokenValidation,
+  TOKEN_CHECK_INTERVAL,
+} from '@/utils/sessionCheck';
 
 /**
  * Port of laxminarayan `useTokenValidator` — validates session via
- * check-token-blacklisted on an interval, tab focus, and cross-tab token clear.
+ * check-token-blacklisted on an interval, focus/visibility, and API activity.
+ * Enforces single active session per mobile (latest login wins).
  */
 export function useTokenValidator(): void {
   const logoutTriggered = useRef(false);
@@ -83,47 +22,15 @@ export function useTokenValidator(): void {
     );
   }, []);
 
-  const validateToken = useCallback(async () => {
-    if (!shouldThisTabRunCheck()) return;
-
-    const token = getAuthToken();
-    const storedUser = localStorage.getItem('user');
-
-    if (!token || !storedUser) {
-      markCheckComplete();
-      return;
-    }
-
-    let userId: string | undefined;
-    try {
-      userId = (JSON.parse(storedUser) as { _id?: string })?._id;
-    } catch {
-      markCheckComplete();
-      return;
-    }
-
-    if (!userId) {
-      markCheckComplete();
-      return;
-    }
-
-    try {
-      if (!inFlightValidation) {
-        inFlightValidation = checkSession(userId).finally(() => {
-          inFlightValidation = null;
-        });
-      }
-
-      const status = await inFlightValidation;
-      markCheckComplete();
-
+  const validateToken = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const status = await runTokenValidation(opts);
       if (status === 'invalid') {
-        handleLogout();
+        handleLogout('You were logged in elsewhere. Please login again.');
       }
-    } catch {
-      markCheckComplete();
-    }
-  }, [handleLogout]);
+    },
+    [handleLogout],
+  );
 
   useEffect(() => {
     const token = getAuthToken();
@@ -133,7 +40,7 @@ export function useTokenValidator(): void {
       return;
     }
 
-    void validateToken();
+    void validateToken({ force: true });
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -143,8 +50,12 @@ export function useTokenValidator(): void {
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        void validateToken();
+        void validateToken({ force: true });
       }
+    };
+
+    const onFocus = () => {
+      void validateToken({ force: true });
     };
 
     const onStorage = (event: StorageEvent) => {
@@ -154,13 +65,17 @@ export function useTokenValidator(): void {
     };
 
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
     window.addEventListener('storage', onStorage);
 
     return () => {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
       window.removeEventListener('storage', onStorage);
     };
     // Mount once while panel router is alive — do not reset on every route change.
   }, [validateToken, handleLogout]);
 }
+
+export { resetTokenValidationThrottle } from '@/utils/sessionCheck';

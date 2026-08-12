@@ -62,7 +62,7 @@ export function ActionDialog({
       onClose={() => !saving && onClose()}
       fullWidth
       maxWidth="sm"
-      PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+      PaperProps={{ sx: { bgcolor: 'background.paper' } }}
     >
       <DialogTitle>Update Withdrawal Status</DialogTitle>
       <DialogContent>

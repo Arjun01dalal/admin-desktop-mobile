@@ -305,7 +305,7 @@ export function DepositScreen() {
           balance: Number(sAmount) || row.amount,
           updatedBy: { name: admin?.name || '', _id: admin?._id || '' },
           reason: sReason.trim(),
-          remark: `Deposite failure of ${row.userName || ''} through ${sGateway || row.paymentGatewayName || ''} pay with order id ${row.orderId} and mobile no ${row.userMobile || row.mobile || ''}`,
+          remark: `Deposit failure of ${row.userName || ''} through ${sGateway || row.paymentGatewayName || ''} pay with order id ${row.orderId} and mobile no ${row.userMobile || row.mobile || ''}`,
           tag: 'credit',
           orderId: row.orderId,
           mid: sMid || row.mid,

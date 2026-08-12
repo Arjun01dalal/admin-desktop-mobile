@@ -42,10 +42,10 @@ export function KpiStatGrid({ items }: Props) {
             }
             sx={{
               p: 2,
-              bgcolor: '#1a1a1f',
+              bgcolor: 'background.paper',
               cursor: clickable ? 'pointer' : 'default',
               border: '1px solid',
-              borderColor: 'rgba(255,255,255,0.06)',
+              borderColor: 'divider',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',

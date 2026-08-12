@@ -290,7 +290,7 @@ export function UtrProviderPage() {
         </Stack>
       </Stack>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             type="date"

@@ -149,7 +149,7 @@ export function SheetUploadDialog({
       onClose={handleClose}
       fullWidth
       maxWidth="md"
-      PaperProps={{ sx: { bgcolor: '#1a1a1f', borderRadius: 2 } }}
+      PaperProps={{ sx: { bgcolor: 'background.paper', borderRadius: 2 } }}
     >
       <DialogTitle>Upload File</DialogTitle>
       <DialogContent>

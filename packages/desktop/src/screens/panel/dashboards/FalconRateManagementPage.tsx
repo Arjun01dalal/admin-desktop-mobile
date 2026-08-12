@@ -169,7 +169,7 @@ export function FalconRateManagementPage() {
       )}
 
       {!loading && events.length === 0 && (
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">No event data</Typography>
         </Paper>
       )}
@@ -190,7 +190,7 @@ export function FalconRateManagementPage() {
             event.Eventname || event.eventName || `Event ${index + 1}`,
           );
           return (
-            <Paper key={`${name}-${index}`} sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+            <Paper key={`${name}-${index}`} sx={{ p: 2, bgcolor: 'background.paper' }}>
               <Typography
                 variant="subtitle1"
                 fontWeight={800}

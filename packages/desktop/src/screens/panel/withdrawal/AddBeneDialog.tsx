@@ -145,7 +145,7 @@ export function AddBeneDialog({
       onClose={() => !saving && onClose()}
       fullWidth
       maxWidth="sm"
-      PaperProps={{ sx: { bgcolor: '#1a1a1f', borderRadius: 2 } }}
+      PaperProps={{ sx: { bgcolor: 'background.paper', borderRadius: 2 } }}
     >
       <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>Select Bank Account Name</DialogTitle>
       <DialogContent dividers sx={{ borderColor: '#2a2a32' }}>

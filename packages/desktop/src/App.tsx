@@ -12,7 +12,10 @@ import { MemoryRouter, Routes, Route, Navigate, useLocation } from 'react-router
 import { Box, CircularProgress, CssBaseline, ThemeProvider } from '@mui/material';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { theme } from '@/theme';
+import {
+  ColorModeProvider,
+  useColorMode,
+} from '@/context/ColorModeContext';
 import { LocationProvider } from '@/controllers/LocationProvider';
 import { AstroSite } from '@/screens/AstroSite';
 import { Login } from '@/screens/Login';
@@ -432,6 +435,15 @@ function PanelPathTracker() {
 }
 
 export default function App() {
+  return (
+    <ColorModeProvider>
+      <AppInner />
+    </ColorModeProvider>
+  );
+}
+
+function AppInner() {
+  const { theme, resolved } = useColorMode();
   const [user, setUser] = useState<AuthUser | null>(null);
   // Always open on the ThirdEye site — never auto-enter the panel.
   const [screen, setScreen] = useState<AppScreen>('site');
@@ -818,7 +830,7 @@ export default function App() {
 
         <UpdateToast />
       </LocationProvider>
-      <ToastContainer position="top-center" theme="dark" autoClose={3000} />
+      <ToastContainer position="top-center" theme={resolved} autoClose={3000} />
     </ThemeProvider>
   );
 }

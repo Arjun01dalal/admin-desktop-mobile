@@ -11,6 +11,8 @@ import { secureApi, setAuthFailureHandler } from '../api/client';
 import { appStorage, hydrateStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
 import { registerSosPush } from '../push/sosPush';
+import { resetTokenValidationThrottle } from './sessionCheck';
+import { useTokenValidator } from './useTokenValidator';
 import type { AuthUser } from '../types/auth';
 
 type AuthState = {
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback((newToken: string, newUser: AuthUser) => {
+    resetTokenValidationThrottle();
     appStorage.setItem('token', newToken);
     appStorage.setItem('user', JSON.stringify(newUser));
     if (newUser.Role_ID) appStorage.setItem('role_id', String(newUser.Role_ID));
@@ -65,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     appStorage.removeItem('user');
     appStorage.removeItem('role_id');
     appStorage.removeItem('role');
+    resetTokenValidationThrottle();
     setToken(null);
     setUser(null);
   }, []);
@@ -79,6 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => setAuthFailureHandler(null);
   }, [logout]);
 
+  // Single-session: poll check-token-blacklisted while logged in.
+  useTokenValidator(Boolean(token), (reason) => {
+    console.log(`[auth] session superseded (${reason}); logging out`);
+    logout();
+  });
+
   const value = useMemo(
     () => ({ ready, token, user, login, logout }),
     [ready, token, user, login, logout],
@@ -86,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
 
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);

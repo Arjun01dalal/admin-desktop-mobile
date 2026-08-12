@@ -931,7 +931,7 @@ export function FundRequestPage() {
         onClose={() => !editSaving && setEditOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+        PaperProps={{ sx: { bgcolor: 'background.paper' } }}
       >
         <DialogTitle>Change Deposit Status</DialogTitle>
         <DialogContent>

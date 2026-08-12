@@ -186,7 +186,6 @@ export const KPI_MAP = {
 // 6) Profit & Loss page columns
 // ---------------------------------------------------------------------------
 export const PROFIT_LOSS_COLUMN_MAP = [
-  { original: 'Deposite', jyotish: 'Deposit' },
   { original: 'Bet Amount', jyotish: 'Panja' },
   { original: 'Win Amount', jyotish: 'Jaya' },
   { original: 'Withdraw', jyotish: 'Refund' },

@@ -16,6 +16,8 @@ import { persistRoleFromLogin } from '@/auth/permissions';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import type { AddressInfo, AuthUser } from '@/types/gcalc';
 import { getAuthToken, setAuthToken } from '@/utils/authToken';
+import { resetTokenValidationThrottle } from '@/utils/sessionCheck';
+import { resetSessionExpiredGuard } from '@/utils/session';
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
@@ -147,6 +149,8 @@ export function Login({ onSuccess, onBack }: Props) {
       else localStorage.removeItem('mobile');
 
       localStorage.removeItem('global_logout');
+      resetTokenValidationThrottle();
+      resetSessionExpiredGuard();
       localStorage.setItem('role_id', String(result.user.Role_ID || ''));
       localStorage.setItem('user', JSON.stringify(result.user));
       await setAuthToken(result.token);
@@ -159,8 +163,19 @@ export function Login({ onSuccess, onBack }: Props) {
         // Keep login Responsibilities from verify-otp if sync fails.
       }
 
+      // Use storage after sync so side nav sees updated Responsibilities.
+      const syncedUser =
+        (() => {
+          try {
+            const raw = localStorage.getItem('user');
+            return raw ? (JSON.parse(raw) as AuthUser) : null;
+          } catch {
+            return null;
+          }
+        })() || result.user;
+
       toast.success('Login successful');
-      onSuccess(result.user, result.token);
+      onSuccess(syncedUser, result.token);
     } finally {
       setLoading(false);
     }

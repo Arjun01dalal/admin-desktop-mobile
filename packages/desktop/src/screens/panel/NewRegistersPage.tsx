@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -11,18 +11,34 @@ import {
   Typography,
   Pagination,
 } from '@mui/material';
-import { todayIST, getStoredUser } from '@/utils/dates';
+import {
+  formatDisplayDate,
+  formatDisplayTime,
+  todayIST,
+  getStoredUser,
+} from '@/utils/dates';
 import { getRoleId } from '@/auth/permissions';
+import { secureApi } from '@/api/secureClient';
 import { CommonTable } from '@/components/CommonTable';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
 import { NewRegistersToolbar } from './newRegisters/NewRegistersToolbar';
 import { NewRegistersFiltersProvider } from './newRegisters/FiltersContext';
-import { useNewRegistersColumns } from './newRegisters/useNewRegistersColumns';
+import {
+  registrationCallLogs,
+  registrationComments,
+  useNewRegistersColumns,
+} from './newRegisters/useNewRegistersColumns';
 import { useNewRegistersQuery } from './newRegisters/useNewRegistersQuery';
 import { useNewRegistersActions } from './newRegisters/useNewRegistersActions';
-import type { UserRow } from './newRegisters/types';
+import type {
+  ActiveStatusFilter,
+  NewRegistrationFilter,
+  RegistrationCallLog,
+  RegistrationComment,
+  UserRow,
+} from './newRegisters/types';
 
 const MAX_REMARK_LENGTH = 500;
 
@@ -38,6 +54,7 @@ function isNewRegistersCaller(roleId?: string): boolean {
 
 export function NewRegistersPage() {
   const admin = getStoredUser<{
+    _id?: string;
     name?: string;
     empCode?: string;
     Role_ID?: string;
@@ -45,6 +62,7 @@ export function NewRegistersPage() {
     serverId?: string | number;
     clientName?: string | string[];
     allotedApps?: string | string[];
+    accessibleStates?: string[];
   }>();
   const isCaller = isNewRegistersCaller(admin?.Role_ID);
 
@@ -60,9 +78,44 @@ export function NewRegistersPage() {
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [campaignName, setCampaignName] = useState('');
+  const [activeStatus, setActiveStatus] = useState<ActiveStatusFilter>('All');
+  const [newRegistration, setNewRegistration] =
+    useState<NewRegistrationFilter>('True');
+  const [otherState, setOtherState] = useState(false);
+  const [nonPerforming, setNonPerforming] = useState(false);
   const [blockTarget, setBlockTarget] = useState<UserRow | null>(null);
   const [remark, setRemark] = useState('');
+  const [appVersions, setAppVersions] = useState<Record<string, string>>({});
 
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentUserId, setCommentUserId] = useState('');
+  const [commentInput, setCommentInput] = useState('');
+  const [viewCommentsOpen, setViewCommentsOpen] = useState(false);
+  const [viewComments, setViewComments] = useState<RegistrationComment[]>([]);
+  const [viewCommentsName, setViewCommentsName] = useState('');
+  const [viewLogsOpen, setViewLogsOpen] = useState(false);
+  const [viewLogs, setViewLogs] = useState<RegistrationCallLog[]>([]);
+  const [viewLogsName, setViewLogsName] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await secureApi<{ clientName?: string; version?: string }[]>(
+        'users.appVersions',
+        {},
+      );
+      if (cancelled || !res.ok) return;
+      const list = Array.isArray(res.data) ? res.data : [];
+      const map: Record<string, string> = {};
+      for (const item of list) {
+        if (item?.clientName) map[item.clientName] = String(item.version ?? '');
+      }
+      setAppVersions(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [searchName, setSearchName] = useState('');
   const [searchDpId, setSearchDpId] = useState('');
   const [userComesFrom, setUserComesFrom] = useState('');
@@ -96,6 +149,10 @@ export function NewRegistersPage() {
       searchReferralCodeUser,
       searchMobile,
       showEmptyRecord,
+      activeStatus,
+      newRegistration,
+      otherState,
+      nonPerforming,
     }),
     [
       searchName,
@@ -113,6 +170,10 @@ export function NewRegistersPage() {
       searchReferralCodeUser,
       searchMobile,
       showEmptyRecord,
+      activeStatus,
+      newRegistration,
+      otherState,
+      nonPerforming,
     ],
   );
 
@@ -126,22 +187,42 @@ export function NewRegistersPage() {
   );
   const deferredRows = useDeferredValue(rows);
 
-  const { dialerLoading, toggleBlock, addToDialer } = useNewRegistersActions(
-    admin,
-    load,
-    page,
-  );
+  const { dialerLoading, toggleBlock, addComment, addToDialer } =
+    useNewRegistersActions(admin, load, page);
 
   const applyFilters = useCallback(() => {
     setPage(1);
     void load(1);
   }, [load]);
 
+  const openAddComment = useCallback((row: UserRow) => {
+    setCommentUserId(String(row._id || ''));
+    setCommentInput('');
+    setCommentOpen(true);
+  }, []);
+
+  const openViewComments = useCallback((row: UserRow) => {
+    setViewComments(registrationComments(row));
+    setViewCommentsName(String(row.name || ''));
+    setViewCommentsOpen(true);
+  }, []);
+
+  const openViewCallLogs = useCallback((row: UserRow) => {
+    setViewLogs(registrationCallLogs(row));
+    setViewLogsName(String(row.name || ''));
+    setViewLogsOpen(true);
+  }, []);
+
   const columns = useNewRegistersColumns({
     page,
     itemsPerPage,
     setBlockTarget,
     isCaller,
+    appVersions,
+    onAddComment: openAddComment,
+    onViewComments: openViewComments,
+    onViewCallLogs: openViewCallLogs,
+    onCallSuccess: () => void load(page),
   });
 
   const filtersValue = useMemo(
@@ -202,8 +283,8 @@ export function NewRegistersPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        New Registers
+      <Typography variant="h5" fontWeight={700} mb={1.5}>
+        New Registration
       </Typography>
 
       <NewRegistersToolbar
@@ -211,6 +292,10 @@ export function NewRegistersPage() {
         endDate={endDate}
         itemsPerPage={itemsPerPage}
         campaignName={campaignName}
+        activeStatus={activeStatus}
+        newRegistration={newRegistration}
+        otherState={otherState}
+        nonPerforming={nonPerforming}
         total={total}
         loading={loading}
         dialerLoading={dialerLoading}
@@ -221,6 +306,23 @@ export function NewRegistersPage() {
           setPage(1);
         }}
         onCampaignNameChange={setCampaignName}
+        onActiveStatusChange={(v) => {
+          setActiveStatus(v);
+          setPage(1);
+        }}
+        onNewRegistrationChange={(v) => {
+          setNewRegistration(v);
+          setPage(1);
+        }}
+        onOtherStateChange={(v) => {
+          setOtherState(v);
+          if (v) setSelectedState([]);
+          setPage(1);
+        }}
+        onNonPerformingChange={(v) => {
+          setNonPerforming(v);
+          setPage(1);
+        }}
         onApply={applyFilters}
         onAddToDialer={() => {
           void addToDialer(campaignName, rows).then((ok) => {
@@ -237,9 +339,11 @@ export function NewRegistersPage() {
           loading={loading}
           emptyMessage="No users"
           stickyHeader
-          minWidth={3200}
+          minWidth={3600}
           dense
           virtualize
+          maxHeight="calc(100vh - 250px)"
+          paper
         />
       </NewRegistersFiltersProvider>
 
@@ -284,6 +388,172 @@ export function NewRegistersPage() {
           >
             Confirm
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={commentOpen}
+        onClose={() => setCommentOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Comment</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            label="Comment"
+            value={commentInput}
+            onChange={(e) => setCommentInput(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCommentOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              void addComment(commentUserId, commentInput).then((ok) => {
+                if (ok) {
+                  setCommentOpen(false);
+                  setCommentInput('');
+                  setCommentUserId('');
+                }
+              });
+            }}
+          >
+            Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={viewCommentsOpen}
+        onClose={() => setViewCommentsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Comments{viewCommentsName ? ` — ${viewCommentsName}` : ''}
+        </DialogTitle>
+        <DialogContent>
+          {viewComments.length === 0 ? (
+            <Box
+              sx={{
+                textAlign: 'center',
+                color: 'text.secondary',
+                py: 3.5,
+                fontSize: 14,
+              }}
+            >
+              No Comments
+            </Box>
+          ) : (
+            <Stack spacing={1.25} sx={{ maxHeight: 420, overflowY: 'auto', pr: 0.5 }}>
+              {viewComments.map((c, i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    bgcolor: 'action.hover',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    p: '12px 14px',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      m: 0,
+                      mb: 1,
+                      color: 'text.primary',
+                      fontSize: 14,
+                      lineHeight: 1.45,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {c.comment || '-'}
+                  </Typography>
+                  <Stack direction="row" flexWrap="wrap" gap="8px 14px">
+                    <Typography sx={{ color: 'text.secondary', fontSize: 12 }}>
+                      {c.who?.userName || '-'}
+                    </Typography>
+                    <Typography sx={{ color: 'text.secondary', fontSize: 12 }}>
+                      {formatDisplayDate(c.createdOn || c.createdAt || c.date) || '-'}{' '}
+                      {formatDisplayTime(c.createdOn || c.createdAt || c.date) || ''}
+                    </Typography>
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewCommentsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={viewLogsOpen}
+        onClose={() => setViewLogsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Call Logs{viewLogsName ? ` — ${viewLogsName}` : ''}
+        </DialogTitle>
+        <DialogContent>
+          {viewLogs.length === 0 ? (
+            <Box
+              sx={{
+                textAlign: 'center',
+                color: 'text.secondary',
+                py: 3.5,
+                fontSize: 14,
+              }}
+            >
+              No Call Logs
+            </Box>
+          ) : (
+            <Stack spacing={1.25} sx={{ maxHeight: 420, overflowY: 'auto', pr: 0.5 }}>
+              {viewLogs.map((log, i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    bgcolor: 'action.hover',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    p: '12px 14px',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      m: 0,
+                      mb: 1,
+                      color: 'text.primary',
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {log.who?.userName || '-'}
+                    {log.status ? ` · ${log.status}` : ''}
+                  </Typography>
+                  <Typography sx={{ color: 'text.secondary', fontSize: 12 }}>
+                    {formatDisplayDate(log.createdOn || log.createdAt || log.date) ||
+                      '-'}{' '}
+                    {formatDisplayTime(log.createdOn || log.createdAt || log.date) ||
+                      ''}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewLogsOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

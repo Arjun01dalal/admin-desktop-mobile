@@ -4,6 +4,7 @@
  * Encrypted responses arrive as response.data.data (string) and are decrypted,
  * then unwrapped to `.payload` unless keepDataEnvelope.
  */
+import { isAuthFailureMessage } from '@astro/shared';
 import { REGISTRY, type SecureAction } from './registry.generated';
 import { encryptPayload, decryptPayload } from './crypto';
 import { getApiBaseUrl } from '../config';
@@ -32,18 +33,16 @@ export function setAuthFailureHandler(handler: AuthFailureHandler | null): void 
   authFailureHandler = handler;
 }
 
+/** Login/OTP — never treat failures as an existing-session logout. */
+const SKIP_SESSION_LOGOUT = new Set<SecureAction>([
+  'auth.sendOtp',
+  'auth.verifyOtp',
+  'auth.getResponsibility',
+]);
+
 /** True when the response signals an invalid/blacklisted/expired session. */
 function isAuthFailure(status: number | undefined, message: string): boolean {
-  if (status === 401) return true;
-  const m = message.toLowerCase();
-  return (
-    m.includes('blacklist') ||
-    m.includes('token expired') ||
-    m.includes('invalid token') ||
-    m.includes('jwt expired') ||
-    m.includes('unauthorized') ||
-    m.includes('unauthenticated')
-  );
+  return isAuthFailureMessage(status, message);
 }
 
 function pickMessage(body: unknown, fallback: string): string {
@@ -54,6 +53,19 @@ function pickMessage(body: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+function maybeAuthFailure(
+  action: SecureAction,
+  hadToken: boolean,
+  status: number | undefined,
+  message: string,
+): void {
+  if (SKIP_SESSION_LOGOUT.has(action)) return;
+  if (!hadToken) return;
+  if (!isAuthFailure(status, message)) return;
+  authFailureHandler?.(message || 'Session expired. Please login again.');
+}
+
 
 export async function secureApi<T = unknown>(
   action: SecureAction,
@@ -68,6 +80,7 @@ export async function secureApi<T = unknown>(
 
   try {
     const token = tokenOverride ?? appStorage.getItem('token');
+    const hadToken = Boolean(token);
 
     // _clientName -> client-name header (mirrors desktop behaviour)
     const { _clientName, ...rest } = payload ?? {};
@@ -134,9 +147,7 @@ export async function secureApi<T = unknown>(
         `[api] ${action} failed: HTTP ${res.status} body=${JSON.stringify(json)?.slice(0, 300)}`,
       );
       const message = pickMessage(json, `Request failed (${res.status})`);
-      if (isAuthFailure(res.status, message)) {
-        authFailureHandler?.(message);
-      }
+      maybeAuthFailure(action, hadToken, res.status, message);
       return { ok: false, status: res.status, message };
     }
 
@@ -179,8 +190,25 @@ export async function secureApi<T = unknown>(
     // Some backends return HTTP 200 with success:false + a blacklist/expired
     // message instead of a 401. Catch that here too.
     const okMessage = typeof data?.message === 'string' ? data.message : '';
-    if (data?.success === false && isAuthFailure(undefined, okMessage)) {
-      authFailureHandler?.(okMessage);
+    if (data?.success === false) {
+      maybeAuthFailure(action, hadToken, undefined, okMessage);
+    }
+
+    // Opportunistic single-session check after authenticated panel actions.
+    if (hadToken && !SKIP_SESSION_LOGOUT.has(action) && action !== 'auth.checkTokenBlacklisted') {
+      void import('../auth/sessionCheck')
+        .then(async ({ runTokenValidation, wasCheckedRecently }) => {
+          if (wasCheckedRecently(10_000)) return;
+          const status = await runTokenValidation({ force: true });
+          if (status === 'invalid') {
+            authFailureHandler?.(
+              'You were logged in elsewhere. Please login again.',
+            );
+          }
+        })
+        .catch(() => {
+          /* ignore */
+        });
     }
 
     return {
@@ -201,3 +229,4 @@ export async function secureApi<T = unknown>(
     return { ok: false, message };
   }
 }
+

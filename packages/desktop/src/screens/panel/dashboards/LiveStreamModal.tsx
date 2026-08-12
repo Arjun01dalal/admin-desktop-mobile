@@ -30,7 +30,7 @@ export function LiveStreamModal({ open, onClose, streamId }: Props) {
           transform: 'translate(-50%, -50%)',
           width: '90%',
           maxWidth: 900,
-          bgcolor: '#1a1a1f',
+          bgcolor: 'background.paper',
           borderRadius: 2,
           boxShadow: 24,
           p: 2,

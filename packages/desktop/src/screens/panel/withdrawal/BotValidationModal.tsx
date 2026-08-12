@@ -28,7 +28,7 @@ export function BotValidationModal({ open, items, onClose }: Props) {
       onClose={onClose}
       fullWidth
       maxWidth="md"
-      PaperProps={{ sx: { bgcolor: '#1a1a1f' } }}
+      PaperProps={{ sx: { bgcolor: 'background.paper' } }}
     >
       <DialogTitle>Bot Validation Results</DialogTitle>
       <DialogContent>

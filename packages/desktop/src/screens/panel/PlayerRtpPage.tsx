@@ -146,7 +146,7 @@ const fieldSx = {
 
 const filterFieldSx = {
   minWidth: 120,
-  '& .MuiInputBase-root': { bgcolor: '#1a1a1f', fontSize: 12 },
+  '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
 };
 
 const orangeBtnSx = {
@@ -489,7 +489,7 @@ export function PlayerRtpPage() {
         </Stack>
       </Stack>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             type="date"

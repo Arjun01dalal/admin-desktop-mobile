@@ -169,7 +169,7 @@ export function DashboardUsersListPage({ mode }: Props) {
         {toDisplayText(meta.title)}
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack
           direction="row"
           spacing={1.5}

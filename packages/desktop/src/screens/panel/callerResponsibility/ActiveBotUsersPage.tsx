@@ -106,7 +106,7 @@ export function ActiveBotUsersPage() {
         Active Bot Users ({total || rows.length})
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}

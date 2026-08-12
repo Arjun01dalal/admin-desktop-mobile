@@ -403,7 +403,7 @@ export function CallerDepositListPage() {
         <Typography variant="h5" fontWeight={700} mb={2}>
           {title}
         </Typography>
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             No caller selected.
           </Typography>
@@ -419,7 +419,7 @@ export function CallerDepositListPage() {
       </Typography>
 
       {(isWithdrawal || isUniquePending) && (
-        <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', overflow: 'auto' }}>
+        <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', overflow: 'auto' }}>
           <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="nowrap">
             {isWithdrawal && (
               <>

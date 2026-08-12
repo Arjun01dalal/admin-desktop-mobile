@@ -52,7 +52,7 @@ const orangeBtnSx = {
 const kpiSx = {
   px: 1.5,
   py: 1,
-  bgcolor: '#1a1a1f',
+  bgcolor: 'background.paper',
   border: '1px solid rgba(255,255,255,0.12)',
   borderRadius: 1,
   fontWeight: 700,
@@ -366,7 +366,7 @@ export function FundsPayinPage() {
         <Typography variant="h5" fontWeight={700} mb={2}>
           Funds — Payin
         </Typography>
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             No MID selected. Open a MID from the Funds MID list.
           </Typography>

@@ -1,20 +1,32 @@
 /** Typed wrapper around window.gcalc.secureApi — no URLs or secrets here. */
 
 import type { ApiResult } from '@astro/shared';
+import { isAuthFailureMessage } from '@astro/shared';
 import { sanitizeBridgePayload } from './bridgeSanitize';
 import { isSecureAction, type SecureAction } from './secureActions';
 import { getAuthToken } from '@/utils/authToken';
 import {
-  isAuthExpiredStatus,
   isJwtExpired,
   notifySessionExpired,
 } from '@/utils/session';
+import { scheduleSessionRecheck } from '@/utils/sessionCheck';
 
 /** Login/OTP flows — never treat their 401s as a session logout. */
 const SKIP_SESSION_LOGOUT = new Set<SecureAction>([
   'auth.sendOtp',
   'auth.verifyOtp',
   'auth.getResponsibility',
+]);
+
+/** Endpoints that already ARE the session check — don't nest another recheck. */
+const SKIP_SESSION_RECHECK = new Set<SecureAction>([
+  'auth.sendOtp',
+  'auth.verifyOtp',
+  'auth.getResponsibility',
+  'auth.checkTokenBlacklisted',
+  'auth.getAllBlockedUserIds',
+  'auth.getSosFlag',
+  'auth.getAllSosBlocks',
 ]);
 
 /** @deprecated Prefer ApiResult from @astro/shared/api — alias kept for existing imports. */
@@ -25,13 +37,24 @@ function maybeExpireSession(
   hadToken: boolean,
   status?: number,
   message?: string,
+  success?: boolean,
 ): void {
   if (SKIP_SESSION_LOGOUT.has(action)) return;
   if (!hadToken) return;
-  if (!isAuthExpiredStatus(status)) return;
-  notifySessionExpired(
-    message || 'Session expired. Please login again.',
-  );
+
+  if (isAuthFailureMessage(status, message)) {
+    notifySessionExpired(
+      message || 'Session expired. Please login again.',
+    );
+    return;
+  }
+
+  // Some backends return HTTP 200 with success:false + blacklist/expired text.
+  if (success === false && isAuthFailureMessage(undefined, message)) {
+    notifySessionExpired(
+      message || 'Session expired. Please login again.',
+    );
+  }
 }
 
 export async function secureApi<T = unknown>(
@@ -72,8 +95,16 @@ export async function secureApi<T = unknown>(
   const message =
     typeof result.message === 'string' ? result.message : undefined;
   const status = typeof result.status === 'number' ? result.status : undefined;
+  const success =
+    typeof result.success === 'boolean' ? result.success : undefined;
 
-  maybeExpireSession(action, hadToken, status, message);
+  maybeExpireSession(action, hadToken, status, message, success);
+
+  // After any authenticated panel action, opportunistically confirm this token
+  // is still the latest session (another panel may have logged in).
+  if (hadToken && !SKIP_SESSION_RECHECK.has(action)) {
+    scheduleSessionRecheck();
+  }
 
   return {
     ok: result.ok === true,

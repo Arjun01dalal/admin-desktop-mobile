@@ -91,7 +91,7 @@ export default function UpdateBetStatusModal({
       onClose={handleClose}
       fullWidth
       maxWidth="xs"
-      PaperProps={{ sx: { maxWidth: 380, bgcolor: '#1a1a1f' } }}
+      PaperProps={{ sx: { maxWidth: 380, bgcolor: 'background.paper' } }}
     >
       <DialogTitle>{toDisplayText('Update Bet Status')}</DialogTitle>
       <DialogContent>

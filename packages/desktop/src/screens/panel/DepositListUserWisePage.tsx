@@ -49,7 +49,7 @@ export function DepositListUserWisePage() {
         <Typography variant="h5" fontWeight={700} mb={2}>
           Deposit List
         </Typography>
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             No MID breakdown selected. Open Deposit / Withdrawal details from
             Deposit List.

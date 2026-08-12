@@ -106,7 +106,7 @@ export function CheckersReportPage() {
         Checkers Report
       </Typography>
 
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1f', width: '100%' }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', width: '100%' }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             type="date"

@@ -195,7 +195,7 @@ export function CasinoTopupBalancePage() {
         <Typography variant="h5" fontWeight={700} mb={2}>
           {toDisplayText('Casino Top-up Balance')}
         </Typography>
-        <Paper sx={{ p: 2, bgcolor: '#1a1a1f' }}>
+        <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
             You do not have permission to view this page.
           </Typography>
@@ -214,7 +214,7 @@ export function CasinoTopupBalancePage() {
         elevation={0}
         sx={{
           p: 2,
-          bgcolor: '#1a1a1f',
+          bgcolor: 'background.paper',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 2,
           minWidth: 0,

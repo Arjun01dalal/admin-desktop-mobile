@@ -22,6 +22,7 @@ import {
   type SxProps,
   type Theme,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -37,7 +38,7 @@ function displayColLabel(label: ReactNode): ReactNode {
 
 /**
  * Shared table styles.
- * Update this object once to change table UI on every page.
+ * Update these objects once to change table UI on every page.
  */
 export const commonTableStyles = {
   paper: {
@@ -82,7 +83,7 @@ export const commonTableStyles = {
   } satisfies SxProps<Theme>,
 };
 
-/** Light table tone for User Report / Laxmi-style pages. */
+/** Light table tone for User Report / Laxmi-style pages + app light mode. */
 export const commonTableStylesLight = {
   paper: {
     bgcolor: '#fff',
@@ -114,7 +115,7 @@ export const commonTableStylesLight = {
     whiteSpace: 'nowrap',
     fontSize: 12,
     color: '#111',
-    bgcolor: '#fff',
+    bgcolor: '#f5f5f7',
     border: '1px solid #ddd',
     py: 0.75,
     px: 1,
@@ -122,6 +123,16 @@ export const commonTableStylesLight = {
     textAlign: 'center',
   } satisfies SxProps<Theme>,
 };
+
+export type CommonTableTone = 'auto' | 'dark' | 'light';
+
+export function resolveCommonTableTone(
+  tone: CommonTableTone | undefined,
+  paletteMode: 'light' | 'dark',
+): 'dark' | 'light' {
+  if (tone === 'dark' || tone === 'light') return tone;
+  return paletteMode === 'light' ? 'light' : 'dark';
+}
 
 export type CommonTableColumn<T> = {
   id: string;
@@ -171,8 +182,12 @@ export type CommonTableProps<T> = {
   maxHeight?: number | string;
   /** Estimated row height for the virtualizer (default dense ? 40 : 48). */
   estimateRowHeight?: number;
-  /** Use Laxmi-style light table (orange header, black text). */
-  tone?: 'dark' | 'light';
+  /**
+   * Table appearance.
+   * - `auto` (default): follows app Light/Dark theme
+   * - `light` / `dark`: force that tone
+   */
+  tone?: CommonTableTone;
 };
 
 type BodyRowProps<T> = {
@@ -302,6 +317,7 @@ function BodyRowInner<T>({
                       }
                     : {
                         // minWidth only — maxWidth + ellipsis clips short numeric cols (e.g. "#").
+                        // Pages that need a hard cap can set maxWidth via cellSx / headSx.
                         width: widthPx,
                         minWidth: widthPx,
                         boxSizing: 'border-box',
@@ -347,10 +363,13 @@ export function CommonTable<T>({
   virtualizeThreshold = 40,
   maxHeight = 560,
   estimateRowHeight,
-  tone = 'dark',
+  tone = 'auto',
 }: CommonTableProps<T>) {
   useRevealCodes(); // re-render headers when Reveal codes toggles
-  const styles = tone === 'light' ? commonTableStylesLight : commonTableStyles;
+  const theme = useTheme();
+  const resolvedTone = resolveCommonTableTone(tone, theme.palette.mode);
+  const styles =
+    resolvedTone === 'light' ? commonTableStylesLight : commonTableStyles;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const cellBase: SxProps<Theme> = dense
     ? { ...styles.cell, fontSize: 12, py: 1 }
@@ -382,12 +401,14 @@ export function CommonTable<T>({
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
     ro?.observe(el);
     return () => ro?.disconnect();
-  }, [columns, dense, showFilters, tone]);
+  }, [columns, dense, showFilters, resolvedTone]);
   const filterStickyTop = showFilters ? labelRowHeight : 0;
   const stickyOffsets = useMemo(() => buildStickyOffsets(columns), [columns]);
   const stickyHeadBg = '#ff9f0a';
-  const stickyFilterBg = tone === 'light' ? '#fff' : '#2c3340';
-  const stickyBodyBg = tone === 'light' ? '#fff' : '#1a1a1f';
+  const stickyFilterBg = resolvedTone === 'light' ? '#f5f5f7' : '#2c3340';
+  const stickyBodyBg = resolvedTone === 'light' ? '#fff' : '#1a1a1f';
+  const overlayBg =
+    resolvedTone === 'light' ? 'rgba(255,255,255,0.55)' : 'rgba(10, 10, 14, 0.55)';
 
   const virtualizer = useVirtualizer({
     count: shouldVirtualize ? rows.length : 0,
@@ -663,7 +684,7 @@ export function CommonTable<T>({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'rgba(10, 10, 14, 0.55)',
+            bgcolor: overlayBg,
             zIndex: 60,
             borderRadius: 1,
           }}

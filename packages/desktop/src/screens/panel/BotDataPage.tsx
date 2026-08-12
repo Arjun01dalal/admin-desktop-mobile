@@ -14,6 +14,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getStoredUser, todayIST } from '@/utils/dates';
 import { BOT_ID_OPTIONS } from '@/screens/panel/callLogs/constants';
+import { pushToBotDialer } from '@/screens/panel/shared/pushToBotDialer';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { mapUsersToBotSettings } from '@/screens/panel/users/toolbarHelpers';
 
@@ -149,7 +150,7 @@ export function BotDataPage() {
       const dialout_settings = entries.flatMap(([botId, users]) =>
         mapUsersToBotSettings(users as never[], botId, userType),
       );
-      const res = await secureApi('callLogs.addToBotDialer', {
+      const res = await pushToBotDialer({
         userId: user?._id,
         created_by: user?.name,
         dialout_settings,
@@ -158,7 +159,7 @@ export function BotDataPage() {
         toast.error(res.message || 'Failed to add to dialer');
         return;
       }
-      toast.success(res.message || `Pushed ${dialout_settings.length} leads`);
+      toast.success(res.message || `Pushed ${res.pushed} leads`);
       setBotMap({});
     } finally {
       setPushing(false);
@@ -172,7 +173,7 @@ export function BotDataPage() {
           mb: 1.5,
           p: 1.5,
           borderRadius: 1.5,
-          bgcolor: '#1a1a1f',
+          bgcolor: 'background.paper',
           border: '1px solid rgba(255,255,255,0.08)',
         }}
       >
@@ -373,7 +374,7 @@ export function BotDataPage() {
               key={card.botId}
               sx={{
                 p: 1.5,
-                bgcolor: '#1a1a1f',
+                bgcolor: 'background.paper',
                 border: '1px solid rgba(255,159,10,0.35)',
                 borderRadius: 1.5,
               }}
