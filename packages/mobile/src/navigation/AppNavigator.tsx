@@ -7,7 +7,8 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import Constants from 'expo-constants';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
@@ -183,15 +184,21 @@ function ThemePicker() {
     setMode(next);
     void (async () => {
       try {
+        if (Platform.OS === 'web') {
+          // Web preview: plain page reload.
+          (globalThis as { location?: { reload: () => void } }).location?.reload();
+          return;
+        }
+        if (Constants.appOwnership === 'expo') {
+          // Expo Go has no expo-updates native module — use dev reload.
+          const { DevSettings } = await import('react-native');
+          DevSettings.reload();
+          return;
+        }
         const Updates = await import('expo-updates');
         await Updates.reloadAsync();
       } catch {
-        try {
-          const { DevSettings } = await import('react-native');
-          DevSettings.reload();
-        } catch {
-          Alert.alert('Theme saved', 'Close and reopen the app to apply the new theme.');
-        }
+        Alert.alert('Theme saved', 'Close and reopen the app to apply the new theme.');
       }
     })();
   };
