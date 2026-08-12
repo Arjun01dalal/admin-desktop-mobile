@@ -449,7 +449,7 @@ export function NewRegistersScreen() {
         <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
       }
     >
-      <Text style={styles.title}>New Registers</Text>
+      <Text style={styles.title}>New Registration</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
         {serverCount !== null && serverCount !== rows.length

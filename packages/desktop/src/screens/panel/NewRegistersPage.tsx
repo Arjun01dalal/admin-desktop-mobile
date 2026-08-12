@@ -284,7 +284,7 @@ export function NewRegistersPage() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={1.5}>
-        New Registers
+        New Registration
       </Typography>
 
       <NewRegistersToolbar

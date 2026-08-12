@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import { monthStartIST, todayIST, formatAmount } from '@/utils/dates';
+import { canAccessNavItem, Permissions } from '@/auth/permissions';
 import TransactionTable from './houseGames/TransactionTable';
 import UpdateBetStatusModal from './houseGames/UpdateBetStatusModal';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -25,6 +26,10 @@ import type { HouseGameTransaction } from './houseGames/types';
 
 export function HouseGamesPage() {
   useRevealCodes();
+  const canView = canAccessNavItem({
+    id: 'houseGames',
+    permission: Permissions.house_game,
+  });
   const [startDate, setStartDate] = useState(monthStartIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [itemsPerPage, setItemsPerPage] = useState(50);
@@ -64,6 +69,16 @@ export function HouseGamesPage() {
     setSelectedItem(item);
     setShowUpdateModal(true);
   }, []);
+
+  if (!canView) {
+    return (
+      <Box sx={{ px: 1.5, py: 2 }}>
+        <Typography color="text.secondary">
+          You do not have permission to view this page.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>

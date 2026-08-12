@@ -92,7 +92,7 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
   },
   {
     path: '/new-registers',
-    title: 'New Registers',
+    title: 'New Registration',
     Component: NewRegistersScreen as PanelDetailRoute['Component'],
   },
   {

@@ -133,7 +133,7 @@ export function ProfitLossScreen() {
       { key: 'name', label: 'User Name', width: 140, render: (r) => String(r.name || '—') },
       { key: 'mobile', label: 'Mobile No', width: 110, render: (r) => maskMobile(r.mobile, canShowMobile) },
       { key: 'startBalance', label: 'Start Balance', width: 110, align: 'right', render: (r) => fmt(r.balance) },
-      { key: 'deposite', label: 'Deposite', width: 100, align: 'right', render: (r) => fmt(r.deposite) },
+      { key: 'deposite', label: 'Deposit', width: 100, align: 'right', render: (r) => fmt(r.deposite) },
       { key: 'betAmount', label: 'Bet Amount', width: 100, align: 'right', render: (r) => fmt(r.betAmount) },
       { key: 'winAmount', label: 'Win Amount', width: 100, align: 'right', render: (r) => fmt(r.totalProfit) },
       { key: 'withdraw', label: 'Refund', width: 100, align: 'right', render: (r) => fmt(r.withdrawl) },

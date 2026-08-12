@@ -11,7 +11,7 @@ export type NavItem = {
 
 /**
  * Panel side nav — visibility is driven by Role_ID → Responsibilities from login.
- * Items without `permission` (Welcome, House Games) are always visible.
+ * Items without `permission` (Welcome) are always visible unless caller-hidden in canAccessNavItem.
  */
 export const NAV_ITEMS: NavItem[] = [
   { id: 'welcome', label: 'Welcome', path: '/welcome' },
@@ -57,7 +57,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/profit-loss',
     permission: Permissions.View_Profit_and_Loss,
   },
-  { id: 'houseGames', label: 'House Games', path: '/house-games' },
+  { id: 'houseGames', label: 'House Krida', path: '/house-games', permission: Permissions.house_game },
   {
     id: 'leaderboard',
     label: 'Leaderboard',
@@ -102,7 +102,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'newRegisters',
-    label: 'New Registers',
+    label: 'New Registration',
     path: '/new-registers',
     permission: Permissions.new_registrations,
   },
@@ -117,12 +117,6 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Users',
     path: '/users',
     permission: Permissions.View_Users,
-  },
-  {
-    id: 'createUser',
-    label: 'Create User',
-    path: '/create-user',
-    permission: Permissions.create_new_user,
   },
   {
     id: 'loginReport',
@@ -276,7 +270,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'withdrawalProviders',
-    label: 'Refund Providers',
+    label: 'Withdrawal Providers',
     path: '/payout-accounts',
     permission: Permissions.View_PayOut_Accounts,
   },
@@ -336,13 +330,13 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'withdrawal',
-    label: 'Refund',
+    label: 'Withdrawal',
     path: '/withdrawal',
     permission: Permissions.View_Withdrawals,
   },
   {
     id: 'withdrawalFund',
-    label: 'Refund Fund',
+    label: 'Withdrawal Fund',
     path: '/withdrawal-fund',
     permission: Permissions.withdrawal_fund,
   },

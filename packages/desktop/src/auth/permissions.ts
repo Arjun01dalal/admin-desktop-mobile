@@ -114,6 +114,8 @@ export const Permissions = {
   New_Deposits: 'New_Deposits',
   Social_Media: 'Social_Media',
   caller_leaderboard_tab: 'caller_leaderboard_tab',
+  /** House Krida side nav + page access. */
+  house_game: 'house_game',
   /** Backend typo — must match Responsibilities string */
   state_wise_registartion: 'state_wise_registartion',
 } as const;
@@ -346,11 +348,15 @@ export function getResponsibilities(
   if (!Array.isArray(raw)) return [];
   return raw
     .map((item) => {
-      if (typeof item === 'string') return item;
-      if (item && typeof item === 'object' && 'name' in item) {
-        return String((item as { name: unknown }).name);
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        const obj = item as Record<string, unknown>;
+        // Prefer Enum (Permissions.*) over display Name.
+        const named =
+          obj.Enum ?? obj.enum ?? obj.name ?? obj.Name ?? obj.key ?? obj.Key;
+        if (named != null && String(named).trim()) return String(named).trim();
       }
-      return String(item ?? '');
+      return '';
     })
     .filter(Boolean);
 }
@@ -535,6 +541,9 @@ export function canAccessNavItem(
   ) {
     return false;
   }
+
+  // Ungated items (Welcome) — always in the drawer for every role except caller-hidden ids above.
+  if (!item.permission && item.id !== 'botPerformance') return true;
 
   // Always show Bot Performance for non-callers (laxminarayan App.tsx mounts it without Responsibility).
   if (item.id === 'botPerformance') return true;

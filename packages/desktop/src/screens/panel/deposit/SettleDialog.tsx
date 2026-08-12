@@ -91,7 +91,7 @@ export function SettleDialog({ open, row, mids, onClose, onDone, onReject }: Pro
           _id: admin?._id || '',
         },
         reason: reason.trim(),
-        remark: `Deposite failure of ${row.userName || ''} through ${gateway || row.paymentGatewayName || ''} pay with order id ${row.orderId} and mobile no ${row.userMobile || row.mobile || ''}`,
+        remark: `Deposit failure of ${row.userName || ''} through ${gateway || row.paymentGatewayName || ''} pay with order id ${row.orderId} and mobile no ${row.userMobile || row.mobile || ''}`,
         tag: 'credit',
         orderId: row.orderId,
         mid: mid || row.mid,

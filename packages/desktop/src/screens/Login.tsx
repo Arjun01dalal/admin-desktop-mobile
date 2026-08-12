@@ -163,8 +163,19 @@ export function Login({ onSuccess, onBack }: Props) {
         // Keep login Responsibilities from verify-otp if sync fails.
       }
 
+      // Use storage after sync so side nav sees updated Responsibilities.
+      const syncedUser =
+        (() => {
+          try {
+            const raw = localStorage.getItem('user');
+            return raw ? (JSON.parse(raw) as AuthUser) : null;
+          } catch {
+            return null;
+          }
+        })() || result.user;
+
       toast.success('Login successful');
-      onSuccess(result.user, result.token);
+      onSuccess(syncedUser, result.token);
     } finally {
       setLoading(false);
     }

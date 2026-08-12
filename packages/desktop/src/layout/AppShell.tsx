@@ -191,7 +191,7 @@ export function AppShell({ onLogout }: Props) {
       officeLocation: String(user?.officeLocation || user?.location || ''),
       userId: String(user?._id || ''),
     });
-  }, [user?._id, user?.officeLocation, user?.location]);
+  }, [user?._id, user?.officeLocation, user?.location, userVersion]);
 
   useEffect(() => {
     const bump = () => setUserVersion((v) => v + 1);
