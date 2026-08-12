@@ -56,7 +56,12 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/profit-loss',
     permission: Permissions.View_Profit_and_Loss,
   },
-  { id: 'houseGames', label: 'House Krida', path: '/house-games' },
+  {
+    id: 'houseGames',
+    label: 'House Krida',
+    path: '/house-games',
+    permission: Permissions.house_game,
+  },
   {
     id: 'leaderboard',
     label: 'Leaderboard',

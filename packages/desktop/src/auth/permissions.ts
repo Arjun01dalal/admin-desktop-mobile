@@ -66,6 +66,7 @@ export const Permissions = {
   casino_delete_button: 'casino_delete_button',
   view_casino_balance: 'view_casino_balance',
   hide_show_games: 'hide_show_games',
+  house_game: 'house_game',
   View_Deposit_List: 'View_Deposit_List',
   Bonus_Wallet_Fund_Request: 'Bonus_Wallet_Fund_Request',
   Bonus_Wallet_Request: 'Bonus_Wallet_Request',
