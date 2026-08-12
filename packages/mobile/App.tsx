@@ -1,62 +1,37 @@
 import 'react-native-gesture-handler';
 import './src/lib/webShim';
-import React, { useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider, useAuth } from './src/auth/AuthContext';
-import { AppNavigator } from './src/navigation/AppNavigator';
-import { CalculatorScreen } from './src/screens/CalculatorScreen';
-import { LoginScreen } from './src/screens/LoginScreen';
-import { LocationRequiredGate } from './src/security/LocationRequiredGate';
-import { SecurityGate } from './src/security/SecurityGate';
-import { useLiveLocation } from './src/security/useLiveLocation';
-import { UpdateGate } from './src/updates/UpdateGate';
-import { colors } from './src/theme';
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { hydrateStorage } from './src/lib/webShim';
+import { applyStoredTheme, colors } from './src/theme';
 
-function Root() {
-  const { ready, token } = useAuth();
-  const [unlocked, setUnlocked] = useState(false);
-
-  // Continuously fetch location while authenticated (compliance/audit).
-  // Hard-blocks the panel when Location is off — desktop LocationProvider parity.
-  const { blocked, loading, error, retry, openSettings } = useLiveLocation(Boolean(token));
-
-  if (!ready) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
-  }
-  if (token) {
-    return (
-      <>
-        <AppNavigator />
-        <LocationRequiredGate
-          open={blocked}
-          loading={loading}
-          error={error}
-          onRetry={retry}
-          onOpenSettings={openSettings}
-        />
-      </>
-    );
-  }
-  if (unlocked) return <LoginScreen onBack={() => setUnlocked(false)} />;
-  return <CalculatorScreen onUnlock={() => setUnlocked(true)} />;
-}
-
+/**
+ * Boot loader: hydrate persisted storage and apply the stored theme BEFORE
+ * requiring the app tree — screens capture theme colors in module-scope
+ * StyleSheet.create, so the palette must be final before those imports run.
+ */
 export default function App() {
-  return (
-    <SafeAreaProvider>
-      <SecurityGate>
-        <AuthProvider>
-          <StatusBar style="light" />
-          <Root />
-          <UpdateGate />
-        </AuthProvider>
-      </SecurityGate>
-    </SafeAreaProvider>
-  );
+  const [AppRoot, setAppRoot] = useState<React.ComponentType | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        await hydrateStorage();
+      } catch {
+        /* storage best-effort — fall back to defaults */
+      }
+      applyStoredTheme();
+      // Lazy require so screen modules evaluate AFTER the palette is set.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('./src/AppRoot') as { default: React.ComponentType };
+      if (alive) setAppRoot(() => mod.default);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!AppRoot) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  return <AppRoot />;
 }

@@ -7,7 +7,8 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
@@ -89,7 +90,7 @@ import { BonusWalletFundRequestScreen } from '../screens/dashboards/details/Bonu
 import { BonusWalletRequestsScreen } from '../screens/dashboards/details/BonusWalletRequestsScreen';
 import { DepositApprovedReportScreen } from '../screens/dashboards/details/DepositApprovedReportScreen';
 import { UniqueDepositPendingScreen } from '../screens/dashboards/details/UniqueDepositPendingScreen';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, getThemeMode, setThemeMode, type ThemeMode } from '../theme';
 
 const Drawer = createDrawerNavigator();
 const RootStack = createNativeStackNavigator();
@@ -167,6 +168,67 @@ function screenNameFor(item: NavItem): string {
   return item.id;
 }
 
+const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+  { value: 'system', label: 'System' },
+];
+
+/** Dark / Light / System selector — theme applies via a JS reload. */
+function ThemePicker() {
+  const [mode, setMode] = useState<ThemeMode>(getThemeMode());
+
+  const pick = (next: ThemeMode) => {
+    if (next === mode) return;
+    setMode(next);
+    void (async () => {
+      // Wait for the choice to be written to disk BEFORE reloading,
+      // otherwise the reload can race the write and the theme stays the same.
+      await setThemeMode(next);
+      try {
+        if (Platform.OS === 'web') {
+          // Web preview: plain page reload.
+          (globalThis as { location?: { reload: () => void } }).location?.reload();
+          return;
+        }
+        // Expo Go has no expo-updates native module — use dev reload there.
+        // (SDK 54: detect Expo Go via executionEnvironment 'storeClient'.)
+        const inExpoGo =
+          Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+          Constants.appOwnership === 'expo';
+        if (inExpoGo || __DEV__) {
+          const { DevSettings } = await import('react-native');
+          DevSettings.reload();
+          return;
+        }
+        const Updates = await import('expo-updates');
+        await Updates.reloadAsync();
+      } catch {
+        Alert.alert('Theme saved', 'Close and reopen the app to apply the new theme.');
+      }
+    })();
+  };
+
+  return (
+    <View style={styles.themeRow}>
+      <Text style={styles.themeLabel}>Theme</Text>
+      <View style={styles.themeChips}>
+        {THEME_OPTIONS.map((opt) => (
+          <TouchableOpacity
+            key={opt.value}
+            style={[styles.themeChip, mode === opt.value && styles.themeChipActive]}
+            onPress={() => pick(opt.value)}
+          >
+            <Text style={[styles.themeChipText, mode === opt.value && styles.themeChipTextActive]}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] }) {
   const { items, ...rest } = props;
   const { logout, user } = useAuth();
@@ -205,6 +267,7 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
           onPress={() => rest.navigation.navigate(screenNameFor(item))}
         />
       ))}
+      <ThemePicker />
       <DrawerItem label="Logout" inactiveTintColor={colors.destructive} onPress={logout} />
     </DrawerContentScrollView>
   );
@@ -457,6 +520,44 @@ export function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
+  themeRow: {
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(3),
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: spacing(2),
+  },
+  themeLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginBottom: spacing(2),
+  },
+  themeChips: {
+    flexDirection: 'row',
+    gap: spacing(2),
+  },
+  themeChip: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  themeChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  themeChipText: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  themeChipTextActive: {
+    color: colors.primaryForeground,
+  },
   drawerHeader: {
     paddingHorizontal: 16,
     paddingVertical: 20,
