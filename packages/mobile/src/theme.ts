@@ -8,6 +8,7 @@
  * (the picker in the drawer triggers one automatically).
  */
 import { Appearance } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appStorage } from './lib/webShim';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
@@ -54,8 +55,18 @@ export function getThemeMode(): ThemeMode {
   return v === 'light' || v === 'system' ? v : 'dark';
 }
 
-export function setThemeMode(mode: ThemeMode): void {
+/**
+ * Persist the theme choice and resolve only once it is actually written to
+ * disk — the caller reloads the JS bundle right after, and a fire-and-forget
+ * write can be lost, making the theme "not change".
+ */
+export async function setThemeMode(mode: ThemeMode): Promise<void> {
   appStorage.setItem(THEME_KEY, mode);
+  try {
+    await AsyncStorage.setItem(THEME_KEY, mode);
+  } catch {
+    /* in-memory value still applies for this session */
+  }
 }
 
 /** Resolve + apply the stored mode. Call after hydrateStorage(), before UI loads. */

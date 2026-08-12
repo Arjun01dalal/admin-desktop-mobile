@@ -25,7 +25,8 @@ const SERVER = String(process.env.EXPO_PUBLIC_SOS_PUSH_SERVER || 'https://ntfy.s
   .trim()
   .replace(/\/$/, '');
 
-const isExpoGo = Constants.appOwnership === 'expo';
+const isExpoGo =
+  Constants.executionEnvironment === 'storeClient' || Constants.appOwnership === 'expo';
 
 let registered = false;
 

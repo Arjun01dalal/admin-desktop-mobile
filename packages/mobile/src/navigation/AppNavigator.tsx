@@ -8,7 +8,7 @@ import {
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
@@ -180,17 +180,23 @@ function ThemePicker() {
 
   const pick = (next: ThemeMode) => {
     if (next === mode) return;
-    setThemeMode(next);
     setMode(next);
     void (async () => {
+      // Wait for the choice to be written to disk BEFORE reloading,
+      // otherwise the reload can race the write and the theme stays the same.
+      await setThemeMode(next);
       try {
         if (Platform.OS === 'web') {
           // Web preview: plain page reload.
           (globalThis as { location?: { reload: () => void } }).location?.reload();
           return;
         }
-        if (Constants.appOwnership === 'expo') {
-          // Expo Go has no expo-updates native module — use dev reload.
+        // Expo Go has no expo-updates native module — use dev reload there.
+        // (SDK 54: detect Expo Go via executionEnvironment 'storeClient'.)
+        const inExpoGo =
+          Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+          Constants.appOwnership === 'expo';
+        if (inExpoGo || __DEV__) {
           const { DevSettings } = await import('react-native');
           DevSettings.reload();
           return;
