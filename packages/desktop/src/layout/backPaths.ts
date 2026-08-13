@@ -9,6 +9,7 @@ export function getBackPath(pathname: string): string | null {
   if (
     pathname === '/falconRateManagement' ||
     pathname === '/exchangeRateManagement' ||
+    pathname === '/activeUserData' ||
     pathname === '/betConstructGamesList' ||
     pathname === '/falcon-rate-management' ||
     pathname === '/exchange-rate-management' ||
@@ -53,7 +54,7 @@ export function getBackPath(pathname: string): string | null {
   if (pathname === '/funds/mid/payingAccount' || pathname === '/funds/payin') {
     return '/funds/mid';
   }
-  if (pathname === '/funds/mid') {
+  if (pathname === '/funds/mid' || pathname === '/funds/mid-groups') {
     return '/funds';
   }
   if (pathname === '/kycList') {

@@ -1,5 +1,5 @@
 /* AUTO-GENERATED from src/layout/navItems.ts — do not edit. Run mobile/scripts/sync-shared.cjs */
-import { Permissions, type Permission } from "../auth/permissions";
+import { Permissions, type Permission } from '../auth/permissions';
 
 export type NavItem = {
   id: string;
@@ -11,7 +11,7 @@ export type NavItem = {
 
 /**
  * Panel side nav — visibility is driven by Role_ID → Responsibilities from login.
- * Items without `permission` (Welcome) are always visible.
+ * Items without `permission` (Welcome) are always visible unless caller-hidden in canAccessNavItem.
  */
 export const NAV_ITEMS: NavItem[] = [
   { id: "welcome", label: "Welcome", path: "/welcome" },
@@ -39,18 +39,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/risk-dashboard",
     permission: Permissions.risk_management_analysis,
   },
-  {
-    id: "analytics",
-    label: "Analytics",
-    path: "/analytics",
-    permission: Permissions.analytics_tab,
-  },
-  {
-    id: "masterFlow",
-    label: "Master Flow",
-    path: "/master-flow",
-    permission: Permissions.master_flow,
-  },
+  // Analytics + Master Flow temporarily hidden from side nav.
   {
     id: "profitLoss",
     label: "Profit & Loss",
@@ -59,7 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: "houseGames",
-    label: "House Games",
+    label: "House Krida",
     path: "/house-games",
     permission: Permissions.house_game,
   },
@@ -358,6 +347,24 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.Social_Media,
   },
   {
+    id: "whatsappMid",
+    label: "Set Whatsapp Mid",
+    path: "/whatsapp-mid",
+    permission: Permissions.set_whatsapp_limit,
+  },
+  {
+    id: "aaaFraudBetReport",
+    label: "AAA Fraud Bet report",
+    path: "/aaa-fraud-bet-report",
+    permission: Permissions.show_aaa_fraud_bets,
+  },
+  {
+    id: "aaaBlacklistedUsers",
+    label: "AAA Black Listed Users",
+    path: "/aaa-blacklisted-users",
+    permission: Permissions.show_aaa_blacklist_user,
+  },
+  {
     id: "mobileApp",
     label: "Mobile App",
     path: "/mobile-app",
@@ -424,9 +431,11 @@ export const PANEL_PATHS = new Set<string>([
   "/funds/mid",
   "/funds/payin",
   "/funds/mid/payingAccount",
+  "/funds/mid-groups",
   "/kycList",
   "/falconRateManagement",
   "/exchangeRateManagement",
+  "/activeUserData",
   "/betConstructGamesList",
   "/falcon-rate-management",
   "/exchange-rate-management",

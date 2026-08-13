@@ -492,6 +492,84 @@ async function uploadDiallerData(payload = {}, token = null) {
   }
 }
 
+const MAX_BANNER_VIDEO_BYTES = 50 * 1024 * 1024;
+const BANNER_VIDEO_TYPES = new Set(['tutorialVideo', 'howToDepositVideo']);
+
+async function uploadBannerVideo(payload = {}, token = null) {
+  const { videoBase64, fileName, videoType, mimeType } = payload;
+  if (!videoBase64 || !fileName) {
+    return { ok: false, message: 'Please select a video file first' };
+  }
+  const type = String(videoType || '').trim();
+  if (!BANNER_VIDEO_TYPES.has(type)) {
+    return { ok: false, message: 'Please select a valid video type' };
+  }
+  const safeName = String(fileName).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
+  if (!/\.(mp4|webm|mov|m4v|avi)$/i.test(safeName)) {
+    return { ok: false, message: 'Only video uploads are allowed (mp4, webm, mov, m4v, avi)' };
+  }
+
+  try {
+    const raw = String(videoBase64).includes(',')
+      ? String(videoBase64).split(',').pop()
+      : String(videoBase64);
+    const buffer = Buffer.from(raw, 'base64');
+    if (buffer.length > MAX_BANNER_VIDEO_BYTES) {
+      return { ok: false, message: 'Video exceeds 50MB limit' };
+    }
+    const blob = new Blob([buffer], {
+      type: String(mimeType || 'video/mp4').slice(0, 80),
+    });
+    const form = new FormData();
+    form.append('File_Name', 'tutorialVideo');
+    form.append('video', blob, safeName);
+    form.append('category', 'others');
+    form.append('deepLink', 'true');
+    form.append('gameName', 'NA');
+    form.append('iframeUrlMob', 'NA');
+    form.append('mobileOptions', '');
+    form.append('mobileRouter', '');
+    form.append('type', type);
+    form.append('iframeUrl', 'NA');
+
+    const response = await apiClient('ops.bannersUploadVideo').post(
+      '/bannerGames/upload_video',
+      form,
+      {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        maxBodyLength: Infinity,
+      },
+    );
+
+    let data = response.data?.data ?? response.data;
+    if (typeof data === 'string') {
+      try {
+        data = decrypt(data);
+      } catch {
+        /* leave as-is */
+      }
+    }
+
+    return {
+      ok: true,
+      success: response.data?.success !== false,
+      message: response.data?.message || 'Tutorial video uploaded successfully',
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        'Video upload failed',
+      status: error?.response?.status,
+    };
+  }
+}
+
 /**
  * @param {string} action - registry key
  * @param {object} payload
@@ -543,6 +621,9 @@ async function execute(action, payload = {}, token = null) {
     }
     if (action === 'caller.uploadDiallerData') {
       return uploadDiallerData(safePayload, safeToken);
+    }
+    if (action === 'ops.bannersUploadVideo') {
+      return uploadBannerVideo(safePayload, safeToken);
     }
     return { ok: false, message: `Unhandled local action: ${action}` };
   }

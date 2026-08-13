@@ -20,7 +20,6 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { toast } from 'react-toastify';
@@ -29,7 +28,7 @@ import { getBackPath } from './backPaths';
 import { AstroLogo } from '@/components/AstroLogo';
 import { BackButton } from '@/components/BackButton';
 import { RevealCodesOtpModal } from '@/components/RevealCodesOtpModal';
-import { ThemeModeMenu } from '@/components/ThemeModeMenu';
+import { ProfileMenu } from '@/components/ProfileMenu';
 import { secureApi } from '@/api/secureClient';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { useTheme } from '@mui/material/styles';
@@ -112,7 +111,7 @@ export function AppShell({ onLogout }: Props) {
       paths.push('/playerRtp/details');
     }
     if (paths.includes('/funds')) {
-      paths.push('/funds/mid', '/funds/payin', '/funds/mid/payingAccount');
+      paths.push('/funds/mid', '/funds/payin', '/funds/mid/payingAccount', '/funds/mid-groups');
     }
     if (paths.includes('/users-kyc')) {
       paths.push('/kycList');
@@ -127,6 +126,7 @@ export function AppShell({ onLogout }: Props) {
       paths.push(
         '/falconRateManagement',
         '/exchangeRateManagement',
+        '/activeUserData',
         '/betConstructGamesList',
         '/falcon-rate-management',
         '/exchange-rate-management',
@@ -292,29 +292,19 @@ export function AppShell({ onLogout }: Props) {
           </Box>
 
           {showSosControls && (
-            <Button
-              size="small"
-              variant="contained"
-              color={sosEnabled ? 'success' : 'error'}
-              startIcon={sosEnabled ? <LockOpenIcon /> : <WarningAmberIcon />}
-              disabled={sosLoading}
-              onClick={() => {
-                if (sosEnabled) {
-                  void unblockUsers();
-                } else {
-                  setSosOpen(true);
-                }
-              }}
-              sx={{ fontWeight: 700, minWidth: sosEnabled ? 140 : 72 }}
-            >
-              {sosLoading
-                ? sosEnabled
-                  ? 'Unblocking…'
-                  : 'Sending…'
-                : sosEnabled
-                  ? 'Unblock users'
-                  : 'SOS'}
-            </Button>
+            // SOS also lives in Profile menu; keep a compact header chip when active.
+            sosEnabled ? (
+              <Button
+                size="small"
+                variant="contained"
+                color="success"
+                disabled={sosLoading}
+                onClick={() => void unblockUsers()}
+                sx={{ fontWeight: 700 }}
+              >
+                {sosLoading ? 'Unblocking…' : 'SOS active — Unblock'}
+              </Button>
+            ) : null
           )}
 
           <Button
@@ -342,21 +332,35 @@ export function AppShell({ onLogout }: Props) {
               : 'Reveal codes'}
           </Button>
 
-          <ThemeModeMenu />
-
-          <Typography variant="body2" color="text.secondary">
-            {user?.name || user?.mobile || 'Admin'}
-          </Typography>
           <Button
             size="small"
             color="inherit"
+            variant="outlined"
+            title="Open another panel window (same security)"
             onClick={() => {
+              void window.gcalc?.openNewWindow?.();
+            }}
+          >
+            New window
+          </Button>
+
+          <ProfileMenu
+            user={user}
+            showSosControls={showSosControls}
+            sosEnabled={sosEnabled}
+            sosLoading={sosLoading}
+            onSosClick={() => {
+              if (sosEnabled) {
+                void unblockUsers();
+              } else {
+                setSosOpen(true);
+              }
+            }}
+            onLogout={() => {
               onLogout();
               navigate('/');
             }}
-          >
-            Sign out
-          </Button>
+          />
         </Toolbar>
       </AppBar>
 

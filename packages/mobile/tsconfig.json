@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext"
+    ],
     "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -13,6 +15,14 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true
   },
-  "include": ["**/*.ts", "**/*.tsx", "App.tsx", "index.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "App.tsx",
+    "index.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
+  "extends": "expo/tsconfig.base"
 }

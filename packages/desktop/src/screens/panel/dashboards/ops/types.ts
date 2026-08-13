@@ -41,8 +41,15 @@ export type ProviderCardModel = {
   showOnVip?: boolean;
   rows: MetricRow[];
   activeCustomerCount?: number;
+  /**
+   * Laxmi ActiveUserData customerKey (qtech / wco / jetfair / falcon /
+   * sattamatka / exchange). When set, player count is clickable.
+   */
+  activeCustomerKey?: string;
+  /** Override label (e.g. Total Exchange Players on Jetfair / AAA). */
+  activeCustomerLabel?: string;
   loading?: boolean;
-  /** Optional game filter dropdown (Ludo / Indian Diva / Plutus). */
+  /** Optional game filter dropdown (Ludo / Diva / Plutus). */
   selectValue?: string;
   selectOptions?: SelectOption[];
   onSelectChange?: (value: string) => void;

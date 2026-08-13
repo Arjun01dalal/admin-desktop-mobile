@@ -6,6 +6,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -67,17 +68,11 @@ export function DataTable<Row>({
   // ScrollView eats taps — any tiny finger movement cancels the row press,
   // making rows feel randomly untappable.
   const [containerW, setContainerW] = React.useState(0);
-  const [contentW, setContentW] = React.useState(0);
-  const needsHScroll = contentW > containerW + 1;
-  return (
-    <View style={styles.card} onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator
-        scrollEnabled={needsHScroll}
-        onContentSizeChange={(w) => setContentW(w)}
-      >
-        <View>
+  const contentW = columns.reduce((sum, c) => sum + c.width, 0);
+  const innerW = Math.max(0, containerW - spacing(3) * 2);
+  const needsHScroll = contentW > innerW + 1;
+  const table = (
+    <View>
           <View style={[styles.row, styles.headRow]}>
             {columns.map((col) =>
               col.onHeaderPress ? (
@@ -172,7 +167,7 @@ export function DataTable<Row>({
                     );
                   }
                   return (
-                    <Text key={col.key} style={textStyle} numberOfLines={2}>
+                    <Text key={col.key} style={textStyle} numberOfLines={1}>
                       {value}
                     </Text>
                   );
@@ -181,13 +176,15 @@ export function DataTable<Row>({
               const rowStyle = [styles.row, bg ? { backgroundColor: bg } : null];
               if (onRowPress) {
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={keyFor(row, index)}
                     style={rowStyle}
                     onPress={() => onRowPress(row, index)}
+                    delayPressIn={0}
+                    unstable_pressDelay={0}
                   >
                     {cells}
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               }
               return (
@@ -217,7 +214,21 @@ export function DataTable<Row>({
             </View>
           ) : null}
         </View>
-      </ScrollView>
+  );
+
+  return (
+    <View style={styles.card} onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}>
+      {needsHScroll ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator
+          keyboardShouldPersistTaps="handled"
+        >
+          {table}
+        </ScrollView>
+      ) : (
+        <View style={styles.tableClip}>{table}</View>
+      )}
       <Text style={styles.hint}>{hint ?? (needsHScroll ? 'Swipe sideways to see all columns →' : '')}</Text>
     </View>
   );
@@ -231,13 +242,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing(3),
     marginTop: spacing(3),
+    overflow: 'hidden',
   },
+  tableClip: { overflow: 'hidden' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing(2),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+    overflow: 'hidden',
   },
   headRow: { borderBottomColor: colors.primary },
   badgeCell: { paddingHorizontal: spacing(0.5) },
@@ -259,7 +273,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingHorizontal: spacing(1),
   },
-  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1) },
+  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1), overflow: 'hidden' },
   right: { textAlign: 'right' },
   center: { textAlign: 'center' },
   link: { color: colors.primary, textDecorationLine: 'underline' },

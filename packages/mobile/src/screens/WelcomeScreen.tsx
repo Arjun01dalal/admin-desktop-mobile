@@ -89,7 +89,9 @@ export function WelcomeScreen() {
           >
             ASTRO ADMIN
           </Text>
-          <View style={styles.brandUnderline} />
+          <View style={styles.csPanel}>
+            <Text style={styles.csPanelText}>CS PANEL</Text>
+          </View>
 
           {user?.Role_Name ? (
             <View style={styles.roleBadge}>
@@ -160,12 +162,17 @@ const styles = StyleSheet.create({
     textShadowRadius: 14,
     textShadowOffset: { width: 0, height: 0 },
   },
-  brandUnderline: {
-    width: 64,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(245,179,1,0.6)',
+  csPanel: {
     marginTop: spacing(3),
+    backgroundColor: '#000',
+    paddingHorizontal: spacing(5),
+    paddingVertical: spacing(2),
+  },
+  csPanelText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 3,
   },
   roleBadge: {
     marginTop: spacing(5),

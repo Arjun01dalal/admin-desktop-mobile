@@ -1,0 +1,9 @@
+{
+  "name": "vpn-status",
+  "version": "1.0.0",
+  "description": "Detect an active system VPN on Android and iOS",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "author": "astro",
+  "homepage": "https://astrotalk.vip"
+}

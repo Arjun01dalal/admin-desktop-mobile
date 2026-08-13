@@ -7,6 +7,8 @@ export type UserReportTab =
   | 'qtech_history'
   | 'jetfair_history'
   | 'falcon_history'
+  | 'coins'
+  | 'add_bonus_coins'
   | 'remove_bonus_coins'
   | 'fund_request'
   | 'provider_history'
@@ -28,6 +30,8 @@ export const USER_REPORT_TABS: { id: UserReportTab; label: string }[] = [
   { id: 'qtech_history', label: 'Qtech History' },
   { id: 'jetfair_history', label: 'JetFair History' },
   { id: 'falcon_history', label: 'Falcon History' },
+  { id: 'coins', label: 'Coins' },
+  { id: 'add_bonus_coins', label: 'Add Bonus Coins' },
   { id: 'remove_bonus_coins', label: 'Remove Bonus Coins' },
   { id: 'fund_request', label: 'Fund Request' },
   { id: 'provider_history', label: 'Qtech Provider History' },
@@ -45,6 +49,9 @@ export type EncryptedUser = {
   encryptedUserName?: string;
   createdAt?: string;
   activeUser?: string;
+  lastActivity?: string;
+  updatedOn?: string;
+  updatedAt?: string;
 };
 
 export type WalletRow = {

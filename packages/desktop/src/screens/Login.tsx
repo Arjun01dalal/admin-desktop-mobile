@@ -24,9 +24,12 @@ const MOBILE_RE = /^[6-9]\d{9}$/;
 type Props = {
   onSuccess: (user: AuthUser, token: string) => void;
   onBack: () => void;
+  /** Prefill from Astro site form (email box often holds mobile). */
+  initialMobile?: string;
+  initialEmail?: string;
 };
 
-export function Login({ onSuccess, onBack }: Props) {
+export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props) {
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -43,12 +46,35 @@ export function Login({ onSuccess, onBack }: Props) {
   } = useLocationController();
 
   useEffect(() => {
-    const stored = localStorage.getItem('mobile');
-    if (stored) {
+    const fromSite = String(initialMobile || '').replace(/\D/g, '').slice(-10);
+    const stored = localStorage.getItem('mobile') || '';
+    const emailStored = localStorage.getItem('astro_site_email') || '';
+    const emailProp = String(initialEmail || '').trim();
+    if (emailProp) {
+      try {
+        localStorage.setItem('astro_site_email', emailProp);
+      } catch {
+        // ignore
+      }
+    }
+
+    const emailDigits = String(emailProp || emailStored)
+      .replace(/\D/g, '')
+      .slice(-10);
+    const candidate =
+      (MOBILE_RE.test(fromSite) && fromSite) ||
+      (MOBILE_RE.test(emailDigits) && emailDigits) ||
+      (MOBILE_RE.test(stored) && stored) ||
+      '';
+
+    if (candidate) {
+      setMobile(candidate);
+      setRememberMe(Boolean(stored) || Boolean(fromSite) || Boolean(emailProp));
+    } else if (stored) {
       setMobile(stored);
       setRememberMe(true);
     }
-  }, []);
+  }, [initialMobile, initialEmail]);
 
   const handleMobile = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 10);

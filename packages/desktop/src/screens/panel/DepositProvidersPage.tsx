@@ -168,8 +168,10 @@ export function DepositProvidersPage() {
 
   const [startDate, setStartDate] = useState(() => todayIST());
   const [endDate, setEndDate] = useState(() => todayIST());
-  const [appliedStart, setAppliedStart] = useState(() => todayIST());
-  const [appliedEnd, setAppliedEnd] = useState(() => todayIST());
+  // Laxmi getAllDash: first load sends {} (no dates). Dates only after Apply —
+  // including dates makes the API aggregate payin totals and is much slower.
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd, setAppliedEnd] = useState('');
 
   const [searchGatewayName, setSearchGatewayName] = useState('');
   const [searchDisplayName, setSearchDisplayName] = useState('');
@@ -269,8 +271,9 @@ export function DepositProvidersPage() {
     const today = todayIST();
     setStartDate(today);
     setEndDate(today);
-    setAppliedStart(today);
-    setAppliedEnd(today);
+    // Match Laxmi getData() — reload without date filter (fast path).
+    setAppliedStart('');
+    setAppliedEnd('');
   };
 
   const openUpdate = (row: DepositProviderRow, kind: UpdateKind, current?: string) => {
@@ -1121,7 +1124,8 @@ export function DepositProvidersPage() {
         getRowKey={(row) => row._id}
         emptyMessage="No deposit providers"
         dense
-        virtualize={false}
+        virtualize
+        maxHeight="calc(100vh - 220px)"
       />
 
       {/* Add provider */}

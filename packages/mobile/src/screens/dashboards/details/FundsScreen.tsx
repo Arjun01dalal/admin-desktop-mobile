@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { colors, radius, spacing } from '../../../theme';
@@ -153,6 +154,7 @@ function asRowList(value: unknown): TxnRow[] {
 export function FundsScreen() {
   // Read once — getSessionUser returns a fresh object each call; using it directly
   // in hook deps retriggers load() every render (infinite API polling).
+  const navigation = useNavigation();
   const user = useMemo(() => getSessionUser(), []);
   const canShowTotal = hasPermission(Permissions.show_gateway_and_total);
   const gatewayOnly = hasPermission(Permissions.show_gateway_only);
@@ -827,6 +829,27 @@ export function FundsScreen() {
         }}
       />
 
+      <TouchableOpacity
+        style={styles.midGroupsBtn}
+        onPress={() => {
+          const parent = navigation.getParent() as
+            | {
+                push?: (name: string, params?: object) => void;
+                navigate: (name: string, params?: object) => void;
+              }
+            | undefined;
+          const go = (parent?.push ??
+            parent?.navigate ??
+            ((name: string) =>
+              (navigation as { navigate: (n: string) => void }).navigate(name))) as (
+            name: string,
+          ) => void;
+          go('/funds/mid-groups');
+        }}
+      >
+        <Text style={styles.midGroupsBtnText}>MID Groups</Text>
+      </TouchableOpacity>
+
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
@@ -881,6 +904,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2.5),
   },
   totalText: { color: colors.foreground, fontSize: 14, fontWeight: '700' },
+  midGroupsBtn: {
+    marginTop: spacing(2),
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    borderRadius: radius.sm,
+  },
+  midGroupsBtnText: {
+    color: colors.primaryForeground,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   kpiWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',

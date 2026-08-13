@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { secureApi } from '../api/client';
 import type { SecureAction } from '../api/registry.generated';
 import { parseLudoGameOptions } from './gameMetrics';
+import { providerWiseActive } from './mergeMetrics';
 import type {
   DashboardFilters,
   DashboardMode,
@@ -94,10 +95,18 @@ export function useOpsDashboardData(
           d,
         ]),
         fetchAction('dashboard.activeCustomersCategory', {
-          ...base,
-          page: 1,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
           itemsPerPage: 50,
-          filter: {},
+          pageNo: 1,
+          activeUserStart: filters.startDate,
+          activeUserEnd: filters.endDate,
+          filter: filters.appClientName
+            ? { clientName: filters.appClientName }
+            : {},
+          ...(filters.appClientName
+            ? { app: [filters.appClientName] }
+            : {}),
         }).then((d) => ['activeCustomers', d]),
         fetchAction('dashboard.qtech', base).then((d) => ['qtech', d]),
         fetchAction('dashboard.wco', base).then((d) => ['wco', d]),
@@ -121,16 +130,20 @@ export function useOpsDashboardData(
         );
       }
 
+      // AAA zehnPL is part of Ashwini / Exaltation totals (laxminarayan Dashboard + VIP).
+      tasks.push(
+        fetchAction('dashboard.aaaZehnPl', {
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        }).then((d) => ['aaa', d]),
+      );
+
       if (mode === 'main') {
         tasks.push(
           fetchAction('dashboard.activeExchangeGet', {}).then((d) => [
             'activeExchange',
             d,
           ]),
-          fetchAction('dashboard.aaaZehnPl', {
-            startDate: filters.startDate,
-            endDate: filters.endDate,
-          }).then((d) => ['aaa', d]),
         );
       }
 
@@ -157,7 +170,6 @@ export function useOpsDashboardData(
           key === 'summary' ||
           key === 'depositCount' ||
           key === 'depositWithdrawal' ||
-          key === 'activeCustomers' ||
           key === 'falcon' ||
           key === 'jetfair' ||
           key === 'satta' ||
@@ -165,6 +177,8 @@ export function useOpsDashboardData(
           key === 'sportBook'
         ) {
           nextBundle[key] = asRecord(value);
+        } else if (key === 'activeCustomers') {
+          nextBundle.activeCustomers = providerWiseActive(value);
         }
       }
 

@@ -301,3 +301,99 @@ export function buildBotSummaryRows(
     };
   });
 }
+
+type SummaryFlag = {
+  flag?: unknown;
+  reason?: string;
+  level?: unknown;
+  required?: unknown;
+  value?: unknown;
+  detected?: unknown;
+  types?: string[];
+};
+
+export type CallRecordRow = {
+  title: string;
+  value: string;
+  reason: string;
+};
+
+/**
+ * Laxmi CallLogModal rows from helper.callingbot.live/process-call payload.
+ * Accepts either `{ data: { analysis, transcript } }` or nested analysis object.
+ */
+export function buildCallRecordRows(
+  summaryData: Record<string, unknown> | null | undefined,
+): CallRecordRow[] {
+  if (!summaryData || typeof summaryData !== 'object') return [];
+
+  const envelope =
+    summaryData.data && typeof summaryData.data === 'object'
+      ? (summaryData.data as Record<string, unknown>)
+      : summaryData;
+  const raw =
+    envelope.analysis && typeof envelope.analysis === 'object'
+      ? (envelope.analysis as Record<string, unknown>)
+      : envelope;
+
+  if (!raw || typeof raw !== 'object') return [];
+
+  const threat = raw.threat as SummaryFlag | undefined;
+  const priority = raw.priority as SummaryFlag | undefined;
+  const humanIntervention = raw.human_intervention as SummaryFlag | undefined;
+  const satisfaction = raw.satisfaction as SummaryFlag | undefined;
+  const frustration = raw.frustration as SummaryFlag | undefined;
+  const nuisance = raw.nuisance as SummaryFlag | undefined;
+  const repeatedComplaint = raw.repeated_complaint as SummaryFlag | undefined;
+  const piiDetails = raw.pii_details as SummaryFlag | undefined;
+
+  const cell = (v: unknown, fallback = '—') => {
+    if (v == null || v === '') return fallback;
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    return String(v);
+  };
+
+  const rows = [
+    { title: 'Summary', value: raw.summary, reason: '-' },
+    {
+      title: 'Transcript',
+      value: envelope.transcript || raw.transcript,
+      reason: '-',
+    },
+    { title: 'Priority', value: priority?.level, reason: priority?.reason },
+    { title: 'Threat', value: threat?.flag, reason: threat?.reason || 'N/A' },
+    {
+      title: 'Human Intervention',
+      value: humanIntervention?.required,
+      reason: humanIntervention?.reason,
+    },
+    {
+      title: 'Frustration',
+      value: frustration?.level,
+      reason: frustration?.reason,
+    },
+    {
+      title: 'Satisfaction',
+      value: satisfaction?.value,
+      reason: satisfaction?.reason || 'N/A',
+    },
+    { title: 'Nuisance', value: nuisance?.value, reason: nuisance?.reason },
+    {
+      title: 'Repeated Complaint',
+      value: repeatedComplaint?.value,
+      reason: repeatedComplaint?.reason,
+    },
+    {
+      title: 'PII Details',
+      value: piiDetails?.detected,
+      reason: piiDetails?.types?.length ? piiDetails.types.join(', ') : 'None',
+    },
+    { title: 'Next Best Action', value: raw.next_best_action, reason: '' },
+  ];
+
+  return rows.map((r) => ({
+    title: r.title,
+    value: cell(r.value),
+    reason: r.reason == null || r.reason === '' ? '' : String(r.reason),
+  }));
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -120,6 +121,7 @@ function unpackPayload(data: unknown): Record<string, unknown> {
 }
 
 export function UniqueDepositPendingPage() {
+  const navigate = useNavigate();
   const admin = getStoredUser<{ _id?: string; name?: string; mobile?: string }>();
   const canChangeStatus = hasPermission('change_status');
   const canDownload = hasPermission('show_download_botton');
@@ -471,7 +473,25 @@ export function UniqueDepositPendingPage() {
       {
         id: 'userName',
         label: 'User Name',
-        render: (row) => display(row.userName),
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: row.userId ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            }}
+            onClick={() => {
+              if (!row.userId) return;
+              navigate(
+                `/users/report/${row.userId}/${encodeURIComponent(row.userName || '')}`,
+              );
+            }}
+          >
+            {display(row.userName)}
+          </Typography>
+        ),
       },
       {
         id: 'clientName',
@@ -717,6 +737,7 @@ export function UniqueDepositPendingPage() {
     openStatusDialog,
     toCallingItem,
     openWhatsApp,
+    navigate,
   ]);
 
   return (

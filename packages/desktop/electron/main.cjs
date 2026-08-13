@@ -11,6 +11,7 @@ const auth = require('./auth.cjs');
 const secureApi = require('./secure/index.cjs');
 const { startSosMonitor } = require('./sosMonitor.cjs');
 const { startPushClient } = require('./pushService.cjs');
+const panelWindows = require('./panelWindows.cjs');
 
 installMainErrorMonitor();
 
@@ -45,8 +46,6 @@ const SITE_LOGIN_BAR_HEIGHT = 56;
 
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 
-let win = null;
-let siteView = null;
 let tray = null;
 /** When true, window close actually quits (tray Quit / before-quit). */
 let isQuitting = false;
@@ -79,10 +78,7 @@ function iconPath() {
   return path.join(__dirname, '..', 'build', 'icon.png');
 }
 
-function showMainWindow() {
-  if (!win || win.isDestroyed()) {
-    createWindow();
-  }
+function focusWindow(win) {
   if (!win || win.isDestroyed()) return;
   try {
     if (win.isMinimized()) win.restore();
@@ -94,7 +90,27 @@ function showMainWindow() {
   }
 }
 
-function hideMainWindowToTray() {
+function showMainWindow() {
+  let win = panelWindows.getPrimaryWindow();
+  if (!win || win.isDestroyed()) {
+    win = createWindow();
+  }
+  focusWindow(win);
+}
+
+function openNewPanelWindow() {
+  if (!panelWindows.canOpenAnotherWindow()) {
+    const existing = panelWindows.getPrimaryWindow();
+    focusWindow(existing);
+    return { ok: false, message: `Maximum ${panelWindows.MAX_PANEL_WINDOWS} windows` };
+  }
+  // Extra windows skip the marketing Astro site → panel (session) or OTP login.
+  const win = createWindow({ skipSite: true });
+  focusWindow(win);
+  return { ok: true };
+}
+
+function hideWindowToTray(win) {
   if (!win || win.isDestroyed()) return;
   win.hide();
 
@@ -131,6 +147,10 @@ function createTray() {
       {
         label: 'Open Astro CS Panel',
         click: () => showMainWindow(),
+      },
+      {
+        label: 'New Window',
+        click: () => openNewPanelWindow(),
       },
       { type: 'separator' },
       {
@@ -221,13 +241,37 @@ function installApplicationMenu() {
             { role: 'quit' },
           ],
         },
+        {
+          label: 'File',
+          submenu: [
+            {
+              label: 'New Window',
+              accelerator: 'CmdOrCtrl+N',
+              click: () => openNewPanelWindow(),
+            },
+          ],
+        },
         editMenu,
       ]),
     );
     return;
   }
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate([editMenu]));
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'File',
+        submenu: [
+          {
+            label: 'New Window',
+            accelerator: 'CmdOrCtrl+N',
+            click: () => openNewPanelWindow(),
+          },
+        ],
+      },
+      editMenu,
+    ]),
+  );
 }
 
 function isDevtoolsShortcut(input) {
@@ -243,6 +287,16 @@ function isDevtoolsShortcut(input) {
 
 function hardenWebContents(wc) {
   if (!wc || wc.isDestroyed()) return;
+
+  // Keep panel typography independent of OS accessibility / system font scaling.
+  try {
+    wc.setZoomFactor(1);
+    if (typeof wc.setVisualZoomLevelLimits === 'function') {
+      wc.setVisualZoomLevelLimits(1, 1);
+    }
+  } catch {
+    // ignore
+  }
 
   wc.on('before-input-event', (event, input) => {
     if (!allowDevTools() && isDevtoolsShortcut(input)) {
@@ -294,16 +348,18 @@ function hardenWebContents(wc) {
       console.warn('[https-only] blocked window.open:', url);
       return { action: 'deny' };
     }
-    return { action: 'allow' };
+    // Never spawn unmanaged Chromium windows — use File → New Window / tray.
+    return { action: 'deny' };
   });
 }
 
-function createWindow() {
-  win = new BrowserWindow({
-    width: PORTRAIT_WIDTH,
-    height: PORTRAIT_HEIGHT,
-    resizable: false,
-    maximizable: false,
+function createWindow(opts = {}) {
+  const skipSite = Boolean(opts.skipSite);
+  const win = new BrowserWindow({
+    width: skipSite ? 1200 : PORTRAIT_WIDTH,
+    height: skipSite ? 800 : PORTRAIT_HEIGHT,
+    resizable: skipSite,
+    maximizable: skipSite,
     title: 'Astro CS Panel',
     icon: iconPath(),
     backgroundColor: '#1c1c1e',
@@ -320,44 +376,71 @@ function createWindow() {
     },
   });
 
+  const rec = panelWindows.registerPanel(win);
   win.setMenuBarVisibility(false);
   hardenWebContents(win.webContents);
 
+  // Cascade extra windows so they are not fully stacked.
+  const existing = panelWindows.listPanels().filter((r) => r.win.id !== win.id);
+  if (existing.length > 0) {
+    try {
+      const [x, y] = existing[existing.length - 1].win.getPosition();
+      win.setPosition(x + 28, y + 28);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (skipSite) {
+    // Landscape ready — renderer jumps to panel/login (no Astro site BrowserView).
+    try {
+      applyBrowserSize(rec);
+    } catch {
+      // ignore
+    }
+  }
+
   win.on('resize', () => {
-    layoutSiteView();
+    layoutSiteView(rec);
   });
 
-  // Close (X) hides to tray — SOS keeps monitoring. Use tray → Quit to exit.
+  // Last panel window: close (X) hides to tray so SOS keeps monitoring.
+  // Extra windows: close for real (same security stack per window).
   win.on('close', (event) => {
-    if (!isQuitting) {
+    if (isQuitting) return;
+    const others = panelWindows.listPanels().filter((r) => r.win.id !== win.id);
+    if (others.length === 0) {
       event.preventDefault();
-      hideMainWindowToTray();
+      hideWindowToTray(win);
     }
   });
 
   win.on('closed', () => {
-    destroySiteView();
-    win = null;
+    destroySiteView(rec);
+    panelWindows.unregisterPanel(win);
   });
 
+  const entryHash = skipSite ? '#entry=panel' : '';
   if (useViteDevServer) {
-    win.loadURL('http://127.0.0.1:5173');
-    return;
+    win.loadURL(`http://127.0.0.1:5173/${entryHash}`);
+    return win;
   }
 
   if (!fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
     console.error(
       'Missing dist/index.html. Run `npm run build` first, or use `npm run dev` for hot reload.',
     );
-    return;
+    return win;
   }
 
-  win.loadURL('app://localhost/index.html');
+  win.loadURL(`app://localhost/index.html${entryHash}`);
+  return win;
 }
 
 /** Compact portrait window — Login */
-function applyPortraitSize() {
-  if (!win) return;
+function applyPortraitSize(rec) {
+  const win = rec?.win;
+  if (!win || win.isDestroyed()) return;
   if (win.isFullScreen()) win.setFullScreen(false);
   if (win.isMaximized()) win.unmaximize();
   win.setResizable(true);
@@ -368,14 +451,16 @@ function applyPortraitSize() {
   win.setResizable(false);
 }
 
-function applyLoginSize() {
-  hideSiteView();
-  applyPortraitSize();
+function applyLoginSize(rec) {
+  if (!rec) return;
+  hideSiteView(rec);
+  applyPortraitSize(rec);
 }
 
 /** Chrome-like landscape browser window — site + admin panel */
-function applyBrowserSize() {
-  if (!win) return;
+function applyBrowserSize(rec) {
+  const win = rec?.win;
+  if (!win || win.isDestroyed()) return;
   if (win.isFullScreen()) win.setFullScreen(false);
 
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
@@ -389,17 +474,21 @@ function applyBrowserSize() {
   win.center();
 }
 
-function applyWelcomeSize() {
-  hideSiteView();
-  applyBrowserSize();
+function applyWelcomeSize(rec) {
+  if (!rec) return;
+  hideSiteView(rec);
+  applyBrowserSize(rec);
 }
 
-function applySiteSize() {
-  applyBrowserSize();
-  showSiteView();
+function applySiteSize(rec) {
+  if (!rec) return;
+  applyBrowserSize(rec);
+  showSiteView(rec);
 }
 
-function layoutSiteView() {
+function layoutSiteView(rec) {
+  const win = rec?.win;
+  const siteView = rec?.siteView;
   if (!win || !siteView || win.isDestroyed()) return;
   const [width, height] = win.getContentSize();
   const bar = SITE_LOGIN_BAR_HEIGHT;
@@ -412,13 +501,16 @@ function layoutSiteView() {
   siteView.setAutoResize({ width: true, height: false });
 }
 
-function destroySiteView() {
-  if (!win || !siteView) {
-    siteView = null;
+function destroySiteView(rec) {
+  if (!rec) return;
+  const win = rec.win;
+  const siteView = rec.siteView;
+  if (!siteView) {
+    rec.siteView = null;
     return;
   }
   try {
-    win.removeBrowserView(siteView);
+    if (win && !win.isDestroyed()) win.removeBrowserView(siteView);
   } catch {
     // ignore
   }
@@ -429,29 +521,73 @@ function destroySiteView() {
   } catch {
     // ignore
   }
-  siteView = null;
+  rec.siteView = null;
 }
 
-/** When true, site BrowserView must stay hidden so update dialogs are visible. */
-let blockSiteForUpdate = false;
+/** Last email/mobile typed on the Astro marketing site (for prefill). */
+let cachedSiteIdentity = { email: '', mobile: '' };
 
-function hideSiteView() {
-  if (!win || !siteView) return;
+function normalizeSiteIdentity(payload) {
+  const src = payload && typeof payload === 'object' ? payload : {};
+  const email = String(src.email || '').trim().slice(0, 200);
+  let mobile = String(src.mobile || '').replace(/\D/g, '');
+  if (mobile.length > 10) mobile = mobile.slice(-10);
+  if (mobile && !/^[6-9]\d{9}$/.test(mobile)) mobile = '';
+  // Email box often holds a 10-digit mobile on this site.
+  if (!mobile && email) {
+    const digits = email.replace(/\D/g, '');
+    if (/^[6-9]\d{9}$/.test(digits.slice(-10))) mobile = digits.slice(-10);
+  }
+  return { email, mobile };
+}
+
+function rememberSiteIdentity(payload) {
+  const next = normalizeSiteIdentity(payload);
+  if (!next.email && !next.mobile) return cachedSiteIdentity;
+  cachedSiteIdentity = {
+    email: next.email || cachedSiteIdentity.email || '',
+    mobile: next.mobile || cachedSiteIdentity.mobile || '',
+  };
+  return cachedSiteIdentity;
+}
+
+function prefillSiteView(rec) {
+  if (!rec?.siteView || rec.siteView.webContents.isDestroyed()) return;
+  if (!cachedSiteIdentity.email && !cachedSiteIdentity.mobile) return;
   try {
-    win.removeBrowserView(siteView);
+    rec.siteView.webContents.send('astro:prefill-site', cachedSiteIdentity);
   } catch {
     // ignore
   }
 }
 
-function showSiteView() {
+/** When true, site BrowserView must stay hidden so update dialogs are visible. */
+let blockSiteForUpdate = false;
+
+function hideSiteView(rec) {
+  if (!rec?.win || !rec.siteView) return;
+  try {
+    rec.win.removeBrowserView(rec.siteView);
+  } catch {
+    // ignore
+  }
+}
+
+function hideAllSiteViews() {
+  for (const rec of panelWindows.listPanels()) {
+    hideSiteView(rec);
+  }
+}
+
+function showSiteView(rec) {
+  const win = rec?.win;
   if (!win || win.isDestroyed()) return;
   // BrowserView sits above the React UI and also above modal dialogs attached
   // to the window — never re-show it while an update prompt is active.
   if (blockSiteForUpdate) return;
 
-  if (!siteView || siteView.webContents.isDestroyed()) {
-    siteView = new BrowserView({
+  if (!rec.siteView || rec.siteView.webContents.isDestroyed()) {
+    rec.siteView = new BrowserView({
       webPreferences: {
         preload: path.join(__dirname, 'sitePreload.cjs'),
         contextIsolation: true,
@@ -463,18 +599,26 @@ function showSiteView() {
       },
     });
 
-    hardenWebContents(siteView.webContents);
-    siteView.webContents.setWindowOpenHandler(() => {
+    hardenWebContents(rec.siteView.webContents);
+    rec.siteView.webContents.setWindowOpenHandler(() => {
       // No popups — panel login is gated by site password in sitePreload.
       return { action: 'deny' };
     });
 
     // SPA navigations: ensure preload listeners stay (preload reloads with page).
-    siteView.webContents.on('dom-ready', () => {
+    rec.siteView.webContents.on('dom-ready', () => {
       console.log('[site] dom-ready — panel gate preload active');
+      prefillSiteView(rec);
     });
 
-    siteView.webContents.on('will-navigate', (event, url) => {
+    // Prefill after first paint as well (some SPAs mount inputs late).
+    rec.siteView.webContents.on('did-finish-load', () => {
+      prefillSiteView(rec);
+      setTimeout(() => prefillSiteView(rec), 400);
+      setTimeout(() => prefillSiteView(rec), 1200);
+    });
+
+    rec.siteView.webContents.on('will-navigate', (event, url) => {
       try {
         if (isBlockedCleartext(url, { allowLocalHttp: false })) {
           event.preventDefault();
@@ -491,15 +635,23 @@ function showSiteView() {
       }
     });
 
-    siteView.webContents.loadURL(ASTRO_SITE_URL);
+    rec.siteView.webContents.loadURL(ASTRO_SITE_URL);
   }
 
-  win.setBrowserView(siteView);
-  layoutSiteView();
+  win.setBrowserView(rec.siteView);
+  layoutSiteView(rec);
+  prefillSiteView(rec);
 }
 
 function sendToRenderer(channel, payload) {
-  if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+  panelWindows.broadcastToPanels(channel, payload);
+}
+
+function resolvePanelFromEvent(event) {
+  return (
+    panelWindows.getPanelByWebContents(event?.sender) ||
+    panelWindows.getPanelBySiteContents(event?.sender)
+  );
 }
 
 /** Last update event — replayed when renderer mounts (avoids missed IPC under site view). */
@@ -508,20 +660,11 @@ let lastUpdateEvent = null;
 function prepareUpdateUi() {
   blockSiteForUpdate = true;
   try {
-    hideSiteView();
+    hideAllSiteViews();
   } catch {
     // ignore
   }
-  if (win && !win.isDestroyed()) {
-    try {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-      if (typeof win.moveTop === 'function') win.moveTop();
-    } catch {
-      // ignore
-    }
-  }
+  focusWindow(panelWindows.getPrimaryWindow());
 }
 
 function publishUpdate(channel, payload) {
@@ -706,29 +849,73 @@ function setupAutoUpdate() {
 
 function registerIpc() {
   // Legacy calculator channel now opens the ThirdEye marketing site.
-  ipcMain.on('gcalc:show-calculator', applySiteSize);
-  ipcMain.on('gcalc:show-site', applySiteSize);
-  ipcMain.on('gcalc:hide-site', hideSiteView);
-  ipcMain.on('gcalc:show-login', applyLoginSize);
-  ipcMain.on('gcalc:show-welcome', applyWelcomeSize);
+  ipcMain.on('gcalc:show-calculator', (event) => {
+    applySiteSize(resolvePanelFromEvent(event));
+  });
+  ipcMain.on('gcalc:show-site', (event) => {
+    applySiteSize(resolvePanelFromEvent(event));
+  });
+  ipcMain.on('gcalc:hide-site', (event) => {
+    hideSiteView(resolvePanelFromEvent(event));
+  });
+  ipcMain.on('gcalc:show-login', (event) => {
+    applyLoginSize(resolvePanelFromEvent(event));
+  });
+  ipcMain.on('gcalc:show-welcome', (event) => {
+    applyWelcomeSize(resolvePanelFromEvent(event));
+  });
 
-  ipcMain.on('astro:panel-gate', (_event, payload = {}) => {
+  ipcMain.handle('app:open-new-window', async () => openNewPanelWindow());
+
+  ipcMain.on('astro:site-identity', (_event, payload = {}) => {
+    rememberSiteIdentity(payload);
+  });
+
+  ipcMain.on('astro:site-identity-request', (event) => {
+    if (!cachedSiteIdentity.email && !cachedSiteIdentity.mobile) return;
+    try {
+      event.sender.send('astro:prefill-site', cachedSiteIdentity);
+    } catch {
+      // ignore
+    }
+  });
+
+  ipcMain.on('astro:panel-gate', (event, payload = {}) => {
     const ok = Boolean(payload && payload.ok);
+    const rec = resolvePanelFromEvent(event);
+    if (rec?.win && !rec.win.isDestroyed()) {
+      rec.win.webContents.send('astro:panel-gate', { ok });
+      return;
+    }
     sendToRenderer('astro:panel-gate', { ok });
   });
 
-  ipcMain.on('astro:request-login', () => {
+  ipcMain.on('astro:request-login', (event, payload = {}) => {
+    const identity = rememberSiteIdentity(payload);
     const sosOn = Boolean(
       sosMonitor && typeof sosMonitor.isActive === 'function' && sosMonitor.isActive(),
     );
+    const rec = resolvePanelFromEvent(event);
     if (sosOn) {
       console.log('[site] panel login blocked — SOS active');
-      sendToRenderer('astro:login-blocked-sos');
+      if (rec?.win && !rec.win.isDestroyed()) {
+        rec.win.webContents.send('astro:login-blocked-sos');
+      } else {
+        sendToRenderer('astro:login-blocked-sos');
+      }
       return;
     }
     console.log('[site] panel login requested (gate password)');
-    hideSiteView();
-    sendToRenderer('astro:request-login');
+    if (rec) hideSiteView(rec);
+    const loginPayload = {
+      email: identity.email || '',
+      mobile: identity.mobile || '',
+    };
+    if (rec?.win && !rec.win.isDestroyed()) {
+      rec.win.webContents.send('astro:request-login', loginPayload);
+    } else {
+      sendToRenderer('astro:request-login', loginPayload);
+    }
   });
 
   ipcMain.handle('auth:send-otp', async (_event, payload) => {
@@ -835,9 +1022,13 @@ function registerIpc() {
   // Named secure API — paths + encryption stay in main process
   const secureRate = new Map(); // webContentsId -> timestamps
   ipcMain.handle('secure:api', async (event, args) => {
-    // Accept IPC from any BrowserWindow we own (not only the cached `win` ref).
+    // Only panel windows (registered + hardened) may use the secure bridge.
     const senderWin = BrowserWindow.fromWebContents(event.sender);
-    if (!senderWin || event.sender.isDestroyed()) {
+    if (
+      !senderWin ||
+      event.sender.isDestroyed() ||
+      !panelWindows.isPanelWindow(senderWin)
+    ) {
       return { ok: false, message: 'Unauthorized bridge sender' };
     }
 
@@ -929,7 +1120,7 @@ app.whenReady().then(() => {
   // Reject cleartext HTTP for Chromium network (Vite localhost still allowed).
   enforceSessionHttpsOnly(session.defaultSession);
   createTray();
-  createWindow();
+  const firstWin = createWindow();
 
   // Launched at login / as hidden — stay in tray for SOS only.
   const loginSettings =
@@ -940,8 +1131,8 @@ app.whenReady().then(() => {
     Boolean(loginSettings.wasOpenedAsHidden) ||
     process.argv.includes('--hidden') ||
     process.argv.includes('--as-hidden');
-  if (startHidden && win && !win.isDestroyed()) {
-    win.hide();
+  if (startHidden && firstWin && !firstWin.isDestroyed()) {
+    firstWin.hide();
   }
 
   registerIpc();
@@ -951,7 +1142,13 @@ app.whenReady().then(() => {
   cachedAuthToken = loadPersistedToken();
 
   sosMonitor = startSosMonitor({
-    getMainWindow: () => win,
+    getMainWindow: () => panelWindows.getPrimaryWindow(),
+    broadcastSosState: (payload) => panelWindows.broadcastToPanels('sos:state', payload),
+    showAllPanelWindows: () => {
+      for (const { win } of panelWindows.listPanels()) {
+        focusWindow(win);
+      }
+    },
     getToken: () => cachedAuthToken,
     getUserDataPath: () => app.getPath('userData'),
   });

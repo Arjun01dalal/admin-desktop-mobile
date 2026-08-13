@@ -239,6 +239,11 @@ export function DepositConfigPage() {
         loading={loading}
         getRowKey={(row) => row._id}
         emptyMessage="No deposit config"
+        stickyHeader
+        dense
+        virtualize
+        maxHeight="calc(100vh - 180px)"
+        minWidth={900}
       />
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="xs">

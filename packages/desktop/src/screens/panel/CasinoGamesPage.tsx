@@ -134,6 +134,34 @@ function asProvider(value: unknown): CasinoProvider {
   return value === 'WACS' ? 'WACS' : 'QTECH';
 }
 
+/** Normalize `/Qtech/Get-provider` payload into selectable name strings. */
+function asProviderNames(data: unknown): string[] {
+  const fromArray = (items: unknown[]): string[] =>
+    items
+      .map((item) => {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object') {
+          const o = item as Record<string, unknown>;
+          const name = o.name ?? o.Name ?? o.providerName ?? o.id;
+          return name != null ? String(name).trim() : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
+
+  if (Array.isArray(data)) return fromArray(data);
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.payload)) return fromArray(obj.payload);
+    if (Array.isArray(obj.items)) return fromArray(obj.items);
+    if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
+      const nested = obj.payload as Record<string, unknown>;
+      if (Array.isArray(nested.items)) return fromArray(nested.items);
+    }
+  }
+  return [];
+}
+
 export function CasinoGamesPage() {
   useRevealCodes();
   const [page, setPage] = useState(1);
@@ -143,6 +171,8 @@ export function CasinoGamesPage() {
   const [appliedName, setAppliedName] = useState('');
   const [appliedId, setAppliedId] = useState('');
   const [gameCategory, setGameCategory] = useState('');
+  const [providerNameSearch, setProviderNameSearch] = useState('');
+  const [providerOptions, setProviderOptions] = useState<string[]>([]);
 
   const [activeProvider, setActiveProvider] = useState<CasinoProvider>('QTECH');
   const pendingProvider = useRef<CasinoProvider>('QTECH');
@@ -177,6 +207,12 @@ export function CasinoGamesPage() {
     setActiveProvider(provider);
   }, []);
 
+  const loadProviderOptions = useCallback(async () => {
+    const res = await secureApi('ops.casinoGetProviders', {});
+    if (!res.ok) return;
+    setProviderOptions(asProviderNames(res.data));
+  }, []);
+
   const loadMiraiStatus = useCallback(async () => {
     const res = await secureApi<Array<{ type?: string; status?: boolean }>>('ops.casinoMiraiGet', {});
     if (!res.ok || !Array.isArray(res.data)) return;
@@ -204,6 +240,7 @@ export function CasinoGamesPage() {
       idOverride = appliedId,
       categoryOverride = gameCategory,
       providerOverride = activeProvider,
+      providerNameOverride = providerNameSearch,
     ) => {
       const gen = next();
       begin();
@@ -216,6 +253,9 @@ export function CasinoGamesPage() {
         if (idOverride.trim()) {
           if (providerOverride === 'QTECH') filters.gameId = idOverride.trim();
           else filters.Game_Code = idOverride.trim();
+        }
+        if (providerOverride === 'QTECH' && providerNameOverride.trim()) {
+          filters['provider.name'] = providerNameOverride.trim();
         }
 
         const res = await secureApi('ops.casinoGetData', {
@@ -254,6 +294,7 @@ export function CasinoGamesPage() {
       appliedId,
       gameCategory,
       activeProvider,
+      providerNameSearch,
       next,
       begin,
       end,
@@ -264,12 +305,13 @@ export function CasinoGamesPage() {
   useEffect(() => {
     void loadConfig();
     void loadMiraiStatus();
-  }, [loadConfig, loadMiraiStatus]);
+    void loadProviderOptions();
+  }, [loadConfig, loadMiraiStatus, loadProviderOptions]);
 
   useEffect(() => {
     void load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, activeProvider, gameCategory]);
+  }, [page, pageSize, activeProvider, gameCategory, providerNameSearch]);
 
   const deferredRows = useDeferredValue(rows);
 
@@ -277,8 +319,8 @@ export function CasinoGamesPage() {
     setAppliedName(nameSearch);
     setAppliedId(idSearch);
     setPage(1);
-    void load(1, nameSearch, idSearch, gameCategory, activeProvider);
-  }, [nameSearch, idSearch, gameCategory, activeProvider, load]);
+    void load(1, nameSearch, idSearch, gameCategory, activeProvider, providerNameSearch);
+  }, [nameSearch, idSearch, gameCategory, activeProvider, providerNameSearch, load]);
 
   const confirmProviderChange = useCallback(async () => {
     setProviderSaving(true);
@@ -292,6 +334,7 @@ export function CasinoGamesPage() {
         return;
       }
       setActiveProvider(nextProvider);
+      setProviderNameSearch('');
       setProviderConfirmOpen(false);
       setPage(1);
       toast.success(`Active provider set to ${nextProvider}`);
@@ -638,6 +681,30 @@ export function CasinoGamesPage() {
               </MenuItem>
             ))}
           </TextField>
+          {activeProvider === 'QTECH' ? (
+            <TextField
+              select
+              label="Provider Name"
+              size="small"
+              value={providerNameSearch}
+              onChange={(e) => {
+                setProviderNameSearch(e.target.value);
+                setPage(1);
+              }}
+              sx={{ ...headerFieldSx, minWidth: 200 }}
+              SelectProps={{ displayEmpty: true }}
+              InputLabelProps={{ shrink: true }}
+            >
+              <MenuItem value="">
+                <em>All</em>
+              </MenuItem>
+              {providerOptions.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : null}
         </Stack>
       </Paper>
 

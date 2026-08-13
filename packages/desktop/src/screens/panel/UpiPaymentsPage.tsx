@@ -289,12 +289,17 @@ export function UpiPaymentsPage() {
 
   const submitApprove = async () => {
     if (!approveItem) return;
+    if (!approveReason.trim()) {
+      toast.error('Select reason');
+      return;
+    }
+    const remark = `Deposite failure of ${approveItem.userName} through ${approveItem.paymentGatewayName} pay with order id ${approveItem.orderId} and mobile no ${approveItem.userMobile ?? ''}`;
     const res = await secureApi('upiPayments.addCoin', {
       userId: approveItem.userId,
       balance: approveItem.amount,
       updatedBy: { name: user?.name, _id: user?._id },
-      reason: approveReason || 'Approved',
-      remark: `Deposit of ${approveItem.userName} through ${approveItem.paymentGatewayName} order ${approveItem.orderId}`,
+      reason: approveReason,
+      remark,
       tag: 'credit',
       orderId: approveItem.orderId,
     });
@@ -305,6 +310,7 @@ export function UpiPaymentsPage() {
     toast.success('Amount deposited successfully');
     setApproveOpen(false);
     setApproveItem(null);
+    setApproveReason('');
     void loadRequests();
   };
 
@@ -702,24 +708,47 @@ export function UpiPaymentsPage() {
       </Stack>
 
       <Dialog open={approveOpen} onClose={() => setApproveOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Approve Deposit</DialogTitle>
+        <DialogTitle>Manual settle Transaction</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" mb={1}>
-            {approveItem?.userName} — ₹{approveItem?.amount}
-          </Typography>
-          <TextField
-            fullWidth
-            size="small"
-            label="Reason"
-            value={approveReason}
-            onChange={(e) => setApproveReason(e.target.value)}
-            sx={{ mt: 1 }}
-          />
+          <Stack spacing={1.5} mt={1}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Amount"
+              value={approveItem?.amount ?? ''}
+              disabled
+            />
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Select Reason"
+              value={approveReason}
+              onChange={(e) => setApproveReason(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            >
+              <MenuItem value="Deposit Failure">Deposit Failure</MenuItem>
+              <MenuItem value="deposit-manual">deposit-manual</MenuItem>
+            </TextField>
+            <TextField
+              fullWidth
+              size="small"
+              label="Remark"
+              multiline
+              minRows={3}
+              disabled
+              value={
+                approveItem
+                  ? `Deposite failure of ${approveItem.userName} through ${approveItem.paymentGatewayName} pay with order id ${approveItem.orderId} and mobile no ${approveItem.userMobile ?? ''}`
+                  : ''
+              }
+            />
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setApproveOpen(false)}>Cancel</Button>
           <Button variant="contained" color="warning" onClick={() => void submitApprove()}>
-            Approve
+            Submit
           </Button>
         </DialogActions>
       </Dialog>

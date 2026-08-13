@@ -15,6 +15,11 @@ import { secureApi } from '@/api/secureClient';
 import { getSessionUser, hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { display } from '@/screens/panel/shared';
+import { canShowFundEditBtn } from '@/screens/panel/funds/constants';
+import {
+  FundsEditAccessModal,
+  type FundsEditTarget,
+} from '@/screens/panel/funds/FundsEditAccessModal';
 import {
   normalizeMids,
   readFundsDates,
@@ -65,6 +70,7 @@ export function FundsPage() {
   const location = useLocation();
   const user = getSessionUser();
   const canShowTotal = hasPermission(Permissions.show_gateway_and_total);
+  const canEditAccess = canShowFundEditBtn(user?.mobile);
 
   const initial = readFundsDates(
     location.state as { startDate?: string; endDate?: string } | null,
@@ -74,6 +80,8 @@ export function FundsPage() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<FundRow[]>([]);
   const [totalDeposit, setTotalDeposit] = useState(0);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<FundsEditTarget | null>(null);
 
   const load = useCallback(
     async (from = startDate, to = endDate) => {
@@ -169,8 +177,13 @@ export function FundsPage() {
     [navigate, startDate, endDate],
   );
 
-  const columns = useMemo<CommonTableColumn<FundRow>[]>(
-    () => [
+  const openEdit = useCallback((row: FundRow) => {
+    setEditTarget({ gatewayName: row.name });
+    setEditOpen(true);
+  }, []);
+
+  const columns = useMemo<CommonTableColumn<FundRow>[]>(() => {
+    const cols: CommonTableColumn<FundRow>[] = [
       {
         id: '#',
         label: (
@@ -207,9 +220,36 @@ export function FundsPage() {
         label: 'Points Remove',
         render: (row) => roundAmt(row.totalCoinRemove),
       },
-    ],
-    [],
-  );
+    ];
+
+    if (canEditAccess) {
+      cols.push({
+        id: 'updateAccess',
+        label: 'Update Access',
+        width: 120,
+        render: (row) => (
+          <Button
+            size="small"
+            variant="contained"
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(row);
+            }}
+            sx={{
+              ...orangeBtnSx,
+              height: 32,
+              fontSize: 12,
+              px: 1.5,
+            }}
+          >
+            Edit
+          </Button>
+        ),
+      });
+    }
+
+    return cols;
+  }, [canEditAccess, openEdit]);
 
   return (
     <Box>
@@ -283,6 +323,9 @@ export function FundsPage() {
         >
           Apply
         </Button>
+        <Button onClick={() => navigate('/funds/mid-groups')} sx={orangeBtnSx}>
+          MID Groups
+        </Button>
         {canShowTotal && (
           <Paper
             elevation={0}
@@ -306,8 +349,17 @@ export function FundsPage() {
         getRowKey={(row, i) => `${row.name}-${i}`}
         loading={loading}
         emptyMessage="No data"
-        minWidth={700}
+        minWidth={canEditAccess ? 820 : 700}
         onRowClick={(row) => openMid(row)}
+      />
+
+      <FundsEditAccessModal
+        open={editOpen}
+        onClose={() => {
+          setEditOpen(false);
+          setEditTarget(null);
+        }}
+        target={editTarget}
       />
     </Box>
   );

@@ -226,8 +226,8 @@ export function BannersScreen() {
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'gameName', label: 'Game Name', width: 160, render: (r) => display(r.gameName) },
-      { key: 'type', label: 'Type', width: 120, render: (r) => display(r.type) },
+      { key: 'gameName', label: 'Game Name', width: 100, render: (r) => display(r.gameName) },
+      { key: 'type', label: 'Type', width: 80, render: (r) => display(r.type) },
       {
         key: 'position',
         label: 'Position',

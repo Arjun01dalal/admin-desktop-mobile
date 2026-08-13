@@ -17,6 +17,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
@@ -102,7 +103,19 @@ function formatTs(ts?: string): string {
 }
 
 export function NonPerformingUserScreen() {
+  const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   const canShowMobile = hasPermission('show_mobile');
+
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId) return;
+      navigation.navigate('/user-report', {
+        userId: String(userId),
+        userName: String(userName || ''),
+      });
+    },
+    [navigation],
+  );
 
   // Desktop starts with no date restriction; dates apply only when both are entered.
   const [draftStart, setDraftStart] = useState('');
@@ -211,7 +224,13 @@ export function NonPerformingUserScreen() {
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
-      { key: 'name', label: 'User Name', width: 130, render: (r) => display(r.name) },
+      {
+        key: 'name',
+        label: 'User Name',
+        width: 130,
+        render: (r) => display(r.name),
+        onCellPress: (r) => openUserReport(r._id, r.name),
+      },
       { key: 'dpId', label: 'Dp ID', width: 150, render: (r) => display(r._id) },
       { key: 'appCode', label: 'App Code', width: 80, render: (r) => appCodeForName(String(r.clientName || '')) },
       { key: 'email', label: 'Email', width: 160, render: (r) => display(r.email) },
@@ -241,7 +260,7 @@ export function NonPerformingUserScreen() {
       { key: 'created', label: 'Created', width: 150, render: (r) => formatTs(r.createdOn) },
       { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => formatTs(r.updatedOn) },
     ],
-    [page, canShowMobile],
+    [page, canShowMobile, openUserReport],
   );
 
   return (
@@ -312,6 +331,19 @@ export function NonPerformingUserScreen() {
             : []
         }
         actions={[
+          ...(sheetRow?._id
+            ? [
+                {
+                  label: 'User Report',
+                  onPress: () => {
+                    const id = sheetRow._id;
+                    const name = sheetRow.name;
+                    setSheetRow(null);
+                    openUserReport(id, name);
+                  },
+                },
+              ]
+            : []),
           {
             label: `Comments (${commentsOf(sheetRow).length})`,
             onPress: () => {

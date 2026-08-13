@@ -3,7 +3,7 @@ import type {
   OpsDashboardBundle,
   ProviderCardModel,
 } from './types';
-import { floorNum, sumArrayField, toNum } from './mergeMetrics';
+import { floorNum, sumArrayField, toNum, activeCount } from './mergeMetrics';
 import { buildGameMetricRows, gameNames } from './gameMetrics';
 import { metricJyotishLabel } from './constants';
 
@@ -61,10 +61,16 @@ export function buildProviderCards(
 
   const startDate = nav?.startDate || '';
   const endDate = nav?.endDate || '';
-  const dateState = { startDate, endDate };
+  const appClientName = nav?.appClientName || '';
+  const dateState = { startDate, endDate, appClientName };
   const rateSearch = (type: string) =>
     `?${new URLSearchParams({ startDate, endDate, type }).toString()}`;
-  const rateState = (type: string) => ({ startDate, endDate, type });
+  const rateState = (type: string) => ({
+    startDate,
+    endDate,
+    type,
+    appClientName,
+  });
   const aaaSearch = `?${new URLSearchParams({ startDate, endDate }).toString()}`;
   const { payload: qPayload, wallet: qWallet } = qtechPayload(bundle.qtech);
   const wco = firstOf(bundle.wco);
@@ -76,49 +82,105 @@ export function buildProviderCards(
   const ludo = asRecord(bundle.ludo);
   const summary = asRecord(bundle.summary);
   const active = asRecord(bundle.activeCustomers);
+  const aaa = asRecord(bundle.aaa);
+  const bcWallet = asRecord(
+    Array.isArray(bc.walletHistory) ? bc.walletHistory[0] : null,
+  );
+  const firstPlutus = asRecord(
+    Array.isArray(bundle.plutus) ? bundle.plutus[0] : null,
+  );
+  const qtechProfit = toNum(bundle.qtech.profit);
+
+  // Laxmi Ashwini Payin/Payout uses dashboard summary satta fields (smBets).
+  const summarySattaBet = toNum(summary.sattaMatkaTotalBetAmount);
+  const summarySattaWin = toNum(summary.sattaMatkaTotalBetWinAmount);
+  // Satta card + Ashwini Net Profit use sattaMarketOverallGGR (allSmBetsData).
+  const sattaGgr = toNum(satta.sattaMatkaGGR ?? summary.sattaMatkaGGR);
 
   const plutusPayin = sumArrayField(bundle.plutus, 'totalBetAmount');
   const plutusPayout = sumArrayField(bundle.plutus, 'totalWinningAmount');
   const divaPayin = sumArrayField(bundle.indianDiva, 'totalBetAmount');
   const divaPayout = sumArrayField(bundle.indianDiva, 'totalWinningAmount');
 
-  const totalPayin =
-    toNum(qPayload.totalBetAmount) +
-    toNum(satta.sattaMatkaTotalBetAmount ?? summary.sattaMatkaTotalBetAmount) +
-    divaPayin +
-    plutusPayin +
-    toNum(ludo.playerBetAmount) +
-    toNum(bc.totalBetAmount) +
-    toNum(wco.totalBetAmount) +
-    toNum(jetfair.payin) +
-    toNum(sb.payin) +
-    toNum(falcon.payin);
+  // Laxmi floors WCO before summing into Ashwini totals.
+  const wcoBetFloored = floorNum(wco.totalBetAmount) || 0;
+  const wcoWinFloored = floorNum(wco.totalWinAmount) || 0;
+  // Laxmi only counts Qtech win in Ashwini payout when walletHistory is an array.
+  const qtechWinForPayout = Array.isArray(bundle.qtech.walletHistory)
+    ? toNum(qPayload.totalWinAmount)
+    : 0;
 
-  const totalPayout =
-    toNum(qPayload.totalWinAmount) +
-    toNum(
-      satta.sattaMatkaTotalBetWinAmount ?? summary.sattaMatkaTotalBetWinAmount,
-    ) +
-    divaPayout +
-    plutusPayout +
-    toNum(ludo.playerWinAmount) +
-    toNum(bc.totalWinAmount) +
-    toNum(wco.totalWinAmount) +
-    toNum(jetfair.payout) +
-    toNum(sb.payout) +
-    toNum(falcon.payout);
+  const vipMode = mode === 'vip';
+
+  const totalPayin = vipMode
+    ? toNum(qPayload.totalBetAmount) +
+      summarySattaBet +
+      toNum(aaa.totalVolume) +
+      wcoBetFloored +
+      toNum(jetfair.payin) +
+      toNum(falcon.payin)
+    : toNum(qPayload.totalBetAmount) +
+      summarySattaBet +
+      divaPayin +
+      plutusPayin +
+      toNum(ludo.playerBetAmount) +
+      toNum(bc.totalBetAmount) +
+      toNum(aaa.totalVolume) +
+      wcoBetFloored +
+      toNum(jetfair.payin) +
+      toNum(sb.payin) +
+      toNum(falcon.payin);
+
+  const totalPayout = vipMode
+    ? qtechWinForPayout +
+      toNum(aaa.totalClientWin) +
+      summarySattaWin +
+      wcoWinFloored +
+      toNum(jetfair.payout) +
+      toNum(falcon.payout)
+    : qtechWinForPayout +
+      summarySattaWin +
+      divaPayout +
+      plutusPayout +
+      toNum(bc.totalWinAmount) +
+      toNum(aaa.totalClientWin) +
+      wcoWinFloored +
+      toNum(jetfair.payout) +
+      toNum(ludo.playerWinAmount) +
+      toNum(sb.payout) +
+      toNum(falcon.payout);
 
   const totalCommission =
+    toNum(aaa.totalCommission) +
     toNum(falcon.CommissionAmount) +
     toNum(jetfair.commissionAmount) +
     toNum(sb.commissionAmount) +
-    toNum(
-      asRecord(Array.isArray(bc.walletHistory) ? bc.walletHistory[0] : null)
-        .totalCommission,
-    ) +
+    toNum(bcWallet.totalCommission) +
     toNum(ludo.totalPlayerCommission) +
     toNum(wco.commissionAmount) +
     toNum(qWallet.totalCommission);
+
+  // Laxmi Net Profit is provider-profit sum — not payin − payout.
+  const wcoGgr = toNum(wco.totalBetAmount) - toNum(wco.totalWinAmount) || 0;
+  const totalNetProfit = vipMode
+    ? qtechProfit +
+      sattaGgr +
+      wcoGgr +
+      toNum(falcon.final_ggr ?? falcon.finalGgr) +
+      toNum(aaa.finalWinLoss) +
+      (toNum(jetfair.commissionAmount) + toNum(jetfair.netpl))
+    : qtechProfit +
+      sattaGgr +
+      wcoGgr +
+      (divaPayin - divaPayout) +
+      (toNum(firstPlutus.totalBetAmount) -
+        toNum(firstPlutus.totalWinningAmount)) +
+      toNum(falcon.final_ggr ?? falcon.finalGgr) +
+      (toNum(bcWallet.totalCommission) + toNum(bc.ggr)) +
+      toNum(aaa.finalWinLoss) +
+      (toNum(sb.commissionAmount) + toNum(sb.netpl)) +
+      (toNum(jetfair.commissionAmount) + toNum(jetfair.netpl)) +
+      toNum(ludo.ggr);
 
   const selectedDiva = games?.selectedIndianDiva ?? 'All';
   const selectedPlutus = games?.selectedPlutus ?? 'All';
@@ -147,12 +209,18 @@ export function buildProviderCards(
       filters: ['Ashwini'],
       showOnVip: true,
       loading,
-      rows: [
-        row('Total Payin', totalPayin),
-        row('Total Payout', totalPayout),
-        row('Total Commission', totalCommission),
-        row('Net Profit', totalPayin - totalPayout),
-      ],
+      rows: vipMode
+        ? [
+            row('Total Payin', totalPayin),
+            row('Total Payout', totalPayout),
+            row('Net Profit', totalNetProfit),
+          ]
+        : [
+            row('Total Payin', totalPayin),
+            row('Total Payout', totalPayout),
+            row('Total Commission', totalCommission),
+            row('Net Profit', totalNetProfit),
+          ],
     },
     {
       id: 'totalExch',
@@ -161,18 +229,36 @@ export function buildProviderCards(
       showOnVip: false,
       loading,
       rows: [
-        row('Bet Amount', toNum(jetfair.payin) + toNum(falcon.payin)),
-        row('Win', toNum(jetfair.payout) + toNum(falcon.payout)),
+        row(
+          'Bet Amount',
+          toNum(aaa.totalVolume) +
+            toNum(falcon.payin) +
+            toNum(jetfair.payin),
+        ),
+        row(
+          'Win',
+          toNum(aaa.totalClientWin) +
+            toNum(falcon.payout) +
+            toNum(jetfair.payout),
+        ),
         row(
           'GGR',
-          toNum(jetfair.payin) +
-            toNum(falcon.payin) -
-            toNum(jetfair.payout) -
-            toNum(falcon.payout),
+          toNum(aaa.totalWinLossWithoutCommission) +
+            toNum(falcon.TotalGGR ?? falcon.totalGGR) +
+            toNum(jetfair.netpl),
         ),
         row(
           'Commission',
-          toNum(jetfair.commissionAmount) + toNum(falcon.CommissionAmount),
+          toNum(aaa.totalCommission) +
+            toNum(falcon.CommissionAmount) +
+            toNum(jetfair.commissionAmount),
+        ),
+        row(
+          'Gross GGR (Including Upline)',
+          toNum(aaa.finalWinLoss) +
+            toNum(jetfair.commissionAmount) +
+            toNum(jetfair.netpl) +
+            toNum(falcon.final_ggr ?? falcon.finalGgr),
         ),
       ],
     },
@@ -184,20 +270,21 @@ export function buildProviderCards(
       loading,
       href: '/game-activity',
       state: { ...dateState, type: 'Qtech' },
-      activeCustomerCount: toNum(asRecord(active.qtech).count),
+      activeCustomerCount: activeCount(active, 'qtech'),
+      activeCustomerKey: 'qtech',
       rows: [
         row('Total Bet Amount', qPayload.totalBetAmount),
-        row(
-          'Total RollBack',
-          qWallet.totalRollbackAmount ?? qPayload.totalRollbackAmount,
-        ),
+        row('Total RollBack', qWallet.rollBackAmount ?? qWallet.totalRollbackAmount),
         row('Total Win Amount', qPayload.totalWinAmount),
         row('Total Commission', qWallet.totalCommission),
-        row(
-          'GGR',
-          toNum(qPayload.totalBetAmount) - toNum(qPayload.totalWinAmount),
-        ),
-        row('Total Profit', qWallet.totalProfit ?? qPayload.totalProfit),
+        {
+          label: metricJyotishLabel('GGR'),
+          value: (qtechProfit - toNum(qWallet.totalCommission)).toFixed(2),
+        },
+        {
+          label: metricJyotishLabel('Total Profit'),
+          value: qtechProfit.toFixed(2),
+        },
       ],
     },
     {
@@ -211,13 +298,9 @@ export function buildProviderCards(
       rows: [
         row('Total Bet Amount', bc.totalBetAmount),
         row('Total Win Amount', bc.totalWinAmount),
-        row('GGR', toNum(bc.totalBetAmount) - toNum(bc.totalWinAmount)),
+        row('GGR', bc.ggr),
         row('RTP', bc.rtp),
-        row(
-          'Commission',
-          asRecord(Array.isArray(bc.walletHistory) ? bc.walletHistory[0] : null)
-            .totalCommission,
-        ),
+        row('Commission', bcWallet.totalCommission),
       ],
     },
     {
@@ -228,14 +311,28 @@ export function buildProviderCards(
       loading,
       href: '/game-activity',
       state: { ...dateState, type: 'Wco' },
-      activeCustomerCount: toNum(asRecord(active.wco).count),
+      activeCustomerCount: activeCount(active, 'wco', 'wacs'),
+      activeCustomerKey: 'wco',
       rows: [
         row('Total Bet Amount', wco.totalBetAmount),
-        row('Total GGR', wco.totalGGR ?? wco.ggr),
-        row('Provider GGR', wco.providerGGR),
+        row(
+          'Total GGR',
+          toNum(wco.totalBetAmount) - toNum(wco.totalWinAmount),
+        ),
+        row(
+          'Provider GGR',
+          toNum(wco.totalBetAmount) -
+            toNum(wco.totalWinAmount) -
+            toNum(wco.commissionAmount),
+        ),
         row('Commission', wco.commissionAmount),
         row('Total Win Amount', wco.totalWinAmount),
-        row('Net RTP', wco.net_rtp ?? wco.netRtp),
+        {
+          label: metricJyotishLabel('Net RTP'),
+          value: Number.isFinite(toNum(wco.netRTP ?? wco.net_rtp ?? wco.netRtp))
+            ? toNum(wco.netRTP ?? wco.net_rtp ?? wco.netRtp).toFixed(2)
+            : '0.00',
+        },
       ],
     },
     {
@@ -244,7 +341,14 @@ export function buildProviderCards(
       filters: ['Ashwini', 'Shatabhisha'],
       showOnVip: true,
       loading,
-      activeCustomerCount: toNum(asRecord(active.sattaMatka).count),
+      activeCustomerCount: activeCount(
+        active,
+        'sattaMatka',
+        'sattamatka',
+        'satta',
+      ),
+      activeCustomerKey: 'sattamatka',
+      state: dateState,
       rows: [
         row(
           'Bet Amount',
@@ -278,7 +382,7 @@ export function buildProviderCards(
         row('Payout', sb.payout),
         row('Net P/L', sb.netpl ?? toNum(sb.payin) - toNum(sb.payout)),
         row('Commission', sb.commissionAmount),
-        row('Profit', sb.profit),
+        row('Profit', toNum(sb.commissionAmount) + toNum(sb.netpl)),
       ],
     },
     {
@@ -318,9 +422,10 @@ export function buildProviderCards(
       href: '/falconRateManagement',
       search: rateSearch('jetfair'),
       state: rateState('jetfair'),
-      activeCustomerCount: toNum(asRecord(active.jetfair).count),
+      activeCustomerCount: activeCount(active, 'jetfair'),
+      activeCustomerKey: 'jetfair',
+      activeCustomerLabel: metricJyotishLabel('Total Exchange Players'),
       rows: [
-        row('Total Exchange Players', jetfair.totalPlayers ?? jetfair.players),
         row('Payin', jetfair.payin),
         row('Payout', jetfair.payout),
         row(
@@ -328,7 +433,10 @@ export function buildProviderCards(
           jetfair.netpl ?? toNum(jetfair.payin) - toNum(jetfair.payout),
         ),
         row('Commission', jetfair.commissionAmount),
-        row('Profit', jetfair.profit),
+        row(
+          'Profit',
+          toNum(jetfair.commissionAmount) + toNum(jetfair.netpl),
+        ),
       ],
     },
     {
@@ -340,7 +448,8 @@ export function buildProviderCards(
       href: '/falconRateManagement',
       search: rateSearch('falcon'),
       state: rateState('falcon'),
-      activeCustomerCount: toNum(asRecord(active.falcon).count),
+      activeCustomerCount: activeCount(active, 'falcon'),
+      activeCustomerKey: 'falcon',
       rows: [
         row('Payin', falcon.payin),
         row('Payout', falcon.payout),
@@ -353,21 +462,24 @@ export function buildProviderCards(
       id: 'aaa',
       title: 'Ascendant Details',
       filters: ['Ashwini', 'Exaltation', 'Ascendant'],
-      showOnVip: false,
+      showOnVip: true,
       loading,
       href: '/exchangeRateManagement',
       search: aaaSearch,
-      activeCustomerCount: toNum(asRecord(active.exchange).count),
+      state: dateState,
+      activeCustomerCount: activeCount(active, 'exchange'),
+      activeCustomerKey: 'exchange',
+      activeCustomerLabel: metricJyotishLabel('Total Exchange Players'),
       rows: [
-        row('Total Bet Amount', asRecord(bundle.aaa).totalVolume),
-        row('Total Win', asRecord(bundle.aaa).totalClientWin),
-        row('Total Active Users', asRecord(bundle.aaa).totalClient),
+        row('Total Bet Amount', aaa.totalVolume),
+        row('Total Win', aaa.totalClientWin),
+        row('Total Active Users', aaa.totalClient),
         row(
           'GGR (Without commission)',
-          asRecord(bundle.aaa).totalWinLossWithoutCommission,
+          aaa.totalWinLossWithoutCommission,
         ),
-        row('Commission', asRecord(bundle.aaa).totalCommission),
-        row('Gross GGR', asRecord(bundle.aaa).finalWinLoss),
+        row('Commission', aaa.totalCommission),
+        row('Gross GGR', aaa.finalWinLoss),
       ],
     },
     {

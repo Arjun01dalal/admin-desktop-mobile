@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -144,6 +145,7 @@ function unpackPayload(data: unknown): Record<string, unknown> {
 }
 
 export function DepositApprovedReportPage() {
+  const navigate = useNavigate();
   const today = todayIST();
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
@@ -396,6 +398,16 @@ export function DepositApprovedReportPage() {
     (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
       setDraftField(key)(e.target.value);
 
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId) return;
+      navigate(
+        `/users/report/${userId}/${encodeURIComponent(userName || '')}`,
+      );
+    },
+    [navigate],
+  );
+
   const requestTypeSelect = (
     <TextField
       select
@@ -455,7 +467,20 @@ export function DepositApprovedReportPage() {
             placeholder="User name"
           />
         ),
-        render: (row) => display(row.userName),
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: row.userId ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            }}
+            onClick={() => openUserReport(row.userId, row.userName)}
+          >
+            {display(row.userName)}
+          </Typography>
+        ),
       },
       {
         id: 'userId',
@@ -616,7 +641,7 @@ export function DepositApprovedReportPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, itemsPerPage, draft, commitQuery, setDraftField, gateways, requestType],
+    [page, itemsPerPage, draft, commitQuery, setDraftField, gateways, requestType, openUserReport],
   );
 
   const scannerColumns = useMemo<CommonTableColumn<ScannerRow>[]>(
@@ -631,7 +656,20 @@ export function DepositApprovedReportPage() {
       {
         id: 'userName',
         label: 'User Name',
-        render: (row) => display(row.userName),
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: row.userId ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            }}
+            onClick={() => openUserReport(row.userId, row.userName)}
+          >
+            {display(row.userName)}
+          </Typography>
+        ),
       },
       {
         id: 'clientName',
@@ -726,7 +764,7 @@ export function DepositApprovedReportPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [requestType, scannerClientName, draft.gatewayId, gateways],
+    [requestType, scannerClientName, draft.gatewayId, gateways, openUserReport],
   );
 
   return (
@@ -825,26 +863,6 @@ export function DepositApprovedReportPage() {
               sx={orangeBtnSx}
             >
               Apply
-            </Button>
-            <Button
-              variant="contained"
-              disabled={loading || scannerLoading}
-              onClick={() => {
-                if (isScanner) {
-                  setQuery((prev) => ({
-                    ...prev,
-                    startDate: '',
-                    endDate: '',
-                    allData: true,
-                  }));
-                  setPage(1);
-                } else {
-                  commitQuery({ allData: true });
-                }
-              }}
-              sx={orangeBtnSx}
-            >
-              All Data
             </Button>
             <Button
               variant="contained"

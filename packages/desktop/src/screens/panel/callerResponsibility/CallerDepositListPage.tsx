@@ -3,7 +3,9 @@ import { useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
+  FormControlLabel,
   MenuItem,
   Pagination,
   Paper,
@@ -19,8 +21,23 @@ import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { formatAmount, formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { maskMobile } from '@/screens/panel/shared';
+import { CallingBtn } from '@/screens/panel/users/CallingBtn';
+import type { UserRow } from '@/screens/panel/users/utils';
 import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
 import { roleFlags, type StoredCallerUser } from './utils';
+
+function toCallingItem(row: CallerRow): UserRow {
+  return {
+    _id: String(row._id || row.userId || ''),
+    name: String(row.userName || row.name || ''),
+    userName: String(row.userName || row.name || ''),
+    mobile: String(row.userMobile || row.mobile || ''),
+    userMobile: String(row.userMobile || row.mobile || ''),
+    clientName: String(row.clientName || ''),
+    state: String(row.userState || row.state || ''),
+    city: String(row.userCity || row.city || ''),
+  };
+}
 type CheckByInfo = {
   name?: string;
   city?: string;
@@ -177,6 +194,10 @@ export function CallerDepositListPage() {
   const [clientName, setClientName] = useState('');
   const [status, setStatus] = useState('');
   const [name, setName] = useState('');
+  // Laxmi CallerDepositList withdrawal filters
+  const [amountGte, setAmountGte] = useState('');
+  const [amountLte, setAmountLte] = useState('');
+  const [checked, setChecked] = useState(true);
 
   const depositRows = useMemo(() => {
     if (isWithdrawal || isUniquePending) {
@@ -208,10 +229,12 @@ export function CallerDepositListPage() {
           itemPerPage: itemsPerPage,
           startDate,
           endDate,
-          checked: true,
+          checked,
         };
         if (status) body.status = status;
         if (name.trim()) body.name = name.trim();
+        if (amountGte.trim()) body.amountGte = amountGte.trim();
+        if (amountLte.trim()) body.amountLte = amountLte.trim();
 
         const res = await secureApi('caller.withdrawalByEmpcode', body);
         if (!res.ok) {
@@ -249,6 +272,9 @@ export function CallerDepositListPage() {
     isUniquePending,
     status,
     name,
+    amountGte,
+    amountLte,
+    checked,
     page,
     itemsPerPage,
     startDate,
@@ -293,11 +319,27 @@ export function CallerDepositListPage() {
         r.clientName || r.appName || r.app_name || r.AppName || r.subDomain,
       ),
     );
-    const mobile = col('mobile', 'Mobile No', (r) =>
-      maskMobile(
-        isWithdrawal ? r.mobile || r.userMobile : r.userMobile || r.mobile,
-        canShowMobile,
-      ),
+    const mobile = col(
+      'mobile',
+      'Mobile No',
+      (r) => {
+        // admin-panel CallerDepositList: unique pending shows CallingBtn in Mobile column
+        if (isUniquePending) {
+          return (
+            <CallingBtn
+              item={toCallingItem(r)}
+              campaignName="CALLER UNIQUE PENDING"
+              reasonList="Caller Unique Pending"
+              hideBotCall
+            />
+          );
+        }
+        return maskMobile(
+          isWithdrawal ? r.mobile || r.userMobile : r.userMobile || r.mobile,
+          canShowMobile,
+        );
+      },
+      isUniquePending ? { width: 180, cellSx: { whiteSpace: 'normal' } } : undefined,
     );
     const created = col('created', 'Created At', (r) => {
       const raw = r.createdOn || r.createdAt || r.created_at;
@@ -363,7 +405,8 @@ export function CallerDepositListPage() {
       dp,
       app,
     ];
-    if (!isCaller) cols.push(mobile);
+    // Unique Pending always shows Mobile + Call (even for callers)
+    if (isUniquePending || !isCaller) cols.push(mobile);
     cols.push(created, amount);
 
     if (!isCaller) {
@@ -444,6 +487,20 @@ export function CallerDepositListPage() {
                   sx={{ width: 170, flexShrink: 0 }}
                 />
                 <TextField
+                  label="User Name"
+                  size="small"
+                  fullWidth={false}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setPage(1);
+                      void loadRemote();
+                    }
+                  }}
+                  sx={{ width: 160, flexShrink: 0 }}
+                />
+                <TextField
                   select
                   label="Status"
                   size="small"
@@ -452,18 +509,41 @@ export function CallerDepositListPage() {
                   onChange={(e) => setStatus(e.target.value)}
                   sx={{ width: 140, flexShrink: 0 }}
                 >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Approved">Approved</MenuItem>
+                  <MenuItem value="">All Status</MenuItem>
                   <MenuItem value="Pending">Pending</MenuItem>
+                  <MenuItem value="Approved">Approved</MenuItem>
                   <MenuItem value="Cancel">Cancel</MenuItem>
                 </TextField>
                 <TextField
-                  label="Name"
+                  type="number"
+                  label="Min Amount"
                   size="small"
                   fullWidth={false}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  sx={{ width: 160, flexShrink: 0 }}
+                  value={amountGte}
+                  onChange={(e) => setAmountGte(e.target.value)}
+                  inputProps={{ min: 0 }}
+                  sx={{ width: 130, flexShrink: 0 }}
+                />
+                <TextField
+                  type="number"
+                  label="Max Amount"
+                  size="small"
+                  fullWidth={false}
+                  value={amountLte}
+                  onChange={(e) => setAmountLte(e.target.value)}
+                  inputProps={{ min: 0 }}
+                  sx={{ width: 130, flexShrink: 0 }}
+                />
+                <FormControlLabel
+                  sx={{ flexShrink: 0, mr: 0 }}
+                  control={
+                    <Checkbox
+                      checked={checked}
+                      onChange={(e) => setChecked(e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label="Checked"
                 />
               </>
             )}
@@ -502,7 +582,7 @@ export function CallerDepositListPage() {
             )}
             <TextField
               select
-              label="Items / Page"
+              label="Items Per Page"
               size="small"
               fullWidth={false}
               value={String(itemsPerPage)}
@@ -510,7 +590,7 @@ export function CallerDepositListPage() {
                 setItemsPerPage(Number(e.target.value));
                 setPage(1);
               }}
-              sx={{ width: 120, flexShrink: 0 }}
+              sx={{ width: 140, flexShrink: 0 }}
             >
               {ITEMS_PER_PAGE_OPTIONS.map((o) => (
                 <MenuItem key={o} value={o}>
@@ -520,14 +600,15 @@ export function CallerDepositListPage() {
             </TextField>
             <Button
               variant="contained"
+              color="secondary"
               onClick={() => {
                 setPage(1);
                 void loadRemote();
               }}
               disabled={loading}
-              sx={{ flexShrink: 0 }}
+              sx={{ flexShrink: 0, fontWeight: 700 }}
             >
-              Apply
+              Search
             </Button>
             {loading && <CircularProgress size={22} />}
           </Stack>

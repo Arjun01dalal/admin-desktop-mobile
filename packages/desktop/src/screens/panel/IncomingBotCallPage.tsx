@@ -2,22 +2,20 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   IconButton,
+  Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
@@ -39,7 +37,15 @@ type IncomingCall = {
   recording_url?: string | null;
 };
 
-type SummaryFlag = { flag?: unknown; reason?: string; level?: unknown; required?: unknown; value?: unknown; detected?: unknown; types?: string[] };
+type SummaryFlag = {
+  flag?: unknown;
+  reason?: string;
+  level?: unknown;
+  required?: unknown;
+  value?: unknown;
+  detected?: unknown;
+  types?: string[];
+};
 
 type CallSummaryData = {
   status?: string;
@@ -50,6 +56,19 @@ type CallSummaryData = {
     analysis?: Record<string, unknown>;
     [key: string]: unknown;
   };
+};
+
+type SummaryMetric = {
+  title: string;
+  value: unknown;
+  reason?: unknown;
+};
+
+type SummaryView = {
+  summary: string;
+  transcript: string;
+  nextAction: string;
+  metrics: SummaryMetric[];
 };
 
 const ALLOWED_TO_NUMBERS = ['08040265157', '08040265127', '02048556172'];
@@ -66,6 +85,14 @@ const dateFieldSx = {
   width: 180,
   flexShrink: 0,
   '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 13 },
+};
+
+const dialogPaperSx = {
+  bgcolor: '#0f0f14',
+  backgroundImage: 'none',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 2.5,
+  overflow: 'hidden',
 };
 
 function getLast10Digits(value?: string | null): string {
@@ -96,9 +123,40 @@ function formatDurationInMin(duration: string | number | undefined): string {
   return (seconds / 60).toFixed(2);
 }
 
-function buildSummaryRows(summaryData: CallSummaryData | null) {
+function asText(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  return String(value).trim();
+}
+
+function formatMetricValue(value: unknown): string {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
+
+function metricTone(
+  title: string,
+  value: unknown,
+): 'default' | 'success' | 'warning' | 'error' | 'info' {
+  const text = String(value ?? '').toLowerCase();
+  if (value === true || text === 'true' || text === 'yes' || text === 'high' || text === 'critical') {
+    if (title === 'Satisfaction') return 'success';
+    return 'error';
+  }
+  if (text === 'medium' || text === 'moderate') return 'warning';
+  if (value === false || text === 'false' || text === 'no' || text === 'low' || text === 'none') {
+    return 'success';
+  }
+  return 'info';
+}
+
+function buildSummaryView(summaryData: CallSummaryData | null): SummaryView {
   const raw = summaryData?.data?.analysis ?? summaryData?.data;
-  if (!raw || typeof raw !== 'object') return [];
+  if (!raw || typeof raw !== 'object') {
+    return { summary: '', transcript: '', nextAction: '', metrics: [] };
+  }
 
   const data = raw as Record<string, unknown>;
   const threat = data.threat as SummaryFlag | undefined;
@@ -110,43 +168,67 @@ function buildSummaryRows(summaryData: CallSummaryData | null) {
   const repeatedComplaint = data.repeated_complaint as SummaryFlag | undefined;
   const piiDetails = data.pii_details as SummaryFlag | undefined;
 
-  return [
-    { title: 'Summary', value: data.summary, reason: '-' },
-    {
-      title: 'Transcript',
-      value: summaryData?.data?.transcript || data.transcript,
-      reason: '-',
-    },
-    { title: 'Priority', value: priority?.level, reason: priority?.reason },
-    { title: 'Threat', value: threat?.flag, reason: threat?.reason || 'N/A' },
-    {
-      title: 'Human Intervention',
-      value: humanIntervention?.required,
-      reason: humanIntervention?.reason,
-    },
-    {
-      title: 'Frustration',
-      value: frustration?.level,
-      reason: frustration?.reason,
-    },
-    {
-      title: 'Satisfaction',
-      value: satisfaction?.value,
-      reason: satisfaction?.reason || 'N/A',
-    },
-    { title: 'Nuisance', value: nuisance?.value, reason: nuisance?.reason },
-    {
-      title: 'Repeated Complaint',
-      value: repeatedComplaint?.value,
-      reason: repeatedComplaint?.reason,
-    },
-    {
-      title: 'PII Details',
-      value: piiDetails?.detected,
-      reason: piiDetails?.types?.join(', '),
-    },
-    { title: 'Next Best Action', value: data.next_best_action, reason: '' },
-  ];
+  return {
+    summary: asText(data.summary),
+    transcript: asText(summaryData?.data?.transcript || data.transcript),
+    nextAction: asText(data.next_best_action),
+    metrics: [
+      { title: 'Priority', value: priority?.level, reason: priority?.reason },
+      { title: 'Threat', value: threat?.flag, reason: threat?.reason },
+      {
+        title: 'Human Intervention',
+        value: humanIntervention?.required,
+        reason: humanIntervention?.reason,
+      },
+      { title: 'Frustration', value: frustration?.level, reason: frustration?.reason },
+      { title: 'Satisfaction', value: satisfaction?.value, reason: satisfaction?.reason },
+      { title: 'Nuisance', value: nuisance?.value, reason: nuisance?.reason },
+      {
+        title: 'Repeated Complaint',
+        value: repeatedComplaint?.value,
+        reason: repeatedComplaint?.reason,
+      },
+      {
+        title: 'PII Details',
+        value: piiDetails?.detected,
+        reason: piiDetails?.types?.join(', '),
+      },
+    ],
+  };
+}
+
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
+        bgcolor: '#16161d',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 2,
+      }}
+    >
+      <Typography
+        sx={{
+          mb: 1.25,
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.55)',
+        }}
+      >
+        {title}
+      </Typography>
+      {children}
+    </Paper>
+  );
 }
 
 export function IncomingBotCallPage() {
@@ -160,6 +242,7 @@ export function IncomingBotCallPage() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
+  const [summaryCall, setSummaryCall] = useState<IncomingCall | null>(null);
 
   const buildPayload = useCallback(
     () => ({ since: startOfDayUtc(sinceDate) }),
@@ -199,7 +282,14 @@ export function IncomingBotCallPage() {
     });
   }, [rows, appliedFrom, appliedTo, appliedSid]);
 
+  const closeSummary = useCallback(() => {
+    setSummaryOpen(false);
+    setSummaryCall(null);
+    setSummaryData(null);
+  }, []);
+
   const openSummary = useCallback(async (call: IncomingCall) => {
+    setSummaryCall(call);
     setSummaryOpen(true);
     setSummaryData(null);
     setSummaryLoading(true);
@@ -210,6 +300,7 @@ export function IncomingBotCallPage() {
       if (!res.ok) {
         toast.error(res.message || 'Analysis is in progress.');
         setSummaryOpen(false);
+        setSummaryCall(null);
         return;
       }
       setSummaryData(res.data || null);
@@ -218,7 +309,7 @@ export function IncomingBotCallPage() {
     }
   }, []);
 
-  const summaryRows = useMemo(() => buildSummaryRows(summaryData), [summaryData]);
+  const summaryView = useMemo(() => buildSummaryView(summaryData), [summaryData]);
 
   const columns = useMemo<CommonTableColumn<IncomingCall>[]>(
     () => [
@@ -368,43 +459,200 @@ export function IncomingBotCallPage() {
 
       <Dialog
         open={summaryOpen}
-        onClose={() => setSummaryOpen(false)}
+        onClose={closeSummary}
         fullWidth
         maxWidth="md"
+        PaperProps={{ sx: dialogPaperSx }}
       >
-        <DialogTitle>Call Summary</DialogTitle>
-        <DialogContent>
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+            pr: 1.5,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            bgcolor: '#121218',
+          }}
+        >
+          <Stack direction="row" spacing={1.25} alignItems="flex-start">
+            <Box
+              sx={{
+                mt: 0.25,
+                width: 36,
+                height: 36,
+                borderRadius: 1.5,
+                display: 'grid',
+                placeItems: 'center',
+                bgcolor: 'rgba(255,159,10,0.14)',
+                color: '#ff9f0a',
+                flexShrink: 0,
+              }}
+            >
+              <SummarizeOutlinedIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight={700} fontSize={18}>
+                Call Summary
+              </Typography>
+              <Typography color="text.secondary" fontSize={12} sx={{ mt: 0.35 }}>
+                {summaryCall
+                  ? `${display(summaryCall.from)} → ${display(summaryCall.to)}`
+                  : 'AI analysis'}
+                {summaryCall?.sid ? ` · ${summaryCall.sid}` : ''}
+              </Typography>
+            </Box>
+          </Stack>
+          <IconButton size="small" onClick={closeSummary} aria-label="Close">
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 2.5, bgcolor: '#0f0f14' }}>
           {summaryLoading ? (
-            <Stack alignItems="center" py={4}>
-              <CircularProgress size={28} />
+            <Stack alignItems="center" justifyContent="center" py={8} spacing={1.5}>
+              <CircularProgress size={28} sx={{ color: '#ff9f0a' }} />
+              <Typography color="text.secondary" fontSize={13}>
+                Loading call analysis…
+              </Typography>
             </Stack>
           ) : summaryData ? (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Attribute</TableCell>
-                  <TableCell>Value</TableCell>
-                  <TableCell>Reason / Details</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {summaryRows.map((item) => (
-                  <TableRow key={item.title}>
-                    <TableCell>
-                      <Typography fontWeight={600}>{item.title}</Typography>
-                    </TableCell>
-                    <TableCell>{display(item.value)}</TableCell>
-                    <TableCell>{display(item.reason)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <Stack spacing={2} mt={0.5}>
+              <SectionCard title="Summary">
+                <Typography
+                  sx={{
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.6,
+                    color: summaryView.summary ? 'text.primary' : 'text.secondary',
+                    fontSize: 14,
+                  }}
+                >
+                  {summaryView.summary || 'No summary available.'}
+                </Typography>
+              </SectionCard>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, minmax(0, 1fr))',
+                  },
+                  gap: 1.25,
+                }}
+              >
+                {summaryView.metrics.map((item) => {
+                  const tone = metricTone(item.title, item.value);
+                  const reason = asText(item.reason);
+                  return (
+                    <Paper
+                      key={item.title}
+                      elevation={0}
+                      sx={{
+                        p: 1.5,
+                        bgcolor: '#16161d',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 2,
+                        minHeight: 92,
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        gap={1}
+                        mb={0.75}
+                      >
+                        <Typography
+                          fontSize={12}
+                          fontWeight={700}
+                          color="rgba(255,255,255,0.55)"
+                          sx={{ textTransform: 'uppercase', letterSpacing: 0.4 }}
+                        >
+                          {item.title}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={formatMetricValue(item.value)}
+                          color={tone === 'default' ? 'default' : tone}
+                          variant={tone === 'default' ? 'outlined' : 'filled'}
+                          sx={{
+                            height: 24,
+                            fontWeight: 700,
+                            fontSize: 11,
+                            ...(tone === 'default'
+                              ? {
+                                  borderColor: 'rgba(255,255,255,0.2)',
+                                  color: 'text.primary',
+                                }
+                              : null),
+                          }}
+                        />
+                      </Stack>
+                      <Typography
+                        fontSize={12.5}
+                        color={reason ? 'text.secondary' : 'rgba(255,255,255,0.28)'}
+                        sx={{ lineHeight: 1.45 }}
+                      >
+                        {reason || 'No extra details'}
+                      </Typography>
+                    </Paper>
+                  );
+                })}
+              </Box>
+
+              {summaryView.nextAction ? (
+                <SectionCard title="Next Best Action">
+                  <Typography sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 14 }}>
+                    {summaryView.nextAction}
+                  </Typography>
+                </SectionCard>
+              ) : null}
+
+              <SectionCard title="Transcript">
+                <Box
+                  sx={{
+                    maxHeight: 220,
+                    overflow: 'auto',
+                    pr: 0.5,
+                    '&::-webkit-scrollbar': { width: 6 },
+                    '&::-webkit-scrollbar-thumb': {
+                      bgcolor: 'rgba(255,255,255,0.18)',
+                      borderRadius: 8,
+                    },
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.65,
+                      fontSize: 13.5,
+                      color: summaryView.transcript ? 'text.primary' : 'text.secondary',
+                    }}
+                  >
+                    {summaryView.transcript || 'No transcript available.'}
+                  </Typography>
+                </Box>
+              </SectionCard>
+            </Stack>
           ) : (
-            <Typography color="text.secondary">No summary data available.</Typography>
+            <Stack alignItems="center" py={8}>
+              <Typography color="text.secondary">No summary data available.</Typography>
+            </Stack>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSummaryOpen(false)}>Close</Button>
+
+        <DialogActions
+          sx={{
+            px: 2.5,
+            py: 1.75,
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            bgcolor: '#121218',
+          }}
+        >
+          <Button onClick={closeSummary} sx={orangeBtnSx}>
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

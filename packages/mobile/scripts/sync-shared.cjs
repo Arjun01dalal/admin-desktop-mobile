@@ -79,10 +79,15 @@ write(
 
 // 4) navItems.ts
 let nav = fs.readFileSync(path.join(ROOT, 'packages/desktop/src/layout/navItems.ts'), 'utf8');
-nav = nav.replace(
-  "import { Permissions, type Permission } from '@/auth/permissions';",
-  "import { Permissions, type Permission } from '../auth/permissions';",
-);
+nav = nav
+  .replace(
+    "import { Permissions, type Permission } from '@/auth/permissions';",
+    "import { Permissions, type Permission } from '../auth/permissions';",
+  )
+  .replace(
+    'import { Permissions, type Permission } from "@/auth/permissions";',
+    "import { Permissions, type Permission } from '../auth/permissions';",
+  );
 write(
   'src/navigation/navItems.ts',
   `/* AUTO-GENERATED from src/layout/navItems.ts — do not edit. Run mobile/scripts/sync-shared.cjs */\n${nav}`,

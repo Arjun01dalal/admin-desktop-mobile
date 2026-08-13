@@ -13,7 +13,10 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getStoredUser, todayIST } from '@/utils/dates';
-import { BOT_ID_OPTIONS } from '@/screens/panel/callLogs/constants';
+import {
+  BOT_DATA_BOT_IDS,
+  PLAY_IN_OPTIONS,
+} from '@/screens/panel/botData/constants';
 import { pushToBotDialer } from '@/screens/panel/shared/pushToBotDialer';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { mapUsersToBotSettings } from '@/screens/panel/users/toolbarHelpers';
@@ -36,8 +39,6 @@ const USER_TYPES = [
   { value: 'Non_Performing_User', label: 'Non Performing User' },
   { value: 'In_Active_Deposit', label: 'Inactive Deposit' },
 ] as const;
-
-const PLAYED_OPTIONS = ['C', 'E', 'S'] as const;
 
 const orangeBtnSx = {
   bgcolor: '#ff9f0a',
@@ -226,7 +227,7 @@ export function BotDataPage() {
           <TextField
             select
             size="small"
-            label="Played"
+            label="In"
             SelectProps={{
               multiple: true,
               renderValue: (v) => (v as string[]).join(', ') || 'All',
@@ -235,7 +236,7 @@ export function BotDataPage() {
             onChange={(e) => setPlayed(e.target.value as unknown as string[])}
             sx={fieldSx}
           >
-            {PLAYED_OPTIONS.map((p) => (
+            {PLAY_IN_OPTIONS.map((p) => (
               <MenuItem key={p} value={p}>
                 <Checkbox size="small" checked={played.includes(p)} />
                 {p}
@@ -283,7 +284,7 @@ export function BotDataPage() {
             onChange={(e) => setBots(e.target.value as unknown as string[])}
             sx={fieldSx}
           >
-            {BOT_ID_OPTIONS.map((id) => (
+            {BOT_DATA_BOT_IDS.map((id) => (
               <MenuItem key={id} value={id}>
                 <Checkbox size="small" checked={bots.includes(id)} />
                 {id}

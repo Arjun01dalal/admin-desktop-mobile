@@ -56,8 +56,8 @@ export function CallLogsToolbar({
   return (
     <Paper
       sx={{
-        p: 2,
-        mb: 2,
+        p: 1.5,
+        mb: 1.5,
         bgcolor: 'background.paper',
         width: '100%',
         maxWidth: '100%',
@@ -68,9 +68,9 @@ export function CallLogsToolbar({
     >
       <Stack
         direction="row"
-        spacing={1.5}
+        spacing={1.25}
         alignItems="center"
-        mb={2}
+        mb={1.25}
         flexWrap="wrap"
         useFlexGap
         sx={{ minWidth: 0, maxWidth: '100%' }}

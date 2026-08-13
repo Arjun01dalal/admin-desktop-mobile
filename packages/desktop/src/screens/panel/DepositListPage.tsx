@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
+  CircularProgress,
   MenuItem,
   Pagination,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
@@ -116,6 +118,8 @@ export function DepositListPage() {
   const [totals, setTotals] = useState<Record<string, unknown> | null>(null);
   const [midOptions, setMidOptions] = useState<string[]>([]);
   const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [query, setQuery] = useState<QueryState>({
     startDate: '',
     endDate: '',
@@ -213,20 +217,34 @@ export function DepositListPage() {
     [draft],
   );
 
+  const applyDates = useCallback(() => {
+    setPage(1);
+    setQuery((prev) => ({
+      ...prev,
+      startDate,
+      endDate,
+      filters: draft,
+    }));
+  }, [startDate, endDate, draft]);
+
   const onDraftChange =
     (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) => {
       setDraft((prev) => ({ ...prev, [key]: e.target.value }));
     };
 
-  const clearDates = () => {
+  const clearFilters = () => {
     localStorage.removeItem(midStorageKey());
+    setStartDate('');
+    setEndDate('');
+    setDraft(EMPTY_FILTERS);
+    setPage(1);
     setQuery((prev) => ({
       ...prev,
       startDate: '',
       endDate: '',
       mid: '',
+      filters: EMPTY_FILTERS,
     }));
-    setPage(1);
   };
 
   const openMidBreakdown = (data?: MidTotal[]) => {
@@ -447,10 +465,8 @@ export function DepositListPage() {
           type="date"
           label="From Date"
           InputLabelProps={{ shrink: true }}
-          value={query.startDate}
-          onChange={(e) =>
-            setQuery((prev) => ({ ...prev, startDate: e.target.value }))
-          }
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
           sx={{ width: 160 }}
         />
         <TextField
@@ -459,14 +475,36 @@ export function DepositListPage() {
           type="date"
           label="To Date"
           InputLabelProps={{ shrink: true }}
-          value={query.endDate}
-          onChange={(e) =>
-            setQuery((prev) => ({ ...prev, endDate: e.target.value }))
-          }
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
           sx={{ width: 160 }}
         />
-        <Button onClick={clearDates} sx={orangeBtnSx}>
+        <Button
+          variant="contained"
+          onClick={applyDates}
+          disabled={loading}
+          sx={orangeBtnSx}
+        >
+          Apply
+        </Button>
+        <Button
+          variant="contained"
+          onClick={clearFilters}
+          disabled={loading}
+          sx={orangeBtnSx}
+        >
           Clear
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={
+            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+          }
+          onClick={() => void loadList()}
+          disabled={loading}
+          sx={orangeBtnSx}
+        >
+          Refresh
         </Button>
         <Typography fontWeight={700} whiteSpace="nowrap">
           Deposit Amt:- {String(totals?.totalDepositAmount ?? 0)}

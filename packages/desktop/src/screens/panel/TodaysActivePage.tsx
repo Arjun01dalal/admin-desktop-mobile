@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -152,6 +153,7 @@ function ColumnSelect({
 
 /** Todays Active users — ops.activeCustomers. */
 export function TodaysActivePage() {
+  const navigate = useNavigate();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
@@ -164,6 +166,16 @@ export function TodaysActivePage() {
 
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
+
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId) return;
+      navigate(
+        `/users/report/${userId}/${encodeURIComponent(userName || '')}`,
+      );
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -258,7 +270,20 @@ export function TodaysActivePage() {
             placeholder="Search name"
           />
         ),
-        render: (row) => display(row.name),
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: row._id ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            }}
+            onClick={() => openUserReport(row._id, row.name)}
+          >
+            {display(row.name)}
+          </Typography>
+        ),
       },
       {
         id: 'dpId',
@@ -440,6 +465,7 @@ export function TodaysActivePage() {
     playedIn,
     appVersions,
     setDraftField,
+    openUserReport,
   ]);
 
   return (

@@ -67,9 +67,7 @@ export function SocialMediaPage() {
       return;
     }
 
-    void copyToClipboard(toCopy, {
-      successMessage: unlock ? 'Link copied' : 'Copied',
-    });
+    void copyToClipboard(toCopy, { silent: true });
   }, []);
 
   const buildPayload = useCallback(() => ({}), []);

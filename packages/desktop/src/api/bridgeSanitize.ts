@@ -5,7 +5,10 @@ const MAX_DEPTH = 8;
 const MAX_KEYS = 200;
 const MAX_ARRAY = 5000;
 const MAX_STRING = 100_000;
-const MAX_JSON_CHARS = 2_000_000;
+/** Banner image / video / dialler uploads travel as base64 on the bridge. */
+const MAX_LONG_STRING = 16_000_000;
+const MAX_JSON_CHARS = 20_000_000;
+const LONG_STRING_KEYS = new Set(['Image', 'fileBase64', 'videoBase64']);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -15,14 +18,15 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null || proto === undefined;
 }
 
-function sanitizeValue(value: unknown, depth = 0): unknown {
+function sanitizeValue(value: unknown, depth = 0, fieldKey = ''): unknown {
   if (value === null || value === undefined) return value;
   if (depth > MAX_DEPTH) return null;
 
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'string') {
-    return value.length > MAX_STRING ? value.slice(0, MAX_STRING) : value;
+    const max = LONG_STRING_KEYS.has(fieldKey) ? MAX_LONG_STRING : MAX_STRING;
+    return value.length > max ? value.slice(0, max) : value;
   }
   if (typeof value !== 'object') return null;
 
@@ -37,7 +41,7 @@ function sanitizeValue(value: unknown, depth = 0): unknown {
   for (let i = 0; i < Math.min(keys.length, MAX_KEYS); i += 1) {
     const key = keys[i];
     if (key.length > 128 || FORBIDDEN_KEYS.has(key)) continue;
-    out[key] = sanitizeValue(value[key], depth + 1);
+    out[key] = sanitizeValue(value[key], depth + 1, key);
   }
   return out;
 }

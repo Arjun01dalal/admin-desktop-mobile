@@ -56,7 +56,9 @@ export type GCalcApi = {
   showCalculator: () => void;
   showSite: () => void;
   hideSite: () => void;
-  onRequestLogin: (cb: () => void) => void;
+  /** Open another hardened panel window (same security / shared session). */
+  openNewWindow: () => Promise<{ ok: boolean; message?: string }>;
+  onRequestLogin: (cb: (d?: { email?: string; mobile?: string }) => void) => () => void;
   /** Fired when password gate is used while SOS is active. */
   onLoginBlockedSos: (cb: () => void) => () => void;
   /** Site password gate unlocked (Astro Admin password matches). */

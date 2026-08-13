@@ -210,6 +210,40 @@ export function CallerAllotmentPage() {
     [callerHeadMap, load],
   );
 
+  /** admin-panel-domains removeCallerHead — one API call per selected head name. */
+  const removeCallerHead = useCallback(
+    async (row: CallerRow) => {
+      const selectedHeads = callerHeadMap[row._id] ?? [];
+      if (!selectedHeads.length) {
+        toast.error('Please select caller head to remove');
+        return;
+      }
+      const key = `${row._id}:removeHead`;
+      setSavingKey(key);
+      try {
+        const results = await Promise.all(
+          selectedHeads.map((item) =>
+            secureApi('ops.removeCallerHead', {
+              _id: row._id,
+              callerHead: item.name,
+            }),
+          ),
+        );
+        const failed = results.find((r) => !r.ok);
+        if (failed) {
+          toast.error(failed.message || 'Failed to remove caller head');
+          return;
+        }
+        toast.success('Caller head removed successfully');
+        setCallerHeadMap((prev) => ({ ...prev, [row._id]: [] }));
+        void load();
+      } finally {
+        setSavingKey(null);
+      }
+    },
+    [callerHeadMap, load],
+  );
+
   const updateOtherData = useCallback(
     async (rowId: string) => {
       const row = rowsRef.current.find((r) => r._id === rowId);
@@ -437,6 +471,26 @@ export function CallerAllotmentPage() {
               <Button
                 size="small"
                 variant="outlined"
+                color="error"
+                disabled={savingKey === `${row._id}:removeHead`}
+                onClick={() => void removeCallerHead(row)}
+                sx={{
+                  ...actionBtnSx,
+                  borderColor: '#ef5350',
+                  color: '#ef5350',
+                  '&:hover': {
+                    borderColor: '#e57373',
+                    bgcolor: 'rgba(239,83,80,0.1)',
+                  },
+                }}
+              >
+                {savingKey === `${row._id}:removeHead`
+                  ? 'Removing…'
+                  : 'Remove Caller Head'}
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
                 disabled={savingKey === `${row._id}:other`}
                 onClick={() => void updateOtherData(row._id)}
                 sx={actionBtnSx}
@@ -454,6 +508,7 @@ export function CallerAllotmentPage() {
       handleRowChange,
       savingKey,
       updateCallerHead,
+      removeCallerHead,
       updateOtherData,
     ],
   );

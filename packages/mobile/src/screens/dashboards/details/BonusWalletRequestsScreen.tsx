@@ -17,6 +17,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
@@ -73,6 +74,7 @@ function formatIN(value: unknown): string {
 }
 
 export function BonusWalletRequestsScreen() {
+  const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   // Read once — getSessionUser returns a fresh object each call.
   const admin = useMemo(
     () => getSessionUser() as { _id?: string; name?: string } | null,
@@ -258,7 +260,19 @@ export function BonusWalletRequestsScreen() {
   const columns = useMemo<DataTableColumn<BonusRow>[]>(
     () => [
       { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      { key: 'name', label: 'User Name', width: w.name, render: (r) => display(r.name) },
+      {
+        key: 'name',
+        label: 'User Name',
+        width: w.name,
+        render: (r) => display(r.name),
+        onCellPress: (r) => {
+          if (!r.userId) return;
+          navigation.navigate('/user-report', {
+            userId: String(r.userId),
+            userName: String(r.name || ''),
+          });
+        },
+      },
       { key: 'transactionId', label: 'Transaction Id', width: 200, render: (r) => display(r._id) },
       { key: 'amount', label: 'Amount', width: w.amount, align: 'right', render: (r) => formatIN(r.amount) },
       { key: 'mobile', label: 'Mobile', width: 130, render: (r) => maskMobile(r.mobile, canShowMobile) },
@@ -274,7 +288,7 @@ export function BonusWalletRequestsScreen() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, pageSize, canShowMobile, availableWidth],
+    [page, pageSize, canShowMobile, availableWidth, navigation],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
@@ -290,16 +304,35 @@ export function BonusWalletRequestsScreen() {
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
+    const acts: SheetAction[] = [];
+    if (sheetRow.userId) {
+      acts.push({
+        label: 'User Report',
+        tone: 'primary',
+        onPress: () => {
+          const id = sheetRow.userId;
+          const name = sheetRow.name;
+          setSheetRow(null);
+          navigation.navigate('/user-report', {
+            userId: String(id),
+            userName: String(name || ''),
+          });
+        },
+      });
+    }
     const pending = String(sheetRow.status || '').trim().toLowerCase() === 'pending';
-    if (!pending) return [];
+    if (!pending) return acts;
     const busy = Boolean(actingId);
-    return (['approve', 'reject', 'remove'] as ActionStatus[]).map((a) => ({
-      label: actingId === `${sheetRow._id}:${a}` ? '…' : a[0].toUpperCase() + a.slice(1),
-      tone: a === 'approve' ? 'primary' : a === 'reject' ? 'warning' : 'default',
-      disabled: busy,
-      onPress: () => handleAction(sheetRow, a),
-    }));
-  }, [sheetRow, actingId, handleAction]);
+    acts.push(
+      ...(['approve', 'reject', 'remove'] as ActionStatus[]).map((a) => ({
+        label: actingId === `${sheetRow._id}:${a}` ? '…' : a[0].toUpperCase() + a.slice(1),
+        tone: (a === 'approve' ? 'primary' : a === 'reject' ? 'warning' : 'default') as SheetAction['tone'],
+        disabled: busy,
+        onPress: () => handleAction(sheetRow, a),
+      })),
+    );
+    return acts;
+  }, [sheetRow, actingId, handleAction, navigation]);
 
   return (
     <ScrollView

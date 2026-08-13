@@ -16,9 +16,15 @@ contextBridge.exposeInMainWorld('gcalc', {
   showSite: () => ipcRenderer.send('gcalc:show-site'),
   hideSite: () => ipcRenderer.send('gcalc:hide-site'),
 
+  openNewWindow: () => safeInvoke('app:open-new-window'),
+
   onRequestLogin: (cb) => {
-    if (typeof cb !== 'function') return;
-    ipcRenderer.on('astro:request-login', () => cb());
+    if (typeof cb !== 'function') return () => {};
+    const handler = (_e, d) => cb(d && typeof d === 'object' ? d : {});
+    ipcRenderer.on('astro:request-login', handler);
+    return () => {
+      ipcRenderer.removeListener('astro:request-login', handler);
+    };
   },
 
   onLoginBlockedSos: (cb) => {

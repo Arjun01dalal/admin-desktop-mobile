@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import {
   Box,
   Button,
@@ -8,8 +8,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   IconButton,
+  InputLabel,
   MenuItem,
+  Select,
   Stack,
   Switch,
   TextField,
@@ -19,11 +22,20 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
+import VideoCallIcon from '@mui/icons-material/VideoCall';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { asList, useReportQuery } from '@/screens/panel/shared';
+import { AddGameLaunchBannerModal } from '@/screens/panel/banners/AddGameLaunchBannerModal';
+import {
+  BANNER_CATEGORY_OPTIONS,
+  BANNER_TYPE_OPTIONS,
+  MOBILE_PAGE_OPTIONS,
+  MOBILE_PARAM_OPTIONS,
+  VIDEO_TYPE_OPTIONS,
+} from '@/screens/panel/banners/constants';
 
 type BannerRow = {
   _id: string;
@@ -35,7 +47,31 @@ type BannerRow = {
   [key: string]: unknown;
 };
 
-const EMPTY_FORM = { url: '', gameName: '', type: '' };
+type AddForm = {
+  imageDataUrl: string;
+  fileName: string;
+  desktopLink: string;
+  gameName: string;
+  mobilePage: string;
+  mobileOptions: string;
+  type: string;
+  category: string;
+  bonusTitle: string;
+  bonusSubtitle: string;
+};
+
+const EMPTY_ADD: AddForm = {
+  imageDataUrl: '',
+  fileName: '',
+  desktopLink: '',
+  gameName: '',
+  mobilePage: '',
+  mobileOptions: '',
+  type: '',
+  category: '',
+  bonusTitle: '',
+  bonusSubtitle: '',
+};
 
 const POSITION_OPTIONS = Array.from({ length: 25 }, (_, i) => i + 1);
 
@@ -53,11 +89,37 @@ const orangeBtnSx = {
   '&:hover': { bgcolor: '#e08c00' },
 };
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64 || '');
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function BannersPage() {
   const [addOpen, setAddOpen] = useState(false);
+  const [addBannerOpen, setAddBannerOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeId, setActiveId] = useState('');
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<AddForm>(EMPTY_ADD);
+  const [videoType, setVideoType] = useState('');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState('');
   const [positionDrafts, setPositionDrafts] = useState<Record<string, string>>({});
@@ -82,7 +144,7 @@ export function BannersPage() {
   });
 
   const openAdd = useCallback(() => {
-    setForm(EMPTY_FORM);
+    setForm(EMPTY_ADD);
     setAddOpen(true);
   }, []);
 
@@ -91,33 +153,126 @@ export function BannersPage() {
     setDeleteOpen(true);
   }, []);
 
+  const handleImageFile = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setForm((prev) => ({
+        ...prev,
+        imageDataUrl: dataUrl,
+        fileName: file.name,
+      }));
+    } catch {
+      toast.error('Failed to read image file');
+    }
+  }, []);
+
   const handleCreate = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
-      if (!form.url.trim() || !form.gameName.trim() || !form.type.trim()) {
-        toast.error('Please fill image URL, game name and type');
+      if (!form.imageDataUrl) {
+        toast.error('Choose an image file');
         return;
       }
+      if (!form.desktopLink.trim()) {
+        toast.error('Enter desktop link');
+        return;
+      }
+      if (!form.gameName.trim()) {
+        toast.error('Enter game name');
+        return;
+      }
+      if (!form.type) {
+        toast.error('Select type');
+        return;
+      }
+      if (!form.category) {
+        toast.error('Select category');
+        return;
+      }
+      if (form.type === 'bonusScreenBanners' && !form.bonusTitle.trim()) {
+        toast.error('Enter banner title');
+        return;
+      }
+      if (form.type === 'bonusScreenBanners' && !form.bonusSubtitle.trim()) {
+        toast.error('Enter banner subtitle');
+        return;
+      }
+
       setSubmitting(true);
       try {
-        const res = await secureApi('ops.bannersCreate', {
-          imagePath: form.url.trim(),
+        const payload: Record<string, unknown> = {
+          iframeUrlMob: form.mobilePage,
+          iframeUrl: form.desktopLink.trim(),
+          type: form.type,
+          File_Name: form.fileName,
+          Image: form.imageDataUrl,
           gameName: form.gameName.trim(),
-          type: form.type.trim(),
-        });
+          category: form.category,
+          deepLink: true,
+          mobileRouter: form.mobilePage,
+          mobileOptions: form.mobileOptions,
+        };
+        if (form.type === 'bonusScreenBanners') {
+          payload.decryption = {
+            title: form.bonusTitle.trim(),
+            subTitle: form.bonusSubtitle.trim(),
+          };
+        }
+
+        const res = await secureApi('ops.bannersCreate', payload);
         if (!res.ok) {
           toast.error(res.message || 'Failed to add banner');
           return;
         }
         toast.success('Banner added');
         setAddOpen(false);
-        setForm(EMPTY_FORM);
+        setForm(EMPTY_ADD);
         void load();
       } finally {
         setSubmitting(false);
       }
     },
     [form, load],
+  );
+
+  const handleVideoSubmit = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      if (!videoType) {
+        toast.error('Select video type');
+        return;
+      }
+      if (!videoFile) {
+        toast.error('No file selected');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const videoBase64 = await readFileAsBase64(videoFile);
+        const res = await secureApi('ops.bannersUploadVideo', {
+          videoBase64,
+          fileName: videoFile.name,
+          videoType,
+          mimeType: videoFile.type || 'video/mp4',
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Video upload failed');
+          return;
+        }
+        toast.success(res.message || 'Tutorial video uploaded successfully');
+        setVideoOpen(false);
+        setVideoType('');
+        setVideoFile(null);
+        void load();
+      } catch {
+        toast.error('Failed to read video file');
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [videoFile, videoType, load],
   );
 
   const handleToggleStatus = useCallback(
@@ -213,7 +368,22 @@ export function BannersPage() {
       {
         id: 'gameName',
         label: 'Game Name',
-        render: (row) => row.gameName || '—',
+        width: 120,
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              maxWidth: 110,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              mx: 'auto',
+            }}
+            title={row.gameName || undefined}
+          >
+            {row.gameName || '—'}
+          </Typography>
+        ),
       },
     ];
 
@@ -238,7 +408,22 @@ export function BannersPage() {
       {
         id: 'type',
         label: 'Type',
-        render: (row) => row.type || '—',
+        width: 100,
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              maxWidth: 90,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              mx: 'auto',
+            }}
+            title={row.type || undefined}
+          >
+            {row.type || '—'}
+          </Typography>
+        ),
       },
       {
         id: 'position',
@@ -326,16 +511,38 @@ export function BannersPage() {
         <Typography variant="h5" fontWeight={700}>
           Banners List
         </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           {canAdd ? (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={openAdd}
-              sx={orangeBtnSx}
-            >
-              Add
-            </Button>
+            <>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={openAdd}
+                sx={orangeBtnSx}
+              >
+                Add
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setAddBannerOpen(true)}
+                sx={orangeBtnSx}
+              >
+                Add Banner
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<VideoCallIcon />}
+                onClick={() => {
+                  setVideoType('');
+                  setVideoFile(null);
+                  setVideoOpen(true);
+                }}
+                sx={orangeBtnSx}
+              >
+                Upload Video
+              </Button>
+            </>
           ) : null}
           <Button
             variant="outlined"
@@ -371,18 +578,25 @@ export function BannersPage() {
         maxHeight="calc(100vh - 220px)"
       />
 
-      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
-        <form onSubmit={handleCreate}>
-          <DialogTitle>Add Banner</DialogTitle>
+      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="sm">
+        <form onSubmit={(e) => void handleCreate(e)}>
+          <DialogTitle>Add</DialogTitle>
           <DialogContent>
             <Stack spacing={2} pt={1}>
               <TextField
-                label="Image URL"
+                type="file"
                 size="small"
                 fullWidth
-                value={form.url}
-                onChange={(e) => setForm((prev) => ({ ...prev, url: e.target.value }))}
-                autoFocus
+                inputProps={{ accept: 'image/*' }}
+                onChange={(e) => void handleImageFile(e as ChangeEvent<HTMLInputElement>)}
+                helperText={form.fileName || 'Choose banner image'}
+              />
+              <TextField
+                label="Desktop Link"
+                size="small"
+                fullWidth
+                value={form.desktopLink}
+                onChange={(e) => setForm((prev) => ({ ...prev, desktopLink: e.target.value }))}
               />
               <TextField
                 label="Game Name"
@@ -391,13 +605,96 @@ export function BannersPage() {
                 value={form.gameName}
                 onChange={(e) => setForm((prev) => ({ ...prev, gameName: e.target.value }))}
               />
-              <TextField
-                label="Type"
-                size="small"
-                fullWidth
-                value={form.type}
-                onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-              />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="mobile-page-label">Mobile Page</InputLabel>
+                  <Select
+                    labelId="mobile-page-label"
+                    label="Mobile Page"
+                    value={form.mobilePage}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, mobilePage: e.target.value }))
+                    }
+                  >
+                    {MOBILE_PAGE_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value || 'none'} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="mobile-options-label">Mobile Page Options</InputLabel>
+                  <Select
+                    labelId="mobile-options-label"
+                    label="Mobile Page Options"
+                    value={form.mobileOptions}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, mobileOptions: e.target.value }))
+                    }
+                  >
+                    {MOBILE_PARAM_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value || 'none'} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <FormControl size="small" fullWidth required>
+                  <InputLabel id="banner-type-label">Select Type</InputLabel>
+                  <Select
+                    labelId="banner-type-label"
+                    label="Select Type"
+                    value={form.type}
+                    onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+                  >
+                    {BANNER_TYPE_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl size="small" fullWidth required>
+                  <InputLabel id="banner-category-label">Category</InputLabel>
+                  <Select
+                    labelId="banner-category-label"
+                    label="Category"
+                    value={form.category}
+                    onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                  >
+                    {BANNER_CATEGORY_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+              {form.type === 'bonusScreenBanners' ? (
+                <>
+                  <TextField
+                    label="Banner Title"
+                    size="small"
+                    fullWidth
+                    value={form.bonusTitle}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, bonusTitle: e.target.value }))
+                    }
+                  />
+                  <TextField
+                    label="Banner Subtitle"
+                    size="small"
+                    fullWidth
+                    value={form.bonusSubtitle}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, bonusSubtitle: e.target.value }))
+                    }
+                  />
+                </>
+              ) : null}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -406,6 +703,61 @@ export function BannersPage() {
             </Button>
             <Button type="submit" variant="contained" disabled={submitting} sx={orangeBtnSx}>
               {submitting ? 'Saving…' : 'Submit'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <AddGameLaunchBannerModal
+        open={addBannerOpen}
+        onClose={() => setAddBannerOpen(false)}
+        onSuccess={() => void load()}
+      />
+
+      <Dialog
+        open={videoOpen}
+        onClose={() => !submitting && setVideoOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <form onSubmit={(e) => void handleVideoSubmit(e)}>
+          <DialogTitle>Upload Video</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} pt={1}>
+              <FormControl size="small" fullWidth required>
+                <InputLabel id="video-type-label">Video Type</InputLabel>
+                <Select
+                  labelId="video-type-label"
+                  label="Video Type"
+                  value={videoType}
+                  onChange={(e) => setVideoType(e.target.value)}
+                >
+                  {VIDEO_TYPE_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                type="file"
+                size="small"
+                fullWidth
+                inputProps={{ accept: 'video/*' }}
+                onChange={(e) => {
+                  const input = e.target as HTMLInputElement;
+                  setVideoFile(input.files?.[0] ?? null);
+                }}
+                helperText={videoFile?.name || 'Choose video file'}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setVideoOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={submitting} sx={orangeBtnSx}>
+              {submitting ? 'Uploading…' : 'Submit'}
             </Button>
           </DialogActions>
         </form>

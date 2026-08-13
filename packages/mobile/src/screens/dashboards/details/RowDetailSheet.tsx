@@ -3,7 +3,7 @@
  * Used by the user-list detail screens: the table shows only the main
  * columns; tapping a row opens this sheet with the full desktop column set.
  */
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import {
   Image,
   Modal,
@@ -30,7 +30,7 @@ export type SheetField = {
 export type SheetAction = {
   label: string;
   onPress: () => void;
-  tone?: 'primary' | 'warning' | 'default';
+  tone?: 'primary' | 'warning' | 'danger' | 'default';
   disabled?: boolean;
 };
 
@@ -47,6 +47,8 @@ type Props = {
   note?: string;
   /** Optional image shown at the top of the sheet (e.g. game artwork). */
   imageUri?: string;
+  /** Extra content (e.g. multi-select chips) rendered above actions. */
+  footer?: ReactNode;
 };
 
 export function RowDetailSheet({
@@ -58,6 +60,7 @@ export function RowDetailSheet({
   actions,
   note,
   imageUri,
+  footer,
 }: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -83,6 +86,7 @@ export function RowDetailSheet({
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
             ) : null}
+            {footer}
             {actions && actions.length > 0 ? (
               <View style={styles.actionsRow}>
                 {actions.map((a) => (
@@ -92,16 +96,19 @@ export function RowDetailSheet({
                       styles.actionBtn,
                       a.tone === 'primary' && styles.actionBtnPrimary,
                       a.tone === 'warning' && styles.actionBtnWarning,
+                      a.tone === 'danger' && styles.actionBtnDanger,
                       a.disabled && styles.actionBtnDisabled,
                     ]}
                     onPress={a.onPress}
                     disabled={a.disabled}
+                    delayPressIn={0}
                   >
                     <Text
                       style={[
                         styles.actionBtnText,
                         a.tone === 'primary' && styles.actionBtnTextPrimary,
                         a.tone === 'warning' && styles.actionBtnTextWarning,
+                        a.tone === 'danger' && styles.actionBtnTextDanger,
                       ]}
                     >
                       {toDisplayText(a.label)}
@@ -203,10 +210,12 @@ const styles = StyleSheet.create({
   },
   actionBtnPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   actionBtnWarning: { backgroundColor: '#facc15', borderColor: '#facc15' },
+  actionBtnDanger: { backgroundColor: '#ef5350', borderColor: '#ef5350' },
   actionBtnDisabled: { opacity: 0.5 },
   actionBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   actionBtnTextPrimary: { color: colors.primaryForeground },
   actionBtnTextWarning: { color: '#111' },
+  actionBtnTextDanger: { color: '#fff' },
   note: {
     color: colors.muted,
     fontSize: 11,

@@ -12,19 +12,23 @@ const ROOT = path.resolve(__dirname, '..', '..', '..');
 let base = '';
 let entk = '';
 
-// 1) Prefer a plaintext root .env (developer machines).
-const rootEnv = path.join(ROOT, '.env');
-if (fs.existsSync(rootEnv)) {
-  for (const line of fs.readFileSync(rootEnv, 'utf8').split('\n')) {
-    const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
+function readEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
     if (!m) continue;
-    const val = m[2].replace(/^['"]|['"]$/g, '');
-    if (m[1] === 'API_BASE_URL') base = val;
-    if (m[1] === 'ENTK_VALUE') entk = val;
+    const val = m[2].replace(/^['"]|['"]$/g, '').trim();
+    if (m[1] === 'API_BASE_URL' || m[1] === 'EXPO_PUBLIC_API_BASE_URL') base = base || val;
+    if (m[1] === 'ENTK_VALUE' || m[1] === 'EXPO_PUBLIC_ENTK_VALUE') entk = entk || val;
   }
 }
 
-// 2) Fall back to the embedded (self-decoding) build config.
+// 1) Prefer desktop .env (same secrets as Electron).
+readEnvFile(path.join(ROOT, 'packages', 'desktop', '.env'));
+// 2) Fall back to repo-root .env.
+readEnvFile(path.join(ROOT, '.env'));
+
+// 3) Fall back to the embedded (self-decoding) build config.
 if (!base || !entk) {
   try {
     const embedded = require(path.join(ROOT, 'packages/desktop/electron/env.generated.cjs'));
@@ -38,7 +42,7 @@ if (!base || !entk) {
 if (!base || !entk) {
   console.error(
     'Could not find API_BASE_URL / ENTK_VALUE.\n' +
-      'Create a root .env (see .env.example) or build the desktop app first, then re-run.',
+      'Create packages/desktop/.env (see packages/desktop/.env.example) or a root .env, then re-run.',
   );
   process.exit(1);
 }

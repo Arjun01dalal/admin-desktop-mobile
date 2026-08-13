@@ -267,7 +267,7 @@ export function UpiPaymentsScreen() {
         balance: approveItem.amount,
         updatedBy: { name: admin?.name, _id: admin?._id },
         reason: approveReason,
-        remark: `Deposit of ${approveItem.userName} through ${approveItem.paymentGatewayName} order ${approveItem.orderId}`,
+        remark: `Deposite failure of ${approveItem.userName} through ${approveItem.paymentGatewayName} pay with order id ${approveItem.orderId} and mobile no ${approveItem.userMobile ?? ''}`,
         tag: 'credit',
         orderId: approveItem.orderId,
       });
@@ -678,21 +678,24 @@ export function UpiPaymentsScreen() {
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle} numberOfLines={1}>
-                Approve deposit{approveItem ? ` — ₹${approveItem.amount}` : ''}
+                Manual settle Transaction
               </Text>
               <TouchableOpacity
-                onPress={() => setApproveItem(null)}
+                onPress={() => {
+                  setApproveItem(null);
+                  setApproveReason('');
+                  setApproveMsg('');
+                }}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
+            <Text style={styles.modalLabel}>Amount</Text>
             <Text style={styles.modalNote}>
-              {approveItem
-                ? `Add ₹${approveItem.amount} to ${approveItem.userName} (order ${approveItem.orderId})`
-                : ''}
+              ₹{approveItem?.amount ?? '—'}
             </Text>
-            <Text style={styles.modalLabel}>Reason</Text>
+            <Text style={styles.modalLabel}>Select Reason</Text>
             <View style={styles.chipsWrap}>
               {['Deposit Failure', 'deposit-manual'].map((r) => (
                 <TouchableOpacity
@@ -706,12 +709,18 @@ export function UpiPaymentsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.modalLabel}>Remark</Text>
+            <Text style={styles.modalNote}>
+              {approveItem
+                ? `Deposite failure of ${approveItem.userName} through ${approveItem.paymentGatewayName} pay with order id ${approveItem.orderId} and mobile no ${approveItem.userMobile ?? ''}`
+                : ''}
+            </Text>
             <TouchableOpacity
               style={[styles.submitBtn, approveSaving && styles.btnDisabled]}
               disabled={approveSaving}
               onPress={() => void submitApprove()}
             >
-              <Text style={styles.submitText}>{approveSaving ? 'Approving…' : 'Approve'}</Text>
+              <Text style={styles.submitText}>{approveSaving ? 'Submitting…' : 'Submit'}</Text>
             </TouchableOpacity>
             {approveMsg ? <Text style={styles.modalMsg}>{approveMsg}</Text> : null}
           </View>

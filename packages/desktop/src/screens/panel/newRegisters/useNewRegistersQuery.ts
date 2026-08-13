@@ -9,6 +9,7 @@ import type {
   UserRow,
   UsersListResponse,
 } from './types';
+import { flattenUserRow, pickBalance, pickUserComesFrom } from './utils';
 
 export type NewRegistersQueryFilters = {
   searchName: string;
@@ -32,6 +33,20 @@ export type NewRegistersQueryFilters = {
   otherState: boolean;
   nonPerforming: boolean;
 };
+
+/** Empty [] / blank string must not be sent as `app` — server then matches nothing. */
+function resolveAppFilter(
+  clientName?: string | string[],
+  allotedApps?: string | string[],
+): string | string[] | undefined {
+  const raw = clientName || allotedApps;
+  if (Array.isArray(raw)) {
+    const apps = raw.map(String).map((s) => s.trim()).filter(Boolean);
+    return apps.length ? apps : undefined;
+  }
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  return undefined;
+}
 
 export function useNewRegistersQuery(
   admin: NewRegistersAdmin | null | undefined,
@@ -76,7 +91,7 @@ export function useNewRegistersQuery(
 
     if (f.nonPerforming) filter.nonPerforming = true;
 
-    // empCode filter intentionally omitted — same as reference (commented out).
+    // empCode filter intentionally omitted — same as admin-panel-domains (commented out).
 
     return Object.fromEntries(
       Object.entries(filter).filter(([, v]) => v !== undefined && v !== ''),
@@ -99,15 +114,16 @@ export function useNewRegistersQuery(
           newRegistration: columnFilters.newRegistration === 'True',
         };
 
-        if (admin?.clientName || admin?.allotedApps) {
-          payload.app = admin.clientName || admin.allotedApps;
-        }
+        const app = resolveAppFilter(admin?.clientName, admin?.allotedApps);
+        if (app) payload.app = app;
 
         const res = await secureApi<UsersListResponse>('users.getAll', payload);
         if (!isCurrent(gen)) return;
 
         if (!res.ok) {
           toast.error(res.message || 'Failed to load users');
+          setRows([]);
+          setTotal(0);
           return;
         }
 
@@ -124,9 +140,24 @@ export function useNewRegistersQuery(
           ? (res.data as UserRow[])
           : nested.items ||
             nested.users ||
+            (nested as { user?: UserRow[] }).user ||
             data.items ||
             data.users ||
             [];
+
+        // Hoist nests + copy alt-key values onto Laxmi field names.
+        list = list.map((row) => {
+          const flat = { ...flattenUserRow(row) } as UserRow & Record<string, unknown>;
+          if (!String(flat.userComesFrom || '').trim()) {
+            const picked = pickUserComesFrom(flat);
+            if (picked !== 'Company') flat.userComesFrom = picked;
+          }
+          if (flat.balance == null || flat.balance === '') {
+            const bal = pickBalance(flat);
+            if (bal != null) flat.balance = bal;
+          }
+          return flat;
+        });
 
         if (columnFilters.showEmptyRecord) {
           list = list.filter(
@@ -145,12 +176,13 @@ export function useNewRegistersQuery(
           );
         }
 
-        // Empty userComesFrom last
+        // Empty userComesFrom last — same as Laxmi NewRegisterUsers.
         list = [...list].sort((a, b) => {
-          const aEmpty = !String(a.userComesFrom || '').trim();
-          const bEmpty = !String(b.userComesFrom || '').trim();
-          if (aEmpty === bEmpty) return 0;
-          return aEmpty ? 1 : -1;
+          const valA = String(a.userComesFrom || '').trim();
+          const valB = String(b.userComesFrom || '').trim();
+          if (!valA && valB) return 1;
+          if (valA && !valB) return -1;
+          return valA.localeCompare(valB);
         });
 
         const apiTotal = Number(
@@ -185,15 +217,20 @@ export function useNewRegistersQuery(
 
   useEffect(() => {
     void load(page);
+    // Intentionally omit `load` / free-text column filters — Apply calls load(1).
+    // Dates + toolbar toggles should refresh automatically.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [
     page,
     itemsPerPage,
+    startDate,
+    endDate,
     columnFilters.showEmptyRecord,
     columnFilters.activeStatus,
     columnFilters.newRegistration,
     columnFilters.otherState,
     columnFilters.nonPerforming,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
+  ]);
 
   return { rows, total, loading, load };
 }

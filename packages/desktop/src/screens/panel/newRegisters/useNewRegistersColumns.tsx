@@ -1,4 +1,4 @@
-import { useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useMemo } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -36,9 +36,11 @@ import {
   pickAadharNumber,
   pickAccountNumber,
   pickAppName,
+  pickBalance,
   pickLastActivity,
   pickPlayIn,
   pickUserBankName,
+  pickUserComesFrom,
 } from './utils';
 
 const actionStackSx = {
@@ -143,7 +145,7 @@ export function registrationCallLogs(row: UserRow): RegistrationCallLog[] {
 export type UseNewRegistersColumnsParams = {
   page: number;
   itemsPerPage: number;
-  setBlockTarget: Dispatch<SetStateAction<UserRow | null>>;
+  onBlock: (row: UserRow) => void;
   isCaller?: boolean;
   appVersions?: Record<string, string>;
   onAddComment: (row: UserRow) => void;
@@ -155,7 +157,7 @@ export type UseNewRegistersColumnsParams = {
 export function useNewRegistersColumns({
   page,
   itemsPerPage,
-  setBlockTarget,
+  onBlock,
   isCaller = false,
   appVersions = {},
   onAddComment,
@@ -202,7 +204,7 @@ export function useNewRegistersColumns({
       {
         id: 'dpId',
         label: 'DP ID',
-        width: 260,
+        width: 220,
         stickyLeft: true,
         filter: <DpIdFilter />,
         cellSx: {
@@ -221,29 +223,34 @@ export function useNewRegistersColumns({
             From
           </>
         ),
-        width: 88,
-        headSx: { maxWidth: 88, width: 88 },
+        width: 120,
         filter: <UserComesFromFilter />,
         cellSx: {
-          maxWidth: 88,
-          width: 88,
+          minWidth: 110,
           whiteSpace: 'normal',
           wordBreak: 'break-word',
           fontSize: 12,
+          overflow: 'visible',
         },
-        render: (row) => String(row.userComesFrom || '-'),
+        // Laxmi: User?.userComesFrom ?? "Company"
+        render: (row) => pickUserComesFrom(row),
       },
       {
         id: 'balance',
         label: 'Balance',
-        width: 72,
+        width: 100,
         align: 'right',
-        headSx: { maxWidth: 72, width: 72 },
         filter: <BalanceFilter />,
-        cellSx: { maxWidth: 72, width: 72, fontSize: 12 },
+        cellSx: {
+          minWidth: 90,
+          fontSize: 12,
+          fontVariantNumeric: 'tabular-nums',
+          overflow: 'visible',
+        },
+        // Laxmi: Math.floor(User?.balance)
         render: (row) => {
-          const n = Number(row.balance);
-          return Number.isFinite(n) ? Math.floor(n) : '-';
+          const n = pickBalance(row);
+          return n == null ? '-' : Math.floor(n).toLocaleString('en-IN');
         },
       },
       {
@@ -523,7 +530,7 @@ export function useNewRegistersColumns({
               size="small"
               variant="contained"
               color="primary"
-              onClick={() => setBlockTarget(row)}
+              onClick={() => void onBlock(row)}
               sx={actionBtnSx}
             >
               {blocked ? 'Un Block' : 'Block'}
@@ -652,7 +659,7 @@ export function useNewRegistersColumns({
     return cols.filter((col) => !CALLER_HIDDEN_COLUMN_IDS.has(col.id));
   }, [
     rowOffset,
-    setBlockTarget,
+    onBlock,
     isCaller,
     canShowMobile,
     canBlock,

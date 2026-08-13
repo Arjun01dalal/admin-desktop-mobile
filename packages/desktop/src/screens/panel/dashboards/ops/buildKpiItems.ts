@@ -1,5 +1,5 @@
 import type { DashboardMode, KpiItem, OpsDashboardBundle } from './types';
-import { floorNum, toNum } from './mergeMetrics';
+import { floorNum, toNum, activeCount } from './mergeMetrics';
 import { KPI_MAP, NAV_MAP } from './jyotishMapping';
 
 function navCards(startDate: string, endDate: string): KpiItem[] {
@@ -50,12 +50,12 @@ export function buildKpiItems(
 
   const todaysActiveCustomers =
     floorNum(
-      toNum(asCount(active, 'qtech')) +
-        toNum(asCount(active, 'wco')) +
-        toNum(asCount(active, 'jetfair')) +
-        toNum(asCount(active, 'falcon')) +
-        toNum(asCount(active, 'sattaMatka')) +
-        toNum(asCount(active, 'exchange')),
+      activeCount(active, 'qtech') +
+        activeCount(active, 'wco', 'wacs') +
+        activeCount(active, 'jetfair') +
+        activeCount(active, 'falcon') +
+        activeCount(active, 'sattaMatka', 'sattamatka', 'satta') +
+        activeCount(active, 'exchange'),
     ) || floorNum(s.totalActiveCustomersToday ?? s.todaysActiveUsers);
 
   const dateState = { startDate, endDate };
@@ -75,6 +75,14 @@ export function buildKpiItems(
           s.totalRefund ??
           dw.totalWithdrawal ??
           s.totalWithdrawal,
+      ),
+      prefix: '₹',
+    },
+    {
+      id: 'totalPendingWithdrawal',
+      label: KPI_MAP.totalPendingWithdrawal.jyotish,
+      value: floorNum(
+        dw.totalPendingWithdrawal ?? s.totalPendingWithdrawal,
       ),
       prefix: '₹',
     },
@@ -203,15 +211,4 @@ export function buildKpiItems(
   }
 
   return items;
-}
-
-function asCount(
-  active: Record<string, unknown>,
-  key: string,
-): number {
-  const node = active[key];
-  if (node && typeof node === 'object' && !Array.isArray(node)) {
-    return toNum((node as { count?: unknown }).count);
-  }
-  return toNum(node);
 }

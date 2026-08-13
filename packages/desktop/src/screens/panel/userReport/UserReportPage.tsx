@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -19,12 +19,18 @@ import { GameHistoryTab } from './GameHistoryTab';
 import { MatkaHistoryTab } from './MatkaHistoryTab';
 import { QtechHistoryTab } from './QtechHistoryTab';
 import { ExchangeHistoryTab } from './ExchangeHistoryTab';
+import { CoinsTab } from './CoinsTab';
+import { AddBonusCoinsTab } from './AddBonusCoinsTab';
 import { RemoveBonusTab } from './RemoveBonusTab';
 import { FundRequestTab } from './FundRequestTab';
 import { ProviderHistoryTab } from './ProviderHistoryTab';
 import { QtechBetDetailsTab } from './QtechBetDetailsTab';
 import { SettleJetfairModal } from './SettleJetfairModal';
 import { laxmiTabBtnSx } from './laxmiButtonSx';
+import {
+  canShowAddBonusCoinsTab,
+  canShowCoinsTab,
+} from './coinAccess';
 import {
   USER_REPORT_TABS,
   type EncryptedUser,
@@ -61,6 +67,10 @@ function TabBody({
       return <ExchangeHistoryTab userId={userId} variant="jetfair" />;
     case 'falcon_history':
       return <ExchangeHistoryTab userId={userId} variant="falcon" />;
+    case 'coins':
+      return <CoinsTab userId={userId} />;
+    case 'add_bonus_coins':
+      return <AddBonusCoinsTab userId={userId} />;
     case 'remove_bonus_coins':
       return <RemoveBonusTab userId={userId} />;
     case 'fund_request':
@@ -93,6 +103,17 @@ export function UserReportPage() {
   }>();
   const navigate = useNavigate();
   const canOpen = hasPermission('wallet_history');
+  const showCoinsTab = canShowCoinsTab();
+  const showAddBonusTab = canShowAddBonusCoinsTab();
+  const visibleTabs = useMemo(
+    () =>
+      USER_REPORT_TABS.filter((item) => {
+        if (item.id === 'coins') return showCoinsTab;
+        if (item.id === 'add_bonus_coins') return showAddBonusTab;
+        return true;
+      }),
+    [showCoinsTab, showAddBonusTab],
+  );
   const [tab, setTab] = useState<UserReportTab>('wallet_history');
   const [loading, setLoading] = useState(true);
   const [encrypted, setEncrypted] = useState<EncryptedUser | null>(null);
@@ -111,9 +132,32 @@ export function UserReportPage() {
         return;
       }
       const data = (res.data || {}) as {
-        payload?: EncryptedUser;
-      } & EncryptedUser;
-      setEncrypted(data.payload || data);
+        payload?: EncryptedUser & Record<string, unknown>;
+      } & EncryptedUser &
+        Record<string, unknown>;
+      const nested = (data.payload || data) as EncryptedUser & Record<string, unknown>;
+      setEncrypted({
+        encryptedUserName: nested.encryptedUserName
+          ? String(nested.encryptedUserName)
+          : undefined,
+        createdAt: nested.createdAt
+          ? String(nested.createdAt)
+          : nested.createdOn
+            ? String(nested.createdOn)
+            : undefined,
+        activeUser: nested.activeUser
+          ? String(nested.activeUser)
+          : nested.lastActivity
+            ? String(nested.lastActivity)
+            : nested.updatedOn
+              ? String(nested.updatedOn)
+              : nested.updatedAt
+                ? String(nested.updatedAt)
+                : undefined,
+        lastActivity: nested.lastActivity ? String(nested.lastActivity) : undefined,
+        updatedOn: nested.updatedOn ? String(nested.updatedOn) : undefined,
+        updatedAt: nested.updatedAt ? String(nested.updatedAt) : undefined,
+      });
     } finally {
       setLoading(false);
     }
@@ -189,7 +233,7 @@ export function UserReportPage() {
           mb: 1,
         }}
       >
-        {USER_REPORT_TABS.map((item) => (
+        {visibleTabs.map((item) => (
           <Button
             key={item.id}
             variant="contained"

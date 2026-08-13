@@ -8,7 +8,10 @@ const MAX_DEPTH = 8;
 const MAX_KEYS = 200;
 const MAX_ARRAY = 5000;
 const MAX_STRING = 100_000;
-const MAX_JSON_CHARS = 2_000_000;
+/** Banner image / video / dialler uploads travel as base64 on the bridge. */
+const MAX_LONG_STRING = 16_000_000;
+const MAX_JSON_CHARS = 20_000_000;
+const LONG_STRING_KEYS = new Set(['Image', 'fileBase64', 'videoBase64']);
 
 function isPlainObject(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -22,9 +25,10 @@ function isPlainObject(value) {
 /**
  * @param {unknown} value
  * @param {number} depth
+ * @param {string} [fieldKey]
  * @returns {unknown}
  */
-function sanitizeBridgeValue(value, depth = 0) {
+function sanitizeBridgeValue(value, depth = 0, fieldKey = '') {
   if (value === null || value === undefined) return value;
   if (depth > MAX_DEPTH) return null;
 
@@ -34,7 +38,8 @@ function sanitizeBridgeValue(value, depth = 0) {
     return value;
   }
   if (t === 'string') {
-    return value.length > MAX_STRING ? value.slice(0, MAX_STRING) : value;
+    const max = LONG_STRING_KEYS.has(fieldKey) ? MAX_LONG_STRING : MAX_STRING;
+    return value.length > max ? value.slice(0, max) : value;
   }
   if (t !== 'object') return null;
 
@@ -56,7 +61,7 @@ function sanitizeBridgeValue(value, depth = 0) {
     const key = keys[i];
     if (typeof key !== 'string' || key.length > 128) continue;
     if (FORBIDDEN_KEYS.has(key)) continue;
-    out[key] = sanitizeBridgeValue(value[key], depth + 1);
+    out[key] = sanitizeBridgeValue(value[key], depth + 1, key);
   }
   return { ...out };
 }

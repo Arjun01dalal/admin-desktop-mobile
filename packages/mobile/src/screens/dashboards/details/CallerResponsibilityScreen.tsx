@@ -7,6 +7,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import {
@@ -97,7 +99,7 @@ function ecs(row: CallerRow): Record<string, unknown> {
 const MAIN_KEYS = new Set(['sr', 'pseudo', 'deposit', 'pnl']);
 
 export function CallerResponsibilityScreen() {
-  const isFocused = useIsFocused();
+  const navigation = useNavigation();
   const user = getStoredUser<StoredCallerUser>();
   const { isCaller, isCallerHead, isCallerOrHead, isFullAllotment } = roleFlags(user?.Role_ID);
   const showTotalDeposit = canSeeTotalDeposit(user);
@@ -119,6 +121,26 @@ export function CallerResponsibilityScreen() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: CallerRow; index: number } | null>(null);
   const genRef = React.useRef(0);
+
+  const openDepositList = useCallback(
+    (row: CallerRow, type?: 'withdrawal' | 'uniquePending') => {
+      const params: Record<string, unknown> = {
+        list: row,
+        empCode: row.empCode,
+        startDate,
+        endDate,
+      };
+      if (type) params.type = type;
+      // Root-stack detail route (above the drawer) — push so Back always returns here.
+      const parent = navigation.getParent() as
+        | { push?: (name: string, params?: object) => void; navigate: (name: string, params?: object) => void }
+        | undefined;
+      const go = parent?.push ?? parent?.navigate ?? navigation.navigate.bind(navigation);
+      go('/caller-responsibility/deposit-list', params);
+      setSelected(null);
+    },
+    [navigation, startDate, endDate],
+  );
 
   const loadHeads = useCallback(async () => {
     const res = await secureApi('caller.subadminsByRole', { filter: {} });
@@ -176,11 +198,14 @@ export function CallerResponsibilityScreen() {
   }, [startDate, endDate, callerHead, office, isCallerHead, isCaller, showTotalDeposit]);
 
   useEffect(() => {
-    if (isFocused) {
-      void loadHeads();
-      void loadMain();
-    }
-  }, [isFocused, loadHeads, loadMain]);
+    void loadHeads();
+  }, [loadHeads]);
+
+  // Reload only when filters change — not when returning from deposit/refund/unique lists.
+  // Pull-to-refresh still calls loadMain() manually.
+  useEffect(() => {
+    void loadMain();
+  }, [loadMain]);
 
   const displayedBotCount = isCaller ? 0 : botCount;
   const summary = (payload.summary || {}) as CallerRow;
@@ -268,18 +293,21 @@ export function CallerResponsibilityScreen() {
     setEndDate(draftEnd);
   }, [draftStart, draftEnd]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void loadMain()} tintColor={colors.primary} />
-      }
-    >
+  const listColumns = useMemo(
+    () => callerColumns.filter((c) => MAIN_KEYS.has(c.key)),
+    [callerColumns],
+  );
+
+  const onCallerPress = useCallback((row: CallerRow, index: number) => {
+    setSelected({ row, index });
+  }, []);
+
+  const header = useMemo(
+    () => (
+    <View>
       <Text style={styles.title}>Caller Responsibility</Text>
       <Text style={styles.sub}>
-        {startDate} → {endDate} · Tap a caller row to see all details
+        {startDate} → {endDate} · Tap a caller row for details & view lists
       </Text>
 
       {!isCaller && (
@@ -392,16 +420,86 @@ export function CallerResponsibilityScreen() {
       {!loading && (
         <>
           <Text style={styles.sectionTitle}>Caller Data</Text>
-          <DataTable
-            columns={callerColumns.filter((c) => MAIN_KEYS.has(c.key))}
-            rows={callerRows}
-            keyFor={(r, i) => String(r.empCode || r._id || i)}
-            emptyMessage="No caller data"
-            onRowPress={(row) => setSelected({ row, index: callerRows.indexOf(row) })}
-            hint="Tap a row to see all details"
-          />
+          <View style={styles.callerHeadRow}>
+            {listColumns.map((c) => (
+              <Text
+                key={c.key}
+                style={[
+                  styles.callerHead,
+                  { flex: c.key === 'sr' ? 0.5 : 1 },
+                  c.align === 'right' && styles.callerRight,
+                ]}
+                numberOfLines={1}
+              >
+                {c.label}
+              </Text>
+            ))}
+          </View>
         </>
       )}
+    </View>
+    ),
+    [
+      startDate,
+      endDate,
+      isCaller,
+      draftStart,
+      draftEnd,
+      loading,
+      applyAll,
+      showCallerHead,
+      callerHead,
+      heads,
+      showLocation,
+      office,
+      displayedBotCount,
+      error,
+      showTotalDeposit,
+      summaryItems,
+      locationColumns,
+      locationRows,
+      listColumns,
+    ],
+  );
+
+  return (
+    <>
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={loading ? [] : callerRows}
+        keyExtractor={(r, i) => String(r.empCode || r._id || i)}
+        ListHeaderComponent={header}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={() => void loadMain()} tintColor={colors.primary} />
+        }
+        ListEmptyComponent={
+          loading ? null : <Text style={styles.emptyList}>No caller data</Text>
+        }
+        renderItem={({ item, index }) => (
+          <Pressable
+            onPress={() => onCallerPress(item, index)}
+            delayPressIn={0}
+            unstable_pressDelay={0}
+            style={({ pressed }) => [styles.callerRow, pressed && styles.callerRowPressed]}
+          >
+            {listColumns.map((c) => (
+              <Text
+                key={c.key}
+                style={[
+                  styles.callerCell,
+                  { flex: c.key === 'sr' ? 0.5 : 1 },
+                  c.align === 'right' && styles.callerRight,
+                ]}
+                numberOfLines={1}
+              >
+                {c.render(item, index)}
+              </Text>
+            ))}
+          </Pressable>
+        )}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -416,9 +514,28 @@ export function CallerResponsibilityScreen() {
               }))
             : []
         }
+        actions={
+          selected
+            ? [
+                {
+                  label: 'View Deposit',
+                  tone: 'primary',
+                  onPress: () => openDepositList(selected.row),
+                },
+                {
+                  label: 'View Refund List',
+                  onPress: () => openDepositList(selected.row, 'withdrawal'),
+                },
+                {
+                  label: 'View Unique Pending',
+                  onPress: () => openDepositList(selected.row, 'uniquePending'),
+                },
+              ]
+            : undefined
+        }
         onClose={() => setSelected(null)}
       />
-    </ScrollView>
+    </>
   );
 }
 
@@ -481,4 +598,34 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  emptyList: { color: colors.muted, textAlign: 'center', marginTop: spacing(4) },
+  callerHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing(2),
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing(2),
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderBottomWidth: 1,
+  },
+  callerHead: { color: colors.primary, fontWeight: '700', fontSize: 12, paddingHorizontal: spacing(1) },
+  callerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing(3),
+    paddingHorizontal: spacing(2),
+    backgroundColor: colors.surface,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  callerRowPressed: { backgroundColor: colors.surfaceAlt },
+  callerCell: { color: colors.foreground, fontSize: 13, paddingHorizontal: spacing(1) },
+  callerRight: { textAlign: 'right' },
 });

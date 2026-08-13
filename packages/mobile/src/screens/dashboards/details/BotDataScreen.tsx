@@ -43,9 +43,9 @@ const USER_TYPES = [
   { value: 'In_Active_Deposit', label: 'Inactive Deposit' },
 ] as const;
 
-const PLAYED_OPTIONS = ['C', 'E', 'S'] as const;
+const PLAY_IN_OPTIONS = ['C', 'E', 'S'] as const;
 
-/** Allowed BOT IDs (user-provided allowlist). */
+/** Curated Bot IDs (admin-panel-domains `BOT_ID`). */
 const BOT_ID_OPTIONS = [
   '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
   '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
@@ -275,10 +275,10 @@ export function BotDataScreen() {
           ))}
         </View>
 
-        {/* Played */}
-        <Text style={styles.label}>Played</Text>
+        {/* In (formerly Played) */}
+        <Text style={styles.label}>In</Text>
         <View style={styles.chipsWrap}>
-          {PLAYED_OPTIONS.map((p) => (
+          {PLAY_IN_OPTIONS.map((p) => (
             <TouchableOpacity
               key={p}
               style={[styles.chip, played.includes(p) && styles.chipActive]}

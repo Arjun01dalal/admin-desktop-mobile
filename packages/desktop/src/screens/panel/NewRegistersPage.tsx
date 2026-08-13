@@ -40,8 +40,6 @@ import type {
   UserRow,
 } from './newRegisters/types';
 
-const MAX_REMARK_LENGTH = 500;
-
 function isNewRegistersCaller(roleId?: string): boolean {
   const id = String(roleId || getRoleId() || '');
   if (id && CALLER_ROLE_IDS.has(id)) return true;
@@ -57,6 +55,7 @@ export function NewRegistersPage() {
     _id?: string;
     name?: string;
     empCode?: string;
+    mobile?: string;
     Role_ID?: string;
     extensionId?: string[];
     serverId?: string | number;
@@ -83,8 +82,6 @@ export function NewRegistersPage() {
     useState<NewRegistrationFilter>('True');
   const [otherState, setOtherState] = useState(false);
   const [nonPerforming, setNonPerforming] = useState(false);
-  const [blockTarget, setBlockTarget] = useState<UserRow | null>(null);
-  const [remark, setRemark] = useState('');
   const [appVersions, setAppVersions] = useState<Record<string, string>>({});
 
   const [commentOpen, setCommentOpen] = useState(false);
@@ -187,7 +184,7 @@ export function NewRegistersPage() {
   );
   const deferredRows = useDeferredValue(rows);
 
-  const { dialerLoading, toggleBlock, addComment, addToDialer } =
+  const { dialerLoading, addComment, addToDialer, block } =
     useNewRegistersActions(admin, load, page);
 
   const applyFilters = useCallback(() => {
@@ -216,7 +213,7 @@ export function NewRegistersPage() {
   const columns = useNewRegistersColumns({
     page,
     itemsPerPage,
-    setBlockTarget,
+    onBlock: (row) => void block.start(row),
     isCaller,
     appVersions,
     onAddComment: openAddComment,
@@ -356,37 +353,56 @@ export function NewRegistersPage() {
         />
       </Stack>
 
-      <Dialog open={Boolean(blockTarget)} onClose={() => setBlockTarget(null)}>
+      <Dialog open={Boolean(block.target)} onClose={block.close}>
         <DialogTitle>
-          {blockTarget && (blockTarget.blockUser || blockTarget.block)
-            ? 'Unblock'
-            : 'Block'}{' '}
-          user
+          {block.nextStatus ? 'Block' : 'Unblock'} user
         </DialogTitle>
         <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, mt: 0.5 }}>
+            {block.otpSending
+              ? 'Sending OTP to SuperAdmin…'
+              : 'Enter OTP and remark to continue.'}
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            required
+            label="Please enter OTP"
+            value={block.otp}
+            onChange={(e) =>
+              block.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))
+            }
+            inputMode="numeric"
+            sx={{ mb: 2 }}
+          />
           <TextField
             fullWidth
-            label="Remark"
-            value={remark}
-            onChange={(e) => setRemark(e.target.value.slice(0, MAX_REMARK_LENGTH))}
-            inputProps={{ maxLength: MAX_REMARK_LENGTH }}
-            sx={{ mt: 1 }}
+            required
+            label="Please enter remark"
+            value={block.remark}
+            onChange={(e) =>
+              block.setRemark(e.target.value.slice(0, block.maxRemark))
+            }
+            inputProps={{ maxLength: block.maxRemark }}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBlockTarget(null)}>Cancel</Button>
+        <DialogActions sx={{ px: 2, pb: 2, gap: 1, flexWrap: 'wrap' }}>
+          <Button onClick={block.close}>Cancel</Button>
+          <Button
+            variant="outlined"
+            disabled={block.otpSending}
+            onClick={() => void block.resendOtp()}
+          >
+            Resend OTP
+          </Button>
           <Button
             variant="contained"
-            onClick={() => {
-              void toggleBlock(blockTarget, remark).then((ok) => {
-                if (ok) {
-                  setBlockTarget(null);
-                  setRemark('');
-                }
-              });
-            }}
+            disabled={
+              block.actionBusyId === block.target?._id || block.otpSending
+            }
+            onClick={() => void block.confirm()}
           >
-            Confirm
+            Submit
           </Button>
         </DialogActions>
       </Dialog>

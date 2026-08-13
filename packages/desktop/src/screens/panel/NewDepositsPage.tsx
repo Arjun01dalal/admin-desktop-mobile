@@ -9,6 +9,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { getSessionUser, hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatDisplayDate, formatDisplayTime, todayIST, formatAmount } from '@/utils/dates';
@@ -84,6 +85,7 @@ function ColumnSearch({
 
 /** New Deposits — ops.newDeposits (CommonTable UI, same as New Registers). */
 export function NewDepositsPage() {
+  const navigate = useNavigate();
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [page, setPage] = useState(1);
@@ -164,7 +166,26 @@ export function NewDepositsPage() {
             placeholder="Search by name"
           />
         ),
-        render: (row) => display(row.name),
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: row._id ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            }}
+            onClick={() => {
+              if (!row._id) return;
+              // Laxmi NewDeposits: /user-report/:id/:name
+              navigate(
+                `/users/report/${row._id}/${encodeURIComponent(row.name || '')}`,
+              );
+            }}
+          >
+            {display(row.name)}
+          </Typography>
+        ),
       },
       {
         id: 'mobile',
@@ -265,7 +286,7 @@ export function NewDepositsPage() {
         render: (row) => formatAmount(row.bonusWalletBalance ?? 0),
       },
     ],
-    [page, itemsPerPage, draft, search, canShowMobile, setDraftField],
+    [page, itemsPerPage, draft, search, canShowMobile, setDraftField, navigate],
   );
 
   return (

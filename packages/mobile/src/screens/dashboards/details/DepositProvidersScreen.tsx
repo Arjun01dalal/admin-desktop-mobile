@@ -111,8 +111,9 @@ export function DepositProvidersScreen() {
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
-  const [startDate, setStartDate] = useState(todayIST());
-  const [endDate, setEndDate] = useState(todayIST());
+  // Laxmi: first getAllDash uses {}; dates only after Apply (faster).
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -667,7 +668,8 @@ export function DepositProvidersScreen() {
     >
       <Text style={styles.title}>Deposit Providers</Text>
       <Text style={styles.sub}>
-        {startDate} → {endDate} · {filtered.length.toLocaleString('en-IN')} providers
+        {startDate && endDate ? `${startDate} → ${endDate}` : 'All dates'} ·{' '}
+        {filtered.length.toLocaleString('en-IN')} providers
       </Text>
 
       <DetailFilterBar

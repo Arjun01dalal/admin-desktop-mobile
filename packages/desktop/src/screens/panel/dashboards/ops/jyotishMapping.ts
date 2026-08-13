@@ -87,6 +87,7 @@ const METRIC_ALIASES: Record<string, string> = {
   'Provider GGR': 'Artha',
   'GGR (Without commission)': 'Artha',
   'GGR - Upline + Commission': 'Artha',
+  'Gross GGR (Including Upline)': 'Pushti',
   'Total Win': 'Jaya',
   'Total Win Amount': 'Jaya',
   'Total Winning Amount': 'Jaya',
@@ -95,6 +96,7 @@ const METRIC_ALIASES: Record<string, string> = {
   Winning: 'Jaya',
   'Total Bet Amount': 'Rashi',
   'Total Active Users': 'Jiva',
+  'Total Exchange Players': 'Jiva',
   'Total RollBack': 'Nivritti',
   'Roll Back': 'Nivritti',
   Rollback: 'Nivritti',
@@ -180,6 +182,10 @@ export const ACTIVE_EXCHANGE_MAP = [
 // ---------------------------------------------------------------------------
 export const KPI_MAP = {
   totalWithdrawal: { original: 'Total Withdrawals', jyotish: 'Total Refund' },
+  totalPendingWithdrawal: {
+    original: 'Total Pending Withdrawals',
+    jyotish: 'Total Pending Refund',
+  },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -281,6 +287,8 @@ export const COMMON_UI_MAP = [
   { original: 'Total Jetfair Deposit', jyotish: 'Total Jyeshtha Deposit' },
   { original: 'Free Points Bonus', jyotish: 'Free Points Varadan' },
   { original: 'Remove Bonus Coins', jyotish: 'Remove Varadan Coins' },
+  { original: 'Add Bonus Coins', jyotish: 'Add Varadan Coins' },
+  { original: 'Coins', jyotish: 'Sikke' },
   { original: 'Total Users Bonus Balance', jyotish: 'Total Users Varadan Balance' },
   { original: 'Total Bonus Given', jyotish: 'Total Varadan Given' },
   { original: 'Bonus Balance', jyotish: 'Varadan Balance' },
@@ -432,6 +440,10 @@ function buildPairs(): {
   );
   for (const m of ACTIVE_EXCHANGE_MAP) add(m.original, m.jyotish);
   add(KPI_MAP.totalWithdrawal.original, KPI_MAP.totalWithdrawal.jyotish);
+  add(
+    KPI_MAP.totalPendingWithdrawal.original,
+    KPI_MAP.totalPendingWithdrawal.jyotish,
+  );
   for (const m of PROFIT_LOSS_COLUMN_MAP) add(m.original, m.jyotish);
   for (const m of HOUSE_GAMES_MAP) add(m.original, m.jyotish);
   for (const m of HOUSE_GAME_ID_MAP) add(m.original, m.jyotish);
@@ -455,13 +467,28 @@ function buildPairs(): {
 
   const seenJ = new Set<string>();
   const uniqReverse: Array<[string, string]> = [];
-  const sortedReverse = [...uniqForward]
-    .map(([o, j]) => [j, o] as [string, string])
-    .sort((a, b) => b[0].length - a[0].length);
-  for (const [j, o] of sortedReverse) {
+  // Prefer Filter-By originals when multiple originals share one Jyotish
+  // (e.g. WCO over WACS for Vakra — WAC/WACS is the same WCO provider).
+  const filterOriginals = new Set(
+    FILTER_BY_MAP.map((m) => m.original.toLowerCase()),
+  );
+  const reverseBuckets = new Map<string, string[]>();
+  for (const [o, j] of uniqForward) {
+    const list = reverseBuckets.get(j) ?? [];
+    list.push(o);
+    reverseBuckets.set(j, list);
+  }
+  const sortedJyotish = [...reverseBuckets.keys()].sort(
+    (a, b) => b.length - a.length,
+  );
+  for (const j of sortedJyotish) {
     if (seenJ.has(j)) continue;
     seenJ.add(j);
-    uniqReverse.push([j, o]);
+    const originals = reverseBuckets.get(j) ?? [];
+    const preferred =
+      originals.find((o) => filterOriginals.has(o.toLowerCase())) ??
+      originals[0];
+    if (preferred) uniqReverse.push([j, preferred]);
   }
 
   return { forward: uniqForward, reverse: uniqReverse };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -161,6 +162,7 @@ function unpackPayload(data: unknown): Record<string, unknown> {
 }
 
 export function BonusWalletRequestsPage() {
+  const navigate = useNavigate();
   const admin = getStoredUser<{ _id?: string; name?: string }>();
   const canShowMobile = hasPermission('show_mobile');
   const today = todayIST();
@@ -333,7 +335,25 @@ export function BonusWalletRequestsPage() {
         id: 'name',
         label: 'User Name',
         filter: <BonusNameFilter />,
-        render: (row) => display(row.name),
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: row.userId ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            }}
+            onClick={() => {
+              if (!row.userId) return;
+              navigate(
+                `/users/report/${row.userId}/${encodeURIComponent(row.name || '')}`,
+              );
+            }}
+          >
+            {display(row.name)}
+          </Typography>
+        ),
       },
       {
         id: 'transactionId',
@@ -417,6 +437,7 @@ export function BonusWalletRequestsPage() {
       canShowMobile,
       actingId,
       handleAction,
+      navigate,
     ],
   );
 

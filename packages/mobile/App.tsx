@@ -3,7 +3,7 @@ import './src/lib/webShim';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { hydrateStorage } from './src/lib/webShim';
-import { applyStoredTheme, colors } from './src/theme';
+import { applyStoredTheme, colors, watchSystemThemeChanges } from './src/theme';
 
 /**
  * Boot loader: hydrate persisted storage and apply the stored theme BEFORE
@@ -15,6 +15,7 @@ export default function App() {
 
   useEffect(() => {
     let alive = true;
+    let stopWatch: (() => void) | undefined;
     (async () => {
       try {
         await hydrateStorage();
@@ -25,10 +26,15 @@ export default function App() {
       // Lazy require so screen modules evaluate AFTER the palette is set.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const mod = require('./src/AppRoot') as { default: React.ComponentType };
-      if (alive) setAppRoot(() => mod.default);
+      if (alive) {
+        setAppRoot(() => mod.default);
+        // System mode: follow OS light/dark changes (requires JS reload).
+        stopWatch = watchSystemThemeChanges();
+      }
     })();
     return () => {
       alive = false;
+      stopWatch?.();
     };
   }, []);
 

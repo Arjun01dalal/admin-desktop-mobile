@@ -20,14 +20,17 @@ import { floorNum } from '../../../dashboards/mergeMetrics';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import {
   formatAadharAddress,
+  flattenUserRow,
   nestedDpId,
   nestedName,
   pickAadharNumber,
   pickAccountNumber,
   pickAppName,
+  pickBalance,
   pickLastActivity,
   pickPlayIn,
   pickUserBankName,
+  pickUserComesFrom,
 } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
@@ -240,6 +243,18 @@ export function NewRegistersScreen() {
       setServerCount(list.length);
 
       // Web-panel post-fetch behavior:
+      list = list.map((row) => {
+        const flat = { ...flattenUserRow(row) } as Row;
+        if (!String(flat.userComesFrom || '').trim()) {
+          const picked = pickUserComesFrom(flat);
+          if (picked !== 'Company') flat.userComesFrom = picked;
+        }
+        if (flat.balance == null || flat.balance === '') {
+          const bal = pickBalance(flat);
+          if (bal != null) flat.balance = bal;
+        }
+        return flat;
+      });
       if (showEmpty) list = list.filter((v) => !v.activeUser);
       const states = Array.isArray(admin?.accessibleStates)
         ? (admin.accessibleStates as string[]).map((s) => String(s).toLowerCase())
@@ -351,14 +366,17 @@ export function NewRegistersScreen() {
         key: 'userComesFrom',
         label: 'User Comes From',
         width: 110,
-        render: (r) => String(r.userComesFrom || 'Company'),
+        render: (r) => pickUserComesFrom(r),
       },
       {
         key: 'balance',
         label: 'Balance',
-        width: 80,
+        width: 90,
         align: 'right',
-        render: (r) => floorNum(r.balance ?? 0).toLocaleString('en-IN'),
+        render: (r) => {
+          const n = pickBalance(r);
+          return n == null ? '—' : floorNum(n).toLocaleString('en-IN');
+        },
       },
       { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => pickLastActivity(r) },
     ];

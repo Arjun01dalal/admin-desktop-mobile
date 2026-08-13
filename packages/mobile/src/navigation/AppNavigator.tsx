@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme, useNavigation } from '@react-navigation/native';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
@@ -7,28 +7,19 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { StyleSheet, Text, TextInput, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
-import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
 import { CreateUserScreen } from '../screens/CreateUserScreen';
 import { UsersScreen } from '../screens/UsersScreen';
 import { WithdrawalScreen } from '../screens/WithdrawalScreen';
-import { useRevealCodes } from '../context/useRevealCodes';
-import { TouchableOpacity } from 'react-native';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { PANEL_DETAIL_ROUTES } from './panelDetail';
-import {
-  buildSosEnablePayload,
-  canAccessNavItem,
-  canShowSos,
-  isSosExemptRole,
-} from '../auth/permissions';
-import { SosProvider, useSos } from '../auth/useSosGuard';
+import { canAccessNavItem } from '../auth/permissions';
+import { SosProvider } from '../auth/useSosGuard';
 import { SosAlertOverlay } from '../components/SosAlertOverlay';
-import { secureApi } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
@@ -54,6 +45,7 @@ import { SheetDownloadReportScreen } from '../screens/dashboards/details/SheetDo
 import { PointsReportScreen } from '../screens/dashboards/details/PointsReportScreen';
 import { CoinRemovalListScreen } from '../screens/dashboards/details/CoinRemovalListScreen';
 import { CustomerAllotmentScreen } from '../screens/dashboards/details/CustomerAllotmentScreen';
+import { CallerAllotmentScreen } from '../screens/dashboards/details/CallerAllotmentScreen';
 import { NonPerformingUserScreen } from '../screens/dashboards/details/NonPerformingUserScreen';
 import { TodaysActiveScreen } from '../screens/dashboards/details/TodaysActiveScreen';
 import { FeedbackScreen } from '../screens/dashboards/details/FeedbackScreen';
@@ -83,6 +75,9 @@ import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerforman
 import { DepositListScreen } from '../screens/dashboards/details/DepositListScreen';
 import { WithdrawalFundScreen } from '../screens/dashboards/details/WithdrawalFundScreen';
 import { SocialMediaScreen } from '../screens/dashboards/details/SocialMediaScreen';
+import { WhatsappMidScreen } from '../screens/dashboards/details/WhatsappMidScreen';
+import { AAAFraudBetReportScreen } from '../screens/dashboards/details/AAAFraudBetReportScreen';
+import { AAABlacklistedUsersScreen } from '../screens/dashboards/details/AAABlacklistedUsersScreen';
 import { MobileAppScreen } from '../screens/dashboards/details/MobileAppScreen';
 import { IncomingBotCallScreen } from '../screens/dashboards/details/IncomingBotCallScreen';
 import { RolesResponsibilitiesScreen } from '../screens/dashboards/details/RolesResponsibilitiesScreen';
@@ -90,7 +85,7 @@ import { BonusWalletFundRequestScreen } from '../screens/dashboards/details/Bonu
 import { BonusWalletRequestsScreen } from '../screens/dashboards/details/BonusWalletRequestsScreen';
 import { DepositApprovedReportScreen } from '../screens/dashboards/details/DepositApprovedReportScreen';
 import { UniqueDepositPendingScreen } from '../screens/dashboards/details/UniqueDepositPendingScreen';
-import { colors, radius, spacing, getThemeMode, setThemeMode, type ThemeMode } from '../theme';
+import { colors, radius, spacing, isDarkTheme } from '../theme';
 
 const Drawer = createDrawerNavigator();
 const RootStack = createNativeStackNavigator();
@@ -123,6 +118,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/coins-report': PointsReportScreen as AnyScreen,
   '/coins-removal': CoinRemovalListScreen as AnyScreen,
   '/customer-allotment': CustomerAllotmentScreen as AnyScreen,
+  '/callerAllotment': CallerAllotmentScreen as AnyScreen,
   '/non_performing_user': NonPerformingUserScreen as AnyScreen,
   '/todays-active': TodaysActiveScreen as AnyScreen,
   '/feedback': FeedbackScreen as AnyScreen,
@@ -152,6 +148,9 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/depositList': DepositListScreen as AnyScreen,
   '/withdrawal-fund': WithdrawalFundScreen as AnyScreen,
   '/social-media': SocialMediaScreen as AnyScreen,
+  '/whatsapp-mid': WhatsappMidScreen as AnyScreen,
+  '/aaa-fraud-bet-report': AAAFraudBetReportScreen as AnyScreen,
+  '/aaa-blacklisted-users': AAABlacklistedUsersScreen as AnyScreen,
   '/mobile-app': MobileAppScreen as AnyScreen,
   '/incoming-bot-call': IncomingBotCallScreen as AnyScreen,
   '/roles-responsibilities': RolesResponsibilitiesScreen as AnyScreen,
@@ -168,70 +167,9 @@ function screenNameFor(item: NavItem): string {
   return item.id;
 }
 
-const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
-  { value: 'dark', label: 'Dark' },
-  { value: 'light', label: 'Light' },
-  { value: 'system', label: 'System' },
-];
-
-/** Dark / Light / System selector — theme applies via a JS reload. */
-function ThemePicker() {
-  const [mode, setMode] = useState<ThemeMode>(getThemeMode());
-
-  const pick = (next: ThemeMode) => {
-    if (next === mode) return;
-    setMode(next);
-    void (async () => {
-      // Wait for the choice to be written to disk BEFORE reloading,
-      // otherwise the reload can race the write and the theme stays the same.
-      await setThemeMode(next);
-      try {
-        if (Platform.OS === 'web') {
-          // Web preview: plain page reload.
-          (globalThis as { location?: { reload: () => void } }).location?.reload();
-          return;
-        }
-        // Expo Go has no expo-updates native module — use dev reload there.
-        // (SDK 54: detect Expo Go via executionEnvironment 'storeClient'.)
-        const inExpoGo =
-          Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
-          Constants.appOwnership === 'expo';
-        if (inExpoGo || __DEV__) {
-          const { DevSettings } = await import('react-native');
-          DevSettings.reload();
-          return;
-        }
-        const Updates = await import('expo-updates');
-        await Updates.reloadAsync();
-      } catch {
-        Alert.alert('Theme saved', 'Close and reopen the app to apply the new theme.');
-      }
-    })();
-  };
-
-  return (
-    <View style={styles.themeRow}>
-      <Text style={styles.themeLabel}>Theme</Text>
-      <View style={styles.themeChips}>
-        {THEME_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.value}
-            style={[styles.themeChip, mode === opt.value && styles.themeChipActive]}
-            onPress={() => pick(opt.value)}
-          >
-            <Text style={[styles.themeChipText, mode === opt.value && styles.themeChipTextActive]}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] }) {
   const { items, ...rest } = props;
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const current = rest.state.routes[rest.state.index]?.name;
   const [menuQuery, setMenuQuery] = useState('');
   const visibleItems = menuQuery.trim()
@@ -240,36 +178,43 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
       )
     : items;
   return (
-    <DrawerContentScrollView {...rest} style={{ backgroundColor: colors.surface }}>
-      <View style={styles.drawerHeader}>
-        <Text style={styles.drawerTitle}>Astro</Text>
-        {user?.name ? <Text style={styles.drawerSub}>{user.name}</Text> : null}
-      </View>
-      <TextInput
-        style={styles.drawerSearch}
-        value={menuQuery}
-        onChangeText={setMenuQuery}
-        placeholder="🔍 Search menu…"
-        placeholderTextColor={colors.muted}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      {visibleItems.length === 0 ? (
-        <Text style={styles.drawerNoMatch}>No menu found</Text>
-      ) : null}
-      {visibleItems.map((item) => (
-        <DrawerItem
-          key={item.id}
-          label={toDisplayText(item.label)}
-          focused={current === screenNameFor(item)}
-          activeTintColor={colors.primary}
-          inactiveTintColor={colors.muted}
-          onPress={() => rest.navigation.navigate(screenNameFor(item))}
+    <SafeAreaView edges={['top', 'bottom', 'left']} style={styles.drawerRoot}>
+      <View style={styles.drawerStickyTop}>
+        <View style={styles.drawerHeader}>
+          <Text style={styles.drawerTitle}>Astro</Text>
+          {user?.name ? <Text style={styles.drawerSub}>{user.name}</Text> : null}
+        </View>
+        <TextInput
+          style={styles.drawerSearch}
+          value={menuQuery}
+          onChangeText={setMenuQuery}
+          placeholder="🔍 Search menu…"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          autoCorrect={false}
         />
-      ))}
-      <ThemePicker />
-      <DrawerItem label="Logout" inactiveTintColor={colors.destructive} onPress={logout} />
-    </DrawerContentScrollView>
+      </View>
+      <DrawerContentScrollView
+        {...rest}
+        style={styles.drawerScroll}
+        contentContainerStyle={styles.drawerScrollContent}
+        // SafeAreaView already handles notch / home-indicator insets.
+      >
+        {visibleItems.length === 0 ? (
+          <Text style={styles.drawerNoMatch}>No menu found</Text>
+        ) : null}
+        {visibleItems.map((item) => (
+          <DrawerItem
+            key={item.id}
+            label={toDisplayText(item.label)}
+            focused={current === screenNameFor(item)}
+            activeTintColor={colors.primary}
+            inactiveTintColor={colors.muted}
+            onPress={() => rest.navigation.navigate(screenNameFor(item))}
+          />
+        ))}
+      </DrawerContentScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -291,134 +236,21 @@ function Screened({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Header icon-only toggle for reveal codes (👁 = locked, 🙈 = revealed). */
-function RevealHeaderButton() {
-  const reveal = useRevealCodes();
-  const [otpOpen, setOtpOpen] = useState(false);
-  return (
-    <>
-      <TouchableOpacity
-        style={styles.headerIconBtn}
-        onPress={() => {
-          // Before the hour expires: tap again reverses to secret/Jyotish names.
-          if (reveal.active) {
-            reveal.clear();
-            return;
-          }
-          setOtpOpen(true);
-        }}
-        accessibilityLabel={reveal.active ? 'Hide original names' : 'Reveal original names'}
-      >
-        <Text style={styles.headerIconText}>{reveal.active ? '🙈' : '👁'}</Text>
-      </TouchableOpacity>
-      <RevealCodesOtpModal visible={otpOpen} onClose={() => setOtpOpen(false)} />
-    </>
-  );
-}
-
-/**
- * Header SOS button (desktop AppShell parity).
- * - Tap → confirm alert → `auth.sosFlag` enable payload by role.
- * - Non-exempt roles are logged out after sending; exempt roles see the
- *   lock state and can "Unblock" (enabled:false, type:all).
- * - Guard polls get-sos-flag and kicks non-exempt users when SOS activates.
- */
-function SosHeaderButton() {
-  const { user, logout } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const { sosEnabled, setSosEnabled, refresh, markOriginator } = useSos();
-  const sosExempt = isSosExemptRole();
-  if (!(canShowSos() || (sosEnabled && sosExempt))) return null;
-
-  const sendSos = async () => {
-    if (busy) return;
-    const built = buildSosEnablePayload();
-    if (!built.ok) {
-      Alert.alert('SOS', built.message);
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await secureApi('auth.sosFlag', built.payload);
-      if (!res.ok) {
-        Alert.alert('SOS', res.message || 'Failed to send SOS alert');
-        return;
-      }
-      setSosEnabled(true);
-      markOriginator(); // No local siren/popup for the device that pressed SOS.
-      if (!sosExempt) {
-        Alert.alert('SOS', 'SOS alert sent. Support will contact you shortly.');
-        logout();
-      } else {
-        await refresh();
-        Alert.alert('SOS', 'SOS alert sent. Support will contact you shortly.');
-      }
-    } catch (err) {
-      Alert.alert('SOS', err instanceof Error ? err.message : 'Failed to send SOS alert');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const unblockUsers = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const res = await secureApi('auth.sosFlag', { enabled: false, type: 'all' });
-      if (!res.ok) {
-        Alert.alert('SOS', res.message || 'Failed to unblock users');
-        return;
-      }
-      setSosEnabled(false);
-      await refresh();
-      Alert.alert('SOS', 'Users unblocked. SOS lock cleared.');
-    } catch (err) {
-      Alert.alert('SOS', err instanceof Error ? err.message : 'Failed to unblock users');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <TouchableOpacity
-      style={[styles.sosBtn, sosEnabled && styles.sosBtnActive]}
-      disabled={busy}
-      accessibilityLabel={sosEnabled ? 'Unblock users' : 'Send SOS alert'}
-      onPress={() => {
-        if (sosEnabled) {
-          Alert.alert('Unblock users', 'Clear the SOS lock for everyone?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Unblock', style: 'destructive', onPress: () => void unblockUsers() },
-          ]);
-          return;
-        }
-        Alert.alert(
-          'SOS',
-          `Emergency support — use only when you need immediate help from the admin team.\n\nLogged in as ${String(
-            user?.name || user?.mobile || 'Admin',
-          )}.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Send SOS', style: 'destructive', onPress: () => void sendSos() },
-          ],
-        );
-      }}
-    >
-      <Text style={styles.sosBtnText}>{busy ? '…' : sosEnabled ? 'Unblock' : 'SOS'}</Text>
-    </TouchableOpacity>
-  );
-}
-
-/** Header logout button (🚪) — quick logout without opening the drawer. */
-function LogoutHeaderButton() {
-  const { logout } = useAuth();
+/** Header profile button — opens account page (SOS / theme / reveal / logout). */
+function ProfileHeaderButton() {
+  const navigation = useNavigation();
   return (
     <TouchableOpacity
       style={styles.headerIconBtn}
-      onPress={logout}
-      accessibilityLabel="Logout"
+      onPress={() => {
+        // Profile lives on the root stack above the drawer.
+        const parent = navigation.getParent();
+        if (parent) parent.navigate('profile' as never);
+        else navigation.navigate('profile' as never);
+      }}
+      accessibilityLabel="Profile"
     >
-      <MaterialIcons name="logout" size={22} color="#ffffff" />
+      <MaterialIcons name="account-circle" size={26} color={colors.foreground} />
     </TouchableOpacity>
   );
 }
@@ -432,13 +264,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600' },
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <SosHeaderButton />
-              <RevealHeaderButton />
-              <LogoutHeaderButton />
-            </View>
-          ),
+          headerRight: () => <ProfileHeaderButton />,
           drawerType: 'front',
           overlayColor: 'rgba(0,0,0,0.55)',
           drawerStyle: { backgroundColor: colors.surface },
@@ -475,9 +301,9 @@ export function AppNavigator() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <NavigationContainer
       theme={{
-        ...DarkTheme,
+        ...(isDarkTheme() ? DarkTheme : DefaultTheme),
         colors: {
-          ...DarkTheme.colors,
+          ...(isDarkTheme() ? DarkTheme.colors : DefaultTheme.colors),
           background: colors.background,
           card: colors.surface,
           text: colors.foreground,
@@ -497,6 +323,13 @@ export function AppNavigator() {
       >
         <RootStack.Screen name="panel" options={{ headerShown: false }}>
           {() => <PanelDrawer items={items} />}
+        </RootStack.Screen>
+        <RootStack.Screen name="profile" options={{ title: 'Profile' }}>
+          {() => (
+            <Screened>
+              <ProfileScreen />
+            </Screened>
+          )}
         </RootStack.Screen>
         {PANEL_DETAIL_ROUTES.map((route) => (
           <RootStack.Screen
@@ -520,50 +353,26 @@ export function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  themeRow: {
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(3),
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    marginTop: spacing(2),
+  drawerRoot: { flex: 1, backgroundColor: colors.surface },
+  drawerStickyTop: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing(2),
   },
-  themeLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: spacing(2),
-  },
-  themeChips: {
-    flexDirection: 'row',
-    gap: spacing(2),
-  },
-  themeChip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  themeChipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
-  },
-  themeChipText: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  themeChipTextActive: {
-    color: colors.primaryForeground,
+  drawerScroll: { flex: 1, backgroundColor: colors.surface },
+  drawerScrollContent: {
+    // Override DrawerContentScrollView defaults — parent SafeAreaView
+    // already clears notch / home-indicator / side insets.
+    paddingTop: spacing(1),
+    paddingBottom: spacing(3),
+    paddingStart: spacing(1),
+    paddingEnd: spacing(1),
   },
   drawerHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 8,
+    paddingTop: spacing(3),
+    paddingBottom: 12,
   },
   drawerTitle: { color: colors.primary, fontSize: 18, fontWeight: '700' },
   drawerSub: { color: colors.muted, fontSize: 13, marginTop: 4 },
@@ -577,24 +386,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2),
     fontSize: 13,
     marginHorizontal: spacing(3),
-    marginBottom: spacing(2),
   },
   headerIconBtn: {
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
   },
-  headerIconText: { fontSize: 18 },
-  sosBtn: {
-    backgroundColor: colors.destructive,
-    borderRadius: 6,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    marginRight: spacing(1),
-  },
-  sosBtnActive: {
-    backgroundColor: colors.success,
-  },
-  sosBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
   drawerNoMatch: {
     color: colors.muted,
     fontSize: 12,

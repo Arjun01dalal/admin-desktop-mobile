@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -235,10 +236,12 @@ async function fetchAllWarningUsers(args: {
 
 export function CallerDetailsPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const nav = (location.state || {}) as NavState;
   const empCode = String(nav.empCode || '');
   const user = getStoredUser<StoredCallerUser>();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
+  const canOpenUserReport = hasPermission('wallet_history', user);
 
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
@@ -257,6 +260,9 @@ export function CallerDetailsPage() {
   const [todayPageSize, setTodayPageSize] = useState(50);
   const [searchName, setSearchName] = useState('');
   const [dialerBusyId, setDialerBusyId] = useState<string | null>(null);
+  const [addDialerBusy, setAddDialerBusy] = useState(false);
+  /** Selected Non Performing row ids for Add Dialer Data (Laxmi checkboxes). */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [altOpen, setAltOpen] = useState(false);
   const [altUser, setAltUser] = useState<DetailRow | null>(null);
   const [altMobile, setAltMobile] = useState('');
@@ -295,6 +301,7 @@ export function CallerDetailsPage() {
         Inactive: inactive.length,
       });
       setTodayPage(1);
+      setSelectedIds(new Set());
 
       if (!aiRes.ok && todayBundle.users.length === 0 && warning.items.length === 0) {
         toast.error('Failed to load caller details');
@@ -349,6 +356,71 @@ export function CallerDetailsPage() {
     },
     [user],
   );
+
+  /** Laxmi addDialerData — push checked Non Performing customers to dialer. */
+  const addDialerData = useCallback(async () => {
+    const ids = extensionIds(user);
+    const numericCampaignId = ids.find((val) => /^\d+$/.test(val)) || '';
+    if (!numericCampaignId) {
+      toast.error('Dialer extension / campaign ID not found for this admin');
+      return;
+    }
+
+    const selected = rows.filter(
+      (r) =>
+        r.status === 'Warning' &&
+        selectedIds.has(String(r._id || r.userId || '')),
+    );
+    const leads = selected
+      .map((item) => ({
+        first_name: String(item.name || item.userName || ''),
+        phone_number: String(item.mobile || item.userMobile || ''),
+        city: String(item.city || ''),
+        state: String(item.state || ''),
+        email: String(item.clientName || ''),
+        comments: String(item.clientName || ''),
+        province: String(item._id || ''),
+      }))
+      .filter((l) => l.phone_number.replace(/\D/g, ''));
+
+    if (!leads.length) {
+      toast.error('Leads should not be empty.');
+      return;
+    }
+
+    setAddDialerBusy(true);
+    try {
+      const res = await secureApi('callLogs.externalDialerBatch', {
+        campaignId: numericCampaignId,
+        campaign_id: numericCampaignId,
+        listId: `9${numericCampaignId}`,
+        list_id: `9${numericCampaignId}`,
+        listName: `${String(user?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
+        list_name: `${String(user?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
+        leads,
+        serverId: user?.serverId,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'API request failed');
+        return;
+      }
+      toast.success(res.message || 'Data sent successfully');
+      setSelectedIds(new Set());
+    } finally {
+      setAddDialerBusy(false);
+    }
+  }, [rows, selectedIds, user]);
+
+  const rowKey = (r: DetailRow) => String(r._id || r.userId || '');
+
+  const toggleSelect = useCallback((id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   const openAlternateMobile = (item: DetailRow) => {
     setAltUser(item);
@@ -431,8 +503,60 @@ export function CallerDetailsPage() {
     Math.ceil((tab === 'Today' ? filteredAll.length : 0) / todayPageSize) || 1,
   );
 
+  const allWarningSelected =
+    tab === 'Warning' &&
+    filteredAll.length > 0 &&
+    filteredAll.every((r) => selectedIds.has(rowKey(r)));
+
+  const toggleSelectAllWarning = useCallback(
+    (checked: boolean) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const r of filteredAll) {
+          const id = rowKey(r);
+          if (!id) continue;
+          if (checked) next.add(id);
+          else next.delete(id);
+        }
+        return next;
+      });
+    },
+    [filteredAll],
+  );
+
   const columns = useMemo<CommonTableColumn<DetailRow>[]>(() => {
-    const cols: CommonTableColumn<DetailRow>[] = [
+    const cols: CommonTableColumn<DetailRow>[] = [];
+
+    if (tab === 'Warning') {
+      cols.push({
+        id: 'select',
+        label: (
+          <Checkbox
+            size="small"
+            checked={allWarningSelected}
+            indeterminate={
+              selectedIds.size > 0 && !allWarningSelected && filteredAll.length > 0
+            }
+            onChange={(e) => toggleSelectAllWarning(e.target.checked)}
+            inputProps={{ 'aria-label': 'Select all non performing' }}
+          />
+        ),
+        width: 52,
+        render: (r) => {
+          const id = rowKey(r);
+          return (
+            <Checkbox
+              size="small"
+              checked={selectedIds.has(id)}
+              onChange={(e) => toggleSelect(id, e.target.checked)}
+              inputProps={{ 'aria-label': `Select ${id}` }}
+            />
+          );
+        },
+      });
+    }
+
+    cols.push(
       {
         id: '#',
         label: '#',
@@ -444,7 +568,40 @@ export function CallerDetailsPage() {
         id: 'name',
         label: 'Name',
         width: 180,
-        render: (r) => String(r.name || r.userName || '-'),
+        render: (r) => {
+          const label = String(r.name || r.userName || '-');
+          const id = String(r._id || r.userId || '');
+          if (!id || label === '-') return label;
+          if (!canOpenUserReport) return label;
+          return (
+            <Typography
+              component="button"
+              type="button"
+              title={label}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Laxmi callerDetails: /user-report/:id/:name
+                navigate(
+                  `/users/report/${encodeURIComponent(id)}/${encodeURIComponent(label)}`,
+                );
+              }}
+              sx={{
+                all: 'unset',
+                cursor: 'pointer',
+                color: '#4fc3f7',
+                fontSize: 12,
+                fontWeight: 600,
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              {label}
+            </Typography>
+          );
+        },
       },
       {
         id: 'dp',
@@ -458,8 +615,8 @@ export function CallerDetailsPage() {
         width: 180,
         render: (r) => {
           const mobile = String(r.mobile || r.userMobile || '');
-          const rowId = String(r._id || r.userId || '');
-          const busy = dialerBusyId === rowId;
+          const id = rowKey(r);
+          const busy = dialerBusyId === id;
           return (
             <Stack spacing={0.5} alignItems="center" sx={{ py: 0.25 }}>
               <Stack direction="row" spacing={0.5} alignItems="center">
@@ -544,15 +701,22 @@ export function CallerDetailsPage() {
         width: 140,
         render: (r) => String(r.state || '-'),
       },
-    ];
+    );
     return cols;
   }, [
     canShowMobile,
+    canOpenUserReport,
+    navigate,
     tab,
     todayPage,
     todayPageSize,
     dialerBusyId,
     dialerCall,
+    allWarningSelected,
+    selectedIds,
+    filteredAll.length,
+    toggleSelect,
+    toggleSelectAllWarning,
   ]);
 
   if (!empCode) {
@@ -665,6 +829,18 @@ export function CallerDetailsPage() {
           >
             Apply
           </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => void addDialerData()}
+            disabled={loading || addDialerBusy || selectedIds.size === 0}
+          >
+            {addDialerBusy
+              ? 'Sending…'
+              : selectedIds.size > 0
+                ? `Add Dialer Data (${selectedIds.size})`
+                : 'Add Dialer Data'}
+          </Button>
           {loading && <CircularProgress size={22} />}
         </Stack>
       </Stack>
@@ -675,6 +851,7 @@ export function CallerDetailsPage() {
           onChange={(_e, v) => {
             setTab(v);
             setTodayPage(1);
+            setSelectedIds(new Set());
           }}
           variant="scrollable"
           scrollButtons="auto"
@@ -687,7 +864,7 @@ export function CallerDetailsPage() {
             [
               { key: 'Today', label: 'Today' },
               { key: 'Active', label: 'Active' },
-              { key: 'Warning', label: 'Warning' },
+              { key: 'Warning', label: 'Non Performing Users' },
               { key: 'Inactive', label: 'Inactive' },
             ] as const
           ).map((t) => (

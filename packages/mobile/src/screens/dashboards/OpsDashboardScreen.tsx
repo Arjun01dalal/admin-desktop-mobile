@@ -224,6 +224,24 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
                   })
               : undefined
           }
+          onActiveCustomersPress={
+            card.activeCustomerKey
+              ? () =>
+                  openPanelTarget(navigation, {
+                    href: '/activeUserData',
+                    state: {
+                      startDate:
+                        card.state?.startDate || applied.startDate,
+                      endDate: card.state?.endDate || applied.endDate,
+                      customerKey: card.activeCustomerKey,
+                      appClientName:
+                        card.state?.appClientName ||
+                        applied.appClientName ||
+                        '',
+                    },
+                  })
+              : undefined
+          }
         />
       ))}
 

@@ -7,6 +7,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import type { ProviderCardModel } from './types';
 import { floorNum } from './mergeMetrics';
 import { metricJyotishLabel, toDisplayText } from './constants';
@@ -20,6 +21,38 @@ type Props = {
 /** Reusable provider metric card (Ludo / Diva / Plutus support select + actions). */
 export function ProviderMetricCard({ card, onClick }: Props) {
   useRevealCodes(); // re-render when OTP reveal toggles
+  const navigate = useNavigate();
+
+  const openActiveUsers = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!card.activeCustomerKey) return;
+    const startDate = String(
+      card.state?.startDate ||
+        (card.search
+          ? new URLSearchParams(card.search.replace(/^\?/, '')).get('startDate')
+          : '') ||
+        '',
+    );
+    const endDate = String(
+      card.state?.endDate ||
+        (card.search
+          ? new URLSearchParams(card.search.replace(/^\?/, '')).get('endDate')
+          : '') ||
+        '',
+    );
+    navigate('/activeUserData', {
+      state: {
+        startDate,
+        endDate,
+        customerKey: card.activeCustomerKey,
+        appClientName: String(card.state?.appClientName || ''),
+      },
+    });
+  };
+
+  const activeLabel =
+    card.activeCustomerLabel || metricJyotishLabel('Active Customer');
+
   return (
     <Paper
       onClick={onClick}
@@ -68,18 +101,39 @@ export function ProviderMetricCard({ card, onClick }: Props) {
 
       <Stack spacing={0.75}>
         {card.activeCustomerCount != null && (
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+          <Box
+            sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}
+            onClick={card.activeCustomerKey ? openActiveUsers : undefined}
+          >
             <Typography variant="body2" fontWeight={700}>
-              {toDisplayText(metricJyotishLabel('Active Customer'))}:
+              {toDisplayText(activeLabel)}:
             </Typography>
-            <Typography
-              variant="body2"
-              fontWeight={800}
-              color="warning.main"
-              sx={{ fontVariantNumeric: 'tabular-nums' }}
-            >
-              {floorNum(card.activeCustomerCount)}
-            </Typography>
+            {card.activeCustomerKey ? (
+              <Link
+                component="button"
+                type="button"
+                underline="hover"
+                onClick={openActiveUsers}
+                sx={{
+                  color: 'warning.main',
+                  fontWeight: 800,
+                  fontSize: 14,
+                  fontVariantNumeric: 'tabular-nums',
+                  cursor: 'pointer',
+                }}
+              >
+                {floorNum(card.activeCustomerCount)}
+              </Link>
+            ) : (
+              <Typography
+                variant="body2"
+                fontWeight={800}
+                color="warning.main"
+                sx={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                {floorNum(card.activeCustomerCount)}
+              </Typography>
+            )}
           </Box>
         )}
         {card.rows.map((row) => (

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { mapUsersToDialerLeads } from '@/screens/panel/users/toolbarHelpers';
+import { resolveBlockOtpMobile } from '@/screens/panel/users/constants';
 import { CAMPAIGN_LIST } from './campaignList';
 import type { NewRegistersAdmin, UserRow } from './types';
 
@@ -13,29 +14,116 @@ export function useNewRegistersActions(
   page: number,
 ) {
   const [dialerLoading, setDialerLoading] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<UserRow | null>(null);
+  const [blockNextStatus, setBlockNextStatus] = useState(false);
+  const [remark, setRemark] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [actionBusyId, setActionBusyId] = useState('');
 
-  const toggleBlock = useCallback(
-    async (blockTarget: UserRow | null, remark: string) => {
-      if (!blockTarget?._id || !remark.trim()) {
-        toast.error('Remark is required');
-        return false;
+  const closeBlockDialog = useCallback(() => {
+    setBlockTarget(null);
+    setRemark('');
+    setOtp('');
+    setBlockNextStatus(false);
+  }, []);
+
+  /** Open OTP+remark dialog and send OTP to SuperAdmin (Users / Laxmi flow). */
+  const startBlockWithOtp = useCallback(
+    async (row: UserRow) => {
+      if (!row._id) return;
+      const currentlyBlocked = Boolean(row.blockUser || row.block);
+      const nextBlocked = !currentlyBlocked;
+      setBlockTarget(row);
+      setBlockNextStatus(nextBlocked);
+      setRemark('');
+      setOtp('');
+      setOtpSending(true);
+      setActionBusyId(row._id);
+      try {
+        const res = await secureApi('users.sendBlockOtp', {
+          mobile: resolveBlockOtpMobile(admin?.mobile),
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to send OTP');
+          return;
+        }
+        toast.success('OTP sent successfully to SuperAdmin');
+      } finally {
+        setOtpSending(false);
+        setActionBusyId('');
       }
-      const currentlyBlocked = Boolean(blockTarget.blockUser || blockTarget.block);
-      const res = await secureApi('users.blockUnblock', {
-        _id: blockTarget._id,
-        blockUser: !currentlyBlocked,
-        blockUserReason: remark.trim().slice(0, MAX_REMARK_LENGTH),
+    },
+    [admin?.mobile],
+  );
+
+  const resendBlockOtp = useCallback(async () => {
+    setOtpSending(true);
+    try {
+      const res = await secureApi('users.sendBlockOtp', {
+        mobile: resolveBlockOtpMobile(admin?.mobile),
       });
       if (!res.ok) {
-        toast.error(res.message || 'Action failed');
-        return false;
+        toast.error(res.message || 'Failed to resend OTP');
+        return;
       }
-      toast.success(currentlyBlocked ? 'User unblocked' : 'User blocked');
+      toast.success('OTP resent successfully to SuperAdmin');
+    } finally {
+      setOtpSending(false);
+    }
+  }, [admin?.mobile]);
+
+  const confirmBlock = useCallback(async () => {
+    if (!blockTarget?._id) return;
+    if (!otp.trim()) {
+      toast.error('Please enter OTP');
+      return;
+    }
+    if (!remark.trim()) {
+      toast.error('Please enter remark');
+      return;
+    }
+
+    const targetId = blockTarget._id;
+    const nextBlocked = blockNextStatus;
+    const reason = remark.trim().slice(0, MAX_REMARK_LENGTH);
+
+    setActionBusyId(targetId);
+    try {
+      const verify = await secureApi('users.verifyBlockOtp', {
+        mobile: resolveBlockOtpMobile(admin?.mobile),
+        otp: Number.parseInt(otp.trim(), 10),
+      });
+      if (!verify.ok) {
+        toast.error(verify.message || 'Invalid OTP');
+        return;
+      }
+
+      const res = await secureApi('users.blockUnblock', {
+        _id: targetId,
+        blockUser: nextBlocked,
+        blockUserReason: reason,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update block status');
+        return;
+      }
+      toast.success(nextBlocked ? 'User blocked' : 'User unblocked');
+      closeBlockDialog();
       await load(page);
-      return true;
-    },
-    [load, page],
-  );
+    } finally {
+      setActionBusyId('');
+    }
+  }, [
+    admin?.mobile,
+    blockNextStatus,
+    blockTarget,
+    closeBlockDialog,
+    load,
+    otp,
+    page,
+    remark,
+  ]);
 
   const addComment = useCallback(
     async (userId: string, comment: string) => {
@@ -136,5 +224,24 @@ export function useNewRegistersActions(
     [],
   );
 
-  return { dialerLoading, toggleBlock, addComment, addToDialer };
+  return {
+    dialerLoading,
+    addComment,
+    addToDialer,
+    block: {
+      target: blockTarget,
+      nextStatus: blockNextStatus,
+      remark,
+      setRemark,
+      otp,
+      setOtp,
+      otpSending,
+      actionBusyId,
+      maxRemark: MAX_REMARK_LENGTH,
+      start: startBlockWithOtp,
+      resendOtp: resendBlockOtp,
+      confirm: confirmBlock,
+      close: closeBlockDialog,
+    },
+  };
 }

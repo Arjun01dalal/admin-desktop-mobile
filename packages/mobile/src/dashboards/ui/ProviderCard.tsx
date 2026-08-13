@@ -19,12 +19,17 @@ function formatValue(v: number | string): string {
 export function ProviderCard({
   card,
   onPress,
+  onActiveCustomersPress,
 }: {
   card: ProviderCardModel;
   /** When provided, the card body becomes tappable (drill-in navigation). */
   onPress?: () => void;
+  /** Laxmi ActiveUserData deep-link from player count. */
+  onActiveCustomersPress?: () => void;
 }) {
   const Wrapper: React.ElementType = onPress ? TouchableOpacity : View;
+  const activeLabel = card.activeCustomerLabel || 'Active Customer';
+
   return (
     <Wrapper
       style={styles.card}
@@ -35,38 +40,60 @@ export function ProviderCard({
       <View style={styles.headerRow}>
         <Text style={styles.title}>{toDisplayText(card.title)}</Text>
         {onPress ? <Text style={styles.chevron}>›</Text> : null}
-        {card.loading ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+        {card.loading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : null}
       </View>
-      {typeof card.activeCustomerCount === 'number' && card.activeCustomerCount > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>
-            {toDisplayText('Active users')}: {card.activeCustomerCount.toLocaleString('en-IN')}
-          </Text>
-        </View>
-      )}
 
-      {card.selectOptions && card.selectOptions.length > 0 && card.onSelectChange && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.selectRow}
+      {card.activeCustomerCount != null ? (
+        <TouchableOpacity
+          disabled={!onActiveCustomersPress}
+          onPress={() => onActiveCustomersPress?.()}
+          style={styles.activeRow}
         >
-          {[{ value: 'All', label: 'All' }, ...card.selectOptions].map((opt) => {
-            const active = (card.selectValue ?? 'All') === opt.value;
-            return (
-              <TouchableOpacity
-                key={opt.value}
-                onPress={() => card.onSelectChange?.(opt.value)}
-                style={[styles.selChip, active && styles.selChipActive]}
-              >
-                <Text style={[styles.selChipText, active && styles.selChipTextActive]}>
-                  {toDisplayText(opt.label)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      )}
+          <Text style={styles.rowLabel}>{toDisplayText(activeLabel)}:</Text>
+          <Text
+            style={[
+              styles.rowValue,
+              onActiveCustomersPress ? styles.activeLink : null,
+            ]}
+          >
+            {card.activeCustomerCount.toLocaleString('en-IN')}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {card.selectOptions &&
+        card.selectOptions.length > 0 &&
+        card.onSelectChange && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.selectRow}
+          >
+            {[{ value: 'All', label: 'All' }, ...card.selectOptions].map(
+              (opt) => {
+                const active = (card.selectValue ?? 'All') === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => card.onSelectChange?.(opt.value)}
+                    style={[styles.selChip, active && styles.selChipActive]}
+                  >
+                    <Text
+                      style={[
+                        styles.selChipText,
+                        active && styles.selChipTextActive,
+                      ]}
+                    >
+                      {toDisplayText(opt.label)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </ScrollView>
+        )}
 
       <View style={styles.rows}>
         {card.rows.map((r, i) => (
@@ -91,7 +118,9 @@ export function ProviderCard({
         <View style={styles.actionsRow}>
           {card.actions.map((action) => (
             <TouchableOpacity key={action.label} onPress={action.onClick}>
-              <Text style={styles.actionLink}>{toDisplayText(action.label)}</Text>
+              <Text style={styles.actionLink}>
+                {toDisplayText(action.label)}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -116,16 +145,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   title: { color: colors.primary, fontSize: 15, fontWeight: '700', flex: 1 },
-  chevron: { color: colors.muted, fontSize: 20, fontWeight: '700', marginRight: spacing(1) },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 999,
-    paddingHorizontal: spacing(2.5),
-    paddingVertical: spacing(1),
-    marginBottom: spacing(2),
+  chevron: {
+    color: colors.muted,
+    fontSize: 20,
+    fontWeight: '700',
+    marginRight: spacing(1),
   },
-  badgeText: { color: colors.success, fontSize: 11, fontWeight: '600' },
+  activeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing(1.5),
+    marginBottom: spacing(1),
+    gap: spacing(2),
+  },
+  activeLink: { color: colors.primary, textDecorationLine: 'underline' },
   selectRow: { gap: spacing(1.5), paddingBottom: spacing(2) },
   selChip: {
     paddingHorizontal: spacing(2.5),
@@ -145,7 +179,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2),
     gap: spacing(2),
   },
-  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
   rowLabel: { color: colors.muted, fontSize: 13, flexShrink: 1 },
   rowValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   negative: { color: colors.destructive },

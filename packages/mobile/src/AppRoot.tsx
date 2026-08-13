@@ -4,27 +4,46 @@
  * been applied — screens capture `colors` in module-scope StyleSheet.create,
  * so the palette must be final before these imports run.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AppNavigator } from './navigation/AppNavigator';
-import { CalculatorScreen } from './screens/CalculatorScreen';
+import { AstroSiteScreen } from './screens/AstroSiteScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { LocationRequiredGate } from './security/LocationRequiredGate';
+import { OfflineGate } from './security/OfflineGate';
 import { SecurityGate } from './security/SecurityGate';
 import { useLiveLocation } from './security/useLiveLocation';
+import { useNetworkStatus } from './security/useNetworkStatus';
 import { UpdateGate } from './updates/UpdateGate';
 import { colors, isDarkTheme } from './theme';
 
+/** Desktop AppScreen parity: always open on the Astro site, never auto-enter the panel. */
+type GateScreen = 'site' | 'login' | 'panel';
+
+function OfflineHost() {
+  const { offline, checking, refresh } = useNetworkStatus();
+  return <OfflineGate open={offline} checking={checking} onRetry={() => void refresh()} />;
+}
+
 function Root() {
   const { ready, token } = useAuth();
-  const [unlocked, setUnlocked] = useState(false);
+  const [screen, setScreen] = useState<GateScreen>('site');
 
   // Continuously fetch location while authenticated (compliance/audit).
   // Hard-blocks the panel when Location is off — desktop LocationProvider parity.
-  const { blocked, loading, error, retry, openSettings } = useLiveLocation(Boolean(token));
+  const inPanel = screen === 'panel' && Boolean(token);
+  const { blocked, loading, error, retry, openSettings } = useLiveLocation(inPanel);
+
+  useEffect(() => {
+    if (token && screen === 'login') setScreen('panel');
+  }, [token, screen]);
+
+  useEffect(() => {
+    if (!token && screen === 'panel') setScreen('site');
+  }, [token, screen]);
 
   if (!ready) {
     return (
@@ -33,7 +52,7 @@ function Root() {
       </View>
     );
   }
-  if (token) {
+  if (inPanel) {
     return (
       <>
         <AppNavigator />
@@ -47,8 +66,17 @@ function Root() {
       </>
     );
   }
-  if (unlocked) return <LoginScreen onBack={() => setUnlocked(false)} />;
-  return <CalculatorScreen onUnlock={() => setUnlocked(true)} />;
+  if (screen === 'login') {
+    return <LoginScreen onBack={() => setScreen('site')} />;
+  }
+  return (
+    <AstroSiteScreen
+      onOpenLogin={() => {
+        if (token) setScreen('panel');
+        else setScreen('login');
+      }}
+    />
+  );
 }
 
 export default function AppRoot() {
@@ -58,6 +86,7 @@ export default function AppRoot() {
         <AuthProvider>
           <StatusBar style={isDarkTheme() ? 'light' : 'dark'} />
           <Root />
+          <OfflineHost />
           <UpdateGate />
         </AuthProvider>
       </SecurityGate>

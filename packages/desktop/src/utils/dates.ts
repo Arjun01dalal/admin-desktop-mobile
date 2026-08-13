@@ -102,11 +102,12 @@ export function coerceDate(value: unknown): Date | null {
 /**
  * Format API date to DD-MM-YYYY in Asia/Kolkata
  * (matches laxminarayan `formatUTCDate` / IST display).
+ * Never returns NaN-NaN-NaN (invalid → '').
  */
 export function formatDisplayDate(value: unknown): string {
-  if (!value) return '';
+  if (value == null || value === '') return '';
   const d = coerceDate(value);
-  if (!d) return String(value);
+  if (!d || Number.isNaN(d.getTime())) return '';
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
     day: '2-digit',
@@ -116,21 +117,26 @@ export function formatDisplayDate(value: unknown): string {
   const day = parts.find((p) => p.type === 'day')?.value ?? '';
   const month = parts.find((p) => p.type === 'month')?.value ?? '';
   const year = parts.find((p) => p.type === 'year')?.value ?? '';
-  if (!day || !month || !year) return String(value);
+  if (!day || !month || !year) return '';
+  if (day === 'NaN' || month === 'NaN' || year === 'NaN') return '';
   return `${day}-${month}-${year}`;
 }
 
 /**
  * Match laxminarayan `formatDate` — DD-MM-YYYY using local calendar parts.
  * Used where the old panel called formatDate (not formatUTCDate).
+ * Never returns NaN-NaN-NaN (invalid → '').
  */
 export function formatLocalDate(value: unknown): string {
-  if (!value) return '';
+  if (value == null || value === '') return '';
   const d = coerceDate(value);
-  if (!d) return String(value);
+  if (!d || Number.isNaN(d.getTime())) return '';
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = String(d.getFullYear());
+  if (day.includes('NaN') || month.includes('NaN') || year.includes('NaN')) {
+    return '';
+  }
   return `${day}-${month}-${year}`;
 }
 

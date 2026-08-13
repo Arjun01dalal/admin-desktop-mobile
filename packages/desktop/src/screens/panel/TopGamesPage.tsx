@@ -323,9 +323,9 @@ export function TopGamesPage() {
 
       <Stack
         direction="row"
-        alignItems="flex-end"
-        flexWrap="wrap"
-        gap={2}
+        alignItems="center"
+        flexWrap="nowrap"
+        gap={1.5}
         mb={2}
       >
         <TextField
@@ -334,7 +334,7 @@ export function TopGamesPage() {
           label="Category"
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
-          sx={{ minWidth: 200 }}
+          sx={{ width: 200, flexShrink: 0 }}
         >
           <MenuItem value="All">All</MenuItem>
           {categoryKeys.map((key) => (
@@ -352,9 +352,9 @@ export function TopGamesPage() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') applySearch();
           }}
-          sx={{ minWidth: 240 }}
+          sx={{ flex: 1, minWidth: 180 }}
         />
-        <Button onClick={applySearch} sx={orangeBtnSx}>
+        <Button onClick={applySearch} sx={{ ...orangeBtnSx, flexShrink: 0 }}>
           Apply
         </Button>
       </Stack>

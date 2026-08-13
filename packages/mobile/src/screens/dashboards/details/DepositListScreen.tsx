@@ -142,6 +142,8 @@ export function DepositListScreen() {
   const [pageSize, setPageSize] = useState(50);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd, setAppliedEnd] = useState('');
   const [mid, setMid] = useState('');
   const [midOptions, setMidOptions] = useState<string[]>([]);
 
@@ -182,9 +184,9 @@ export function DepositListScreen() {
           mid,
         },
       };
-      if (startDate && endDate) {
-        body.startDate = startDate;
-        body.endDate = endDate;
+      if (appliedStart && appliedEnd) {
+        body.startDate = appliedStart;
+        body.endDate = appliedEnd;
       }
       const res = await secureApi<unknown>('depositList.report', body);
       if (gen !== genRef.current) return;
@@ -220,7 +222,7 @@ export function DepositListScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [page, pageSize, startDate, endDate, mid, applied]);
+  }, [page, pageSize, appliedStart, appliedEnd, mid, applied]);
 
   useEffect(() => {
     void load();
@@ -231,9 +233,17 @@ export function DepositListScreen() {
     setPage(1);
   }, [searchField, draftText]);
 
+  const applyDates = useCallback(() => {
+    setAppliedStart(startDate);
+    setAppliedEnd(endDate);
+    setPage(1);
+  }, [startDate, endDate]);
+
   const clearFilters = useCallback(() => {
     setStartDate('');
     setEndDate('');
+    setAppliedStart('');
+    setAppliedEnd('');
     setMid('');
     setDraftText('');
     setApplied(EMPTY_SEARCH);
@@ -442,12 +452,24 @@ export function DepositListScreen() {
           </View>
           <TouchableOpacity
             style={styles.applyBtn}
-            onPress={() => setPage(1)}
+            onPress={applyDates}
+            disabled={loading}
           >
             <Text style={styles.applyText}>Apply</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.applyBtn, styles.clearBtn]} onPress={clearFilters}>
+          <TouchableOpacity
+            style={[styles.applyBtn, styles.clearBtn]}
+            onPress={clearFilters}
+            disabled={loading}
+          >
             <Text style={styles.applyText}>Clear</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.applyBtn}
+            onPress={() => void load()}
+            disabled={loading}
+          >
+            <Text style={styles.applyText}>Refresh</Text>
           </TouchableOpacity>
         </View>
 

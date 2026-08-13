@@ -112,21 +112,16 @@ export function RevealCodesOtpModal({ visible, onClose }: Props) {
               <Text style={styles.sendingText}>Sending OTP…</Text>
             </View>
           ) : (
-            <>
-              <Text style={styles.sub}>
-                4-digit OTP sent to your registered mobile. Valid for 1 hour after verify.
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={otp}
-                onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 4))}
-                placeholder="Enter 4-digit OTP"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                maxLength={4}
-                autoFocus
-              />
-            </>
+            <TextInput
+              style={styles.input}
+              value={otp}
+              onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, 4))}
+              placeholder="Enter 4-digit OTP"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              maxLength={4}
+              autoFocus
+            />
           )}
           <View style={styles.actions}>
             <TouchableOpacity
@@ -163,7 +158,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing(6),
   },
   title: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(2) },
   sendingRow: {
     flexDirection: 'row',
     alignItems: 'center',

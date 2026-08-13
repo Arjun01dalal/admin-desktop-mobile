@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -110,6 +111,7 @@ function roundAmount(value: unknown): number {
 
 /** Non Performing User list — ops.nonPerformingUser. */
 export function NonPerformingUserPage() {
+  const navigate = useNavigate();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [appliedStart, setAppliedStart] = useState('');
@@ -121,6 +123,16 @@ export function NonPerformingUserPage() {
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
 
   const canShowMobile = hasPermission('show_mobile');
+
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId) return;
+      navigate(
+        `/users/report/${userId}/${encodeURIComponent(userName || '')}`,
+      );
+    },
+    [navigate],
+  );
 
   const buildFilter = useCallback((): Record<string, unknown> => {
     const filter: Record<string, unknown> = {};
@@ -188,7 +200,20 @@ export function NonPerformingUserPage() {
             placeholder="Search name"
           />
         ),
-        render: (row) => display(row.name),
+        render: (row) => (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: row._id ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            }}
+            onClick={() => openUserReport(row._id, row.name)}
+          >
+            {display(row.name)}
+          </Typography>
+        ),
       },
       {
         id: 'dpId',
@@ -289,7 +314,7 @@ export function NonPerformingUserPage() {
             : '—',
       },
     ],
-    [page, itemsPerPage, draft, search, canShowMobile, setDraftField],
+    [page, itemsPerPage, draft, search, canShowMobile, setDraftField, openUserReport],
   );
 
   return (

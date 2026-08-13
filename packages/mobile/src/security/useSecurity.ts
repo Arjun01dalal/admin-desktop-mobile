@@ -1,22 +1,24 @@
 /**
- * useSecurity — aggregates all runtime protections:
- *  - screenshot / screen-recording block for the whole app session
- *  - freeRASP (native): root/jailbreak, hooking, emulator, debugger, tamper, VPN
- *  - NetInfo VPN source (native): independent, toggle-able VPN signal
- *
- * On web everything degrades to a no-op so the UI still renders.
+ * useSecurity — aggregates runtime protections.
+ * Preview builds: no freeRASP; VPN via NetInfo + optional native VpnStatus.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { enableScreenshotBlock, disableScreenshotBlock } from './screenshot';
 import { useRaspThreats } from './raspGuard';
+import {
+  detectVpn,
+  refreshVpn,
+  subscribeNativeVpn,
+  subscribeNetInfoVpn,
+} from './vpnDetect';
 import type { ThreatKind } from './rasp';
 
 export type SecurityStatus = {
   threats: ThreatKind[];
-  /** True when a blocking threat (root/hook/tamper/emulator/VPN) is active. */
   blocked: boolean;
-  /** Re-queries the current network/VPN state (for the "Check again" button). */
+  /** Always true quickly — never block first paint forever. */
+  vpnReady: boolean;
   refresh: () => Promise<void>;
 };
 
@@ -28,72 +30,110 @@ const BLOCKING: ThreatKind[] = [
   'systemVPN',
 ];
 
-/** Independent NetInfo VPN detector (native only). Toggles on/off with the network. */
-function useNetInfoVpn(): { vpn: boolean; refresh: () => Promise<void> } {
+const VPN_POLL_MS = 3_000;
+
+function useLiveVpn(raspVpn: boolean): {
+  vpn: boolean;
+  ready: boolean;
+  refresh: () => Promise<void>;
+} {
   const [vpn, setVpn] = useState(false);
+  // Never gate the whole app on VPN probe — mark ready ASAP.
+  const [ready, setReady] = useState(true);
+  const [ignoreRasp, setIgnoreRasp] = useState(false);
 
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    let unsubscribe: (() => void) | undefined;
-    let cancelled = false;
-    void (async () => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const NetInfo = require('@react-native-community/netinfo').default;
-        if (cancelled) return;
-        unsubscribe = NetInfo.addEventListener((state: { type?: string }) => {
-          // Only Android reliably reports a dedicated 'vpn' connection type.
-          // iOS VPN detection is left to freeRASP to avoid false positives.
-          setVpn(state?.type === 'vpn');
-        });
-      } catch {
-        /* NetInfo unavailable */
-      }
-    })();
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-  }, []);
-
-  // Forces a fresh read (used by the "Check again" button so the user can
-  // disable their VPN and re-enter the app without restarting).
   const refresh = useCallback(async () => {
     if (Platform.OS === 'web') return;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const NetInfo = require('@react-native-community/netinfo').default;
-      const state = await NetInfo.refresh();
-      setVpn(state?.type === 'vpn');
+      const next = await refreshVpn();
+      setVpn(next);
+      if (!next) setIgnoreRasp(true);
     } catch {
-      /* NetInfo unavailable */
+      setVpn(false);
+      setIgnoreRasp(true);
     }
   }, []);
 
-  return { vpn, refresh };
+  useEffect(() => {
+    if (vpn) setIgnoreRasp(false);
+  }, [vpn]);
+
+  useEffect(() => {
+    if (raspVpn && !ignoreRasp) setVpn(true);
+  }, [raspVpn, ignoreRasp]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let cancelled = false;
+    const apply = (value: boolean) => {
+      if (!cancelled) setVpn(value);
+    };
+
+    // Hard timeout so a hung native call cannot freeze the UI.
+    const readyTimer = setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 800);
+
+    void detectVpn()
+      .then(apply)
+      .catch(() => apply(false))
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+
+    let unsubNative: (() => void) | undefined;
+    try {
+      unsubNative = subscribeNativeVpn(apply);
+    } catch {
+      unsubNative = undefined;
+    }
+
+    const unsubNet = subscribeNetInfoVpn((netVpn) => {
+      void detectVpn().then(apply).catch(() => undefined);
+      if (netVpn) apply(true);
+    });
+    const poll = setInterval(() => {
+      void detectVpn().then(apply).catch(() => undefined);
+    }, VPN_POLL_MS);
+    const appSub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void detectVpn().then(apply).catch(() => undefined);
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(readyTimer);
+      unsubNative?.();
+      unsubNet();
+      clearInterval(poll);
+      appSub.remove();
+    };
+  }, []);
+
+  const locked = vpn || (raspVpn && !ignoreRasp);
+  return { vpn: locked, ready, refresh };
 }
 
 export function useSecurity(): SecurityStatus {
-  // Screenshot block — app-wide policy; enable now, re-assert on foreground,
-  // and release on unmount.
   useEffect(() => {
-    void enableScreenshotBlock();
+    void enableScreenshotBlock().catch(() => undefined);
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void enableScreenshotBlock();
+      if (s === 'active') void enableScreenshotBlock().catch(() => undefined);
     });
     return () => {
       sub.remove();
-      void disableScreenshotBlock();
+      void disableScreenshotBlock().catch(() => undefined);
     };
   }, []);
 
   const { threats: raspThreats } = useRaspThreats();
-  const { vpn: netVpn, refresh } = useNetInfoVpn();
+  const raspVpn = raspThreats.includes('systemVPN');
+  const { vpn: liveVpn, ready: vpnReady, refresh } = useLiveVpn(raspVpn);
 
-  const threats = netVpn && !raspThreats.includes('systemVPN')
-    ? [...raspThreats, 'systemVPN' as ThreatKind]
-    : raspThreats;
+  const raspWithoutVpn = raspThreats.filter((t) => t !== 'systemVPN');
+  // Preview: do not hard-block on freeRASP integrity (sideload false positives).
+  const hardThreats = raspWithoutVpn.filter((t) => t !== 'appIntegrity' && t !== 'unofficialStore');
+  const threats: ThreatKind[] = liveVpn ? [...hardThreats, 'systemVPN'] : hardThreats;
 
   const blocked = threats.some((t) => BLOCKING.includes(t));
-  return { threats, blocked, refresh };
+  return { threats, blocked, vpnReady, refresh };
 }

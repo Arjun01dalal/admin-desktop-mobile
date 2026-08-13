@@ -63,11 +63,40 @@ function asProvider(value: unknown): Provider {
   return value === 'WACS' ? 'WACS' : 'QTECH';
 }
 
+function asProviderNames(data: unknown): string[] {
+  const fromArray = (items: unknown[]): string[] =>
+    items
+      .map((item) => {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object') {
+          const o = item as Record<string, unknown>;
+          const name = o.name ?? o.Name ?? o.providerName ?? o.id;
+          return name != null ? String(name).trim() : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
+
+  if (Array.isArray(data)) return fromArray(data);
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.payload)) return fromArray(obj.payload);
+    if (Array.isArray(obj.items)) return fromArray(obj.items);
+    if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
+      const nested = obj.payload as Record<string, unknown>;
+      if (Array.isArray(nested.items)) return fromArray(nested.items);
+    }
+  }
+  return [];
+}
+
 export function CasinoGamesScreen() {
   const [provider, setProvider] = useState<Provider>('QTECH');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [gameCategory, setGameCategory] = useState('');
+  const [providerName, setProviderName] = useState('');
+  const [providerOptions, setProviderOptions] = useState<string[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +116,13 @@ export function CasinoGamesScreen() {
     })();
   }, []);
 
+  useEffect(() => {
+    void (async () => {
+      const res = await secureApi<unknown>('ops.casinoGetProviders', {});
+      if (res.ok) setProviderOptions(asProviderNames(res.data));
+    })();
+  }, []);
+
   const load = useCallback(async () => {
     const gen = ++genRef.current;
     setLoading(true);
@@ -99,6 +135,9 @@ export function CasinoGamesScreen() {
       if (applied.id.trim()) {
         if (provider === 'QTECH') filters.gameId = applied.id.trim();
         else filters.Game_Code = applied.id.trim();
+      }
+      if (provider === 'QTECH' && providerName.trim()) {
+        filters['provider.name'] = providerName.trim();
       }
       const res = await secureApi<unknown>('ops.casinoGetData', {
         pageNo: page,
@@ -119,7 +158,7 @@ export function CasinoGamesScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [page, pageSize, gameCategory, applied, provider]);
+  }, [page, pageSize, gameCategory, applied, provider, providerName]);
 
   useEffect(() => {
     void load();
@@ -256,6 +295,38 @@ export function CasinoGamesScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      {provider === 'QTECH' ? (
+        <View style={styles.chipsRow}>
+          <Text style={styles.chipsLabel}>Provider:</Text>
+          <TouchableOpacity
+            style={[styles.chip, !providerName && styles.chipActive]}
+            onPress={() => {
+              if (providerName) {
+                setProviderName('');
+                setPage(1);
+              }
+            }}
+          >
+            <Text style={[styles.chipText, !providerName && styles.chipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {providerOptions.map((name) => (
+            <TouchableOpacity
+              key={name}
+              style={[styles.chip, providerName === name && styles.chipActive]}
+              onPress={() => {
+                if (providerName !== name) {
+                  setProviderName(name);
+                  setPage(1);
+                }
+              }}
+            >
+              <Text style={[styles.chipText, providerName === name && styles.chipTextActive]}>
+                {name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
       <View style={styles.chipsRow}>
         <Text style={styles.chipsLabel}>Per page:</Text>
         {PAGE_SIZE_OPTIONS.map((n) => (

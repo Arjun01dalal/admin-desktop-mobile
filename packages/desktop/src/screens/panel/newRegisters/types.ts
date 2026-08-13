@@ -70,6 +70,7 @@ export type NewRegistersAdmin = {
   _id?: string;
   name?: string;
   empCode?: string;
+  mobile?: string;
   extensionId?: string[];
   serverId?: string | number;
   clientName?: string | string[];

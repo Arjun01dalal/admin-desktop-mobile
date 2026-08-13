@@ -205,7 +205,12 @@ export function StateWiseRegistrationScreen() {
     }
     cols.push(
       { key: 'kyc', label: 'KYC', width: 70, render: (r) => (r.kyc === true ? 'Done' : 'Not Done') },
-      { key: 'appName', label: 'App Name', width: 80, render: (r) => appCodeForName(String(r.clientName || '')) },
+      {
+        key: 'appName',
+        label: 'App Name',
+        width: 80,
+        render: (r) => appCodeForName(String(r.clientName || '')),
+      },
     );
     if (!hideContact) {
       cols.push({ key: 'email', label: 'Email', width: 160, render: (r) => String(r.email || '—') });

@@ -17,6 +17,9 @@ import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameAct
 import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstructGamesScreen';
 import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
 import { UserReportScreen } from '../screens/UserReportScreen';
+import { CallerDepositListScreen } from '../screens/dashboards/details/CallerDepositListScreen';
+import { ActiveUserDataScreen } from '../screens/dashboards/details/ActiveUserDataScreen';
+import { MidGroupsScreen } from '../screens/dashboards/details/MidGroupsScreen';
 
 export type PanelDetailParams = Record<string, unknown>;
 
@@ -64,6 +67,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/exchangeRateManagement',
     title: 'Exchange Rate Management',
     Component: ExchangeRateManagementScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/activeUserData',
+    title: 'Active User Data',
+    Component: ActiveUserDataScreen as PanelDetailRoute['Component'],
   },
   {
     path: '/masterDashboard',
@@ -124,6 +132,16 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/user-report',
     title: 'User Report',
     Component: UserReportScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/caller-responsibility/deposit-list',
+    title: 'Caller Deposit List',
+    Component: CallerDepositListScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/funds/mid-groups',
+    title: 'MID Groups',
+    Component: MidGroupsScreen as PanelDetailRoute['Component'],
   },
 ];
 

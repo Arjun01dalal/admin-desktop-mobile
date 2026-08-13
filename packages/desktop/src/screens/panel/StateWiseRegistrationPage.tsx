@@ -490,7 +490,7 @@ export function StateWiseRegistrationPage() {
               { value: '', label: 'All Apps' },
               ...CLIENT_NAMES.map((name) => ({
                 value: name,
-                label: `${appCodeForName(name)} (${name})`,
+                label: appCodeForName(name),
               })),
             ]}
           />

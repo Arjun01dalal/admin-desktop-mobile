@@ -27,6 +27,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { appCodeForName, asPaged, unpackPayload } from '@astro/shared';
@@ -118,6 +119,7 @@ function whatsAppMessage(row: UniquePendingRow): string {
 }
 
 export function UniqueDepositPendingScreen() {
+  const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   // Read once — getSessionUser returns a fresh object each call.
   const admin = useMemo(
     () => getSessionUser() as { _id?: string; name?: string; mobile?: string } | null,
@@ -439,7 +441,19 @@ export function UniqueDepositPendingScreen() {
   const columns = useMemo<DataTableColumn<UniquePendingRow>[]>(
     () => [
       { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      { key: 'userName', label: 'User Name', width: w.userName, render: (r) => display(r.userName) },
+      {
+        key: 'userName',
+        label: 'User Name',
+        width: w.userName,
+        render: (r) => display(r.userName),
+        onCellPress: (r) => {
+          if (!r.userId) return;
+          navigation.navigate('/user-report', {
+            userId: String(r.userId),
+            userName: String(r.userName || ''),
+          });
+        },
+      },
       { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
       { key: 'userId', label: 'DP ID', width: 180, render: (r) => display(r.userId) },
       { key: 'amount', label: 'Amount', width: w.amount, align: 'right', render: (r) => formatIN(r.amount) },
@@ -453,7 +467,7 @@ export function UniqueDepositPendingScreen() {
       { key: 'comment', label: 'Comment', width: 200, render: (r) => display(r.uniquePendingReason?.reason) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, pageSize, availableWidth],
+    [page, pageSize, availableWidth, navigation],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
@@ -471,6 +485,21 @@ export function UniqueDepositPendingScreen() {
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
     const acts: SheetAction[] = [];
+    if (sheetRow.userId) {
+      acts.push({
+        label: 'User Report',
+        tone: 'primary',
+        onPress: () => {
+          const id = sheetRow.userId;
+          const name = sheetRow.userName;
+          setSheetRow(null);
+          navigation.navigate('/user-report', {
+            userId: String(id),
+            userName: String(name || ''),
+          });
+        },
+      });
+    }
     const isPending = String(sheetRow.status || '').toLowerCase() === 'pending';
     if (!sheetRow.uniquePendingReason?.reason) {
       acts.push({ label: 'Add Comment', tone: 'default', onPress: () => openInput('comment', sheetRow) });
@@ -495,7 +524,7 @@ export function UniqueDepositPendingScreen() {
       acts.push({ label: 'Change Status', tone: 'warning', onPress: () => openInput('status', sheetRow) });
     }
     return acts;
-  }, [sheetRow, canWhatsApp, canChangeStatus, busy, openInput, openWhatsApp, openDialer, initiateBotCall]);
+  }, [sheetRow, canWhatsApp, canChangeStatus, busy, openInput, openWhatsApp, openDialer, initiateBotCall, navigation]);
 
   return (
     <ScrollView

@@ -1,13 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
-  Button,
   Pagination,
   Stack,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TableSearchBar } from '@/components/TableSearchBar';
@@ -54,14 +52,6 @@ type FundRow = {
 };
 
 const ITEMS_PER_PAGE = 50;
-
-const orangeBtnSx = {
-  bgcolor: '#ff9f0a',
-  color: '#1a1200',
-  fontWeight: 700,
-  textTransform: 'none' as const,
-  '&:hover': { bgcolor: '#e08c00' },
-};
 
 const ACTION_BY_TYPE: Record<FundType, SecureAction> = {
   pending: 'bonusWallet.fundPending',
@@ -113,7 +103,6 @@ function unpackDocuments(res: { data?: unknown }) {
 }
 
 export function BonusWalletFundRequestTablePage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const navState = (location.state || {}) as LocationState;
   const type: FundType =
@@ -283,26 +272,9 @@ export function BonusWalletFundRequestTablePage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        gap={1.5}
-        mb={1.5}
-      >
-        <Typography variant="h6" fontWeight={700}>
-          Bonus Wallet Table — {TITLE_BY_TYPE[type]}
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(-1)}
-          sx={orangeBtnSx}
-        >
-          Back
-        </Button>
-      </Stack>
+      <Typography variant="h6" fontWeight={700} mb={1.5}>
+        Bonus Wallet Table — {TITLE_BY_TYPE[type]}
+      </Typography>
 
       <CommonTable
         columns={columns}

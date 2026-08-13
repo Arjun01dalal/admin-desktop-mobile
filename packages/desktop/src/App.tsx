@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ComponentType,
@@ -139,6 +140,18 @@ const SocialMediaPage = lazyNamed(
   () => import('@/screens/panel/SocialMediaPage'),
   'SocialMediaPage',
 );
+const WhatsappMidPage = lazyNamed(
+  () => import('@/screens/panel/WhatsappMidPage'),
+  'WhatsappMidPage',
+);
+const AAAFraudBetReportPage = lazyNamed(
+  () => import('@/screens/panel/AAAFraudBetReportPage'),
+  'AAAFraudBetReportPage',
+);
+const AAABlacklistedUsersPage = lazyNamed(
+  () => import('@/screens/panel/AAABlacklistedUsersPage'),
+  'AAABlacklistedUsersPage',
+);
 const UpiListsPage = lazyNamed(() => import('@/screens/panel/UpiListsPage'), 'UpiListsPage');
 const UpiPaymentsPage = lazyNamed(
   () => import('@/screens/panel/UpiPaymentsPage'),
@@ -200,6 +213,10 @@ const FundsPage = lazyNamed(
 const FundsMidPage = lazyNamed(
   () => import('@/screens/panel/FundsMidPage'),
   'FundsMidPage',
+);
+const MidGroupsPage = lazyNamed(
+  () => import('@/screens/panel/MidGroupsPage'),
+  'MidGroupsPage',
 );
 const FundsPayinPage = lazyNamed(
   () => import('@/screens/panel/FundsPayinPage'),
@@ -342,6 +359,10 @@ const ExchangeRateManagementPage = lazyNamed(
   () => import('@/screens/panel/dashboards/ExchangeRateManagementPage'),
   'ExchangeRateManagementPage',
 );
+const ActiveUserDataPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/ActiveUserDataPage'),
+  'ActiveUserDataPage',
+);
 const BetConstructGamesListPage = lazyNamed(
   () => import('@/screens/panel/dashboards/BetConstructGamesListPage'),
   'BetConstructGamesListPage',
@@ -445,27 +466,65 @@ export default function App() {
 function AppInner() {
   const { theme, resolved } = useColorMode();
   const [user, setUser] = useState<AuthUser | null>(null);
-  // Always open on the ThirdEye site — never auto-enter the panel.
-  const [screen, setScreen] = useState<AppScreen>('site');
+  // First window: Astro site. Extra windows (#entry=panel): skip site → panel/login.
+  const skipSiteLaunch = useMemo(() => {
+    try {
+      return /(?:^|[&#])entry=panel(?:&|$)/.test(String(window.location.hash || ''));
+    } catch {
+      return false;
+    }
+  }, []);
+  const [screen, setScreen] = useState<AppScreen>(skipSiteLaunch ? 'login' : 'site');
   const panelEntry = useState(() => readLastPanelPath())[0];
   const sessionToastShown = useRef(false);
-  const goLoginRef = useRef<() => void>(() => {});
+  const goLoginRef = useRef<(prefill?: { email?: string; mobile?: string }) => void>(
+    () => {},
+  );
   const sosBlocksLoginRef = useRef(false);
+  const [loginPrefill, setLoginPrefill] = useState<{ email?: string; mobile?: string }>(
+    {},
+  );
 
   useEffect(() => {
+    if (skipSiteLaunch) return;
     window.gcalc?.showSite?.();
-  }, []);
+  }, [skipSiteLaunch]);
 
   // Load OS-encrypted token before session checks.
   useEffect(() => {
     let cancelled = false;
     void initAuthToken().then(() => {
-      if (!cancelled) setUser(readStoredSession());
+      if (cancelled) return;
+      const session = readStoredSession();
+      setUser(session);
+      if (skipSiteLaunch) {
+        try {
+          // Avoid re-triggering skip on reload of the same window.
+          window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}${window.location.search}`,
+          );
+        } catch {
+          // ignore
+        }
+        if (session) {
+          resetSessionExpiredGuard();
+          sessionToastShown.current = false;
+          setScreen('welcome');
+          window.gcalc?.hideSite?.();
+          window.gcalc?.showWelcome?.();
+        } else {
+          setScreen('login');
+          window.gcalc?.hideSite?.();
+          window.gcalc?.showLogin?.();
+        }
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [skipSiteLaunch]);
 
   const goPanel = useCallback((nextUser: AuthUser) => {
     resetSessionExpiredGuard();
@@ -476,7 +535,24 @@ function AppInner() {
     window.gcalc?.showWelcome?.();
   }, []);
 
-  const goLogin = useCallback(() => {
+  const goLogin = useCallback((prefill?: { email?: string; mobile?: string }) => {
+    if (prefill?.email || prefill?.mobile) {
+      setLoginPrefill({
+        email: prefill.email || '',
+        mobile: prefill.mobile || '',
+      });
+      try {
+        if (prefill.email) localStorage.setItem('astro_site_email', prefill.email);
+        const digits = String(prefill.mobile || prefill.email || '')
+          .replace(/\D/g, '')
+          .slice(-10);
+        if (/^[6-9]\d{9}$/.test(digits)) {
+          localStorage.setItem('mobile', digits);
+        }
+      } catch {
+        // ignore
+      }
+    }
     // Valid existing session → skip login and open admin panel.
     const session = readStoredSession();
     if (session) {
@@ -491,13 +567,13 @@ function AppInner() {
   goLoginRef.current = goLogin;
 
   useEffect(() => {
-    window.gcalc?.onRequestLogin?.(() => {
+    const unsubLogin = window.gcalc?.onRequestLogin?.((payload) => {
       // SOS on → password gate must not open the OTP login window.
       if (sosBlocksLoginRef.current) {
         toast.error('SOS is active — panel login is disabled.');
         return;
       }
-      goLoginRef.current();
+      goLoginRef.current(payload);
     });
 
     const unsubBlocked = window.gcalc?.onLoginBlockedSos?.(() => {
@@ -505,6 +581,7 @@ function AppInner() {
     });
 
     return () => {
+      unsubLogin?.();
       unsubBlocked?.();
     };
   }, []);
@@ -581,7 +658,12 @@ function AppInner() {
       <LocationProvider>
         {screen === 'site' && <AstroSite onOpenLogin={goLogin} />}
         {screen === 'login' && (
-          <Login onSuccess={(u) => goPanel(u)} onBack={goSite} />
+          <Login
+            onSuccess={(u) => goPanel(u)}
+            onBack={goSite}
+            initialMobile={loginPrefill.mobile}
+            initialEmail={loginPrefill.email}
+          />
         )}
 
         {inPanel && (
@@ -606,6 +688,10 @@ function AppInner() {
                   <Route
                     path="/exchangeRateManagement"
                     element={<ExchangeRateManagementPage />}
+                  />
+                  <Route
+                    path="/activeUserData"
+                    element={<ActiveUserDataPage />}
                   />
                   <Route
                     path="/betConstructGamesList"
@@ -768,6 +854,7 @@ function AppInner() {
                     element={<DepositListUserWisePage />}
                   />
                   <Route path="/funds" element={<FundsPage />} />
+                  <Route path="/funds/mid-groups" element={<MidGroupsPage />} />
                   <Route path="/funds/mid" element={<FundsMidPage />} />
                   <Route path="/funds/payin" element={<FundsPayinPage />} />
                   <Route
@@ -819,6 +906,15 @@ function AppInner() {
                   <Route path="/percentage" element={<PercentagePage />} />
                   <Route path="/newdeposits" element={<NewDepositsPage />} />
                   <Route path="/social-media" element={<SocialMediaPage />} />
+                  <Route path="/whatsapp-mid" element={<WhatsappMidPage />} />
+                  <Route
+                    path="/aaa-fraud-bet-report"
+                    element={<AAAFraudBetReportPage />}
+                  />
+                  <Route
+                    path="/aaa-blacklisted-users"
+                    element={<AAABlacklistedUsersPage />}
+                  />
                   <Route path="/mobile-app" element={<MobileAppPage />} />
                   <Route path="*" element={<Navigate to="/welcome" replace />} />
                 </Route>

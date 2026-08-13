@@ -11,8 +11,19 @@ body,
   background: #1c1c1e;
   color: #fff;
   overflow: hidden;
-  font-family: 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  /* Fixed stack — avoid system-ui so OS font settings do not change the panel. */
+  font-family: 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 html[data-color-mode='light'],

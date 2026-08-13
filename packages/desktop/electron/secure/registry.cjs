@@ -794,6 +794,21 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'ops.bannersCreateGameLaunch': {
+    method: 'POST',
+    path: '/bannerGames/create-game-launch',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'ops.bannersCreateWithGameData': {
+    method: 'POST',
+    path: '/bannerGames/create-with-game-data',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'ops.bannersUploadVideo': {
+    type: 'local',
+  },
   'ops.bannersDelete': {
     method: 'POST',
     path: '/bannerGames/delete',
@@ -808,7 +823,7 @@ module.exports = {
   },
   'ops.bannersUpdate': {
     method: 'POST',
-    path: '/bannerGames',
+    path: '/bannerGames/update',
     encryptRequest: true,
     decryptResponse: true,
   },
@@ -1055,6 +1070,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'ops.removeCallerHead': {
+    method: 'POST',
+    path: '/SubAdmin/remove-caller-head',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'ops.updateOfficeLocation': {
     method: 'POST',
     path: '/SubAdmin/update-office-location',
@@ -1178,6 +1199,8 @@ module.exports = {
     path: '/Qtech/store-bet-All',
     encryptRequest: false,
     decryptResponse: false,
+    // Full envelope: { profit, payload, walletHistory } — do not unwrap to .payload only.
+    keepDataEnvelope: true,
   },
   'dashboard.falcon': {
     method: 'POST',
@@ -1505,6 +1528,18 @@ module.exports = {
     path: '/bonus-wallet/remove-bonus',
     encryptRequest: true,
     decryptResponse: false,
+  },
+  'userReport.addBonus': {
+    method: 'POST',
+    path: '/bonus-wallet/add-bonus',
+    encryptRequest: true,
+    decryptResponse: false,
+  },
+  'userReport.addCoin': {
+    method: 'POST',
+    path: '/coin/add',
+    encryptRequest: true,
+    decryptResponse: true,
   },
   'userReport.qtechStoreBet': {
     method: 'POST',
@@ -2046,12 +2081,69 @@ module.exports = {
     decryptResponse: true,
     timeout: 180000,
   },
+  // Laxmi Funds ApproveModal — plain body (not encrypted token)
+  'funds.updateGateway': {
+    method: 'POST',
+    path: '/subAdmin/update-gateway',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+
+  // MID Groups (admin-panel Funds/MidGroups)
+  'funds.midGroupsGet': {
+    method: 'POST',
+    path: '/payinAccounts/mid-groups/get',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'funds.midGroupsAddGroup': {
+    method: 'POST',
+    path: '/payinAccounts/mid-groups/add-group',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'funds.midGroupsRemoveGroup': {
+    method: 'POST',
+    path: '/payinAccounts/mid-groups/remove-group',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'funds.midGroupsAddMid': {
+    method: 'POST',
+    path: '/payinAccounts/mid-groups/add-mid',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'funds.midGroupsRemoveMid': {
+    method: 'POST',
+    path: '/payinAccounts/mid-groups/remove-mid',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'funds.midGroupsWhatsappAdd': {
+    method: 'POST',
+    path: '/payinAccounts/mid-groups/whatsapp-global-only/add',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'funds.midGroupsWhatsappRemove': {
+    method: 'POST',
+    path: '/payinAccounts/mid-groups/whatsapp-global-only/remove',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
 
   // Casino Top-up Balance
   'casinoTopup.get': {
     method: 'POST',
     path: '/change-percentage/qtech-topped-up-balance/get',
     encryptRequest: true,
+    decryptResponse: true,
+  },
+  'casinoTopup.qtechRemaining': {
+    method: 'POST',
+    path: '/Qtech/topup-balance-remaining',
+    encryptRequest: false,
     decryptResponse: true,
   },
   'casinoTopup.addQtech': {
@@ -2077,6 +2169,46 @@ module.exports = {
   'whatsapp.sendExotel': {
     method: 'POST',
     path: '/subAdmin/send-exotel-whatsapp-message',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+
+  // Set Whatsapp Mid (admin-panel-domains WhatsappMid)
+  'whatsappMid.list': {
+    method: 'GET',
+    path: '/SubAdmin/get-all-whatsapp-UPI-ids',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'whatsappMid.create': {
+    method: 'POST',
+    path: '/SubAdmin/create-whatsapp-UPI-id',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'whatsappMid.update': {
+    method: 'POST',
+    path: '/SubAdmin/update-whatsapp-UPI-id',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'whatsappMid.delete': {
+    method: 'POST',
+    path: '/SubAdmin/delete-whatsapp-UPI-id',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+
+  // AAA Fraud Bet Report / Blacklisted Users (external nodeadmin host)
+  'aaa.fraudBetsReport': {
+    method: 'GET',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/getFraudBetsReport',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'aaa.blacklistedUsers': {
+    method: 'GET',
+    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/getBlacklistedUsers',
     encryptRequest: false,
     decryptResponse: false,
   },

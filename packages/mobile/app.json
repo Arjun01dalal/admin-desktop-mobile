@@ -14,12 +14,13 @@
     },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "vip.astrotalk.panel",
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes."
       }
@@ -56,6 +57,8 @@
     },
     "plugins": [
       "expo-dev-client",
+      "expo-asset",
+      "expo-font",
       "expo-secure-store",
       [
         "expo-location",

@@ -12,7 +12,8 @@ export type AppPaletteMode = 'light' | 'dark';
 
 const shared: ThemeOptions = {
   typography: {
-    fontFamily: '"SF Pro Display", "Segoe UI", system-ui, sans-serif',
+    // Fixed stack — never use system-ui so OS font settings do not change the panel.
+    fontFamily: '"SF Pro Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
     button: {
       textTransform: 'none',
       fontWeight: 600,
@@ -24,6 +25,18 @@ const shared: ThemeOptions = {
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        html: {
+          fontSize: '16px',
+          WebkitTextSizeAdjust: '100%',
+          textSizeAdjust: '100%',
+        },
+        'html, body, #root': {
+          fontFamily:
+            '"SF Pro Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+        },
+        'button, input, select, textarea': {
+          fontFamily: 'inherit',
+        },
         "input[type='date']::-webkit-calendar-picker-indicator, input[type='time']::-webkit-calendar-picker-indicator, input[type='datetime-local']::-webkit-calendar-picker-indicator":
           {
             cursor: 'pointer',

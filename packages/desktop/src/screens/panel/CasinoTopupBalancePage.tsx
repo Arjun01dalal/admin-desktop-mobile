@@ -14,6 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import HistoryIcon from '@mui/icons-material/History';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
@@ -25,11 +26,21 @@ import {
   PROVIDER_CONFIG,
   displayToppedUpAt,
   emptyForm,
+  emptyRemainingSummary,
+  formatMoney,
   parseBothProviders,
+  parseQtechRemaining,
+  remainingRowCode,
+  remainingRowConsumed,
+  remainingRowGgrInr,
+  remainingRowGgrUsd,
+  remainingRowLabel,
   toApiDateTime,
   type FormState,
   type ProviderKey,
   type ProviderState,
+  type QtechRemainingSummary,
+  type RemainingBreakdownRow,
   type TopupRecord,
 } from '@/screens/panel/casinoTopup/helpers';
 import { useRevealCodes } from '@/context/useRevealCodes';
@@ -50,9 +61,42 @@ const emptyProviders = (): Record<ProviderKey, ProviderState> => ({
   betconstruct: { records: [], balance: null, currency: 'USD', loading: false },
 });
 
+function MetricCard({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: string;
+}) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.5,
+        height: '100%',
+        bgcolor: '#121218',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 1.5,
+      }}
+    >
+      <Typography color="text.secondary" fontSize={12}>
+        {label}
+      </Typography>
+      <Typography
+        fontWeight={700}
+        fontSize={20}
+        sx={{ mt: 0.5, color: accent || 'text.primary' }}
+      >
+        {value}
+      </Typography>
+    </Paper>
+  );
+}
+
 export function CasinoTopupBalancePage() {
-  const { active: revealActive } = useRevealCodes();
-  // Match sidebar gating (full-access / QA see all nav even if Responsibility row is missing).
+  useRevealCodes();
   const canView = canAccessNavItem({
     id: 'casinoTopup',
     permission: Permissions.view_casino_balance,
@@ -60,7 +104,13 @@ export function CasinoTopupBalancePage() {
   const [providers, setProviders] =
     useState<Record<ProviderKey, ProviderState>>(emptyProviders);
   const [pageLoading, setPageLoading] = useState(false);
-  const [addProvider, setAddProvider] = useState<ProviderKey | null>(null);
+  const [qtechRemaining, setQtechRemaining] = useState<QtechRemainingSummary>(
+    emptyRemainingSummary(),
+  );
+  const [qtechRemainingLoading, setQtechRemainingLoading] = useState(false);
+  const [remainingTab, setRemainingTab] = useState<'provider' | 'game'>('provider');
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm(''));
   const [formErrors, setFormErrors] = useState({
     amount: false,
@@ -68,7 +118,7 @@ export function CasinoTopupBalancePage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async () => {
+  const loadBalances = useCallback(async () => {
     setPageLoading(true);
     setProviders((prev) => ({
       qtech: { ...prev.qtech, loading: true },
@@ -104,24 +154,49 @@ export function CasinoTopupBalancePage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (canView) void load();
-  }, [canView, load]);
+  const loadQtechRemaining = useCallback(async () => {
+    setQtechRemainingLoading(true);
+    try {
+      const res = await secureApi('casinoTopup.qtechRemaining', {});
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to load Qtech remaining balance');
+        setQtechRemaining(emptyRemainingSummary());
+        return;
+      }
+      setQtechRemaining(parseQtechRemaining(res.data));
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to load Qtech remaining balance',
+      );
+      setQtechRemaining(emptyRemainingSummary());
+    } finally {
+      setQtechRemainingLoading(false);
+    }
+  }, []);
 
-  const openAddPopup = (key: ProviderKey) => {
-    setAddProvider(key);
-    setForm(emptyForm(PROVIDER_CONFIG[key].defaultNote));
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadBalances(), loadQtechRemaining()]);
+  }, [loadBalances, loadQtechRemaining]);
+
+  useEffect(() => {
+    if (canView) void refreshAll();
+  }, [canView, refreshAll]);
+
+  const openAddPopup = () => {
+    setAddOpen(true);
+    setForm(emptyForm(PROVIDER_CONFIG.qtech.defaultNote));
     setFormErrors({ amount: false, toppedUpAtIst: false });
   };
 
   const closeAddPopup = () => {
-    setAddProvider(null);
+    setAddOpen(false);
     setForm(emptyForm(''));
     setFormErrors({ amount: false, toppedUpAtIst: false });
   };
 
   const handleAdd = async () => {
-    if (!addProvider) return;
     const amountError = !form.amount || Number(form.amount) <= 0;
     const dateError = !form.toppedUpAtIst;
     if (amountError || dateError) {
@@ -132,12 +207,8 @@ export function CasinoTopupBalancePage() {
 
     setSubmitting(true);
     try {
-      const config = PROVIDER_CONFIG[addProvider];
-      const action =
-        addProvider === 'qtech'
-          ? 'casinoTopup.addQtech'
-          : 'casinoTopup.addBetconstruct';
-      const res = await secureApi(action, {
+      const config = PROVIDER_CONFIG.qtech;
+      const res = await secureApi('casinoTopup.addQtech', {
         amount: Number(form.amount),
         currency: form.currency,
         toppedUpAtIst: toApiDateTime(form.toppedUpAtIst),
@@ -149,19 +220,19 @@ export function CasinoTopupBalancePage() {
       }
       toast.success(`${config.title} top-up added successfully`);
       closeAddPopup();
-      void load();
+      void loadBalances();
+      void loadQtechRemaining();
     } finally {
       setSubmitting(false);
     }
   };
 
-  const columns = useMemo<CommonTableColumn<TopupRecord>[]>(
+  const historyColumns = useMemo<CommonTableColumn<TopupRecord>[]>(
     () => [
       {
         id: '#',
         label: '#',
-        width: 64,
-        cellSx: { overflow: 'visible', textOverflow: 'clip' },
+        width: 56,
         render: (_row, index) => index + 1,
       },
       {
@@ -186,8 +257,48 @@ export function CasinoTopupBalancePage() {
         render: (row) => display(row.note),
       },
     ],
-    [revealActive],
+    [],
   );
+
+  const remainingColumns = useMemo<CommonTableColumn<RemainingBreakdownRow>[]>(
+    () => [
+      {
+        id: '#',
+        label: '#',
+        width: 56,
+        render: (_row, index) => index + 1,
+      },
+      {
+        id: 'name',
+        label: remainingTab === 'provider' ? 'Provider' : 'Game',
+        render: (row) => remainingRowLabel(row, remainingTab),
+      },
+      {
+        id: 'code',
+        label: 'ID / Code',
+        render: (row) => remainingRowCode(row),
+      },
+      {
+        id: 'ggrUsd',
+        label: 'GGR / Amount (USD)',
+        render: (row) => remainingRowGgrUsd(row),
+      },
+      {
+        id: 'ggrInr',
+        label: 'GGR / Amount (INR)',
+        render: (row) => remainingRowGgrInr(row),
+      },
+      {
+        id: 'consumed',
+        label: 'Consumed / Turnover',
+        render: (row) => remainingRowConsumed(row),
+      },
+    ],
+    [remainingTab],
+  );
+
+  const remainingRows =
+    remainingTab === 'provider' ? qtechRemaining.byProvider : qtechRemaining.byGame;
 
   if (!canView) {
     return (
@@ -204,90 +315,6 @@ export function CasinoTopupBalancePage() {
     );
   }
 
-  const renderSection = (key: ProviderKey) => {
-    const config = PROVIDER_CONFIG[key];
-    const state = providers[key];
-
-    return (
-      <Paper
-        key={key}
-        elevation={0}
-        sx={{
-          p: 2,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 2,
-          minWidth: 0,
-        }}
-      >
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          mb={2}
-          gap={1}
-          flexWrap="wrap"
-        >
-          <Box>
-            <Typography fontWeight={700} fontSize={18}>
-              {toDisplayText(config.title)}
-            </Typography>
-            <Typography color="text.secondary" fontSize={13}>
-              Topped-up balance
-            </Typography>
-          </Box>
-          <Button
-            startIcon={<AddIcon />}
-            onClick={() => openAddPopup(key)}
-            sx={orangeBtnSx}
-          >
-            Add
-          </Button>
-        </Stack>
-
-        <Paper
-          elevation={0}
-          sx={{
-            p: 1.5,
-            mb: 2,
-            bgcolor: '#121218',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}
-        >
-          <Typography color="text.secondary" fontSize={13}>
-            Current Balance
-          </Typography>
-          <Typography fontWeight={700} fontSize={24}>
-            {state.loading && state.balance == null ? (
-              '...'
-            ) : state.balance != null ? (
-              <>
-                {Number(state.balance).toLocaleString()}{' '}
-                <Box
-                  component="span"
-                  sx={{ fontSize: 14, fontWeight: 500, color: 'text.secondary' }}
-                >
-                  {state.currency}
-                </Box>
-              </>
-            ) : (
-              '—'
-            )}
-          </Typography>
-        </Paper>
-
-        <CommonTable
-          columns={columns}
-          rows={state.records}
-          getRowKey={(row, i) => String(row._id || i)}
-          loading={state.loading && state.records.length === 0}
-          emptyMessage="No top-up records found"
-          minWidth={640}
-        />
-      </Paper>
-    );
-  };
-
   return (
     <Box>
       <Stack
@@ -303,34 +330,217 @@ export function CasinoTopupBalancePage() {
         </Typography>
         <Button
           startIcon={
-            pageLoading ? (
+            pageLoading || qtechRemainingLoading ? (
               <CircularProgress size={16} color="inherit" />
             ) : (
               <RefreshIcon />
             )
           }
-          onClick={() => void load()}
-          disabled={pageLoading || submitting}
+          onClick={() => void refreshAll()}
+          disabled={pageLoading || qtechRemainingLoading || submitting}
           sx={orangeBtnSx}
         >
           Refresh
         </Button>
       </Stack>
 
-      <Box
+      <Paper
+        elevation={0}
         sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
-          gap: 2,
+          p: 2,
+          mb: 2,
+          bgcolor: 'background.paper',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 2,
         }}
       >
-        {renderSection('qtech')}
-        {renderSection('betconstruct')}
-      </Box>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          mb={2}
+          gap={1}
+          flexWrap="wrap"
+        >
+          <Box>
+            <Typography fontWeight={700} fontSize={18}>
+              Qtech Remaining Balance
+            </Typography>
+            <Typography color="text.secondary" fontSize={13}>
+              From /Qtech/topup-balance-remaining
+              {qtechRemaining.toppedUpAtIst
+                ? ` • Topped up: ${qtechRemaining.toppedUpAtIst}`
+                : ''}
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button
+              startIcon={
+                qtechRemainingLoading ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : (
+                  <RefreshIcon />
+                )
+              }
+              onClick={() => void loadQtechRemaining()}
+              disabled={qtechRemainingLoading}
+              sx={orangeBtnSx}
+            >
+              Refresh
+            </Button>
+            <Button
+              startIcon={<HistoryIcon />}
+              onClick={() => {
+                setHistoryModalOpen(true);
+                void loadBalances();
+              }}
+              sx={orangeBtnSx}
+            >
+              History
+            </Button>
+            <Button
+              startIcon={<AddIcon />}
+              onClick={() => openAddPopup()}
+              sx={orangeBtnSx}
+            >
+              Add
+            </Button>
+          </Stack>
+        </Stack>
 
-      <Dialog open={!!addProvider} onClose={closeAddPopup} maxWidth="sm" fullWidth>
+        {qtechRemainingLoading && qtechRemaining.remainingUsd == null ? (
+          <Typography color="text.secondary" py={3} textAlign="center">
+            Loading remaining balance…
+          </Typography>
+        ) : (
+          <>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'repeat(2, minmax(0, 1fr))',
+                  md: 'repeat(3, minmax(0, 1fr))',
+                  xl: 'repeat(4, minmax(0, 1fr))',
+                },
+                gap: 1.5,
+                mb: 2,
+              }}
+            >
+              <MetricCard
+                label="Remaining (USD)"
+                value={formatMoney(qtechRemaining.remainingUsd)}
+                accent="#2dd4bf"
+              />
+              <MetricCard
+                label="Topped Up (USD)"
+                value={formatMoney(qtechRemaining.toppedUpUsd)}
+                accent="#60a5fa"
+              />
+              <MetricCard
+                label="Consumed (USD)"
+                value={formatMoney(qtechRemaining.consumedUsd)}
+                accent="#fbbf24"
+              />
+              <MetricCard label="Currency" value={qtechRemaining.currency || 'USD'} />
+              <MetricCard
+                label="USD → INR"
+                value={formatMoney(qtechRemaining.usdToInr, 2)}
+              />
+              <MetricCard label="Fee (INR)" value={formatMoney(qtechRemaining.feeInr)} />
+              <MetricCard label="GGR (USD)" value={formatMoney(qtechRemaining.ggrUsd)} />
+              <MetricCard label="GGR (INR)" value={formatMoney(qtechRemaining.ggrInr)} />
+              <MetricCard
+                label="Unmatched Games"
+                value={
+                  qtechRemaining.unmatchedGamesCount != null
+                    ? String(qtechRemaining.unmatchedGamesCount)
+                    : '—'
+                }
+              />
+            </Box>
+
+            {(qtechRemaining.rangeStart || qtechRemaining.rangeEnd) && (
+              <Typography color="text.secondary" fontSize={13} mb={1.5}>
+                Range:{' '}
+                {qtechRemaining.rangeStart
+                  ? new Date(qtechRemaining.rangeStart).toLocaleString()
+                  : '—'}{' '}
+                →{' '}
+                {qtechRemaining.rangeEnd
+                  ? new Date(qtechRemaining.rangeEnd).toLocaleString()
+                  : '—'}
+              </Typography>
+            )}
+
+            <Stack direction="row" spacing={1} mb={1.5}>
+              <Button
+                size="small"
+                variant={remainingTab === 'provider' ? 'contained' : 'outlined'}
+                onClick={() => setRemainingTab('provider')}
+                sx={
+                  remainingTab === 'provider'
+                    ? orangeBtnSx
+                    : { textTransform: 'none', borderColor: 'rgba(255,255,255,0.28)' }
+                }
+              >
+                By Provider ({qtechRemaining.byProvider.length})
+              </Button>
+              <Button
+                size="small"
+                variant={remainingTab === 'game' ? 'contained' : 'outlined'}
+                onClick={() => setRemainingTab('game')}
+                sx={
+                  remainingTab === 'game'
+                    ? orangeBtnSx
+                    : { textTransform: 'none', borderColor: 'rgba(255,255,255,0.28)' }
+                }
+              >
+                By Game ({qtechRemaining.byGame.length})
+              </Button>
+            </Stack>
+
+            <CommonTable
+              columns={remainingColumns}
+              rows={remainingRows}
+              getRowKey={(row, i) =>
+                String(row._id || row.id || row.gameId || row.provider || i)
+              }
+              loading={qtechRemainingLoading && remainingRows.length === 0}
+              emptyMessage="No data found"
+              stickyHeader
+              dense
+              minWidth={900}
+              maxHeight={420}
+            />
+          </>
+        )}
+      </Paper>
+
+      <Dialog
+        open={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Qtech Top-up History</DialogTitle>
+        <DialogContent>
+          <CommonTable
+            columns={historyColumns}
+            rows={providers.qtech.records}
+            getRowKey={(row, i) => String(row._id || i)}
+            loading={providers.qtech.loading && providers.qtech.records.length === 0}
+            emptyMessage="No top-up records found"
+            minWidth={640}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryModalOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={addOpen} onClose={closeAddPopup} maxWidth="sm" fullWidth>
         <DialogTitle>
-          Add {addProvider ? toDisplayText(PROVIDER_CONFIG[addProvider].title) : ''} Top-up
+          Add {toDisplayText(PROVIDER_CONFIG.qtech.title)} Top-up
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>

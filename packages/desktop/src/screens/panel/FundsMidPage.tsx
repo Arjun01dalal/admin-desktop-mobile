@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Paper, Typography } from '@mui/material';
+import { Box, Button, Paper, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { getSessionUser, hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { display } from '@/screens/panel/shared';
+import { canShowFundEditBtn } from '@/screens/panel/funds/constants';
+import {
+  FundsEditAccessModal,
+  type FundsEditTarget,
+} from '@/screens/panel/funds/FundsEditAccessModal';
 import {
   clearFundsSelectedMid,
   readFundsDrill,
@@ -14,11 +19,26 @@ import {
   type FundsMidRow,
 } from '@/screens/panel/funds/utils';
 
+const orangeBtnSx = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 700,
+  textTransform: 'none' as const,
+  height: 32,
+  fontSize: 12,
+  px: 1.5,
+  '&:hover': { bgcolor: '#e08c00' },
+};
+
 export function FundsMidPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = getSessionUser();
   const gatewayOnly = hasPermission(Permissions.show_gateway_only);
+  const canEditAccess = canShowFundEditBtn(user?.mobile);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<FundsEditTarget | null>(null);
 
   const drill = useMemo(
     () =>
@@ -77,8 +97,19 @@ export function FundsMidPage() {
     [drill, gatewayOnly, navigate],
   );
 
-  const columns = useMemo<CommonTableColumn<FundsMidRow>[]>(
-    () => [
+  const openEdit = useCallback(
+    (row: FundsMidRow) => {
+      setEditTarget({
+        gatewayName: drill?.name,
+        midName: String(row.mid || ''),
+      });
+      setEditOpen(true);
+    },
+    [drill?.name],
+  );
+
+  const columns = useMemo<CommonTableColumn<FundsMidRow>[]>(() => {
+    const cols: CommonTableColumn<FundsMidRow>[] = [
       {
         id: '#',
         label: (
@@ -147,9 +178,31 @@ export function FundsMidPage() {
         label: 'Company Group',
         render: (row) => display(row.companyGroup),
       },
-    ],
-    [gatewayOnly],
-  );
+    ];
+
+    if (canEditAccess) {
+      cols.push({
+        id: 'updateAccess',
+        label: 'Update Access',
+        width: 120,
+        render: (row) => (
+          <Button
+            size="small"
+            variant="contained"
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(row);
+            }}
+            sx={orangeBtnSx}
+          >
+            Edit
+          </Button>
+        ),
+      });
+    }
+
+    return cols;
+  }, [canEditAccess, gatewayOnly, openEdit]);
 
   if (!drill) {
     return (
@@ -182,8 +235,17 @@ export function FundsMidPage() {
         rows={mids}
         getRowKey={(row, i) => `${row.mid}-${i}`}
         emptyMessage="No MID Data"
-        minWidth={1100}
+        minWidth={canEditAccess ? 1220 : 1100}
         onRowClick={gatewayOnly ? undefined : (row) => openPayin(row)}
+      />
+
+      <FundsEditAccessModal
+        open={editOpen}
+        onClose={() => {
+          setEditOpen(false);
+          setEditTarget(null);
+        }}
+        target={editTarget}
       />
     </Box>
   );

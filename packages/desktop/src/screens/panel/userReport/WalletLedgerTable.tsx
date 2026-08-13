@@ -30,15 +30,16 @@ function rowBg(action?: string): string {
   switch (action) {
     case 'Win':
     case 'Settled':
-      return 'rgba(255, 0, 149, 0.12)';
+      return 'rgba(255, 0, 149, 0.22)';
     case 'Deposit':
-      return '#84d184';
+      // Soft mint on dark table (was solid #84d184 — too harsh on dark theme)
+      return 'rgba(46, 125, 50, 0.55)';
     case 'withdrawal request':
-      return 'rgba(0, 225, 21, 0.2)';
+      return 'rgba(0, 225, 21, 0.31)';
     case 'Bonus Transfer':
-      return 'rgba(255, 255, 0, 0.28)';
+      return 'rgba(255, 255, 0, 0.36)';
     case 'Roll Back':
-      return 'rgba(255, 125, 0, 0.55)';
+      return 'rgba(255, 125, 0, 0.84)';
     default:
       return 'transparent';
   }

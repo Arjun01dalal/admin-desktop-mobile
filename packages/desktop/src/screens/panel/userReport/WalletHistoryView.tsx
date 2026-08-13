@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { secureApi } from '@/api/secureClient';
-import { hasPermission } from '@/auth/permissions';
-import { formatAmount, formatDisplayDate } from '@/utils/dates';
+import { formatAmount, formatLocalDate } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { WalletLedgerTable } from './WalletLedgerTable';
 import type { EncryptedUser } from './types';
@@ -26,15 +25,59 @@ type AvailedBonus = {
 
 const BAZAR_ROWS = ['Regular', 'Starline', 'King Bazar', 'Casino'] as const;
 
+/** Dig through common secure-bridge wrappers to the wallet summary object. */
+function unpackWalletSummary(data: unknown): Record<string, unknown> {
+  let cur: unknown = data;
+  for (let i = 0; i < 4; i += 1) {
+    if (!cur || typeof cur !== 'object' || Array.isArray(cur)) break;
+    const obj = cur as Record<string, unknown>;
+    if (
+      obj.totalDeposit != null ||
+      obj.totalWithdrawal != null ||
+      obj.balance != null ||
+      obj.walletHistory != null
+    ) {
+      return obj;
+    }
+    if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
+      cur = obj.payload;
+      continue;
+    }
+    if (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
+      cur = obj.data;
+      continue;
+    }
+    break;
+  }
+  return cur && typeof cur === 'object' && !Array.isArray(cur)
+    ? (cur as Record<string, unknown>)
+    : {};
+}
+
 function unpackPayload<T>(data: unknown): T | null {
   if (!data || typeof data !== 'object') return null;
-  const rec = data as { payload?: T };
-  return (rec.payload ?? data) as T;
+  const rec = data as { payload?: T; data?: T };
+  return (rec.payload ?? rec.data ?? data) as T;
+}
+
+/** Laxmi `formatDate` — DD-MM-YYYY, but never NaN-NaN-NaN. */
+function formatReportDate(value: unknown): string {
+  return formatLocalDate(value) || '-';
+}
+
+function pickLastActivity(encrypted?: EncryptedUser | null): unknown {
+  if (!encrypted) return null;
+  return (
+    encrypted.activeUser ||
+    encrypted.lastActivity ||
+    encrypted.updatedOn ||
+    encrypted.updatedAt ||
+    null
+  );
 }
 
 /** Wallet History tab — layout mirrors admin-panel WalletHistory.css */
 export function WalletHistoryView({ userId, encrypted }: Props) {
-  const showProfit = hasPermission('show_profit_loss');
   const [loading, setLoading] = useState(true);
   const [depositTotal, setDepositTotal] = useState(0);
   const [withdrawalTotal, setWithdrawalTotal] = useState(0);
@@ -64,18 +107,12 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
       ]);
 
       if (walletRes.ok) {
-        const nested = unpackPayload<{
-          totalDeposit?: number;
-          totalWithdrawal?: number;
-          balance?: number;
-          bonusWalletBalance?: number;
-          pendingWithdrawal?: number;
-        }>(walletRes.data);
-        setDepositTotal(Number(nested?.totalDeposit) || 0);
-        setWithdrawalTotal(Number(nested?.totalWithdrawal) || 0);
-        setBalanceTotal(Math.floor(Number(nested?.balance) || 0));
-        setBonusBalance(Number(nested?.bonusWalletBalance) || 0);
-        setPendingWithdrawal(Number(nested?.pendingWithdrawal) || 0);
+        const nested = unpackWalletSummary(walletRes.data);
+        setDepositTotal(Number(nested.totalDeposit) || 0);
+        setWithdrawalTotal(Number(nested.totalWithdrawal) || 0);
+        setBalanceTotal(Math.floor(Number(nested.balance) || 0));
+        setBonusBalance(Number(nested.bonusWalletBalance) || 0);
+        setPendingWithdrawal(Number(nested.pendingWithdrawal) || 0);
       }
 
       if (bonusRes.ok) {
@@ -109,16 +146,18 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
           justifyContent: 'space-between',
+          alignItems: 'stretch',
           gap: 1.25,
           my: 2.5,
           width: '100%',
         }}
       >
-        {/* Orange bazar stub — ~70% */}
+        {/* Orange bazar stub — ~70% (Laxmi wallet-history-count-box) */}
         <Box
           sx={{
             flex: { md: '1 1 70%' },
             width: { xs: '100%', md: '70%' },
+            minWidth: 0,
             bgcolor: '#FF9A43',
             p: 1.25,
             display: 'flex',
@@ -143,11 +182,12 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
           />
         </Box>
 
-        {/* Stats panel — white + shadow */}
+        {/* Stats panel — white + shadow (Laxmi deposit-withdrawal-container) */}
         <Box
           sx={{
             flex: { md: '1 1 26%' },
             width: { xs: '100%', md: '26%' },
+            minWidth: { md: 260 },
             bgcolor: '#fff',
             p: 1.25,
             boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
@@ -160,65 +200,58 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
             </Stack>
           ) : (
             <Stack spacing={0}>
-              <StatText>{`${toDisplayText('Deposit')}: ${formatAmount(depositTotal)}`}</StatText>
-              <StatText>{`${toDisplayText('Withdraw')}: ${formatAmount(withdrawalTotal)}`}</StatText>
+              <StatText>{`Deposit: ${formatAmount(depositTotal)}`}</StatText>
+              <StatText>{`Withdraw: ${formatAmount(withdrawalTotal)}`}</StatText>
               <StatText>{`Balance: ${formatAmount(balanceTotal)}`}</StatText>
-              <StatText>{`${toDisplayText('Bonus Wallet Balance')}: ${formatAmount(bonusBalance)}`}</StatText>
-              <StatText>{`${toDisplayText('Pending withdrawal')}: ${formatAmount(pendingWithdrawal)}`}</StatText>
-              <StatText>
-                {`Created At: ${formatDisplayDate(encrypted?.createdAt) || '-'}`}
-              </StatText>
-              <StatText>
-                {`Last Activity: ${formatDisplayDate(encrypted?.activeUser) || '-'}`}
-              </StatText>
+              <StatText>{`Bonus Wallet Balance: ${formatAmount(bonusBalance)}`}</StatText>
+              <StatText>{`Pending withdrawal: ${formatAmount(pendingWithdrawal)}`}</StatText>
+              <StatText>{`Created At: ${formatReportDate(encrypted?.createdAt)}`}</StatText>
+              <StatText>{`Last Activity: ${formatReportDate(pickLastActivity(encrypted))}`}</StatText>
 
-              {showProfit && (
-                <>
-                  <Box sx={{ borderTop: '1px solid #000', mt: 1.25, pt: 1.25 }}>
-                    <Typography
-                      sx={{
-                        fontSize: 15,
-                        py: 0.5,
-                        fontWeight: 600,
-                        color: profit < 0 ? 'red' : 'green',
-                      }}
-                    >
-                      {profit < 0 ? 'Loss' : 'Profit'}: {formatAmount(profit)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ borderTop: '1px solid #000', mt: 1.25, pt: 1.25 }}>
-                    <Typography
-                      sx={{
-                        fontSize: 15,
-                        py: 0.5,
-                        fontWeight: 600,
-                        color: profitAfter < 0 ? 'red' : 'green',
-                      }}
-                    >
-                      {toDisplayText(
-                        profitAfter < 0
-                          ? 'Loss After Withdrawal'
-                          : 'Profit After Withdrawal',
-                      )}
-                      : {formatAmount(profitAfter)}
-                    </Typography>
-                  </Box>
-                </>
-              )}
+              <Box sx={{ borderTop: '1px solid #000', mt: 1.25, pt: 1.25 }}>
+                <Typography
+                  sx={{
+                    fontSize: 15,
+                    py: 0.5,
+                    fontWeight: 600,
+                    color: profit < 0 ? 'red' : 'green',
+                  }}
+                >
+                  {profit < 0 ? 'Loss' : 'Profit'}: {formatAmount(profit)}
+                </Typography>
+              </Box>
+              <Box sx={{ borderTop: '1px solid #000', mt: 1.25, pt: 1.25 }}>
+                <Typography
+                  sx={{
+                    fontSize: 15,
+                    py: 0.5,
+                    fontWeight: 600,
+                    color: profitAfter < 0 ? 'red' : 'green',
+                  }}
+                >
+                  {toDisplayText(
+                    profitAfter < 0
+                      ? 'Loss After Withdrawal'
+                      : 'Profit After Withdrawal',
+                  )}
+                  : {formatAmount(profitAfter)}
+                </Typography>
+              </Box>
 
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
-                {toDisplayText('Bonus Earning')} ({bonusData?.userOwnEarningCount ?? 0}) :{' '}
+              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
+                Bonus Earning ({bonusData?.userOwnEarningCount ?? 0}) :{' '}
                 {formatAmount(bonusData?.userOwnEarning ?? 0)}
               </Typography>
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
-                {toDisplayText('Bonus Earning')} ({availedBonus?.count ?? 0}) :{' '}
-                {formatAmount(availedBonus?.totalAmount ?? 0)}
+              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
+                {availedBonus?.totalAmount
+                  ? `Availed Bonus (${availedBonus?.count ?? 0}) : ${formatAmount(availedBonus.totalAmount)}`
+                  : 'Bonus Earning (0) : 0'}
               </Typography>
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
+              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
                 {toDisplayText('Bonus Referral Earning')} ({bonusData?.userReferralCount ?? 0}) :{' '}
                 {formatAmount(bonusData?.userReferral ?? 0)}
               </Typography>
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700 }}>
+              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
                 User Exposure Total Sum : {formatAmount(userExposure)}
               </Typography>
             </Stack>

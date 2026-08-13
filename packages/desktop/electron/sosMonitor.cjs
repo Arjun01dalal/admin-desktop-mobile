@@ -140,11 +140,19 @@ function alertHtmlPath() {
 /**
  * @param {{
  *   getMainWindow: () => import('electron').BrowserWindow | null,
+ *   broadcastSosState?: (payload: { active: boolean }) => void,
+ *   showAllPanelWindows?: () => void,
  *   getToken: () => string | null,
  *   getUserDataPath?: () => string,
  * }} opts
  */
-function startSosMonitor({ getMainWindow, getToken, getUserDataPath }) {
+function startSosMonitor({
+  getMainWindow,
+  broadcastSosState,
+  showAllPanelWindows,
+  getToken,
+  getUserDataPath,
+}) {
   let sosActive = false;
   let acknowledged = false;
   let alertWin = null;
@@ -255,6 +263,13 @@ function startSosMonitor({ getMainWindow, getToken, getUserDataPath }) {
   }
 
   function focusMainWindow() {
+    try {
+      if (typeof showAllPanelWindows === 'function') {
+        showAllPanelWindows();
+      }
+    } catch {
+      // ignore
+    }
     const win = getMainWindow?.();
     if (!win || win.isDestroyed()) return;
     try {
@@ -449,6 +464,10 @@ function startSosMonitor({ getMainWindow, getToken, getUserDataPath }) {
 
   function notifyRenderer() {
     try {
+      if (typeof broadcastSosState === 'function') {
+        broadcastSosState({ active: sosActive });
+        return;
+      }
       const mainWin = typeof getMainWindow === 'function' ? getMainWindow() : null;
       if (mainWin && !mainWin.isDestroyed()) {
         mainWin.webContents.send('sos:state', { active: sosActive });

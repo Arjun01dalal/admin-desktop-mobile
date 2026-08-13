@@ -100,6 +100,7 @@ export const Permissions = {
   show_profit_loss: 'show_profit_loss',
   showCoinButton: 'showCoinButton',
   showRemoveCoin: 'showRemoveCoin',
+  show_back_date: 'show_back_date',
   Register_New_User: 'Register_New_User',
   create_new_user: 'create_new_user',
   user_table: 'user_table',
@@ -114,9 +115,13 @@ export const Permissions = {
   Percentage: 'Percentage',
   New_Deposits: 'New_Deposits',
   Social_Media: 'Social_Media',
+  /** Set Whatsapp Mid page (admin-panel WhatsappMid). */
+  set_whatsapp_limit: 'set_whatsapp_limit',
+  /** AAA Fraud Bet Report (external nodeadmin). */
+  show_aaa_fraud_bets: 'show_aaa_fraud_bets',
+  /** AAA Black Listed Users (external nodeadmin). */
+  show_aaa_blacklist_user: 'show_aaa_blacklist_user',
   caller_leaderboard_tab: 'caller_leaderboard_tab',
-  /** House Krida side nav + page access. */
-  house_game: 'house_game',
   /** Backend typo — must match Responsibilities string */
   state_wise_registartion: 'state_wise_registartion',
 } as const;
@@ -417,6 +422,15 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'View_Casino_Balance',
     'casino_topup',
     'Casino Top-up Balance',
+  ],
+  show_profit_loss: [
+    'show_profit_loss',
+    'Show_Profit_Loss',
+    'showProfitLoss',
+    'Show Profit Loss',
+    'profit_loss',
+    'Profit_Loss',
+    'Profit Loss',
   ],
 };
 

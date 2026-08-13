@@ -5,10 +5,10 @@
  * status chips and comment chips. Non-callers see the bot status table and
  * can add comments (callLogs.updateCallData) by tapping the Comment cell.
  * Row actions (from the row detail sheet): Bot Call (callLogs.addToBotDialer),
- * End Call (callLogs.updateCallData), View Summary (direct POST to the
- * process-call helper, same endpoint the desktop bridge uses) and opening the
- * recording URL. Connect Dialer needs the desktop external-dialer bridge and
- * is shown as a desktop-only note instead.
+ * End Call (callLogs.updateCallData), Connect Dialer (singleCallToDialer),
+ * View Summary (direct POST to the process-call helper, same endpoint the
+ * desktop bridge uses) and opening the recording URL. Add to Dialer sends
+ * selected rows to a campaign via addToDialerBatch (desktop Dialer Call).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -32,6 +32,8 @@ import { getStoredUser } from '../../../lib/webShim';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { formatDdMmYyyy, todayIST } from '../../../utils/dates';
+import { CAMPAIGN_LIST } from '../../../utils/campaignList';
+import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
@@ -91,7 +93,22 @@ const COMMENT_OPTIONS = [
 const MAX_COMMENT_LENGTH = 200;
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
-const MAIN_KEYS = new Set(['sr', 'name', 'status', 'comment']);
+const MAIN_KEYS = new Set(['sel', 'sr', 'name', 'status', 'comment']);
+
+function callLogRowId(row: CallLogRow): string {
+  return String(row.call_sid || row._id || '');
+}
+
+function toDialerLeadSource(row: CallLogRow) {
+  return {
+    _id: String(row.caller_user_id || row._id || ''),
+    name: row.client_name,
+    mobile: row.phone_number,
+    city: row.city,
+    state: row.state,
+    clientName: row.app_name,
+  };
+}
 
 /* ---------- helpers (ported from desktop callLogs/utils.ts) ---------- */
 
@@ -300,6 +317,12 @@ export function CallLogsScreen() {
   const [actionMsg, setActionMsg] = useState('');
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
 
+  const [campaignId, setCampaignId] = useState('');
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [dialerMsg, setDialerMsg] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // Comment modal
   const [commentRow, setCommentRow] = useState<CallLogRow | null>(null);
   const [commentChoice, setCommentChoice] = useState('');
@@ -369,6 +392,7 @@ export function CallLogsScreen() {
         const raw = data.calls || [];
         const next = filterCallsClientSide(raw, selectedStatus, assignedBots);
         setRows(next);
+        setSelectedIds(new Set());
         setTotal(Number(data.pagination?.totalCount ?? next.length));
         setError('');
       }
@@ -432,6 +456,73 @@ export function CallLogsScreen() {
   }, [commentRow, commentChoice, commentText, admin, load]);
 
   /* ---------- row actions (ported from desktop useCallLogsActions) ---------- */
+
+  const toggleSelect = useCallback((row: CallLogRow) => {
+    const id = callLogRowId(row);
+    if (!id) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(callLogRowId(r)));
+
+  const toggleAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (rows.length > 0 && rows.every((r) => prev.has(callLogRowId(r)))) return new Set();
+      return new Set(rows.map(callLogRowId).filter(Boolean));
+    });
+  }, [rows]);
+
+  const addToDialer = useCallback(async () => {
+    setDialerMsg('');
+    if (!campaignId) {
+      setDialerMsg('Campaign should not be empty');
+      return;
+    }
+    const chosen = rows.filter((r) => selectedIds.has(callLogRowId(r)));
+    if (!chosen.length) {
+      setDialerMsg('Select at least one row');
+      return;
+    }
+    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
+    setPushing(true);
+    try {
+      const res = await addToDialerBatch({
+        campaignId,
+        serverId: campaign?.serverId ?? (admin as { serverId?: string } | null)?.serverId,
+        leads: chosen.map(toDialerLeadSource),
+      });
+      setDialerMsg(res.message);
+      if (res.ok) setSelectedIds(new Set());
+    } finally {
+      setPushing(false);
+    }
+  }, [admin, campaignId, rows, selectedIds]);
+
+  const connectDialer = useCallback(
+    async (row: CallLogRow) => {
+      setActionLoading(true);
+      setActionMsg('');
+      try {
+        const res = await singleCallToDialer({
+          lead: toDialerLeadSource(row),
+          extensionId: (admin as { extensionId?: string[] | string } | null)?.extensionId,
+          adminName: typeof (admin as { name?: string } | null)?.name === 'string'
+            ? String((admin as { name?: string }).name)
+            : 'ADMIN',
+          serverId: (admin as { serverId?: unknown } | null)?.serverId,
+        });
+        setActionMsg(res.message);
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [admin],
+  );
 
   const botCall = useCallback(
     async (row: CallLogRow) => {
@@ -524,6 +615,11 @@ export function CallLogsScreen() {
           onPress: () => void botCall(row),
         });
       }
+      actions.push({
+        label: actionLoading ? 'Connecting…' : 'Connect Dialer',
+        disabled: actionLoading,
+        onPress: () => void connectDialer(row),
+      });
     }
     if (!isCaller && status === 'completed' && row.recording_url) {
       actions.push(
@@ -539,7 +635,7 @@ export function CallLogsScreen() {
       );
     }
     return actions;
-  }, [selected, actionLoading, isCaller, botCall, endCall, openRecording, viewSummary]);
+  }, [selected, actionLoading, isCaller, botCall, endCall, connectDialer, openRecording, viewSummary]);
 
   const rowOffset = (page - 1) * pageSize;
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
@@ -547,6 +643,15 @@ export function CallLogsScreen() {
 
   const columns = useMemo<DataTableColumn<CallLogRow>[]>(() => {
     const cols: DataTableColumn<CallLogRow>[] = [
+      {
+        key: 'sel',
+        label: allSelected ? '☑' : '☐',
+        width: 36,
+        render: (r) => (selectedIds.has(callLogRowId(r)) ? '☑' : '☐'),
+        color: (r) => (selectedIds.has(callLogRowId(r)) ? colors.primary : colors.muted),
+        onCellPress: toggleSelect,
+        onHeaderPress: toggleAll,
+      },
       { key: 'sr', label: '#', width: 46, render: (_r, i) => String(rowOffset + i + 1) },
       { key: 'name', label: 'Name', width: 110, render: (r) => String(r.client_name || '—') },
       { key: 'dpId', label: 'DP ID', width: 180, render: (r) => String(r.caller_user_id || '—') },
@@ -637,7 +742,7 @@ export function CallLogsScreen() {
       );
     }
     return cols;
-  }, [rowOffset, isCaller, canShowMobile, openComment]);
+  }, [rowOffset, isCaller, canShowMobile, openComment, allSelected, selectedIds, toggleSelect, toggleAll]);
 
   /** Mobile-friendly bot summary: one card per bot with status count chips. */
   const botCardStats = useCallback((r: BotSummaryRow) => {
@@ -772,6 +877,50 @@ export function CallLogsScreen() {
         ))}
       </View>
 
+      {/* Add to Dialer — desktop Dialer Call: selected rows + campaign */}
+      <TouchableOpacity style={styles.collapseHeader} onPress={() => setDialerOpen((o) => !o)}>
+        <Text style={styles.collapseTitle}>
+          Add to Dialer{campaignId ? ` · ${campaignId}` : ''}
+          {selectedIds.size ? ` · ${selectedIds.size} selected` : ''} {dialerOpen ? '▲' : '▼'}
+        </Text>
+      </TouchableOpacity>
+      {dialerOpen && (
+        <View style={styles.filterCard}>
+          <Text style={styles.filterLabel}>Campaign</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.chipRow}>
+              {CAMPAIGN_LIST.map((c) => {
+                const id = c.id.trim();
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[styles.chip, campaignId === id && styles.chipActive]}
+                    onPress={() => setCampaignId(campaignId === id ? '' : id)}
+                  >
+                    <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
+                      {id} · {c.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+          <Text style={styles.dialerHint}>
+            Tick rows in the table (tap the ☐ cell), pick a campaign, then push.
+          </Text>
+          <TouchableOpacity
+            style={[styles.dialerBtn, (pushing || !selectedIds.size || !campaignId) && styles.btnDisabled]}
+            onPress={() => void addToDialer()}
+            disabled={pushing || !selectedIds.size || !campaignId}
+          >
+            <Text style={styles.searchBtnText}>
+              {pushing ? 'Adding…' : `Add ${selectedIds.size || ''} to Dialer`}
+            </Text>
+          </TouchableOpacity>
+          {dialerMsg ? <Text style={styles.dialerMsg}>{dialerMsg}</Text> : null}
+        </View>
+      )}
+
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
@@ -842,8 +991,8 @@ export function CallLogsScreen() {
             onRowPress={(row) => setSelected({ row, index: rows.indexOf(row) })}
             hint={
               isCaller
-                ? 'Tap a row to see all details'
-                : 'Tap a row for details · Tap a Comment cell to add a comment'
+                ? 'Tap a row to see all details · Tick ☐ to add to dialer'
+                : 'Tap a row for details · Tick ☐ to add to dialer · Tap a Comment cell to add a comment'
             }
           />
 
@@ -878,7 +1027,7 @@ export function CallLogsScreen() {
         fields={
           selected
             ? columns
-                .filter((c) => c.key !== 'sr' && c.key !== 'name')
+                .filter((c) => c.key !== 'sr' && c.key !== 'name' && c.key !== 'sel')
                 .map<SheetField>((c) => {
                   const value = c.render(selected.row, selected.index);
                   const sub = c.subtext?.(selected.row);
@@ -892,32 +1041,43 @@ export function CallLogsScreen() {
             : []
         }
         actions={sheetActions}
-        note={
-          selected ? 'Connect Dialer is available on the desktop app only.' : undefined
-        }
         onClose={() => setSelected(null)}
       />
 
-      {/* Call summary modal (View Summary) */}
+      {/* Call Record modal (View Summary) — Laxmi CallLogModal layout */}
       <Modal visible={summaryData !== null} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Call Summary</Text>
+          <View style={[styles.modalCard, styles.summaryCard]}>
+            <Text style={styles.summaryModalTitle}>Call Record</Text>
             <ScrollView style={styles.summaryScroll} showsVerticalScrollIndicator={false}>
-              {buildSummaryRows(summaryData).map((r) => (
-                <View key={r.title} style={styles.summaryRow}>
-                  <Text style={styles.summaryTitle}>{r.title}</Text>
-                  <Text style={styles.summaryValue} selectable>
-                    {r.value}
-                  </Text>
-                  {r.reason && r.reason !== '-' ? (
-                    <Text style={styles.summaryReason}>{r.reason}</Text>
-                  ) : null}
-                </View>
-              ))}
               {buildSummaryRows(summaryData).length === 0 ? (
                 <Text style={styles.summaryValue}>No summary available.</Text>
-              ) : null}
+              ) : (
+                <View style={styles.summaryTable}>
+                  <View style={[styles.summaryTableRow, styles.summaryTableHead]}>
+                    <Text style={[styles.summaryTh, styles.summaryColAttr]}>Attribute</Text>
+                    <Text style={[styles.summaryTh, styles.summaryColValue]}>Value</Text>
+                    <Text style={[styles.summaryTh, styles.summaryColReason]}>Reason / Details</Text>
+                  </View>
+                  {buildSummaryRows(summaryData).map((r, idx) => (
+                    <View
+                      key={r.title}
+                      style={[
+                        styles.summaryTableRow,
+                        idx % 2 === 0 ? styles.summaryRowEven : styles.summaryRowOdd,
+                      ]}
+                    >
+                      <Text style={[styles.summaryTdAttr, styles.summaryColAttr]}>{r.title}</Text>
+                      <Text style={[styles.summaryTd, styles.summaryColValue]} selectable>
+                        {r.value}
+                      </Text>
+                      <Text style={[styles.summaryTd, styles.summaryColReason]} selectable>
+                        {r.reason || '—'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </ScrollView>
             <View style={styles.filterActions}>
               <TouchableOpacity style={styles.clearBtn} onPress={() => setSummaryData(null)}>
@@ -1071,6 +1231,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  btnDisabled: { opacity: 0.5 },
+  dialerHint: { color: colors.muted, fontSize: 11 },
+  dialerMsg: { color: colors.foreground, fontSize: 12, textAlign: 'center' },
+  dialerBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+  },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -1169,19 +1338,60 @@ const styles = StyleSheet.create({
   modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
   modalSub: { color: colors.muted, fontSize: 12 },
   modalChips: { maxHeight: 220 },
-  summaryScroll: { maxHeight: 420 },
-  summaryRow: {
-    paddingVertical: spacing(2),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    gap: spacing(0.5),
+  summaryScroll: { maxHeight: 480 },
+  summaryCard: {
+    backgroundColor: '#fff',
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
-  summaryTitle: { color: colors.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  summaryValue: { color: colors.foreground, fontSize: 13 },
-  summaryReason: { color: colors.muted, fontSize: 12, fontStyle: 'italic' },
+  summaryModalTitle: {
+    color: '#111',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: spacing(1.5),
+  },
+  summaryTable: {
+    borderWidth: 1,
+    borderColor: '#9e9e9e',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  summaryTableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#9e9e9e',
+  },
+  summaryTableHead: { backgroundColor: 'orange' },
+  summaryRowEven: { backgroundColor: '#fff' },
+  summaryRowOdd: { backgroundColor: '#f5f5f5' },
+  summaryTh: {
+    color: '#000',
+    fontWeight: '800',
+    fontSize: 12,
+    paddingHorizontal: spacing(1),
+    paddingVertical: spacing(1.25),
+  },
+  summaryTdAttr: {
+    color: '#000',
+    fontWeight: '700',
+    fontSize: 12,
+    paddingHorizontal: spacing(1),
+    paddingVertical: spacing(1.25),
+  },
+  summaryTd: {
+    color: '#000',
+    fontSize: 12,
+    paddingHorizontal: spacing(1),
+    paddingVertical: spacing(1.25),
+  },
+  summaryColAttr: { width: '28%' },
+  summaryColValue: { width: '40%' },
+  summaryColReason: { flex: 1 },
+  summaryValue: { color: '#111', fontSize: 13 },
 });
 
-/** Port of desktop buildSummaryRows (IncomingBotCallPage.tsx). */
+/** Port of Laxmi CallLogModal / desktop buildCallRecordRows. */
 function buildSummaryRows(summaryData: CallSummaryData | null): Array<{ title: string; value: string; reason: string }> {
   const raw = summaryData?.data?.analysis ?? summaryData?.data;
   if (!raw || typeof raw !== 'object') return [];
@@ -1195,6 +1405,11 @@ function buildSummaryRows(summaryData: CallSummaryData | null): Array<{ title: s
   const nuisance = flag('nuisance');
   const repeatedComplaint = flag('repeated_complaint');
   const piiDetails = flag('pii_details');
+  const cell = (v: unknown, fallback = '—') => {
+    if (v == null || v === '') return fallback;
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    return String(v);
+  };
   const rows = [
     { title: 'Summary', value: data.summary, reason: '-' },
     { title: 'Transcript', value: summaryData?.data?.transcript || data.transcript, reason: '-' },
@@ -1205,12 +1420,16 @@ function buildSummaryRows(summaryData: CallSummaryData | null): Array<{ title: s
     { title: 'Satisfaction', value: satisfaction.value, reason: satisfaction.reason || 'N/A' },
     { title: 'Nuisance', value: nuisance.value, reason: nuisance.reason },
     { title: 'Repeated Complaint', value: repeatedComplaint.value, reason: repeatedComplaint.reason },
-    { title: 'PII Details', value: piiDetails.detected, reason: piiDetails.types?.join(', ') },
+    {
+      title: 'PII Details',
+      value: piiDetails.detected,
+      reason: piiDetails.types?.length ? piiDetails.types.join(', ') : 'None',
+    },
     { title: 'Next Best Action', value: data.next_best_action, reason: '' },
   ];
   return rows.map((r) => ({
     title: r.title,
-    value: r.value == null || r.value === '' ? '—' : String(r.value),
+    value: cell(r.value),
     reason: r.reason == null || r.reason === '' ? '' : String(r.reason),
   }));
 }

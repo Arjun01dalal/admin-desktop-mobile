@@ -19,6 +19,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -105,6 +106,9 @@ function asPaged<T>(data: unknown): { list: T[]; total: number } {
 }
 
 export function NewDepositsScreen() {
+  const navigation = useNavigation<{
+    navigate: (name: string, params?: Record<string, unknown>) => void;
+  }>();
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
   const [startDate, setStartDate] = useState(todayIST);
@@ -183,7 +187,19 @@ export function NewDepositsScreen() {
         width: 60,
         render: (_r, i) => String((page - 1) * pageSize + i + 1),
       },
-      { key: 'name', label: 'Name', width: 140, render: (r) => display(r.name) },
+      {
+        key: 'name',
+        label: 'Name',
+        width: 140,
+        render: (r) => display(r.name),
+        onCellPress: (r) => {
+          if (!r._id) return;
+          navigation.navigate('/user-report', {
+            userId: String(r._id),
+            userName: String(r.name || ''),
+          });
+        },
+      },
       {
         key: 'mobile',
         label: 'Mobile Phone',
@@ -288,7 +304,7 @@ export function NewDepositsScreen() {
         render: (r) => formatAmount(r.bonusWalletBalance ?? 0),
       },
     ],
-    [page, pageSize, canShowMobile],
+    [page, pageSize, canShowMobile, navigation],
   );
 
   return (

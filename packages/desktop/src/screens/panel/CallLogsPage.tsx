@@ -8,6 +8,11 @@ import {
   DialogTitle,
   MenuItem,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
   Pagination,
@@ -27,7 +32,7 @@ import { useCallLogsQuery } from './callLogs/useCallLogsQuery';
 import { useCallLogsActions } from './callLogs/useCallLogsActions';
 import type { CallLogRow, CallLogsFilterState } from './callLogs/types';
 import { MAX_COMMENT_LENGTH } from './callLogs/types';
-import { isCallLogsCaller } from './callLogs/utils';
+import { buildCallRecordRows, isCallLogsCaller } from './callLogs/utils';
 
 export function CallLogsPage() {
   const admin = getStoredUser<{
@@ -235,6 +240,11 @@ function CallLogsPageBody({
   const [commentText, setCommentText] = useState('');
   const [summaryOpen, setSummaryOpen] = useState(false);
 
+  const summaryRows = useMemo(
+    () => buildCallRecordRows(summaryData),
+    [summaryData],
+  );
+
   const onPageReset = useCallback(() => setPage(1), [setPage]);
 
   const applyFilters = useCallback(() => {
@@ -318,69 +328,81 @@ function CallLogsPageBody({
         minWidth: 0,
         overflowX: 'hidden',
         boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        // Fill panel viewport; bot summary stays compact, logs fill the rest.
+        height: 'calc(100vh - 96px)',
+        minHeight: 480,
       }}
     >
-      <Typography variant="h5" fontWeight={700} mb={2}>
+      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
         Call Logs
       </Typography>
 
-      <CallLogsToolbar
-        startDate={startDate}
-        endDate={endDate}
-        campaignId={campaignId}
-        itemsPerPage={itemsPerPage}
-        total={total}
-        loading={loading}
-        actionLoading={actionLoading}
-        fileRef={fileRef}
-        isCaller={isCaller}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-        onCampaignChange={setCampaignId}
-        onItemsPerPageChange={(value) => {
-          setItemsPerPage(value);
-          setPage(1);
-        }}
-        onApply={applyFilters}
-        onBotCall={() => void botCall()}
-        onDialerCall={() => void dialerCall()}
-        onUpload={(file) => {
-          void onUpload(file).finally(() => {
-            if (fileRef.current) fileRef.current.value = '';
-          });
-        }}
-        onPauseOpen={() => setPauseOpen(true)}
-      />
-
-      {!isCaller && (
-        <BotStatusTable
-          botSummary={botSummary}
+      <Box sx={{ flexShrink: 0 }}>
+        <CallLogsToolbar
+          startDate={startDate}
+          endDate={endDate}
+          campaignId={campaignId}
+          itemsPerPage={itemsPerPage}
+          total={total}
           loading={loading}
           actionLoading={actionLoading}
-          onReinitiateDeleted={reinitiateDeleted}
+          fileRef={fileRef}
+          isCaller={isCaller}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onCampaignChange={setCampaignId}
+          onItemsPerPageChange={(value) => {
+            setItemsPerPage(value);
+            setPage(1);
+          }}
+          onApply={applyFilters}
+          onBotCall={() => void botCall()}
+          onDialerCall={() => void dialerCall()}
+          onUpload={(file) => {
+            void onUpload(file).finally(() => {
+              if (fileRef.current) fileRef.current.value = '';
+            });
+          }}
+          onPauseOpen={() => setPauseOpen(true)}
         />
+      </Box>
+
+      {!isCaller && (
+        <Box sx={{ flexShrink: 0 }}>
+          <BotStatusTable
+            botSummary={botSummary}
+            loading={loading}
+            actionLoading={actionLoading}
+            onReinitiateDeleted={reinitiateDeleted}
+          />
+        </Box>
       )}
 
-      <CallLogsFiltersProvider value={filtersValue}>
-        <CommonTable
-          columns={columns}
-          rows={deferredCalls}
-          getRowKey={(row, i) => String(row.call_sid || row._id || i)}
-          loading={loading}
-          emptyMessage="No call logs"
-          stickyHeader
-          dense
-          virtualize
-          maxHeight="calc(100vh - 360px)"
-        />
-      </CallLogsFiltersProvider>
+      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <CallLogsFiltersProvider value={filtersValue}>
+          <CommonTable
+            columns={columns}
+            rows={deferredCalls}
+            getRowKey={(row, i) => String(row.call_sid || row._id || i)}
+            loading={loading}
+            emptyMessage="No call logs"
+            stickyHeader
+            dense
+            virtualize
+            maxHeight="100%"
+          />
+        </CallLogsFiltersProvider>
+      </Box>
 
-      <Stack alignItems="center" mt={2}>
+      <Stack alignItems="center" mt={1.5} mb={0.5} sx={{ flexShrink: 0 }}>
         <Pagination
           count={Math.max(1, Math.ceil(total / itemsPerPage))}
           page={page}
           onChange={(_e, p) => setPage(p)}
           color="primary"
+          size="small"
         />
       </Stack>
 
@@ -465,19 +487,83 @@ function CallLogsPageBody({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={summaryOpen} onClose={() => setSummaryOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Call Summary</DialogTitle>
-        <DialogContent>
-          <Typography
-            component="pre"
-            variant="body2"
-            sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-          >
-            {JSON.stringify(summaryData, null, 2)}
-          </Typography>
+      <Dialog
+        open={summaryOpen}
+        onClose={() => {
+          setSummaryOpen(false);
+          setSummaryData(null);
+        }}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#fff',
+            color: '#000',
+            borderRadius: 2,
+            maxHeight: '90vh',
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: '#000', pb: 1 }}>
+          Call Record
+        </DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: '#fff' }}>
+          {summaryRows.length === 0 ? (
+            <Typography color="text.secondary">No summary data available.</Typography>
+          ) : (
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table
+                size="small"
+                sx={{
+                  border: '1px solid #9e9e9e',
+                  '& td, & th': {
+                    border: '1px solid #9e9e9e',
+                    color: '#000',
+                    verticalAlign: 'top',
+                    whiteSpace: 'pre-line',
+                  },
+                }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      sx={{ bgcolor: 'orange', fontWeight: 700, color: '#000 !important' }}
+                    >
+                      Attribute
+                    </TableCell>
+                    <TableCell
+                      sx={{ bgcolor: 'orange', fontWeight: 700, color: '#000 !important' }}
+                    >
+                      Value
+                    </TableCell>
+                    <TableCell
+                      sx={{ bgcolor: 'orange', fontWeight: 700, color: '#000 !important' }}
+                    >
+                      Reason / Details
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {summaryRows.map((item, idx) => (
+                    <TableRow
+                      key={item.title}
+                      sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#f5f5f5' }}
+                    >
+                      <TableCell sx={{ fontWeight: 700, width: '22%' }}>
+                        {item.title}
+                      </TableCell>
+                      <TableCell sx={{ width: '40%' }}>{item.value}</TableCell>
+                      <TableCell>{item.reason || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'center', py: 1.5 }}>
           <Button
+            variant="outlined"
             onClick={() => {
               setSummaryOpen(false);
               setSummaryData(null);

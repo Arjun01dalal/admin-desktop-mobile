@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
@@ -80,11 +80,23 @@ function display(value: unknown): string {
 }
 
 export function TodaysActiveScreen() {
+  const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
+
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId) return;
+      navigation.navigate('/user-report', {
+        userId: String(userId),
+        userName: String(userName || ''),
+      });
+    },
+    [navigation],
+  );
 
   const [draftStart, setDraftStart] = useState(initialStart);
   const [draftEnd, setDraftEnd] = useState(initialEnd);
@@ -163,7 +175,13 @@ export function TodaysActiveScreen() {
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const cols: DataTableColumn<Row>[] = [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      { key: 'name', label: 'Name', width: 120, render: (r) => display(r.name) },
+      {
+        key: 'name',
+        label: 'Name',
+        width: 120,
+        render: (r) => display(r.name),
+        onCellPress: (r) => openUserReport(r._id, r.name),
+      },
       { key: 'dpId', label: 'Dp Id', width: 150, render: (r) => display(r._id) },
     ];
     if (!hideContact) {
@@ -228,7 +246,7 @@ export function TodaysActiveScreen() {
       },
     );
     return cols;
-  }, [page, pageSize, hideContact, canShowMobile, appVersions]);
+  }, [page, pageSize, hideContact, canShowMobile, appVersions, openUserReport]);
 
   return (
     <ScrollView
@@ -305,6 +323,21 @@ export function TodaysActiveScreen() {
             : []
         }
         onClose={() => setSelected(null)}
+        actions={
+          selected?._id
+            ? [
+                {
+                  label: 'User Report',
+                  onPress: () => {
+                    const id = selected._id;
+                    const name = selected.name;
+                    setSelected(null);
+                    openUserReport(id, name);
+                  },
+                },
+              ]
+            : undefined
+        }
       />
 
       <View style={styles.pager}>

@@ -103,6 +103,82 @@ export function pickAppName(row: UserRow): unknown {
   return firstDefined(row.clientName, row.appName, row.app_name);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+export function flattenUserRow(row: UserRow): UserRow {
+  const root = asRecord(row);
+  if (!root) return row;
+  const nests = [root._doc, root.user, root.data, root.User]
+    .map(asRecord)
+    .filter((v): v is Record<string, unknown> => Boolean(v));
+  if (!nests.length) return row;
+  let merged: Record<string, unknown> = {};
+  for (const nest of nests) merged = { ...merged, ...nest };
+  return { ...merged, ...root };
+}
+
+function normKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function findByNormKeys(row: Record<string, unknown>, candidates: string[]): unknown {
+  const wanted = new Set(candidates.map(normKey));
+  for (const [key, value] of Object.entries(row)) {
+    if (!wanted.has(normKey(key))) continue;
+    if (!isEmptyValue(value)) return value;
+  }
+  return undefined;
+}
+
+/** Laxmi: `User?.userComesFrom ?? "Company"`. */
+export function pickUserComesFrom(row: UserRow): string {
+  const flat = flattenUserRow(row);
+  const rec = asRecord(flat) || {};
+  const raw = firstDefined(
+    flat.userComesFrom,
+    rec.user_comes_from,
+    rec.comesFrom,
+    rec.userComeFrom,
+    rec.UserComesFrom,
+    findByNormKeys(rec, [
+      'userComesFrom',
+      'user_comes_from',
+      'comesFrom',
+      'userComeFrom',
+      'usercomesfrom',
+    ]),
+  );
+  const text = raw == null ? '' : String(raw).trim();
+  return text || 'Company';
+}
+
+export function pickBalance(row: UserRow): number | null {
+  const flat = flattenUserRow(row);
+  const rec = asRecord(flat) || {};
+  const raw = firstDefined(
+    flat.balance,
+    rec.walletBalance,
+    rec.availableBalance,
+    rec.userBalance,
+    rec.Balance,
+    findByNormKeys(rec, [
+      'balance',
+      'walletBalance',
+      'availableBalance',
+      'userBalance',
+    ]),
+  );
+  if (raw == null) return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  const cleaned = String(raw).replace(/,/g, '').trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function formatAadharAddress(row: UserRow): string {
   const addr = (row.aadharAddress || row.aadhaarAddress || {}) as Record<string, unknown>;
   if (!row.kyc || !Object.keys(addr).length) return '-';

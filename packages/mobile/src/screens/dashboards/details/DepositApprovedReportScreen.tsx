@@ -18,6 +18,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
@@ -111,11 +112,11 @@ function paymentMethod(gw: unknown, mid: unknown): string {
 }
 
 export function DepositApprovedReportScreen() {
+  const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
-  const [allData, setAllData] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [requestType, setRequestType] = useState<RequestType>('automaticDeposit');
@@ -202,10 +203,8 @@ export function DepositApprovedReportScreen() {
         pageNo: page,
         filter,
       };
-      if (!allData) {
-        payload.startDate = startDate || todayIST();
-        payload.endDate = endDate || todayIST();
-      }
+      payload.startDate = startDate || todayIST();
+      payload.endDate = endDate || todayIST();
       const res = await secureApi<unknown>('depositApproved.transactions', payload);
       if (gen !== genRef.current) return;
       if (!res.ok) {
@@ -223,7 +222,7 @@ export function DepositApprovedReportScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [appliedSearch, clientName, gateways, gatewayId, pageSize, page, allData, startDate, endDate]);
+  }, [appliedSearch, clientName, gateways, gatewayId, pageSize, page, startDate, endDate]);
 
   const loadScanner = useCallback(async () => {
     const gen = ++genRef.current;
@@ -234,14 +233,8 @@ export function DepositApprovedReportScreen() {
       const payload: Record<string, unknown> = {};
       if (gateway?.name) payload.paymentGatewayName = gateway.name;
       if (gateway?.mid != null && gateway.mid !== '') payload.mid = gateway.mid;
-      if (allData) {
-        const d = todayIST();
-        payload.startDate = d;
-        payload.endDate = d;
-      } else {
-        payload.startDate = startDate || todayIST();
-        payload.endDate = endDate || todayIST();
-      }
+      payload.startDate = startDate || todayIST();
+      payload.endDate = endDate || todayIST();
       if (clientName) payload.clientName = clientName;
       const res = await secureApi<unknown>('depositApproved.scannerData', payload);
       if (gen !== genRef.current) return;
@@ -263,7 +256,7 @@ export function DepositApprovedReportScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [gateways, gatewayId, selectedGateway, allData, startDate, endDate, clientName]);
+  }, [gateways, gatewayId, selectedGateway, startDate, endDate, clientName]);
 
   const loadApprovedSum = useCallback(async () => {
     const gen = ++sumGenRef.current;
@@ -274,8 +267,8 @@ export function DepositApprovedReportScreen() {
       return;
     }
     try {
-      const start = allData ? todayIST() : startDate || todayIST();
-      const end = allData ? todayIST() : endDate || todayIST();
+      const start = startDate || todayIST();
+      const end = endDate || todayIST();
       const res = await secureApi<unknown>('depositApproved.approvedSum', {
         depositType: requestType,
         mid,
@@ -292,7 +285,7 @@ export function DepositApprovedReportScreen() {
     } catch {
       /* ignore */
     }
-  }, [gateways, gatewayId, selectedGateway, allData, startDate, endDate, requestType]);
+  }, [gateways, gatewayId, selectedGateway, startDate, endDate, requestType]);
 
   useEffect(() => {
     void loadGateways();
@@ -308,11 +301,21 @@ export function DepositApprovedReportScreen() {
   }, [loadApprovedSum]);
 
   const applyDates = useCallback(() => {
-    setAllData(false);
     setStartDate(draftStart);
     setEndDate(draftEnd);
     setPage(1);
   }, [draftStart, draftEnd]);
+
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId) return;
+      navigation.navigate('/user-report', {
+        userId: String(userId),
+        userName: String(userName || ''),
+      });
+    },
+    [navigation],
+  );
 
   const search = useCallback(() => {
     setAppliedSearch(draftSearch);
@@ -331,7 +334,13 @@ export function DepositApprovedReportScreen() {
   const depositColumns = useMemo<DataTableColumn<DepositRow>[]>(
     () => [
       { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      { key: 'userName', label: 'User Name', width: dw.userName, render: (r) => display(r.userName) },
+      {
+        key: 'userName',
+        label: 'User Name',
+        width: dw.userName,
+        render: (r) => display(r.userName),
+        onCellPress: (r) => openUserReport(r.userId, r.userName),
+      },
       { key: 'userId', label: 'DP Id', width: 180, render: (r) => display(r.userId) },
       { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
       { key: 'amount', label: 'Amount', width: dw.amount, align: 'right', render: (r) => formatIN(r.amount) },
@@ -349,13 +358,19 @@ export function DepositApprovedReportScreen() {
       { key: 'reason', label: 'Rejected Reason', width: 150, render: (r) => display(r.reason) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, pageSize, availableWidth],
+    [page, pageSize, availableWidth, openUserReport],
   );
 
   const scannerColumns = useMemo<DataTableColumn<ScannerRow>[]>(
     () => [
       { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
-      { key: 'userName', label: 'User Name', width: sw.userName, render: (r) => display(r.userName) },
+      {
+        key: 'userName',
+        label: 'User Name',
+        width: sw.userName,
+        render: (r) => display(r.userName),
+        onCellPress: (r) => openUserReport(r.userId, r.userName),
+      },
       { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
       { key: 'balance', label: 'Balance', width: sw.balance, align: 'right', render: (r) => formatIN(r.balance) },
       { key: 'state', label: 'State', width: 130, render: (r) => display(r.state) },
@@ -386,7 +401,7 @@ export function DepositApprovedReportScreen() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availableWidth],
+    [availableWidth, openUserReport],
   );
 
   const depositSheetFields = useMemo<SheetField[]>(() => {
@@ -430,7 +445,7 @@ export function DepositApprovedReportScreen() {
     >
       <Text style={styles.title}>Deposit Approved Report</Text>
       <Text style={styles.sub}>
-        {allData ? 'All data' : `${startDate} → ${endDate}`} · Total:{' '}
+        {`${startDate} → ${endDate}`} · Total:{' '}
         {(isScanner ? scannerRows.length : total).toLocaleString('en-IN')}
       </Text>
 
@@ -475,15 +490,6 @@ export function DepositApprovedReportScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity
-          style={[styles.chip, allData && styles.chipActive]}
-          onPress={() => {
-            setAllData((prev) => !prev);
-            setPage(1);
-          }}
-        >
-          <Text style={[styles.chipText, allData && styles.chipTextActive]}>All Data</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
@@ -582,12 +588,42 @@ export function DepositApprovedReportScreen() {
         title={depositSheet ? display(depositSheet.userName) : ''}
         fields={depositSheetFields}
         onClose={() => setDepositSheet(null)}
+        actions={
+          depositSheet?.userId
+            ? [
+                {
+                  label: 'User Report',
+                  onPress: () => {
+                    const id = depositSheet.userId;
+                    const name = depositSheet.userName;
+                    setDepositSheet(null);
+                    openUserReport(id, name);
+                  },
+                },
+              ]
+            : undefined
+        }
       />
       <RowDetailSheet
         visible={scannerSheet !== null}
         title={scannerSheet ? display(scannerSheet.userName) : ''}
         fields={scannerSheetFields}
         onClose={() => setScannerSheet(null)}
+        actions={
+          scannerSheet?.userId
+            ? [
+                {
+                  label: 'User Report',
+                  onPress: () => {
+                    const id = scannerSheet.userId;
+                    const name = scannerSheet.userName;
+                    setScannerSheet(null);
+                    openUserReport(id, name);
+                  },
+                },
+              ]
+            : undefined
+        }
       />
     </ScrollView>
   );

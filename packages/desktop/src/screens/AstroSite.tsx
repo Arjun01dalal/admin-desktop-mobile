@@ -72,12 +72,6 @@ export function AstroSite({ onOpenLogin: _onOpenLogin }: Props) {
           <Typography variant="h6" fontWeight={700}>
             Loading Astro Admin…
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Opening{' '}
-            <Box component="span" sx={{ color: '#ff9f0a' }}>
-              astrotalk.vip
-            </Box>
-          </Typography>
         </Stack>
       </Box>
 
