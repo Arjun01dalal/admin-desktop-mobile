@@ -22,6 +22,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { type SearchFieldOption } from './DetailFilterBar';
 import { TextInput } from 'react-native';
+import { pickPageSizes } from '@astro/shared';
 
 type PLRow = {
   _id?: string;
@@ -42,7 +43,7 @@ const SEARCH_BAR_FIELDS: readonly SearchFieldOption[] = [
   { key: 'mobile', label: 'Mobile' },
 ];
 
-const PAGE_SIZES = [10, 25, 50, 75, 100];
+const PAGE_SIZES = pickPageSizes([10, 25, 50, 75, 100]);
 
 function fmt(value: unknown): string {
   const n = Number(value ?? 0);

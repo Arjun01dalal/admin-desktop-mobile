@@ -1,9 +1,11 @@
+import { pickPageSizes } from '@astro/shared/pagination';
 import type { UserType } from './constants';
 import type { UserRow } from './utils';
 
-export const USERS_PAGE_SIZE_OPTIONS = [
-  10, 25, 50, 75, 100, 250, 500, 10000,
-] as const;
+/** Shared sizes + Users-only extras (250 / 10000). */
+export const USERS_PAGE_SIZE_OPTIONS = Array.from(
+  new Set([...pickPageSizes([10, 25, 50, 75, 100, 500]), 250, 10000]),
+).sort((a, b) => a - b);
 
 export function reasonForUserType(type: UserType): string {
   switch (type) {

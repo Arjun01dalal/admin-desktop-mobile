@@ -19,6 +19,11 @@ import {
   View,
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
+import {
+  USER_TYPES,
+  CALLER_HIDDEN_USER_TYPES,
+  type UserType,
+} from '@astro/shared/userTypes';
 import { colors, radius, spacing } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../dashboards/ui/DataTable';
@@ -56,20 +61,8 @@ function reasonForUserType(type: UserType): string {
 
 /* ---------------------------------- types --------------------------------- */
 
-const USER_TYPES = [
-  'User',
-  'Sub_Admin',
-  'Todays_Active',
-  'Active_User',
-  'Non_Performing_User',
-  'In_Active_Deposit',
-  'Non_Performing_Active_User',
-  'LAXMI_999_Users',
-] as const;
-type UserType = (typeof USER_TYPES)[number];
-
 /** Callers: hide Todays_Active / Active_User / LAXMI_999 (desktop parity). */
-const CALLER_HIDDEN: UserType[] = ['Todays_Active', 'Active_User', 'LAXMI_999_Users'];
+const CALLER_HIDDEN: UserType[] = [...CALLER_HIDDEN_USER_TYPES];
 
 const TYPE_ACTION: Record<UserType, string> = {
   User: 'users.getAll',

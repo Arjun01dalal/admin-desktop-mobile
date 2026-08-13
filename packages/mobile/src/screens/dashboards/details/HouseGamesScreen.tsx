@@ -23,6 +23,7 @@ import { monthStartIST, todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { pickPageSizes } from '@astro/shared';
 
 type TxnRow = {
   _id?: string;
@@ -51,7 +52,7 @@ type TxnRow = {
   updatedAt?: string;
 };
 
-const ITEMS_PER_PAGE_OPTIONS = [50, 100, 200, 500];
+const ITEMS_PER_PAGE_OPTIONS = pickPageSizes([50, 100, 200, 500]);
 
 /** Same shape as desktop INITIAL_FILTERS. */
 const INITIAL_FILTERS = {

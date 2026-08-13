@@ -21,7 +21,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { asPaged, unpackPayload } from '@astro/shared';
+import { pickPageSizes, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -65,7 +65,7 @@ type FundRow = {
   updatedAt?: string | number;
 };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'amount', 'status']);
 
 const ACTION_BY_TYPE: Record<NavType, string> = {

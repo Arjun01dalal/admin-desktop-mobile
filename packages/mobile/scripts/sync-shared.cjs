@@ -1,11 +1,11 @@
 /**
- * Sync shared logic from the desktop app into the mobile app.
- * Run from repo root or mobile/: `node mobile/scripts/sync-shared.cjs`
+ * Sync shared artifacts into the mobile app.
+ * Run from repo root or mobile/: `node packages/mobile/scripts/sync-shared.cjs`
  *
  * - electron/secure/registry.cjs  -> mobile/src/api/registry.generated.ts
- * - src/auth/permissions.ts       -> mobile/src/auth/permissions.ts (imports rewritten)
- * - src/layout/navItems.ts        -> mobile/src/navigation/navItems.ts (imports rewritten)
- * - callerResponsibility/constants.ts -> mobile/src/auth/callerRoles.ts
+ * - desktop navItems.ts          -> mobile/src/navigation/navItems.ts
+ *
+ * Permissions + caller roles live in @astro/shared (import directly — do not copy).
  */
 const fs = require('fs');
 const path = require('path');
@@ -47,37 +47,7 @@ export type SecureAction = keyof typeof REGISTRY;
 `,
 );
 
-// 2) Caller role constants
-const caller = fs.readFileSync(
-  path.join(ROOT, 'packages/desktop/src/screens/panel/callerResponsibility/constants.ts'),
-  'utf8',
-);
-write(
-  'src/auth/callerRoles.ts',
-  `/* AUTO-GENERATED from src/screens/panel/callerResponsibility/constants.ts — do not edit. */\n${caller}`,
-);
-
-// 3) permissions.ts (rewrite imports to mobile equivalents)
-let perms = fs.readFileSync(path.join(ROOT, 'packages/desktop/src/auth/permissions.ts'), 'utf8');
-perms = perms
-  .replace(
-    "import { getStoredUser } from '@/utils/dates';",
-    "import { getStoredUser } from '../lib/webShim';",
-  )
-  .replace(
-    "import type { AuthUser } from '@/types/gcalc';",
-    "import type { AuthUser } from '../types/auth';",
-  )
-  .replace(
-    /from '@\/screens\/panel\/callerResponsibility\/constants';/,
-    "from './callerRoles';",
-  );
-write(
-  'src/auth/permissions.ts',
-  `/* AUTO-GENERATED from src/auth/permissions.ts — do not edit. Run mobile/scripts/sync-shared.cjs */\n${perms}`,
-);
-
-// 4) navItems.ts
+// 2) navItems.ts (permissions import stays on mobile auth adapter)
 let nav = fs.readFileSync(path.join(ROOT, 'packages/desktop/src/layout/navItems.ts'), 'utf8');
 nav = nav
   .replace(
@@ -93,4 +63,4 @@ write(
   `/* AUTO-GENERATED from src/layout/navItems.ts — do not edit. Run mobile/scripts/sync-shared.cjs */\n${nav}`,
 );
 
-console.log('sync complete');
+console.log('sync complete (permissions/callerRoles → @astro/shared)');

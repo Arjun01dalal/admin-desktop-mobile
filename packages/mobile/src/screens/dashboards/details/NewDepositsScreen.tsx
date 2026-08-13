@@ -28,6 +28,7 @@ import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { pickPageSizes } from '@astro/shared';
 
 type Row = {
   _id?: string;
@@ -62,7 +63,7 @@ type Row = {
 type Filters = { name: string; mobile: string };
 
 const EMPTY_FILTERS: Filters = { name: '', mobile: '' };
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200] as const;
+const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
 const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'balance']);
 
 function display(value: unknown): string {

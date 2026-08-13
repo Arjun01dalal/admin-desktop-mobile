@@ -21,11 +21,5 @@ export {
   displayApiValue,
 } from './jyotishMapping';
 
-/** VIP dashboard app list (hardcoded in VipDashboard.tsx). */
-export const VIP_CLIENT_NAMES = [
-  'GOLDEXCHANGE',
-  'BETCLUB247',
-  'GOLD247',
-  'STAR247',
-  'FAIRBETS',
-] as const;
+/** VIP dashboard app list — shared with mobile. */
+export { VIP_CLIENT_NAMES } from '@astro/shared/vipClients';

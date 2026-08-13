@@ -55,6 +55,7 @@ import {
   type FundRequestCoinSummary,
   type BonusWalletSummary,
 } from '@/screens/panel/transactions/shared';
+import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 
 type DrillType = 'deposit' | 'withdrawal';
 
@@ -95,7 +96,6 @@ type ColumnFilters = {
 };
 
 const EMPTY_FILTERS: ColumnFilters = { status: '', userName: '', amount: '', clientName: '' };
-const DEFAULT_ITEMS_PER_PAGE = 10;
 
 function dateField(label: string, value: string, onChange: (v: string) => void) {
   return (

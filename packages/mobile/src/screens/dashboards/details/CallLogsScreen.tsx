@@ -24,7 +24,11 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { appCodeForName } from '@astro/shared';
+import { appCodeForName, pickPageSizes } from '@astro/shared';
+import {
+  CALL_STATUS_OPTIONS,
+  COMMENT_FILTER_OPTIONS,
+} from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS, RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
@@ -61,35 +65,9 @@ type CallLogRow = Record<string, unknown> & {
   reason?: string;
 };
 
-const PAGE_SIZES = [50, 100, 200, 500];
-const STATUS_OPTIONS = ['All', 'completed', 'no-answer', 'Not Received'] as const;
-const COMMENT_OPTIONS = [
-  'Call Back',
-  'Call Disconnect',
-  'Do Not Call',
-  'Finance Issue',
-  'Interested',
-  'Link Send',
-  'Not Getting Time',
-  'Not Interested',
-  'Not Responding',
-  'Call Received By Another Person',
-  'Number Busy',
-  'Out of Network',
-  'Out of Service',
-  'Play After Some Time',
-  'Player Busy',
-  'Player Not Avaliable',
-  'Playing Customer',
-  'Playing in Another App',
-  'Switch Off',
-  'Invalid Number',
-  'Not Answer',
-  'Money Issue',
-  'Demo User',
-  'User Block',
-  'Call Transfer',
-] as const;
+const PAGE_SIZES = pickPageSizes([50, 100, 200, 500]);
+const STATUS_OPTIONS = CALL_STATUS_OPTIONS;
+const COMMENT_OPTIONS = COMMENT_FILTER_OPTIONS.filter((c) => c !== 'All');
 const MAX_COMMENT_LENGTH = 200;
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */

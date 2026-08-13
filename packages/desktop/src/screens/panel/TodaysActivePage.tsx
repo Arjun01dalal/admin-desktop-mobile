@@ -17,6 +17,7 @@ import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { PLAY_IN_CODES } from '@astro/shared/botIds';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import {
   useReportQuery,
@@ -65,11 +66,7 @@ const EMPTY_FILTERS: Filters = {
   state: '',
 };
 
-const PLAY_IN_OPTIONS = [
-  { value: 'E', label: 'E' },
-  { value: 'C', label: 'C' },
-  { value: 'S', label: 'S' },
-];
+const PLAY_IN_OPTIONS = PLAY_IN_CODES.map((value) => ({ value, label: value }));
 
 const filterFieldSx = {
   minWidth: 120,

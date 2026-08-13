@@ -9,15 +9,15 @@ export default defineConfig({
   base: './',
   resolve: {
     // More specific aliases MUST come first — otherwise `@astro/shared`
-    // steals `@astro/shared/api` and resolution fails.
+    // steals `@astro/shared/permissions` (etc.) and resolution fails.
     alias: [
       {
-        find: '@astro/shared/api',
+        find: /^@astro\/shared\/api$/,
         replacement: path.join(sharedSrc, 'api/index.ts'),
       },
       {
-        find: '@astro/shared/clientNames',
-        replacement: path.join(sharedSrc, 'clientNames.ts'),
+        find: /^@astro\/shared\/(.+)$/,
+        replacement: path.join(sharedSrc, '$1.ts'),
       },
       {
         find: '@astro/shared',

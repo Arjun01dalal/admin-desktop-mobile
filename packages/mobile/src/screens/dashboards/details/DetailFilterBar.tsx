@@ -14,14 +14,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { CLIENT_NAMES, appCodeForName } from '@astro/shared';
+import { CLIENT_NAMES, appCodeForName, pickPageSizes } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DateField } from '../../../components/DateField';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Mirrors desktop ITEMS_PER_PAGE_OPTIONS (subset that makes sense on mobile). */
-export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200] as const;
+/** Mobile page-size chips — shared pagination, compact subset for small screens. */
+export const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
+
 
 /** One search field option; `key` is sent as the server-side filter key (mirrors desktop). */
 export type SearchFieldOption = { key: string; label: string };

@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { appCodeForName, asPaged } from '@astro/shared';
+import { pickPageSizes, appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
@@ -52,7 +52,7 @@ const TYPE_OPTIONS = [
   'active_by_bot',
 ] as const;
 
-const PAGE_SIZES = [10, 25, 50, 100, 200, 500] as const;
+const PAGE_SIZES = pickPageSizes([10, 25, 50, 100, 200, 500]);
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
 const MAIN_KEYS = new Set(['sel', 'sr', 'name', 'botId', 'balance']);

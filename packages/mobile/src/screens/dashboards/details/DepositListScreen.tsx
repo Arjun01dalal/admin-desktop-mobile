@@ -32,6 +32,7 @@ import { getSessionUser, hasPermission, Permissions } from '../../../auth/permis
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { DateField } from '../../../components/DateField';
+import { pickPageSizes } from '@astro/shared';
 
 type MidTotal = { mid?: string; amount?: number | string; count?: number | string };
 
@@ -51,7 +52,7 @@ type DepositListRow = {
   approvedWithdrawalAmountByMid?: MidTotal[];
 };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 
 const SEARCH_FIELDS: { key: keyof SearchState; label: string; placeholder: string }[] = [
   { key: 'name', label: 'Name', placeholder: 'Search by Name' },

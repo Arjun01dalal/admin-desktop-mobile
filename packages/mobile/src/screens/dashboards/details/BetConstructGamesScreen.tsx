@@ -24,6 +24,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { pickPageSizes } from '@astro/shared';
 
 type Row = {
   _id?: string;
@@ -44,7 +45,7 @@ type Row = {
   [key: string]: unknown;
 };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100]);
 const MAIN_KEYS = new Set(['idx', 'name', 'category', 'status']);
 
 function display(value: unknown): string {

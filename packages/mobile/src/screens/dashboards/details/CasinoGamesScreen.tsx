@@ -21,6 +21,7 @@ import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { pickPageSizes } from '@astro/shared';
 
 type Row = {
   _id?: string;
@@ -42,7 +43,7 @@ type Row = {
 
 type Provider = 'QTECH' | 'WACS';
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
 const GAME_CATEGORIES = [
   'Andar Bahar',
   'Roulette',

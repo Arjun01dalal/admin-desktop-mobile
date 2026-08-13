@@ -23,6 +23,12 @@ import { getStoredUser } from '../../../lib/webShim';
 import { todayIST } from '../../../utils/dates';
 import { mapUsersToBotSettings } from '../../../utils/dialerHelpers';
 import { DateField } from '../../../components/DateField';
+import {
+  BOT_DATA_BOT_IDS,
+  PLAY_IN_CODES,
+  INDIA_STATES,
+  BOT_DATA_USER_TYPE_OPTIONS,
+} from '@astro/shared';
 
 type BotUser = {
   _id?: string;
@@ -35,64 +41,10 @@ type BotUser = {
   activeUser?: string;
 };
 
-const USER_TYPES = [
-  { value: 'User', label: 'User' },
-  { value: 'Todays_Active', label: "Today's Active" },
-  { value: 'Active_User', label: 'Active User' },
-  { value: 'Non_Performing_User', label: 'Non Performing User' },
-  { value: 'In_Active_Deposit', label: 'Inactive Deposit' },
-] as const;
+const USER_TYPES = BOT_DATA_USER_TYPE_OPTIONS;
 
-const PLAY_IN_OPTIONS = ['C', 'E', 'S'] as const;
-
-/** Curated Bot IDs (admin-panel-domains `BOT_ID`). */
-const BOT_ID_OPTIONS = [
-  '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
-  '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
-  '21', '22', '23', '24', '31', '33', '34', '39', '46', '47',
-  '55', '56', '63', '64', '65', '69', '73', '74', '84', '85',
-  '86', '92', '97', '104', '105', '106', '114', '126',
-];
-
-/** Mirrors desktop INDIA_STATES (users/constants). */
-const INDIA_STATES = [
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jharkhand',
-  'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal',
-  'Delhi',
-  'Jammu and Kashmir',
-  'Ladakh',
-  'Puducherry',
-  'Chandigarh',
-  'Andaman and Nicobar Islands',
-  'Dadra and Nagar Haveli and Daman and Diu',
-  'Lakshadweep',
-] as const;
+const PLAY_IN_OPTIONS = PLAY_IN_CODES;
+const BOT_ID_OPTIONS = BOT_DATA_BOT_IDS;
 
 function asBotMap(raw: unknown): Record<string, BotUser[]> {
   if (!raw || typeof raw !== 'object') return {};

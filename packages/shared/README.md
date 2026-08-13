@@ -7,6 +7,8 @@ Safe shared code for Astro **desktop** and **mobile**.
 ```text
 src/
   clientNames.ts     # app / client codes
+  permissions.ts     # Permissions enum + hasPermission / nav / SOS helpers
+  callerRoles.ts     # Caller Role_ID sets (shared with permissions)
   api/
     types.ts         # ApiResult, ApiTransport
     actions.ts       # shared action name constants
@@ -14,6 +16,20 @@ src/
     sos.ts           # isSosFlagEnabled, getSosBlock
     createApi.ts     # createAstroApi(transport) — business ops once
 ```
+
+## Permissions (desktop + mobile)
+
+```ts
+// Edit once:
+//   packages/shared/src/permissions.ts
+
+// Desktop / mobile thin adapters (session storage only):
+import { Permissions, hasPermission } from '@/auth/permissions'; // desktop
+import { Permissions, hasPermission } from '../auth/permissions'; // mobile
+```
+
+Platform adapters in `packages/desktop|mobile/src/auth/permissions.ts` only wire
+`localStorage` / session user. Do **not** copy permissions via `sync-shared`.
 
 ## Pattern (no duplicated business logic)
 

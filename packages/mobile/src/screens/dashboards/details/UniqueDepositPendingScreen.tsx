@@ -30,7 +30,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { appCodeForName, asPaged, unpackPayload } from '@astro/shared';
+import { pickPageSizes, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -61,7 +61,7 @@ type UniquePendingRow = {
   uniquePendingReason?: { reason?: string; name?: string; _id?: string };
 };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 const MAIN_KEYS = new Set(['idx', 'userName', 'amount', 'status']);
 
 function display(value: unknown): string {

@@ -1,5 +1,6 @@
 /** Shared helpers for Deposit / Withdrawal / Fund Request pages. */
 
+import { ITEMS_PER_PAGE_OPTIONS } from '@astro/shared/pagination';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 export const orangeBtnSx = {
@@ -93,14 +94,12 @@ export const WITHDRAWAL_STATUSES = [
   'on hold',
 ] as const;
 
+/** Shared sizes + fund/deposit drill-down extras. */
 export const PAGE_SIZE_OPTIONS = [
-  '10',
-  '25',
-  '50',
-  '75',
-  '100',
+  ...ITEMS_PER_PAGE_OPTIONS.filter((n) =>
+    ['10', '25', '50', '75', '100', '500'].includes(n),
+  ),
   '300',
-  '500',
   '1000',
   '5000',
   '10000',

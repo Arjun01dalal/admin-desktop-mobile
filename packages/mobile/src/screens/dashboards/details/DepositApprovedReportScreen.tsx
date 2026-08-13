@@ -21,7 +21,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
+import { pickPageSizes, appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -84,7 +84,7 @@ type ScannerRow = {
 
 type GatewayOption = { _id: string; name?: string; mid?: string | number };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 const DEPOSIT_MAIN = new Set(['idx', 'userName', 'amount', 'status']);
 const SCANNER_MAIN = new Set(['idx', 'userName', 'balance', 'reason']);
 

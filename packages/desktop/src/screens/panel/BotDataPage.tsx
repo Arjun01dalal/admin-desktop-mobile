@@ -17,6 +17,7 @@ import {
   BOT_DATA_BOT_IDS,
   PLAY_IN_OPTIONS,
 } from '@/screens/panel/botData/constants';
+import { BOT_DATA_USER_TYPE_OPTIONS } from '@astro/shared/userTypes';
 import { pushToBotDialer } from '@/screens/panel/shared/pushToBotDialer';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { mapUsersToBotSettings } from '@/screens/panel/users/toolbarHelpers';
@@ -32,13 +33,7 @@ type BotUser = {
   activeUser?: string;
 };
 
-const USER_TYPES = [
-  { value: 'User', label: 'User' },
-  { value: 'Todays_Active', label: "Today's Active" },
-  { value: 'Active_User', label: 'Active User' },
-  { value: 'Non_Performing_User', label: 'Non Performing User' },
-  { value: 'In_Active_Deposit', label: 'Inactive Deposit' },
-] as const;
+const USER_TYPES = BOT_DATA_USER_TYPE_OPTIONS;
 
 const orangeBtnSx = {
   bgcolor: '#ff9f0a',

@@ -19,7 +19,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { CLIENT_NAMES, asPaged } from '@astro/shared';
+import { pickPageSizes, CLIENT_NAMES, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -65,7 +65,7 @@ type Gateway = { _id?: string; name?: string; mid?: string };
 
 type Tab = 'notifications' | 'requests';
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100]);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';

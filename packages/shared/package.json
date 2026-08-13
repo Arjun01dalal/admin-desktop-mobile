@@ -9,7 +9,16 @@
   "exports": {
     ".": "./src/index.ts",
     "./clientNames": "./src/clientNames.ts",
-    "./api": "./src/api/index.ts"
+    "./api": "./src/api/index.ts",
+    "./permissions": "./src/permissions.ts",
+    "./callerRoles": "./src/callerRoles.ts",
+    "./campaignList": "./src/campaignList.ts",
+    "./botIds": "./src/botIds.ts",
+    "./pagination": "./src/pagination.ts",
+    "./vipClients": "./src/vipClients.ts",
+    "./userTypes": "./src/userTypes.ts",
+    "./callLogs": "./src/callLogs.ts",
+    "./states": "./src/states.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

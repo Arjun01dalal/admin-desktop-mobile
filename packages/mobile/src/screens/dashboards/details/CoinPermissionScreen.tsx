@@ -25,7 +25,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { asPaged, CLIENT_NAMES } from '@astro/shared';
+import { pickPageSizes, asPaged, CLIENT_NAMES } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -49,7 +49,7 @@ type Row = {
   [key: string]: unknown;
 };
 
-const PAGE_SIZE_OPTIONS = [20, 25, 50, 75, 100];
+const PAGE_SIZE_OPTIONS = pickPageSizes([20, 25, 50, 75, 100]);
 // Same Role_ID allowlist the web panel uses for the Edit Apps "Add" button.
 const EDIT_APPS_ADD_ROLE_IDS = new Set([
   '6a33c137a6558491e0d20464',

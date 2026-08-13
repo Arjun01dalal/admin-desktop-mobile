@@ -4,13 +4,7 @@ import { PROVIDER_FILTERS as JYOTISH_PROVIDER_FILTERS } from './jyotish/jyotishM
 /** Provider filter options — Jyotish UI names (same values used for filtering). */
 export const PROVIDER_FILTERS: ProviderFilter[] = [...JYOTISH_PROVIDER_FILTERS];
 
-/** VIP dashboard app list (hardcoded in VipDashboard.tsx). */
-export const VIP_CLIENT_NAMES = [
-  'GOLDEXCHANGE',
-  'BETCLUB247',
-  'GOLD247',
-  'STAR247',
-  'FAIRBETS',
-] as const;
+/** VIP dashboard app list — shared with desktop. */
+export { VIP_CLIENT_NAMES } from '@astro/shared/vipClients';
 
 export { metricJyotishLabel } from './jyotish/jyotishMapping';

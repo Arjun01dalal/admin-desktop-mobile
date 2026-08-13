@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { appCodeForName, asPaged } from '@astro/shared';
+import { pickPageSizes, appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -47,7 +47,7 @@ type Row = {
   [key: string]: unknown;
 };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 const MAIN_KEYS = new Set(['idx', 'name', 'dpId', 'mobile', 'balance']);
 
 const SEARCH_FIELDS: readonly SearchFieldOption[] = [
