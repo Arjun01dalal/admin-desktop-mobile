@@ -527,6 +527,33 @@ function destroySiteView(rec) {
 /** Last email/mobile typed on the Astro marketing site (for prefill). */
 let cachedSiteIdentity = { email: '', mobile: '' };
 
+function siteIdentityPath() {
+  return path.join(app.getPath('userData'), 'astro-site-identity.json');
+}
+
+function loadPersistedSiteIdentity() {
+  try {
+    const raw = fs.readFileSync(siteIdentityPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    cachedSiteIdentity = normalizeSiteIdentity(parsed);
+  } catch {
+    // first run / corrupt — keep empty
+  }
+}
+
+function persistSiteIdentityToDisk() {
+  if (!cachedSiteIdentity.email && !cachedSiteIdentity.mobile) return;
+  try {
+    fs.writeFileSync(
+      siteIdentityPath(),
+      JSON.stringify(cachedSiteIdentity),
+      'utf8',
+    );
+  } catch {
+    // ignore disk errors
+  }
+}
+
 function normalizeSiteIdentity(payload) {
   const src = payload && typeof payload === 'object' ? payload : {};
   const email = String(src.email || '').trim().slice(0, 200);
@@ -548,6 +575,7 @@ function rememberSiteIdentity(payload) {
     email: next.email || cachedSiteIdentity.email || '',
     mobile: next.mobile || cachedSiteIdentity.mobile || '',
   };
+  persistSiteIdentityToDisk();
   return cachedSiteIdentity;
 }
 
@@ -616,6 +644,7 @@ function showSiteView(rec) {
       prefillSiteView(rec);
       setTimeout(() => prefillSiteView(rec), 400);
       setTimeout(() => prefillSiteView(rec), 1200);
+      setTimeout(() => prefillSiteView(rec), 2500);
     });
 
     rec.siteView.webContents.on('will-navigate', (event, url) => {
@@ -1096,6 +1125,8 @@ app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.yourcompany.astro');
   }
+
+  loadPersistedSiteIdentity();
 
   installApplicationMenu();
 

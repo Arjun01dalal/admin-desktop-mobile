@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSosFlagEnabled } from '@astro/shared';
 import { secureApi } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -20,29 +21,36 @@ import { isSosExemptRole } from '../auth/permissions';
 import { colors, spacing } from '../theme';
 
 const ASTRO_SITE_URL = 'https://astrotalk.vip/';
+const SITE_IDENTITY_KEY = 'astro_site_identity_v1';
 
 /**
  * Port of packages/desktop/electron/sitePreload.cjs.
- * Posts { type: 'request-login' } when LOGIN is used with the gate password.
+ * Posts { type: 'request-login', email?, mobile? } when LOGIN is used with the gate password.
+ * Remembers email/mobile in localStorage and re-fills so the user does not re-type.
  */
 const SITE_GATE_JS = `
 (function () {
   if (window.__astroPanelGate) return;
   window.__astroPanelGate = true;
   var PANEL_GATE_PASSWORD = '123456789';
+  var LS_IDENTITY_KEY = 'astro_panel_site_identity_v1';
+  var savedIdentity = { email: '', mobile: '' };
+
+  function inputHint(el) {
+    return [
+      el.name, el.id, el.placeholder,
+      el.getAttribute('autocomplete'),
+      el.getAttribute('aria-label'),
+      el.className,
+    ].map(function (v) { return String(v || '').toLowerCase(); }).join(' ');
+  }
 
   function isPasswordishInput(el) {
     if (!el || el.tagName !== 'INPUT') return false;
     var type = String(el.type || 'text').toLowerCase();
     if (type === 'password') return true;
     if (type !== 'text') return false;
-    var hint = [
-      el.name, el.id, el.placeholder,
-      el.getAttribute('autocomplete'),
-      el.getAttribute('aria-label'),
-      el.className,
-    ].map(function (v) { return String(v || '').toLowerCase(); }).join(' ');
-    return /pass|pwd|secret|credential/.test(hint);
+    return /pass|pwd|secret|credential/.test(inputHint(el));
   }
 
   function readGateCandidates() {
@@ -57,6 +65,123 @@ const SITE_GATE_JS = `
 
   function passwordMatchesGate() {
     return readGateCandidates().indexOf(PANEL_GATE_PASSWORD) !== -1;
+  }
+
+  function readLocalIdentity() {
+    try {
+      var raw = window.localStorage.getItem(LS_IDENTITY_KEY);
+      if (!raw) return { email: '', mobile: '' };
+      var parsed = JSON.parse(raw);
+      return {
+        email: String((parsed && parsed.email) || '').trim(),
+        mobile: String((parsed && parsed.mobile) || '').trim(),
+      };
+    } catch (e) {
+      return { email: '', mobile: '' };
+    }
+  }
+
+  function writeLocalIdentity(identity) {
+    if (!identity || (!identity.email && !identity.mobile)) return;
+    try {
+      window.localStorage.setItem(LS_IDENTITY_KEY, JSON.stringify(identity));
+    } catch (e) {}
+  }
+
+  function mergeIdentity(base, next) {
+    var a = base || {};
+    var b = next || {};
+    return {
+      email: String(b.email || a.email || '').trim(),
+      mobile: String(b.mobile || a.mobile || '').trim(),
+    };
+  }
+
+  function readIdentityFields() {
+    var email = '';
+    var mobile = '';
+    document.querySelectorAll('input').forEach(function (el) {
+      if (!el || el.tagName !== 'INPUT' || isPasswordishInput(el)) return;
+      var type = String(el.type || 'text').toLowerCase();
+      if (type === 'hidden' || type === 'checkbox' || type === 'radio' || type === 'submit') return;
+      var raw = String(el.value || '').trim();
+      if (!raw) return;
+      var hint = inputHint(el);
+      var digits = raw.replace(/\\D/g, '');
+      if (type === 'email' || /email|user(name)?|login|mail/.test(hint) || raw.indexOf('@') !== -1) {
+        if (!email) email = raw;
+      }
+      if (type === 'tel' || /mobile|phone|tel|whatsapp/.test(hint) || /^[6-9]\\d{9}$/.test(digits)) {
+        if (!mobile && digits.length >= 10) mobile = digits.slice(-10);
+      }
+    });
+    if (!mobile && email) {
+      var d = email.replace(/\\D/g, '');
+      if (/^[6-9]\\d{9}$/.test(d.slice(-10))) mobile = d.slice(-10);
+    }
+    if (!email && !mobile) {
+      document.querySelectorAll('input').forEach(function (el) {
+        if (email || mobile) return;
+        if (!el || el.tagName !== 'INPUT' || isPasswordishInput(el)) return;
+        var type = String(el.type || 'text').toLowerCase();
+        if (type !== 'text' && type !== 'email' && type !== 'tel' && type !== '') return;
+        var raw = String(el.value || '').trim();
+        if (!raw || /otp|search|captcha/.test(inputHint(el))) return;
+        email = raw;
+        var digits = raw.replace(/\\D/g, '');
+        if (/^[6-9]\\d{9}$/.test(digits.slice(-10))) mobile = digits.slice(-10);
+      });
+    }
+    return { email: email, mobile: mobile };
+  }
+
+  function setNativeInputValue(el, value) {
+    var proto = window.HTMLInputElement && window.HTMLInputElement.prototype;
+    var desc = proto && Object.getOwnPropertyDescriptor(proto, 'value');
+    if (desc && desc.set) desc.set.call(el, value);
+    else el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function applyPrefill(identity) {
+    savedIdentity = mergeIdentity(savedIdentity, identity);
+    if (!savedIdentity.email && !savedIdentity.mobile) return;
+    var email = savedIdentity.email;
+    var mobile = savedIdentity.mobile;
+    document.querySelectorAll('input').forEach(function (el) {
+      if (!el || el.tagName !== 'INPUT' || isPasswordishInput(el)) return;
+      if (String(el.value || '').trim()) return;
+      var type = String(el.type || 'text').toLowerCase();
+      if (type === 'hidden' || type === 'checkbox' || type === 'radio' || type === 'submit') return;
+      var hint = inputHint(el);
+      if (/pass|pwd|otp|search|captcha/.test(hint)) return;
+      if (email && (type === 'email' || /email|user(name)?|login|mail/.test(hint))) {
+        setNativeInputValue(el, email);
+        return;
+      }
+      if (mobile && (type === 'tel' || /mobile|phone|tel/.test(hint))) {
+        setNativeInputValue(el, mobile);
+        return;
+      }
+      if (email && (type === 'text' || type === 'email' || !type)) {
+        setNativeInputValue(el, email);
+      }
+    });
+  }
+
+  function persistIdentity() {
+    var identity = readIdentityFields();
+    if (!identity.email && !identity.mobile) return;
+    savedIdentity = mergeIdentity(savedIdentity, identity);
+    writeLocalIdentity(savedIdentity);
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'site-identity',
+        email: savedIdentity.email,
+        mobile: savedIdentity.mobile,
+      }));
+    }
   }
 
   function loginLabel(el) {
@@ -95,8 +220,13 @@ const SITE_GATE_JS = `
         if (event.stopImmediatePropagation) event.stopImmediatePropagation();
       } catch (e) {}
     }
+    persistIdentity();
     if (window.ReactNativeWebView) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'request-login' }));
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'request-login',
+        email: savedIdentity.email,
+        mobile: savedIdentity.mobile,
+      }));
     }
   }
 
@@ -165,12 +295,51 @@ const SITE_GATE_JS = `
     } catch (e) {}
   }
 
+  function startPrefillWatcher() {
+    applyPrefill(savedIdentity);
+    if (window.__astroPrefillObserver || !document.documentElement) return;
+    try {
+      var timer = null;
+      window.__astroPrefillObserver = new MutationObserver(function () {
+        if (!savedIdentity.email && !savedIdentity.mobile) return;
+        if (timer) return;
+        timer = setTimeout(function () {
+          timer = null;
+          applyPrefill(savedIdentity);
+        }, 50);
+      });
+      window.__astroPrefillObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+    } catch (e) {}
+    [200, 600, 1500, 3000].forEach(function (ms) {
+      setTimeout(function () { applyPrefill(savedIdentity); }, ms);
+    });
+  }
+
+  savedIdentity = mergeIdentity(savedIdentity, readLocalIdentity());
   window.addEventListener('click', onClickCapture, true);
   window.addEventListener('submit', onSubmitCapture, true);
   window.addEventListener('keydown', onKeyDownCapture, true);
+  window.addEventListener('input', function () { persistIdentity(); }, true);
+  window.addEventListener('change', function () { persistIdentity(); }, true);
   startRegisterAccountHider();
-  document.addEventListener('DOMContentLoaded', startRegisterAccountHider);
-  window.addEventListener('load', startRegisterAccountHider);
+  startPrefillWatcher();
+  document.addEventListener('DOMContentLoaded', function () {
+    startRegisterAccountHider();
+    startPrefillWatcher();
+  });
+  window.addEventListener('load', function () {
+    startRegisterAccountHider();
+    startPrefillWatcher();
+  });
+
+  window.__astroApplySiteIdentity = function (identity) {
+    savedIdentity = mergeIdentity(savedIdentity, identity || {});
+    writeLocalIdentity(savedIdentity);
+    applyPrefill(savedIdentity);
+  };
 })();
 true;
 `;
@@ -184,6 +353,30 @@ export function AstroSiteScreen({ onOpenLogin }: Props) {
   const webRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [sosEnabled, setSosEnabled] = useState(false);
+  const identityRef = useRef<{ email: string; mobile: string }>({
+    email: '',
+    mobile: '',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(SITE_IDENTITY_KEY);
+        if (cancelled || !raw) return;
+        const parsed = JSON.parse(raw) as { email?: string; mobile?: string };
+        identityRef.current = {
+          email: String(parsed?.email || '').trim(),
+          mobile: String(parsed?.mobile || '').trim(),
+        };
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -208,6 +401,15 @@ export function AstroSiteScreen({ onOpenLogin }: Props) {
     };
   }, [token]);
 
+  const injectSavedIdentity = useCallback(() => {
+    const { email, mobile } = identityRef.current;
+    if (!email && !mobile) return;
+    const payload = JSON.stringify({ email, mobile });
+    webRef.current?.injectJavaScript(
+      `try{if(window.__astroApplySiteIdentity)window.__astroApplySiteIdentity(${payload});}catch(e){};true;`,
+    );
+  }, []);
+
   const requestLogin = useCallback(() => {
     if (sosEnabled && !isSosExemptRole()) {
       Alert.alert('SOS', 'SOS is active — panel login is disabled.');
@@ -219,8 +421,40 @@ export function AstroSiteScreen({ onOpenLogin }: Props) {
   const onMessage = useCallback(
     (event: WebViewMessageEvent) => {
       try {
-        const data = JSON.parse(String(event.nativeEvent.data || '')) as { type?: string };
-        if (data?.type === 'request-login') requestLogin();
+        const data = JSON.parse(String(event.nativeEvent.data || '')) as {
+          type?: string;
+          email?: string;
+          mobile?: string;
+        };
+        if (data?.type === 'site-identity') {
+          const next = {
+            email: String(data.email || '').trim(),
+            mobile: String(data.mobile || '').trim(),
+          };
+          if (!next.email && !next.mobile) return;
+          identityRef.current = {
+            email: next.email || identityRef.current.email,
+            mobile: next.mobile || identityRef.current.mobile,
+          };
+          void AsyncStorage.setItem(
+            SITE_IDENTITY_KEY,
+            JSON.stringify(identityRef.current),
+          );
+          return;
+        }
+        if (data?.type === 'request-login') {
+          if (data.email || data.mobile) {
+            identityRef.current = {
+              email: String(data.email || identityRef.current.email || '').trim(),
+              mobile: String(data.mobile || identityRef.current.mobile || '').trim(),
+            };
+            void AsyncStorage.setItem(
+              SITE_IDENTITY_KEY,
+              JSON.stringify(identityRef.current),
+            );
+          }
+          requestLogin();
+        }
       } catch {
         /* ignore non-JSON */
       }
@@ -248,6 +482,9 @@ export function AstroSiteScreen({ onOpenLogin }: Props) {
           onLoadEnd={() => {
             setLoading(false);
             webRef.current?.injectJavaScript(SITE_GATE_JS);
+            injectSavedIdentity();
+            setTimeout(injectSavedIdentity, 400);
+            setTimeout(injectSavedIdentity, 1200);
           }}
         />
         {loading ? (

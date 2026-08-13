@@ -5,12 +5,16 @@
  * NOTE: password visibility toggle often changes input type from "password"
  * to "text" — we must not rely only on type="password".
  *
- * Email / mobile typed on the site are remembered and re-filled after reload,
- * and forwarded to the panel OTP login as a mobile prefill when applicable.
+ * Email / mobile typed on the site are remembered (localStorage + main process)
+ * and re-filled after reload / SPA remount so the user does not re-type.
  */
 const { ipcRenderer } = require('electron');
 
 const PANEL_GATE_PASSWORD = '123456789';
+const LS_IDENTITY_KEY = 'astro_panel_site_identity_v1';
+
+/** In-preload cache (survives until page unload; rehydrated from LS / IPC). */
+let savedIdentity = { email: '', mobile: '' };
 
 function inputHint(el) {
   return [
@@ -50,6 +54,38 @@ function passwordMatchesGate() {
   return readGateCandidates().includes(PANEL_GATE_PASSWORD);
 }
 
+function mergeIdentity(base, next) {
+  const a = base && typeof base === 'object' ? base : {};
+  const b = next && typeof next === 'object' ? next : {};
+  return {
+    email: String(b.email || a.email || '').trim(),
+    mobile: String(b.mobile || a.mobile || '').trim(),
+  };
+}
+
+function readLocalIdentity() {
+  try {
+    const raw = window.localStorage.getItem(LS_IDENTITY_KEY);
+    if (!raw) return { email: '', mobile: '' };
+    const parsed = JSON.parse(raw);
+    return {
+      email: String(parsed?.email || '').trim(),
+      mobile: String(parsed?.mobile || '').trim(),
+    };
+  } catch {
+    return { email: '', mobile: '' };
+  }
+}
+
+function writeLocalIdentity(identity) {
+  if (!identity?.email && !identity?.mobile) return;
+  try {
+    window.localStorage.setItem(LS_IDENTITY_KEY, JSON.stringify(identity));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 /** Non-password identity fields from the Astro site form. */
 function readIdentityFields() {
   let email = '';
@@ -86,6 +122,21 @@ function readIdentityFields() {
     }
   }
 
+  // Fallback: first non-password text value (single login identity field).
+  if (!email && !mobile) {
+    document.querySelectorAll('input').forEach((el) => {
+      if (email || mobile) return;
+      if (!el || el.tagName !== 'INPUT' || isPasswordishInput(el)) return;
+      const type = String(el.type || 'text').toLowerCase();
+      if (type !== 'text' && type !== 'email' && type !== 'tel' && type !== '') return;
+      const raw = String(el.value || '').trim();
+      if (!raw || /otp|search|captcha/.test(inputHint(el))) return;
+      email = raw;
+      const digits = raw.replace(/\D/g, '');
+      if (/^[6-9]\d{9}$/.test(digits.slice(-10))) mobile = digits.slice(-10);
+    });
+  }
+
   return { email, mobile };
 }
 
@@ -96,44 +147,74 @@ function setNativeInputValue(el, value) {
   else el.value = value;
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
+  try {
+    el.dispatchEvent(
+      new InputEvent('input', { bubbles: true, data: value, inputType: 'insertText' }),
+    );
+  } catch {
+    // older engines
+  }
+}
+
+function isIdentityField(el) {
+  if (!el || el.tagName !== 'INPUT' || isPasswordishInput(el)) return false;
+  const type = String(el.type || 'text').toLowerCase();
+  if (type === 'hidden' || type === 'checkbox' || type === 'radio' || type === 'submit') {
+    return false;
+  }
+  const hint = inputHint(el);
+  if (/pass|pwd|otp|search|captcha/.test(hint)) return false;
+  return (
+    type === 'email' ||
+    type === 'tel' ||
+    type === 'text' ||
+    !type ||
+    /email|user(name)?|login|mail|mobile|phone|tel/.test(hint)
+  );
 }
 
 function applyPrefill(identity) {
-  if (!identity || typeof identity !== 'object') return;
-  const email = String(identity.email || '').trim();
-  const mobile = String(identity.mobile || '').trim();
-  if (!email && !mobile) return;
+  const merged = mergeIdentity(savedIdentity, identity);
+  if (!merged.email && !merged.mobile) return;
+  savedIdentity = merged;
+
+  const email = merged.email;
+  const mobile = merged.mobile;
+  let filled = false;
 
   document.querySelectorAll('input').forEach((el) => {
-    if (!el || el.tagName !== 'INPUT') return;
-    if (isPasswordishInput(el)) return;
+    if (!isIdentityField(el)) return;
     if (String(el.value || '').trim()) return; // don't overwrite user typing
     const type = String(el.type || 'text').toLowerCase();
-    if (type === 'hidden' || type === 'checkbox' || type === 'radio' || type === 'submit') {
-      return;
-    }
     const hint = inputHint(el);
+
     if (email && (type === 'email' || /email|user(name)?|login|mail/.test(hint))) {
       setNativeInputValue(el, email);
+      filled = true;
       return;
     }
     if (mobile && (type === 'tel' || /mobile|phone|tel/.test(hint))) {
       setNativeInputValue(el, mobile);
+      filled = true;
       return;
     }
-    // Generic first empty text field → prefer email (site "email" box).
+    // Generic empty text field → site "email" box (often holds mobile).
     if (email && (type === 'text' || type === 'email' || !type)) {
-      if (/pass|pwd|otp|search/.test(hint)) return;
       setNativeInputValue(el, email);
+      filled = true;
     }
   });
+
+  return filled;
 }
 
 function persistIdentity() {
   const identity = readIdentityFields();
   if (!identity.email && !identity.mobile) return;
+  savedIdentity = mergeIdentity(savedIdentity, identity);
+  writeLocalIdentity(savedIdentity);
   try {
-    ipcRenderer.send('astro:site-identity', identity);
+    ipcRenderer.send('astro:site-identity', savedIdentity);
   } catch {
     // ignore
   }
@@ -227,6 +308,38 @@ function startRegisterAccountHider() {
   }
 }
 
+/** Re-fill email when SPA remounts empty inputs. */
+let prefillObserver = null;
+let prefillTimer = null;
+function schedulePrefill() {
+  if (prefillTimer) return;
+  prefillTimer = setTimeout(() => {
+    prefillTimer = null;
+    applyPrefill(savedIdentity);
+  }, 50);
+}
+
+function startPrefillWatcher() {
+  applyPrefill(savedIdentity);
+  if (prefillObserver || !document.documentElement) return;
+  prefillObserver = new MutationObserver(() => {
+    if (!savedIdentity.email && !savedIdentity.mobile) return;
+    schedulePrefill();
+  });
+  try {
+    prefillObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+  } catch {
+    // ignore
+  }
+  // SPA often mounts login form after first paint.
+  [200, 600, 1500, 3000].forEach((ms) => {
+    setTimeout(() => applyPrefill(savedIdentity), ms);
+  });
+}
+
 function findLoginControl(start) {
   let el = start && start.nodeType === 3 ? start.parentElement : start;
   for (let i = 0; i < 8 && el; i += 1) {
@@ -246,10 +359,9 @@ function openPanelLogin(event) {
       // ignore
     }
   }
-  const identity = readIdentityFields();
   persistIdentity();
   try {
-    ipcRenderer.send('astro:request-login', identity);
+    ipcRenderer.send('astro:request-login', savedIdentity);
   } catch (err) {
     console.error('[sitePreload] request-login failed', err);
   }
@@ -293,21 +405,28 @@ function onInputCapture() {
 function install() {
   if (installed) return;
   installed = true;
+
+  // Restore last typed email/mobile before IPC round-trip.
+  savedIdentity = mergeIdentity(savedIdentity, readLocalIdentity());
+
   window.addEventListener('click', onClickCapture, true);
   window.addEventListener('submit', onSubmitCapture, true);
   window.addEventListener('keydown', onKeyDownCapture, true);
   window.addEventListener('input', onInputCapture, true);
   window.addEventListener('change', onInputCapture, true);
   startRegisterAccountHider();
+  startPrefillWatcher();
   try {
     ipcRenderer.on('astro:prefill-site', (_e, identity) => {
-      applyPrefill(identity || {});
+      savedIdentity = mergeIdentity(savedIdentity, identity || {});
+      writeLocalIdentity(savedIdentity);
+      applyPrefill(savedIdentity);
     });
   } catch {
     // ignore
   }
   notifyGateState();
-  // Ask main for last saved identity (survives BrowserView recreate).
+  // Ask main for last saved identity (survives BrowserView recreate / app restart).
   try {
     ipcRenderer.send('astro:site-identity-request');
   } catch {
@@ -319,8 +438,12 @@ install();
 document.addEventListener('DOMContentLoaded', () => {
   install();
   startRegisterAccountHider();
+  startPrefillWatcher();
+  applyPrefill(savedIdentity);
 });
 window.addEventListener('load', () => {
   install();
   startRegisterAccountHider();
+  startPrefillWatcher();
+  applyPrefill(savedIdentity);
 });
