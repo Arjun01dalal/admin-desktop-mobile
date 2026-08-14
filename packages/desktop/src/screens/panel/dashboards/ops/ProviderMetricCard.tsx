@@ -12,6 +12,7 @@ import type { ProviderCardModel } from './types';
 import { floorNum } from './mergeMetrics';
 import { metricJyotishLabel, toDisplayText } from './constants';
 import { useRevealCodes } from '@/context/useRevealCodes';
+import { LudoGameSelect } from './LudoGameSelect';
 
 type Props = {
   card: ProviderCardModel;
@@ -53,6 +54,11 @@ export function ProviderMetricCard({ card, onClick }: Props) {
   const activeLabel =
     card.activeCustomerLabel || metricJyotishLabel('Active Customer');
 
+  const useLudoTable =
+    Boolean(card.selectStatsMap) &&
+    Boolean(card.selectOptions?.length) &&
+    Boolean(card.onSelectChange);
+
   return (
     <Paper
       onClick={onClick}
@@ -63,22 +69,35 @@ export function ProviderMetricCard({ card, onClick }: Props) {
         cursor: onClick ? 'pointer' : 'default',
         border: '1px solid',
         borderColor: 'divider',
-        transition: 'border-color 0.15s ease',
-        '&:hover': onClick ? { borderColor: 'warning.main' } : undefined,
+        borderRadius: 2,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+        '&:hover': onClick
+          ? {
+              borderColor: 'warning.main',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            }
+          : undefined,
       }}
     >
       <Stack
-        direction="row"
-        alignItems="center"
+        direction={{ xs: 'column', sm: 'row' }}
+        alignItems={{ xs: 'stretch', sm: 'center' }}
         justifyContent="space-between"
         gap={1}
         mb={1.5}
-        flexWrap="wrap"
       >
-        <Typography variant="subtitle1" fontWeight={800}>
+        <Typography variant="subtitle1" fontWeight={800} sx={{ minWidth: 0 }}>
           {toDisplayText(card.title)}
         </Typography>
-        {card.selectOptions && card.onSelectChange && (
+        {useLudoTable ? (
+          <LudoGameSelect
+            value={card.selectValue ?? 'All'}
+            options={card.selectOptions!}
+            statsMap={card.selectStatsMap}
+            onChange={(v) => card.onSelectChange?.(v)}
+          />
+        ) : card.selectOptions && card.onSelectChange ? (
           <TextField
             select
             size="small"
@@ -96,7 +115,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
               </MenuItem>
             ))}
           </TextField>
-        )}
+        ) : null}
       </Stack>
 
       <Stack spacing={0.75}>
@@ -147,8 +166,22 @@ export function ProviderMetricCard({ card, onClick }: Props) {
             <Typography
               variant="body2"
               fontWeight={800}
-              color="warning.main"
-              sx={{ fontVariantNumeric: 'tabular-nums' }}
+              color={
+                row.label.toLowerCase().includes('ggr') &&
+                typeof row.value === 'number'
+                  ? row.value < 0
+                    ? 'error.main'
+                    : 'success.main'
+                  : 'warning.main'
+              }
+              sx={{
+                fontVariantNumeric: 'tabular-nums',
+                textDecoration:
+                  row.label.toLowerCase().includes('ggr') &&
+                  typeof row.value === 'number'
+                    ? 'underline'
+                    : 'none',
+              }}
             >
               {typeof row.value === 'number' ? floorNum(row.value) : row.value}
             </Typography>

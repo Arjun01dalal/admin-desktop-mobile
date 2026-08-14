@@ -876,6 +876,29 @@ function setupAutoUpdate() {
   });
 }
 
+function formatAuthNetworkError(error, fallback) {
+  const apiMessage = error?.response?.data?.message;
+  if (apiMessage) return String(apiMessage);
+
+  const code = String(error?.code || '');
+  const msg = String(error?.message || '');
+  // Packaged apps often surface raw getaddrinfo ENOTFOUND for a dead/wrong API host.
+  if (code === 'ENOTFOUND' || /ENOTFOUND/i.test(msg)) {
+    const host =
+      error?.hostname ||
+      msg.match(/ENOTFOUND\s+(\S+)/i)?.[1] ||
+      'API host';
+    return `Cannot reach API (${host}). Check API_BASE_URL / DNS, then rebuild with embed:env.`;
+  }
+  if (code === 'ECONNREFUSED' || /ECONNREFUSED/i.test(msg)) {
+    return 'API connection refused. Check API_BASE_URL and that the server is up.';
+  }
+  if (code === 'ETIMEDOUT' || /timeout/i.test(msg)) {
+    return 'API request timed out. Check network / VPN.';
+  }
+  return msg || fallback;
+}
+
 function registerIpc() {
   // Legacy calculator channel now opens the ThirdEye marketing site.
   ipcMain.on('gcalc:show-calculator', (event) => {
@@ -953,7 +976,7 @@ function registerIpc() {
     } catch (error) {
       return {
         ok: false,
-        message: error?.response?.data?.message || error?.message || 'Failed to send OTP',
+        message: formatAuthNetworkError(error, 'Failed to send OTP'),
       };
     }
   });
@@ -964,7 +987,7 @@ function registerIpc() {
     } catch (error) {
       return {
         ok: false,
-        message: error?.response?.data?.message || error?.message || 'Invalid OTP',
+        message: formatAuthNetworkError(error, 'Invalid OTP'),
       };
     }
   });

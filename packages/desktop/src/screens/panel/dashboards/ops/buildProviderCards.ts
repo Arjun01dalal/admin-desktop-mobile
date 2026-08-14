@@ -393,6 +393,7 @@ export function buildProviderCards(
       loading,
       selectValue: selectedLudo,
       selectOptions: ludoOptions,
+      selectStatsMap: bundle.ludoGameStatsMap,
       onSelectChange: games?.onLudoGameChange,
       actions: [
         {

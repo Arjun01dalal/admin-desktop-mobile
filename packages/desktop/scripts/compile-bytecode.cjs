@@ -49,6 +49,7 @@ const COMPILE = [
   'location.cjs',
   'sosMonitor.cjs',
   'pushService.cjs',
+  'panelWindows.cjs',
   'secure/index.cjs',
   'secure/registry.cjs',
   'secure/crypto.cjs',

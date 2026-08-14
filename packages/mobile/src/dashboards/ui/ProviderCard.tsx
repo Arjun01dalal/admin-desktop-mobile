@@ -2,7 +2,6 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,9 +10,14 @@ import {
 import { colors, radius, spacing } from '../../theme';
 import { toDisplayText } from '../jyotish/jyotishMapping';
 import type { ProviderCardModel } from '../types';
+import { LudoGameStatsPicker } from './LudoGameStatsPicker';
 
 function formatValue(v: number | string): string {
   return typeof v === 'number' ? v.toLocaleString('en-IN') : String(v);
+}
+
+function isGgrLabel(label: string): boolean {
+  return label.toLowerCase().includes('ggr');
 }
 
 export function ProviderCard({
@@ -29,6 +33,10 @@ export function ProviderCard({
 }) {
   const Wrapper: React.ElementType = onPress ? TouchableOpacity : View;
   const activeLabel = card.activeCustomerLabel || 'Active Customer';
+  const useLudoTable =
+    Boolean(card.selectStatsMap) &&
+    Boolean(card.selectOptions?.length) &&
+    Boolean(card.onSelectChange);
 
   return (
     <Wrapper
@@ -44,6 +52,41 @@ export function ProviderCard({
           <ActivityIndicator size="small" color={colors.primary} />
         ) : null}
       </View>
+
+      {useLudoTable ? (
+        <View style={styles.ludoSelectWrap}>
+          <LudoGameStatsPicker
+            value={card.selectValue ?? 'All'}
+            options={card.selectOptions!}
+            statsMap={card.selectStatsMap}
+            onChange={(v) => card.onSelectChange?.(v)}
+          />
+        </View>
+      ) : card.selectOptions &&
+        card.selectOptions.length > 0 &&
+        card.onSelectChange ? (
+        <View style={styles.selectRow}>
+          {card.selectOptions.map((opt) => {
+            const active = (card.selectValue ?? 'All') === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => card.onSelectChange?.(opt.value)}
+                style={[styles.selChip, active && styles.selChipActive]}
+              >
+                <Text
+                  style={[
+                    styles.selChipText,
+                    active && styles.selChipTextActive,
+                  ]}
+                >
+                  {toDisplayText(opt.label)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
 
       {card.activeCustomerCount != null ? (
         <TouchableOpacity
@@ -63,55 +106,29 @@ export function ProviderCard({
         </TouchableOpacity>
       ) : null}
 
-      {card.selectOptions &&
-        card.selectOptions.length > 0 &&
-        card.onSelectChange && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.selectRow}
-          >
-            {[{ value: 'All', label: 'All' }, ...card.selectOptions].map(
-              (opt) => {
-                const active = (card.selectValue ?? 'All') === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    onPress={() => card.onSelectChange?.(opt.value)}
-                    style={[styles.selChip, active && styles.selChipActive]}
-                  >
-                    <Text
-                      style={[
-                        styles.selChipText,
-                        active && styles.selChipTextActive,
-                      ]}
-                    >
-                      {toDisplayText(opt.label)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              },
-            )}
-          </ScrollView>
-        )}
-
       <View style={styles.rows}>
-        {card.rows.map((r, i) => (
-          <View
-            key={`${r.label}-${i}`}
-            style={[styles.row, i < card.rows.length - 1 && styles.rowBorder]}
-          >
-            <Text style={styles.rowLabel}>{toDisplayText(r.label)}</Text>
-            <Text
-              style={[
-                styles.rowValue,
-                typeof r.value === 'number' && r.value < 0 && styles.negative,
-              ]}
+        {card.rows.map((r, i) => {
+          const ggr = isGgrLabel(r.label) && typeof r.value === 'number';
+          return (
+            <View
+              key={`${r.label}-${i}`}
+              style={[styles.row, i < card.rows.length - 1 && styles.rowBorder]}
             >
-              {formatValue(r.value)}
-            </Text>
-          </View>
-        ))}
+              <Text style={styles.rowLabel}>{toDisplayText(r.label)}</Text>
+              <Text
+                style={[
+                  styles.rowValue,
+                  typeof r.value === 'number' && r.value < 0 && styles.negative,
+                  ggr && (r.value as number) < 0 && styles.negative,
+                  ggr && (r.value as number) >= 0 && styles.ggrPos,
+                  ggr && styles.ggrUnderline,
+                ]}
+              >
+                {formatValue(r.value)}
+              </Text>
+            </View>
+          );
+        })}
       </View>
 
       {card.actions && card.actions.length > 0 && (
@@ -137,6 +154,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing(3.5),
     marginBottom: spacing(3),
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',
@@ -151,6 +173,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginRight: spacing(1),
   },
+  ludoSelectWrap: { marginBottom: spacing(2) },
   activeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -160,7 +183,12 @@ const styles = StyleSheet.create({
     gap: spacing(2),
   },
   activeLink: { color: colors.primary, textDecorationLine: 'underline' },
-  selectRow: { gap: spacing(1.5), paddingBottom: spacing(2) },
+  selectRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(1.5),
+    paddingBottom: spacing(2),
+  },
   selChip: {
     paddingHorizontal: spacing(2.5),
     paddingVertical: spacing(1),
@@ -186,6 +214,8 @@ const styles = StyleSheet.create({
   rowLabel: { color: colors.muted, fontSize: 13, flexShrink: 1 },
   rowValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   negative: { color: colors.destructive },
+  ggrPos: { color: colors.success },
+  ggrUnderline: { textDecorationLine: 'underline' },
   actionsRow: {
     flexDirection: 'row',
     gap: spacing(4),

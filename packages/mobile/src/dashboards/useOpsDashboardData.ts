@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { secureApi } from '../api/client';
 import type { SecureAction } from '../api/registry.generated';
-import { parseLudoGameOptions } from './gameMetrics';
+import { parseLudoGameOptions, parseLudoGameStats } from './gameMetrics';
 import { providerWiseActive } from './mergeMetrics';
 import type {
   DashboardFilters,
@@ -53,6 +53,7 @@ const EMPTY: OpsDashboardBundle = {
   indianDiva: null,
   ludo: {},
   ludoGameOptions: [],
+  ludoGameStatsMap: {},
   activeExchange: {},
 };
 
@@ -183,6 +184,23 @@ export function useOpsDashboardData(
       }
 
       nextBundle.ludoGameOptions = ludoOptions;
+
+      const dates = {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      };
+      const statsEntries = await Promise.all(
+        ['All', ...ludoOptions.map((o) => o.value)].map(async (gameId) => {
+          if (gameId === 'All') {
+            return [gameId, parseLudoGameStats(nextBundle.ludo)] as const;
+          }
+          const data = await loadLudo(gameId, dates);
+          return [gameId, parseLudoGameStats(data)] as const;
+        }),
+      );
+      if (gen !== genRef.current) return;
+      nextBundle.ludoGameStatsMap = Object.fromEntries(statsEntries);
+
       setBundle(nextBundle);
     } catch (err) {
       if (gen !== genRef.current) return;
@@ -191,7 +209,7 @@ export function useOpsDashboardData(
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [mode, filters]);
+  }, [mode, filters, loadLudo]);
 
   const ludoGenRef = useRef(0);
   const reloadLudo = useCallback(
@@ -204,7 +222,19 @@ export function useOpsDashboardData(
       });
       // Drop the response if a newer Ludo request or a full reload started since.
       if (ludoGen !== ludoGenRef.current || mainGen !== genRef.current) return;
-      setBundle((prev) => (prev ? { ...prev, ludo } : prev));
+      const stats = parseLudoGameStats(ludo);
+      setBundle((prev) =>
+        prev
+          ? {
+              ...prev,
+              ludo,
+              ludoGameStatsMap: {
+                ...prev.ludoGameStatsMap,
+                [gameId || 'All']: stats,
+              },
+            }
+          : prev,
+      );
     },
     [filters.startDate, filters.endDate, loadLudo],
   );

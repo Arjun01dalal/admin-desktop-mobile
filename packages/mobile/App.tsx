@@ -1,9 +1,30 @@
 import 'react-native-gesture-handler';
 import './src/lib/webShim';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 import { hydrateStorage } from './src/lib/webShim';
 import { applyStoredTheme, colors, watchSystemThemeChanges } from './src/theme';
+
+type ComponentWithDefaults = {
+  defaultProps?: Record<string, unknown>;
+};
+
+/**
+ * Keep the app layout independent of the device's system font-size setting.
+ * This applies to all native Text/TextInput instances loaded below AppRoot.
+ */
+function lockNativeFontScaling() {
+  const components = [Text, TextInput] as unknown as ComponentWithDefaults[];
+  components.forEach((component) => {
+    component.defaultProps = {
+      ...component.defaultProps,
+      allowFontScaling: false,
+      maxFontSizeMultiplier: 1,
+    };
+  });
+}
+
+lockNativeFontScaling();
 
 /**
  * Boot loader: hydrate persisted storage and apply the stored theme BEFORE

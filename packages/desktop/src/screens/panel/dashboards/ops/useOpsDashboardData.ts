@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
-import { parseLudoGameOptions } from './gameMetrics';
+import { parseLudoGameOptions, parseLudoGameStats } from './gameMetrics';
 import { providerWiseActive } from './mergeMetrics';
 import type {
   DashboardFilters,
@@ -50,6 +50,7 @@ const EMPTY: OpsDashboardBundle = {
   indianDiva: null,
   ludo: {},
   ludoGameOptions: [],
+  ludoGameStatsMap: {},
   activeExchange: {},
 };
 
@@ -200,6 +201,25 @@ export function useOpsDashboardData(
       }
 
       nextBundle.ludoGameOptions = ludoOptions;
+
+      // Laxmi: load house-stats for All + every game so the select menu can
+      // show Game | Players | Bet | Win | RTP | GGR (All (ggr) closed label).
+      const dates = {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      };
+      const statsEntries = await Promise.all(
+        ['All', ...ludoOptions.map((o) => o.value)].map(async (gameId) => {
+          if (gameId === 'All') {
+            return [gameId, parseLudoGameStats(nextBundle.ludo)] as const;
+          }
+          const data = await loadLudo(gameId, dates);
+          return [gameId, parseLudoGameStats(data)] as const;
+        }),
+      );
+      if (!isCurrent(gen)) return;
+      nextBundle.ludoGameStatsMap = Object.fromEntries(statsEntries);
+
       setBundle(nextBundle);
     } catch (err) {
       if (!isCurrent(gen)) return;
@@ -209,7 +229,7 @@ export function useOpsDashboardData(
       end();
       if (isCurrent(gen)) setLoading(false);
     }
-  }, [mode, filters, next, begin, end, isCurrent]);
+  }, [mode, filters, next, begin, end, isCurrent, loadLudo]);
 
   const reloadLudo = useCallback(
     async (gameId: string) => {
@@ -217,7 +237,19 @@ export function useOpsDashboardData(
         startDate: filters.startDate,
         endDate: filters.endDate,
       });
-      setBundle((prev) => (prev ? { ...prev, ludo } : prev));
+      const stats = parseLudoGameStats(ludo);
+      setBundle((prev) =>
+        prev
+          ? {
+              ...prev,
+              ludo,
+              ludoGameStatsMap: {
+                ...prev.ludoGameStatsMap,
+                [gameId || 'All']: stats,
+              },
+            }
+          : prev,
+      );
     },
     [filters.startDate, filters.endDate, loadLudo],
   );

@@ -53,6 +53,20 @@ export type ProviderCardModel = {
   selectValue?: string;
   selectOptions?: SelectOption[];
   onSelectChange?: (value: string) => void;
+  /**
+   * When set (Lagna / Ludo card), select menu renders Game|Players|Bet|Win|RTP|GGR
+   * table like laxminarayan Dashboard.
+   */
+  selectStatsMap?: Record<
+    string,
+    {
+      uniquePlayers: number;
+      bet: number;
+      win: number;
+      ggr: number;
+      rtp: number;
+    }
+  >;
   /** Footer action links (Update / Update RTP). */
   actions?: CardAction[];
   /** Card body click → navigate (laxminarayan dashboard cards). */
@@ -107,6 +121,17 @@ export type OpsDashboardBundle = {
   indianDiva: unknown;
   ludo: Record<string, unknown>;
   ludoGameOptions: SelectOption[];
+  /** Per-game house-stats for Ludo select table (All + each gameId). */
+  ludoGameStatsMap: Record<
+    string,
+    {
+      uniquePlayers: number;
+      bet: number;
+      win: number;
+      ggr: number;
+      rtp: number;
+    }
+  >;
   activeExchange: Record<string, unknown>;
   /** Optional AAA zehnPL payload (main dashboard AAA card). */
   aaa?: Record<string, unknown>;

@@ -101,3 +101,26 @@ export function parseLudoGameOptions(raw: unknown): { value: string; label: stri
     })
     .filter(Boolean) as { value: string; label: string }[];
 }
+
+export type LudoGameStats = {
+  uniquePlayers: number;
+  bet: number;
+  win: number;
+  ggr: number;
+  rtp: number;
+};
+
+export function parseLudoGameStats(raw: unknown): LudoGameStats {
+  const obj =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  return {
+    uniquePlayers: Math.floor(toNum(obj.uniquePlayers)),
+    bet: Math.floor(toNum(obj.playerBetAmount ?? obj.bet)),
+    win: Math.floor(toNum(obj.playerWinAmount ?? obj.win)),
+    ggr: Math.round(toNum(obj.ggr)),
+    rtp: Math.round(toNum(obj.rtp)),
+  };
+};
+
