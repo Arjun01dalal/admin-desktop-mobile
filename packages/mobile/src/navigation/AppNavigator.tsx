@@ -22,6 +22,7 @@ import { SosProvider } from '../auth/useSosGuard';
 import { SosAlertOverlay } from '../components/SosAlertOverlay';
 import { useAuth } from '../auth/AuthContext';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
+import { useRevealCodes } from '../context/useRevealCodes';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { OpsDashboardScreen } from '../screens/dashboards/OpsDashboardScreen';
@@ -170,6 +171,7 @@ function screenNameFor(item: NavItem): string {
 function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] }) {
   const { items, ...rest } = props;
   const { user } = useAuth();
+  useRevealCodes(); // refresh drawer labels immediately after OTP reveal
   const current = rest.state.routes[rest.state.index]?.name;
   const [menuQuery, setMenuQuery] = useState('');
   const visibleItems = menuQuery.trim()
@@ -224,10 +226,14 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
  * transparent roots.
  */
 function Screened({ children }: { children: React.ReactNode }) {
+  const reveal = useRevealCodes();
   // Top inset is handled by the navigation header; bottom edge keeps content
   // clear of the home-indicator / gesture bar (and notch edges in landscape).
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View
+      key={reveal.active ? `revealed-${reveal.expiresAt}` : 'hidden'}
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
       <AppBackground />
       <SafeAreaView edges={['bottom', 'left', 'right']} style={{ flex: 1 }}>
         {children}
@@ -290,6 +296,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
 
 export function AppNavigator() {
   const { user } = useAuth();
+  useRevealCodes(); // refresh screen titles and navigation chrome
 
   const items = useMemo(
     () => NAV_ITEMS.filter((item) => canAccessNavItem(item)),

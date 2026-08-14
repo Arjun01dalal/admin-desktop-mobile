@@ -76,6 +76,8 @@ export function MobileAppPage() {
         rows={apps}
         getRowKey={(row) => row.key}
         emptyMessage="No apps"
+        minWidth="100%"
+        maxHeight="calc(100vh - 180px)"
       />
     </Box>
   );

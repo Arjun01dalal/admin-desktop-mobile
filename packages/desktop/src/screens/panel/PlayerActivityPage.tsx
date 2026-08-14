@@ -183,6 +183,7 @@ export function PlayerActivityPage() {
         loading={loading}
         emptyMessage="No data"
         minWidth={1000}
+        maxHeight="calc(100vh - 230px)"
       />
     </Box>
   );

@@ -279,72 +279,98 @@ export function NewRegistersPage() {
   );
 
   return (
-    <Box>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100vh - 96px)',
+        minHeight: 480,
+      }}
+    >
+      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
         New Registration
       </Typography>
 
-      <NewRegistersToolbar
-        startDate={startDate}
-        endDate={endDate}
-        itemsPerPage={itemsPerPage}
-        campaignName={campaignName}
-        activeStatus={activeStatus}
-        newRegistration={newRegistration}
-        otherState={otherState}
-        nonPerforming={nonPerforming}
-        total={total}
-        loading={loading}
-        dialerLoading={dialerLoading}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-        onItemsPerPageChange={(value) => {
-          setItemsPerPage(value);
-          setPage(1);
-        }}
-        onCampaignNameChange={setCampaignName}
-        onActiveStatusChange={(v) => {
-          setActiveStatus(v);
-          setPage(1);
-        }}
-        onNewRegistrationChange={(v) => {
-          setNewRegistration(v);
-          setPage(1);
-        }}
-        onOtherStateChange={(v) => {
-          setOtherState(v);
-          if (v) setSelectedState([]);
-          setPage(1);
-        }}
-        onNonPerformingChange={(v) => {
-          setNonPerforming(v);
-          setPage(1);
-        }}
-        onApply={applyFilters}
-        onAddToDialer={() => {
-          void addToDialer(campaignName, rows).then((ok) => {
-            if (ok) setCampaignName('');
-          });
-        }}
-      />
-
-      <NewRegistersFiltersProvider value={filtersValue}>
-        <CommonTable
-          columns={columns}
-          rows={deferredRows}
-          getRowKey={(row, i) => String(row._id || i)}
+      <Box sx={{ flexShrink: 0 }}>
+        <NewRegistersToolbar
+          startDate={startDate}
+          endDate={endDate}
+          itemsPerPage={itemsPerPage}
+          campaignName={campaignName}
+          activeStatus={activeStatus}
+          newRegistration={newRegistration}
+          otherState={otherState}
+          nonPerforming={nonPerforming}
+          total={total}
           loading={loading}
-          emptyMessage="No users"
-          stickyHeader
-          minWidth={3600}
-          dense
-          virtualize
-          maxHeight="calc(100vh - 250px)"
-          paper
+          dialerLoading={dialerLoading}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onItemsPerPageChange={(value) => {
+            setItemsPerPage(value);
+            setPage(1);
+          }}
+          onCampaignNameChange={setCampaignName}
+          onActiveStatusChange={(v) => {
+            setActiveStatus(v);
+            setPage(1);
+          }}
+          onNewRegistrationChange={(v) => {
+            setNewRegistration(v);
+            setPage(1);
+          }}
+          onOtherStateChange={(v) => {
+            setOtherState(v);
+            if (v) setSelectedState([]);
+            setPage(1);
+          }}
+          onNonPerformingChange={(v) => {
+            setNonPerforming(v);
+            setPage(1);
+          }}
+          onApply={applyFilters}
+          onAddToDialer={() => {
+            void addToDialer(campaignName, rows).then((ok) => {
+              if (ok) setCampaignName('');
+            });
+          }}
         />
-      </NewRegistersFiltersProvider>
+      </Box>
 
-      <Stack alignItems="center" mt={2}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          // CommonTable wraps its scrollport in an auto-height Box; without this
+          // the virtualized table renders full height and paints under the pager.
+          '& > *': { flex: 1, minHeight: 0 },
+        }}
+      >
+        <NewRegistersFiltersProvider value={filtersValue}>
+          <CommonTable
+            columns={columns}
+            rows={deferredRows}
+            getRowKey={(row, i) => String(row._id || i)}
+            loading={loading}
+            emptyMessage="No users"
+            stickyHeader
+            minWidth={3600}
+            dense
+            virtualize
+            maxHeight="100%"
+            paper
+          />
+        </NewRegistersFiltersProvider>
+      </Box>
+
+      <Stack alignItems="center" mt={1.5} mb={0.5} sx={{ flexShrink: 0 }}>
         <Pagination
           count={Math.max(1, Math.ceil(total / itemsPerPage))}
           page={page}

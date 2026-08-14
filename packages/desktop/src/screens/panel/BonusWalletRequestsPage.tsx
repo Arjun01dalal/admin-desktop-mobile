@@ -448,8 +448,21 @@ export function BonusWalletRequestsPage() {
 
   return (
     <BonusFiltersProvider value={filtersCtx}>
-    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        px: 1.5,
+        py: 1.25,
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100vh - 96px)',
+        minHeight: 480,
+      }}
+    >
+      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
         Bonus Wallet Requests
       </Typography>
 
@@ -460,6 +473,7 @@ export function BonusWalletRequestsPage() {
           borderRadius: 1.5,
           bgcolor: 'background.paper',
           border: '1px solid rgba(255,255,255,0.08)',
+          flexShrink: 0,
         }}
       >
         <Box
@@ -576,7 +590,14 @@ export function BonusWalletRequestsPage() {
         </Box>
       </Box>
 
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mb={1.5}>
+      <Stack
+        direction="row"
+        spacing={1}
+        flexWrap="wrap"
+        useFlexGap
+        mb={1.5}
+        sx={{ flexShrink: 0 }}
+      >
         <Chip
           label={`Approved: ${summary.approvedCount}`}
           sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
@@ -592,19 +613,37 @@ export function BonusWalletRequestsPage() {
         {summaryLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || index}
-        loading={loading}
-        emptyMessage="No bonus wallet requests found"
-        stickyHeader
-        dense
-        minWidth={1400}
-        maxHeight="calc(100vh - 340px)"
-      />
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          '& > *': { flex: 1, minHeight: 0 },
+        }}
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || index}
+          loading={loading}
+          emptyMessage="No bonus wallet requests found"
+          stickyHeader
+          dense
+          minWidth={1400}
+          maxHeight="100%"
+        />
+      </Box>
 
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        mt={1.5}
+        mb={0.5}
+        sx={{ flexShrink: 0 }}
+      >
         <Typography variant="body2" color="text.secondary">
           Total: {total}
         </Typography>

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { formatDdMmYyyy } from '@/utils/dates';
 import { pushToBotDialer } from '@/screens/panel/shared/pushToBotDialer';
 import {
   extractDialLeadsFromExcel,
@@ -8,7 +9,11 @@ import {
   toDialerConnectDetails,
   toDialerLead,
 } from './utils';
-import type { CallLogRow, DialerConnectDetails } from './types';
+import type {
+  CallLogRow,
+  CallLogsListResponse,
+  DialerConnectDetails,
+} from './types';
 import { MAX_COMMENT_LENGTH } from './types';
 
 type Admin = {
@@ -249,6 +254,53 @@ export function useCallLogsActions({
     [botCall, getDateRange],
   );
 
+  /** Reinitiate failed calls for a bot — same dialer push as deleted reinit. */
+  const reinitiateFailed = useCallback(
+    async (botId: number) => {
+      setActionLoading(true);
+      try {
+        const { startDate, endDate } = getDateRange();
+        const res = await secureApi<CallLogsListResponse>('callLogs.getDialerData', {
+          userId: '',
+          filter: {
+            status: 'failed',
+            startDate: formatDdMmYyyy(startDate),
+            endDate: formatDdMmYyyy(endDate),
+            botId: [botId],
+            index: 1,
+            limit: 5000,
+          },
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to fetch failed calls');
+          return;
+        }
+        const raw = Array.isArray(res.data?.calls) ? res.data.calls : [];
+        const rows = raw.filter(
+          (r) =>
+            String(r.status || '').toLowerCase() === 'failed' &&
+            Number(r.bot_id) === Number(botId),
+        );
+        if (!rows.length) {
+          toast.info('No failed calls to reinitiate');
+          return;
+        }
+        await botCall(rows);
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [botCall, getDateRange],
+  );
+
+  const reinitiateStatus = useCallback(
+    async (botId: number, status: 'deleted' | 'failed') => {
+      if (status === 'failed') await reinitiateFailed(botId);
+      else await reinitiateDeleted(botId);
+    },
+    [reinitiateDeleted, reinitiateFailed],
+  );
+
   return {
     actionLoading,
     summaryData,
@@ -262,5 +314,6 @@ export function useCallLogsActions({
     viewSummary,
     onUpload,
     reinitiateDeleted,
+    reinitiateStatus,
   };
 }

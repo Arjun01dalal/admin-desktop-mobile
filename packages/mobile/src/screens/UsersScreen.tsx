@@ -703,10 +703,13 @@ export function UsersScreen() {
   }, [page, pageSize, userType, hideContact, canShowMobile]);
 
   const showBlockAction = userType !== 'Sub_Admin' && !isCaller;
-  // Desktop parity: Dump only for these user types, never for callers.
-  const showDumpAction =
-    !isCaller &&
-    ['User', 'Non_Performing_User', 'Todays_Active', 'Active_User'].includes(userType);
+  // Callers may dump users from the same user types (Laxmi parity).
+  const showDumpAction = [
+    'User',
+    'Non_Performing_User',
+    'Todays_Active',
+    'Active_User',
+  ].includes(userType);
 
   return (
     <ScrollView

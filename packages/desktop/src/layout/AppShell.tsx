@@ -16,9 +16,12 @@ import {
   DialogActions,
   Stack,
   InputAdornment,
+  IconButton,
   TextField,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import MenuIcon from '@mui/icons-material/Menu';
+import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -45,14 +48,16 @@ import {
 } from '@/auth/permissions';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import { useSosFlagGuard } from '@/hooks/useSosFlagGuard';
+import type { AuthUser } from '@/types/gcalc';
 
 const DRAWER_WIDTH = 240;
 
 type Props = {
   onLogout: () => void;
+  onUserChanged: (user: AuthUser) => void;
 };
 
-export function AppShell({ onLogout }: Props) {
+export function AppShell({ onLogout, onUserChanged }: Props) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const shellBg = isDark ? '#0f0f12' : '#f0f0f2';
@@ -65,6 +70,13 @@ export function AppShell({ onLogout }: Props) {
   const [sosLoading, setSosLoading] = useState(false);
   const [userVersion, setUserVersion] = useState(0);
   const [navSearch, setNavSearch] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      return localStorage.getItem('astro_sidebar_hidden') !== '1';
+    } catch {
+      return true;
+    }
+  });
   const [revealOtpOpen, setRevealOtpOpen] = useState(false);
   const reveal = useRevealCodes();
   const [revealTick, setRevealTick] = useState(0);
@@ -284,6 +296,24 @@ export function AppShell({ onLogout }: Props) {
         }}
       >
         <Toolbar sx={{ gap: 2 }}>
+          <IconButton
+            color="inherit"
+            title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            onClick={() => {
+              setSidebarOpen((current) => {
+                const next = !current;
+                try {
+                  localStorage.setItem('astro_sidebar_hidden', next ? '0' : '1');
+                } catch {
+                  // ignore
+                }
+                return next;
+              });
+            }}
+          >
+            {sidebarOpen ? <MenuOpenIcon /> : <MenuIcon />}
+          </IconButton>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexGrow: 1 }}>
             <AstroLogo size={36} showGlow={false} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -356,6 +386,11 @@ export function AppShell({ onLogout }: Props) {
                 setSosOpen(true);
               }
             }}
+            onUserChanged={(nextUser) => {
+              setUserVersion((value) => value + 1);
+              onUserChanged(nextUser);
+              navigate('/welcome');
+            }}
             onLogout={() => {
               onLogout();
               navigate('/');
@@ -367,8 +402,9 @@ export function AppShell({ onLogout }: Props) {
       <Drawer
         variant="permanent"
         sx={{
-          width: DRAWER_WIDTH,
+          width: sidebarOpen ? DRAWER_WIDTH : 0,
           flexShrink: 0,
+          display: sidebarOpen ? 'block' : 'none',
           [`& .MuiDrawer-paper`]: {
             width: DRAWER_WIDTH,
             boxSizing: 'border-box',
@@ -497,7 +533,10 @@ export function AppShell({ onLogout }: Props) {
             <BackButton to={backTo} />
           </Box>
         )}
-        <Outlet />
+        {/* Remount the active route when OTP reveal toggles. Some legacy
+            screens call the label mapper directly and do not subscribe to the
+            reveal store themselves. */}
+        <Outlet key={reveal.active ? `revealed-${reveal.expiresAt}` : 'hidden'} />
       </Box>
 
       <Dialog

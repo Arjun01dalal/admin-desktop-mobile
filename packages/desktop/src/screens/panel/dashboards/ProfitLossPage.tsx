@@ -332,7 +332,7 @@ export function ProfitLossPage() {
           emptyMessage="No records found"
           stickyHeader
           dense
-          maxHeight="calc(100vh - 280px)"
+          maxHeight="calc(100vh - 235px)"
         />
       </ProfitLossFiltersProvider>
 

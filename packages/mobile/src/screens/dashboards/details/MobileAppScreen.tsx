@@ -5,24 +5,22 @@
  * registry only exposes mobileApp.getLinks as a local (unsupported) action, so
  * this screen reproduces the same local link builder using @astro/shared.
  *
- * Desktop's "gated copy" trick (every 6th tap on a link shares the REAL CDN URL;
- * other taps share a decoy) is preserved via the RN Share sheet, since mobile
- * has no clipboard dependency. Row tap opens the detail sheet with per-link
- * Share actions.
+ * Desktop's "gated copy" trick (every 6th tap on a link copies the REAL CDN URL;
+ * other taps copy a decoy) is preserved with the native clipboard.
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Share,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { CLIENT_APP_CODES, CLIENT_NAMES } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { getSessionUser } from '../../../auth/permissions';
+import { useAuth } from '../../../auth/AuthContext';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 /** CDN used for Mobile App registration / deposit links (mirrors desktop default). */
@@ -30,7 +28,7 @@ const MOBILE_CDN_BASE = 'https://d2opi4jisa0j0o.cloudfront.net';
 
 /** Shared decoy until the 6th tap unlocks the real CDN URL. */
 const SHARE_DECOY_URL = 'https://astropixel.live/';
-/** Every Nth tap on a given link shares the original URL, then the cycle repeats. */
+/** Every Nth tap on a given link copies the original URL, then the cycle repeats. */
 const ORIGINAL_URL_EVERY_N_TAPS = 6;
 
 /** Mobile App rows — order/names match desktop MOBILE_APP_DETAILS. */
@@ -78,7 +76,7 @@ function buildMobileAppLinks(empCode = '001'): AppLink[] {
 void CLIENT_NAMES;
 
 export function MobileAppScreen() {
-  const user = useMemo(() => getSessionUser(), []);
+  const { user } = useAuth();
   const empCode = String((user as { empCode?: string } | null)?.empCode || '001').trim() || '001';
   const apps = useMemo(() => buildMobileAppLinks(empCode), [empCode]);
 
@@ -86,20 +84,21 @@ export function MobileAppScreen() {
   // Per (rowKey + which) tap counter driving the gated share.
   const tapCountsRef = useRef<Record<string, number>>({});
 
-  const shareGated = useCallback(async (rowKey: string, which: 'reg' | 'dep', realUrl: string) => {
+  const copyGated = useCallback(async (rowKey: string, which: 'reg' | 'dep', realUrl: string) => {
     const key = `${rowKey}:${which}`;
     const next = (tapCountsRef.current[key] || 0) + 1;
     tapCountsRef.current[key] = next;
     const unlock = next % ORIGINAL_URL_EVERY_N_TAPS === 0;
-    const toShare = unlock ? realUrl : SHARE_DECOY_URL;
+    const toCopy = unlock ? realUrl : SHARE_DECOY_URL;
     if (unlock && !realUrl) {
       Alert.alert('No link available');
       return;
     }
     try {
-      await Share.share({ message: toShare });
+      await Clipboard.setStringAsync(toCopy);
+      Alert.alert(unlock ? 'Copied original link' : 'Copied', unlock ? realUrl : undefined);
     } catch {
-      /* user dismissed */
+      Alert.alert('Copy failed', 'Could not copy the link');
     }
   }, []);
 
@@ -107,8 +106,9 @@ export function MobileAppScreen() {
     if (!sheetRow) return [];
     return [
       { label: 'App Code', value: sheetRow.code },
-      { label: 'Registration Link', value: SHARE_DECOY_URL, multiline: true },
-      { label: 'Deposit Link', value: SHARE_DECOY_URL, multiline: true },
+      // Decoy only — real URL unlocks via Copy buttons (matches desktop gated control).
+      { label: 'Registration Link', value: SHARE_DECOY_URL, multiline: true, selectable: false },
+      { label: 'Deposit Link', value: SHARE_DECOY_URL, multiline: true, selectable: false },
     ];
   }, [sheetRow]);
 
@@ -117,17 +117,17 @@ export function MobileAppScreen() {
     const row = sheetRow;
     return [
       {
-        label: 'Share Registration Link',
+        label: 'Copy Registration Link',
         tone: 'primary',
-        onPress: () => void shareGated(row.key, 'reg', row.registrationLink),
+        onPress: () => void copyGated(row.key, 'reg', row.registrationLink),
       },
       {
-        label: 'Share Deposit Link',
+        label: 'Copy Deposit Link',
         tone: 'default',
-        onPress: () => void shareGated(row.key, 'dep', row.depositLink),
+        onPress: () => void copyGated(row.key, 'dep', row.depositLink),
       },
     ];
-  }, [sheetRow, shareGated]);
+  }, [sheetRow, copyGated]);
 
   return (
     <ScrollView
@@ -150,7 +150,10 @@ export function MobileAppScreen() {
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={styles.hint}>Tap a card to share its registration / deposit link</Text>
+      <Text style={styles.hint}>
+        Tap a card, then use Copy Registration / Deposit. Every 6th copy unlocks the original CDN
+        link.
+      </Text>
 
       <RowDetailSheet
         visible={sheetRow !== null}

@@ -68,12 +68,19 @@ export function CallLogsToolbar({
     >
       <Stack
         direction="row"
-        spacing={1.25}
+        spacing={1}
         alignItems="center"
-        mb={1.25}
-        flexWrap="wrap"
-        useFlexGap
-        sx={{ minWidth: 0, maxWidth: '100%' }}
+        sx={{
+          minWidth: 0,
+          maxWidth: '100%',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          pb: 0.25,
+          '& .MuiButton-root': {
+            whiteSpace: 'nowrap',
+            minWidth: 'max-content',
+          },
+        }}
       >
         <TextField
           type="date"
@@ -82,7 +89,7 @@ export function CallLogsToolbar({
           InputLabelProps={{ shrink: true }}
           value={startDate}
           onChange={(e) => onStartDateChange(e.target.value)}
-          sx={{ width: 170, flexShrink: 0 }}
+          sx={{ width: 130, flexShrink: 0 }}
         />
         <TextField
           type="date"
@@ -91,7 +98,7 @@ export function CallLogsToolbar({
           InputLabelProps={{ shrink: true }}
           value={endDate}
           onChange={(e) => onEndDateChange(e.target.value)}
-          sx={{ width: 170, flexShrink: 0 }}
+          sx={{ width: 130, flexShrink: 0 }}
         />
         <Button
           variant="contained"
@@ -120,23 +127,13 @@ export function CallLogsToolbar({
         >
           Dialer Call
         </Button>
-      </Stack>
-
-      <Stack
-        direction="row"
-        spacing={1.5}
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        sx={{ minWidth: 0, maxWidth: '100%' }}
-      >
         <TextField
           select
           label="Campaign List"
           size="small"
           value={campaignId}
           onChange={(e) => onCampaignChange(e.target.value)}
-          sx={{ width: 220, flexShrink: 0 }}
+          sx={{ width: 155, flexShrink: 0 }}
         >
           <MenuItem value="">
             <em>Select campaign</em>
@@ -153,7 +150,7 @@ export function CallLogsToolbar({
           size="small"
           value={String(itemsPerPage)}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          sx={{ width: 150, flexShrink: 0 }}
+          sx={{ width: 112, flexShrink: 0 }}
         >
           {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
             <MenuItem key={opt} value={opt}>
@@ -189,11 +186,14 @@ export function CallLogsToolbar({
           </Button>
         )}
         {(loading || actionLoading) && <CircularProgress size={22} />}
+        <Typography
+          variant="body2"
+          fontWeight={700}
+          sx={{ ml: 'auto !important', pl: 1, whiteSpace: 'nowrap', flexShrink: 0 }}
+        >
+          Total users: {total}
+        </Typography>
       </Stack>
-
-      <Typography variant="body2" fontWeight={700} mt={1.5}>
-        Total user count : {total}
-      </Typography>
     </Paper>
   );
 }

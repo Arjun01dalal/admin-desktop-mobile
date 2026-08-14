@@ -4,16 +4,13 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { secureApi } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
 import { Button } from '../../components/UI';
+import { useRevealCodes } from '../../context/useRevealCodes';
 import {
+  ACTIVE_EXCHANGE_MAP,
   PANEL_LABELS,
   activeExchangeJyotishLabel,
+  toDisplayText,
 } from '../jyotish/jyotishMapping';
-
-const EXCHANGES = [
-  { original: 'AAA', jyotish: 'Ascendant' },
-  { original: 'FALCON', jyotish: 'Phalguni' },
-  { original: 'JETFAIR', jyotish: 'Jyeshtha' },
-] as const;
 
 type Props = {
   activeExchangeName?: string;
@@ -21,6 +18,7 @@ type Props = {
 };
 
 export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
+  useRevealCodes();
   const [selected, setSelected] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -54,16 +52,16 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
 
   return (
     <View style={styles.panel}>
-      <Text style={styles.title}>{PANEL_LABELS.title}</Text>
+      <Text style={styles.title}>{toDisplayText(PANEL_LABELS.title)}</Text>
       <Text style={styles.currentLabel}>
-        {PANEL_LABELS.activeName}:{' '}
+        {toDisplayText(PANEL_LABELS.activeName)}:{' '}
         <Text style={styles.currentValue}>
           {activeExchangeJyotishLabel(activeExchangeName)}
         </Text>
       </Text>
 
       <View style={styles.chipRow}>
-        {EXCHANGES.map((ex) => {
+        {ACTIVE_EXCHANGE_MAP.map((ex) => {
           const active = selected === ex.original;
           return (
             <TouchableOpacity
@@ -76,7 +74,7 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
               style={[styles.chip, active && styles.chipActive]}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                {ex.jyotish}
+                {toDisplayText(ex.jyotish)}
               </Text>
             </TouchableOpacity>
           );

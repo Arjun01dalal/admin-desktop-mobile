@@ -5,9 +5,10 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { Link as RouterLink } from 'react-router-dom';
 import { hasPermission } from '@/auth/permissions';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
-import { CopyText, type CommonTableColumn } from '@/components/CommonTable';
+import { type CommonTableColumn } from '@/components/CommonTable';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
+import { CompactDpId } from '@/screens/panel/users/FilterControls';
 import {
   AadharFilter,
   AccNoFilter,
@@ -204,15 +205,18 @@ export function useNewRegistersColumns({
       {
         id: 'dpId',
         label: 'DP ID',
-        width: 220,
+        // Sticky cells lock maxWidth — keep room for full ObjectId + copy icon.
+        width: 252,
         stickyLeft: true,
         filter: <DpIdFilter />,
+        headSx: { px: 0.75, overflow: 'hidden' },
         cellSx: {
+          px: 0.75,
+          overflow: 'hidden',
           whiteSpace: 'nowrap',
-          fontSize: 12,
-          letterSpacing: 0,
+          verticalAlign: 'middle',
         },
-        render: (row) => <CopyText value={String(row._id || '')} />,
+        render: (row) => <CompactDpId value={String(row._id || '')} />,
       },
       {
         id: 'userComesFrom',

@@ -768,8 +768,21 @@ export function DepositApprovedReportPage() {
   );
 
   return (
-    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        px: 1.5,
+        py: 1.25,
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100vh - 96px)',
+        minHeight: 480,
+      }}
+    >
+      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
         Deposit Approved Report
       </Typography>
 
@@ -780,6 +793,7 @@ export function DepositApprovedReportPage() {
           borderRadius: 1.5,
           bgcolor: 'background.paper',
           border: '1px solid rgba(255,255,255,0.08)',
+          flexShrink: 0,
         }}
       >
         <Box
@@ -899,7 +913,13 @@ export function DepositApprovedReportPage() {
         </Box>
       </Box>
 
-      <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        mb={1.5}
+        sx={{ flexShrink: 0 }}
+      >
         <Chip
           label={
             selectedGateway?.mid
@@ -911,35 +931,51 @@ export function DepositApprovedReportPage() {
         {sumLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
       </Stack>
 
-      {isScanner ? (
-        <CommonTable
-          columns={scannerColumns}
-          rows={scannerRows}
-          getRowKey={(row, index) => row._id || row.userId || index}
-          loading={scannerLoading}
-          emptyMessage="No scanner data found"
-          stickyHeader
-          dense
-          virtualize={false}
-          minWidth={1800}
-          maxHeight="calc(100vh - 340px)"
-        />
-      ) : (
-        <CommonTable
-          columns={depositColumns}
-          rows={rows}
-          getRowKey={(row, index) => row._id || row.orderId || index}
-          loading={loading}
-          emptyMessage="No approved deposits found"
-          stickyHeader
-          dense
-          virtualize={false}
-          minWidth={2200}
-          maxHeight="calc(100vh - 340px)"
-        />
-      )}
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          '& > *': { flex: 1, minHeight: 0 },
+        }}
+      >
+        {isScanner ? (
+          <CommonTable
+            columns={scannerColumns}
+            rows={scannerRows}
+            getRowKey={(row, index) => row._id || row.userId || index}
+            loading={scannerLoading}
+            emptyMessage="No scanner data found"
+            stickyHeader
+            dense
+            minWidth={1800}
+            maxHeight="100%"
+          />
+        ) : (
+          <CommonTable
+            columns={depositColumns}
+            rows={rows}
+            getRowKey={(row, index) => row._id || row.orderId || index}
+            loading={loading}
+            emptyMessage="No approved deposits found"
+            stickyHeader
+            dense
+            minWidth={2200}
+            maxHeight="100%"
+          />
+        )}
+      </Box>
 
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        mt={1.5}
+        mb={0.5}
+        sx={{ flexShrink: 0 }}
+      >
         <Typography variant="body2" color="text.secondary">
           Total: {isScanner ? scannerRows.length : total}
         </Typography>

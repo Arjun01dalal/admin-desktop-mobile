@@ -25,6 +25,8 @@ export type SheetField = {
   badgeColor?: string;
   /** Long text: label on top, full-width left-aligned value below. */
   multiline?: boolean;
+  /** Allow OS text selection / long-press copy. Defaults to true. */
+  selectable?: boolean;
 };
 
 export type SheetAction = {
@@ -122,7 +124,10 @@ export function RowDetailSheet({
               f.multiline ? (
                 <View key={f.label} style={styles.fieldBlock}>
                   <Text style={styles.label}>{toDisplayText(f.label)}</Text>
-                  <Text style={[styles.blockValue, f.color ? { color: f.color } : null]} selectable>
+                  <Text
+                    style={[styles.blockValue, f.color ? { color: f.color } : null]}
+                    selectable={f.selectable !== false}
+                  >
                     {f.value ? toDisplayText(f.value) : '—'}
                   </Text>
                 </View>
@@ -136,7 +141,10 @@ export function RowDetailSheet({
                     </Text>
                   </View>
                 ) : (
-                  <Text style={[styles.value, f.color ? { color: f.color } : null]} selectable>
+                  <Text
+                    style={[styles.value, f.color ? { color: f.color } : null]}
+                    selectable={f.selectable !== false}
+                  >
                     {f.value ? toDisplayText(f.value) : '—'}
                   </Text>
                 )}

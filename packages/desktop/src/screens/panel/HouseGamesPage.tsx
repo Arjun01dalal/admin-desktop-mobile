@@ -135,9 +135,6 @@ export function HouseGamesPage() {
             Search
           </Button>
           {loader && <CircularProgress size={22} />}
-        </Stack>
-
-        <Stack direction="row" spacing={3} mt={1.5} flexWrap="nowrap">
           <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
             {toDisplayText('Total')}: {totalCount}
           </Typography>

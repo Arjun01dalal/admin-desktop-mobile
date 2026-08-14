@@ -16,9 +16,9 @@ export function AstroSite({ onOpenLogin: _onOpenLogin }: Props) {
 
   useEffect(() => {
     window.gcalc?.showSite?.();
-    return () => {
-      window.gcalc?.hideSite?.();
-    };
+    // Intentionally no hideSite on cleanup: React StrictMode remounts this
+    // effect and a hide→show cycle black-flashes the window. Login / welcome
+    // transitions call hideSite themselves.
   }, []);
 
   useEffect(() => {

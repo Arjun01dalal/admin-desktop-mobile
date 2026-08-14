@@ -9,7 +9,7 @@ import {
   useState,
   type ComponentType,
 } from 'react';
-import { MemoryRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Box, CircularProgress, CssBaseline, ThemeProvider } from '@mui/material';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -24,7 +24,6 @@ import { AppShell } from '@/layout/AppShell';
 import { UpdateToast } from '@/components/UpdateToast';
 import { TokenValidator } from '@/components/TokenValidator';
 import { BlockedUserCheck } from '@/components/BlockedUserCheck';
-import { PANEL_PATHS } from '@/layout/navItems';
 import {
   clearAuthStorage,
   isJwtExpired,
@@ -416,8 +415,6 @@ function PanelRouteFallback() {
   );
 }
 
-const LAST_PANEL_PATH_KEY = 'last_panel_path';
-
 function readStoredSession(): AuthUser | null {
   try {
     const raw = localStorage.getItem('user');
@@ -431,28 +428,6 @@ function readStoredSession(): AuthUser | null {
     clearAuthStorage();
     return null;
   }
-}
-
-function readLastPanelPath(): string {
-  try {
-    const path = sessionStorage.getItem(LAST_PANEL_PATH_KEY) || '/welcome';
-    return PANEL_PATHS.has(path) ? path : '/welcome';
-  } catch {
-    return '/welcome';
-  }
-}
-
-/** Saves current panel route so refresh reopens the same page. */
-function PanelPathTracker() {
-  const location = useLocation();
-
-  useEffect(() => {
-    if (PANEL_PATHS.has(location.pathname)) {
-      sessionStorage.setItem(LAST_PANEL_PATH_KEY, location.pathname);
-    }
-  }, [location.pathname]);
-
-  return null;
 }
 
 export default function App() {
@@ -475,7 +450,6 @@ function AppInner() {
     }
   }, []);
   const [screen, setScreen] = useState<AppScreen>(skipSiteLaunch ? 'login' : 'site');
-  const panelEntry = useState(() => readLastPanelPath())[0];
   const sessionToastShown = useRef(false);
   const goLoginRef = useRef<(prefill?: { email?: string; mobile?: string }) => void>(
     () => {},
@@ -484,11 +458,6 @@ function AppInner() {
   const [loginPrefill, setLoginPrefill] = useState<{ email?: string; mobile?: string }>(
     {},
   );
-
-  useEffect(() => {
-    if (skipSiteLaunch) return;
-    window.gcalc?.showSite?.();
-  }, [skipSiteLaunch]);
 
   // Load OS-encrypted token before session checks.
   useEffect(() => {
@@ -667,12 +636,14 @@ function AppInner() {
         )}
 
         {inPanel && (
-          <MemoryRouter initialEntries={[panelEntry]}>
+          <MemoryRouter initialEntries={['/welcome']}>
             <TokenValidator />
             <BlockedUserCheck />
             <Suspense fallback={<PanelRouteFallback />}>
               <Routes>
-                <Route element={<AppShell onLogout={logout} />}>
+                <Route
+                  element={<AppShell onLogout={logout} onUserChanged={goPanel} />}
+                >
                   <Route path="/welcome" element={<WelcomePage user={user} />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/vip-dashboard" element={<VipDashboardPage />} />
@@ -920,7 +891,6 @@ function AppInner() {
                 </Route>
               </Routes>
             </Suspense>
-            <PanelPathTracker />
           </MemoryRouter>
         )}
 

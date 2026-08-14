@@ -3,13 +3,19 @@ import {
   Avatar,
   Box,
   Button,
+  CircularProgress,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
   Tooltip,
+  TextField,
   Typography,
 } from '@mui/material';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
@@ -20,11 +26,14 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import CheckIcon from '@mui/icons-material/Check';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import { toast } from 'react-toastify';
 import {
   useColorMode,
   type ColorModePreference,
 } from '@/context/ColorModeContext';
 import type { AuthUser } from '@/types/gcalc';
+import { getRoleOptions, selectActiveRole } from '@/auth/roleSelection';
 
 const THEME_OPTIONS: {
   value: ColorModePreference;
@@ -42,6 +51,7 @@ type Props = {
   sosEnabled: boolean;
   sosLoading: boolean;
   onSosClick: () => void;
+  onUserChanged: (user: AuthUser) => void;
   onLogout: () => void;
 };
 
@@ -69,10 +79,15 @@ export function ProfileMenu({
   sosEnabled,
   sosLoading,
   onSosClick,
+  onUserChanged,
   onLogout,
 }: Props) {
   const { preference, setPreference } = useColorMode();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [roleOpen, setRoleOpen] = useState(false);
+  const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [roleLoading, setRoleLoading] = useState(false);
+  const roleOptions = getRoleOptions(user);
 
   const name = String(user?.name || '').trim();
   const mobile = String(user?.mobile || '').trim();
@@ -92,6 +107,22 @@ export function ProfileMenu({
 
   const open = (e: MouseEvent<HTMLElement>) => setAnchor(e.currentTarget);
   const close = () => setAnchor(null);
+
+  const applyRole = async () => {
+    const role = roleOptions.find((item) => item.id === selectedRoleId);
+    if (!user || !role) return;
+    setRoleLoading(true);
+    try {
+      const nextUser = await selectActiveRole(user, role);
+      onUserChanged(nextUser);
+      setRoleOpen(false);
+      toast.success('Role is updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update role');
+    } finally {
+      setRoleLoading(false);
+    }
+  };
 
   return (
     <>
@@ -181,6 +212,24 @@ export function ProfileMenu({
           );
         })}
 
+        {roleOptions.length > 0 ? (
+          <>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                close();
+                setSelectedRoleId(String(user?.Role_ID || ''));
+                setRoleOpen(true);
+              }}
+            >
+              <ListItemIcon>
+                <SwapHorizIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Change role</ListItemText>
+            </MenuItem>
+          </>
+        ) : null}
+
         {showSosControls ? (
           <>
             <Divider />
@@ -224,6 +273,40 @@ export function ProfileMenu({
           <ListItemText>Logout</ListItemText>
         </MenuItem>
       </Menu>
+
+      <Dialog open={roleOpen} onClose={() => !roleLoading && setRoleOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Change Role</DialogTitle>
+        <DialogContent>
+          <TextField
+            select
+            fullWidth
+            margin="dense"
+            label="Select Role"
+            value={selectedRoleId}
+            onChange={(event) => setSelectedRoleId(event.target.value)}
+            disabled={roleLoading}
+          >
+            {roleOptions.map((role) => (
+              <MenuItem key={role.id} value={role.id}>
+                {role.name}
+              </MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={roleLoading} onClick={() => setRoleOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={roleLoading || !selectedRoleId}
+            startIcon={roleLoading ? <CircularProgress size={16} color="inherit" /> : undefined}
+            onClick={() => void applyRole()}
+          >
+            Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

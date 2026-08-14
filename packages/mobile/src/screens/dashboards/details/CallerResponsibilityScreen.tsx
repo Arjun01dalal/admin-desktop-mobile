@@ -310,17 +310,17 @@ export function CallerResponsibilityScreen() {
         {startDate} → {endDate} · Tap a caller row for details & view lists
       </Text>
 
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={applyAll}
+      />
+
       {!isCaller && (
         <>
-          <DetailFilterBar
-            startDate={draftStart}
-            endDate={draftEnd}
-            loading={loading}
-            onStartDateChange={setDraftStart}
-            onEndDateChange={setDraftEnd}
-            onApply={applyAll}
-          />
-
           {showCallerHead && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
               <View style={styles.chipRow}>

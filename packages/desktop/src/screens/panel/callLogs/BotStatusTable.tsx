@@ -28,7 +28,7 @@ type BotStatusTableProps = {
   botSummary: Record<string, unknown>;
   loading: boolean;
   actionLoading: boolean;
-  onReinitiateDeleted: (botId: number) => void;
+  onReinitiate: (botId: number, status: 'deleted' | 'failed') => void;
 };
 
 type StatusKey = (typeof BOT_STATUS_KEYS)[number];
@@ -124,9 +124,11 @@ export function BotStatusTable({
   botSummary,
   loading,
   actionLoading,
-  onReinitiateDeleted,
+  onReinitiate,
 }: BotStatusTableProps) {
-  const [open, setOpen] = useState(true);
+  // Keep the large bot matrix collapsed by default so the call-log table gets
+  // the available viewport. The summary header acts as the dropdown trigger.
+  const [open, setOpen] = useState(false);
   const rows = useMemo(() => buildBotSummaryRows(botSummary), [botSummary]);
 
   const visibleKeys = useMemo(() => {
@@ -270,7 +272,8 @@ export function BotStatusTable({
                   </TableCell>
                   {keysToShow.map((key) => {
                     const count = Number(row[key]) || 0;
-                    if (key === 'deleted' && count > 0) {
+                    if ((key === 'deleted' || key === 'failed') && count > 0) {
+                      const tone = TONE[key] ?? TONE.deleted;
                       return (
                         <TableCell key={key} sx={cellSx}>
                           <Button
@@ -278,7 +281,7 @@ export function BotStatusTable({
                             variant="outlined"
                             color="secondary"
                             disabled={actionLoading}
-                            onClick={() => void onReinitiateDeleted(row.botId)}
+                            onClick={() => void onReinitiate(row.botId, key)}
                             sx={{
                               textTransform: 'none',
                               fontSize: 10,
@@ -287,8 +290,8 @@ export function BotStatusTable({
                               px: 0.75,
                               minWidth: 0,
                               lineHeight: 1.25,
-                              borderColor: TONE.deleted.fg,
-                              color: TONE.deleted.fg,
+                              borderColor: tone.fg,
+                              color: tone.fg,
                             }}
                           >
                             Reinit {count}

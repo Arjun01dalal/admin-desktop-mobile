@@ -218,6 +218,7 @@ export function AllUserLoginReportPage() {
         loading={loading}
         emptyMessage="No login records found"
         minWidth={1100}
+        maxHeight="calc(100vh - 300px)"
       />
 
       <Stack alignItems="center" mt={2}>

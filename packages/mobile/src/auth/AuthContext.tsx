@@ -14,12 +14,14 @@ import { registerSosPush } from '../push/sosPush';
 import { resetTokenValidationThrottle } from './sessionCheck';
 import { useTokenValidator } from './useTokenValidator';
 import type { AuthUser } from '../types/auth';
+import { getRoleOptions, selectActiveRole } from './roleSelection';
 
 type AuthState = {
   ready: boolean;
   token: string | null;
   user: AuthUser | null;
   login: (token: string, user: AuthUser) => void;
+  switchRole: (roleId: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -63,6 +65,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void registerSosPush(); // APK builds: enable closed-app SOS siren push.
   }, []);
 
+  const switchRole = useCallback(
+    async (roleId: string) => {
+      if (!token || !user) throw new Error('No active session');
+      const role = getRoleOptions(user).find((item) => item.id === roleId);
+      if (!role) throw new Error('Selected role is not available');
+
+      const nextUser = await selectActiveRole(user, token, role);
+      appStorage.setItem('token', token);
+      appStorage.setItem('user', JSON.stringify(nextUser));
+      appStorage.setItem('role_id', role.id);
+      appStorage.setItem('role', role.name);
+      setUser(nextUser);
+    },
+    [token, user],
+  );
+
   const logout = useCallback(() => {
     appStorage.removeItem('token');
     appStorage.removeItem('user');
@@ -90,8 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const value = useMemo(
-    () => ({ ready, token, user, login, logout }),
-    [ready, token, user, login, logout],
+    () => ({ ready, token, user, login, switchRole, logout }),
+    [ready, token, user, login, switchRole, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

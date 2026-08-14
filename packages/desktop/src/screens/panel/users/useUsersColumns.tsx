@@ -1137,8 +1137,7 @@ const cols: CommonTableColumn<UserRow>[] = [
         {(userType === 'User' ||
           userType === 'Non_Performing_User' ||
           userType === 'Todays_Active' ||
-          userType === 'Active_User') &&
-          !isCaller && (
+          userType === 'Active_User') && (
           <Button
             size="small"
             variant="contained"

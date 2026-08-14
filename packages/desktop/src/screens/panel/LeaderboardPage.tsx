@@ -403,6 +403,7 @@ export function LeaderboardPage() {
             ? { bgcolor: 'rgba(255,255,255,0.03)', '& td': { bgcolor: 'transparent' } }
             : undefined
         }
+        maxHeight="calc(100vh - 255px)"
       />
 
       <Dialog open={cityOpen} onClose={() => setCityOpen(false)} fullWidth maxWidth="xs">

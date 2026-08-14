@@ -165,7 +165,7 @@ export function LoginReportPage() {
         emptyMessage="No login records found"
         stickyHeader
         dense
-        maxHeight="calc(100vh - 280px)"
+        maxHeight="calc(100vh - 225px)"
       />
     </Box>
   );

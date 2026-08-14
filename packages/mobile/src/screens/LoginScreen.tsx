@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +14,7 @@ import { resolveLocation, useAuth } from '../auth/AuthContext';
 import { Button, Card, ErrorBanner, Input } from '../components/UI';
 import { colors, spacing } from '../theme';
 import type { AuthUser } from '../types/auth';
+import { getRoleOptions, selectActiveRole } from '../auth/roleSelection';
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
@@ -23,6 +26,11 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
   const [otpSent, setOtpSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingSession, setPendingSession] = useState<{
+    token: string;
+    user: AuthUser;
+  } | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState('');
 
   const sendOtp = async () => {
     setError(null);
@@ -77,9 +85,44 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
         setError('This account is blocked');
         return;
       }
+
+      if (getRoleOptions(user).length > 0) {
+        setPendingSession({ token, user });
+        setSelectedRoleId('');
+        return;
+      }
       login(token, user);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const chooseRole = async () => {
+    if (!pendingSession || !selectedRoleId) {
+      setError('Please select a role');
+      return;
+    }
+    const role = getRoleOptions(pendingSession.user).find(
+      (item) => item.id === selectedRoleId,
+    );
+    if (!role) {
+      setError('Selected role is not available');
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const nextUser = await selectActiveRole(
+        pendingSession.user,
+        pendingSession.token,
+        role,
+      );
+      login(pendingSession.token, nextUser);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update role');
     } finally {
       setBusy(false);
     }
@@ -92,12 +135,44 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
         style={styles.center}
       >
         <Card style={styles.card}>
-          <Text style={styles.title}>Astro Admin</Text>
+          <Text style={styles.title}>
+            {pendingSession ? 'Change Role' : 'Astro Admin'}
+          </Text>
           <Text style={styles.subtitle}>
-            {otpSent ? `OTP sent to ${mobile}` : 'Sign in with your registered mobile'}
+            {pendingSession
+              ? 'Select the role you want to use for this session'
+              : otpSent
+                ? `OTP sent to ${mobile}`
+                : 'Sign in with your registered mobile'}
           </Text>
           <ErrorBanner message={error} />
-          {!otpSent ? (
+          {pendingSession ? (
+            <>
+              <ScrollView style={styles.roleList} nestedScrollEnabled>
+                {getRoleOptions(pendingSession.user).map((role) => {
+                  const active = selectedRoleId === role.id;
+                  return (
+                    <TouchableOpacity
+                      key={role.id}
+                      style={[styles.roleOption, active && styles.roleOptionActive]}
+                      onPress={() => setSelectedRoleId(role.id)}
+                      disabled={busy}
+                    >
+                      <Text style={[styles.roleText, active && styles.roleTextActive]}>
+                        {role.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <Button
+                title="Submit"
+                onPress={() => void chooseRole()}
+                loading={busy}
+                disabled={!selectedRoleId}
+              />
+            </>
+          ) : !otpSent ? (
             <>
               <Input
                 placeholder="Mobile number"
@@ -130,7 +205,7 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
               />
             </>
           )}
-          <Button title="Back" variant="outline" onPress={onBack} />
+          {!pendingSession ? <Button title="Back" variant="outline" onPress={onBack} /> : null}
         </Card>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -143,4 +218,17 @@ const styles = StyleSheet.create({
   card: { gap: spacing(3) },
   title: { color: colors.foreground, fontSize: 24, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: colors.muted, fontSize: 14, textAlign: 'center', marginBottom: spacing(2) },
+  roleList: { maxHeight: 260 },
+  roleOption: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 10,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(3),
+    marginBottom: spacing(2),
+  },
+  roleOptionActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  roleText: { color: colors.foreground, fontSize: 14, fontWeight: '600' },
+  roleTextActive: { color: colors.primaryForeground },
 });

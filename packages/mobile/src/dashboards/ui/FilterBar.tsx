@@ -18,6 +18,8 @@ import { PROVIDER_FILTERS } from '../constants';
 import type { ProviderFilter } from '../types';
 import { daysAgoIST, monthStartIST, todayIST } from '../../utils/dates';
 import { DateField } from '../../components/DateField';
+import { useRevealCodes } from '../../context/useRevealCodes';
+import { toDisplayText } from '../jyotish/jyotishMapping';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -68,6 +70,7 @@ function Chip({
 }
 
 export function FilterBar(props: Props) {
+  useRevealCodes();
   const {
     startDate,
     endDate,
@@ -144,7 +147,7 @@ export function FilterBar(props: Props) {
           {PROVIDER_FILTERS.map((name) => (
             <Chip
               key={name}
-              label={name}
+              label={toDisplayText(name)}
               active={filterBy === name}
               onPress={() => onFilterByChange(name)}
             />

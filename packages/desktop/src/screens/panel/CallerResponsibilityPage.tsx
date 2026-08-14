@@ -47,10 +47,16 @@ export function CallerResponsibilityPage() {
   const showLocation = !isCaller || isFullAllotment;
 
   const [startDate, setStartDate] = useState(
-    () => localStorage.getItem('callerResponsibilityStartDate') || todayIST(),
+    () =>
+      isCaller
+        ? todayIST()
+        : localStorage.getItem('callerResponsibilityStartDate') || todayIST(),
   );
   const [endDate, setEndDate] = useState(
-    () => localStorage.getItem('callerResponsibilityEndDate') || todayIST(),
+    () =>
+      isCaller
+        ? todayIST()
+        : localStorage.getItem('callerResponsibilityEndDate') || todayIST(),
   );
   const [callerHead, setCallerHead] = useState('');
   const [office, setOffice] = useState('');
@@ -453,8 +459,7 @@ export function CallerResponsibilityPage() {
         Caller Responsibility
       </Typography>
 
-      {!isCaller && (
-        <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', width: '100%', maxWidth: '100%', minWidth: 0 }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', width: '100%', maxWidth: '100%', minWidth: 0 }}>
           <Stack
             direction="row"
             spacing={1.5}
@@ -527,14 +532,16 @@ export function CallerResponsibilityPage() {
             >
               Apply
             </Button>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={() => setValidateOpen(true)}
-              sx={{ flexShrink: 0, fontWeight: 700 }}
-            >
-              Validate Data
-            </Button>
+            {!isCaller && (
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => setValidateOpen(true)}
+                sx={{ flexShrink: 0, fontWeight: 700 }}
+              >
+                Validate Data
+              </Button>
+            )}
             {loading && <CircularProgress size={22} />}
           </Stack>
 
@@ -550,7 +557,6 @@ export function CallerResponsibilityPage() {
             <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
           </Typography>
         </Paper>
-      )}
 
       {showTotalDeposit && (
         <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>

@@ -5,6 +5,7 @@ import {
   Checkbox,
   CircularProgress,
   FormControlLabel,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -13,6 +14,11 @@ import { toast } from 'react-toastify';
 import { useLocationController } from '@/controllers/LocationProvider';
 import { AstroLogo } from '@/components/AstroLogo';
 import { persistRoleFromLogin } from '@/auth/permissions';
+import {
+  getRoleOptions,
+  selectActiveRole,
+  type RoleOption,
+} from '@/auth/roleSelection';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import type { AddressInfo, AuthUser } from '@/types/gcalc';
 import { getAuthToken, setAuthToken } from '@/utils/authToken';
@@ -37,6 +43,8 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
   const [otpError, setOtpError] = useState<string>();
   const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pendingUser, setPendingUser] = useState<AuthUser | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState('');
 
   const {
     coords,
@@ -180,6 +188,16 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
       localStorage.setItem('role_id', String(result.user.Role_ID || ''));
       localStorage.setItem('user', JSON.stringify(result.user));
       await setAuthToken(result.token);
+
+      // Laxmi requires users with a `roles` map to choose the active role
+      // before entering the panel.
+      const roleOptions = getRoleOptions(result.user);
+      if (roleOptions.length > 0) {
+        setPendingUser(result.user);
+        setSelectedRoleId('');
+        return;
+      }
+
       persistRoleFromLogin(result.user);
 
       // Role_ID → Responsibilities (drives side nav). Prefer fresh API list.
@@ -206,6 +224,80 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
       setLoading(false);
     }
   };
+
+  const chooseRole = async () => {
+    if (!pendingUser || !selectedRoleId) {
+      toast.error('Please select a role');
+      return;
+    }
+    const role = getRoleOptions(pendingUser).find((item) => item.id === selectedRoleId);
+    if (!role) {
+      toast.error('Selected role is not available');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const nextUser = await selectActiveRole(pendingUser, role);
+      toast.success('Role is updated');
+      onSuccess(nextUser, getAuthToken() || '');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update role');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (pendingUser) {
+    const options = getRoleOptions(pendingUser);
+    return (
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'radial-gradient(circle at 50% 0%, #2b2b30 0%, #1c1c1e 55%)',
+          px: 3,
+        }}
+      >
+        <Stack spacing={3} sx={{ width: '100%', maxWidth: 420 }}>
+          <Stack spacing={1} alignItems="center">
+            <AstroLogo size={96} />
+            <Typography variant="h5" fontWeight={700}>
+              Change Role
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              Select the role you want to use for this session
+            </Typography>
+          </Stack>
+          <TextField
+            select
+            fullWidth
+            label="Select Role"
+            value={selectedRoleId}
+            onChange={(event) => setSelectedRoleId(event.target.value)}
+            disabled={loading}
+          >
+            {options.map((role: RoleOption) => (
+              <MenuItem key={role.id} value={role.id}>
+                {role.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            fullWidth
+            disabled={loading || !selectedRoleId}
+            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : undefined}
+            onClick={() => void chooseRole()}
+          >
+            {loading ? 'Updating…' : 'Submit'}
+          </Button>
+        </Stack>
+      </Box>
+    );
+  }
 
   return (
     <Box

@@ -212,6 +212,7 @@ const TransactionTable = ({
         minWidth={2100}
         dense
         virtualize
+        maxHeight="calc(100vh - 285px)"
       />
     </HouseGamesFiltersProvider>
   );

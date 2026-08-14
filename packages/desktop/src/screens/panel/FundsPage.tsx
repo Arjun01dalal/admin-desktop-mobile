@@ -252,7 +252,7 @@ export function FundsPage() {
   }, [canEditAccess, openEdit]);
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Stack
         direction="row"
         alignItems="center"
@@ -349,7 +349,8 @@ export function FundsPage() {
         getRowKey={(row, i) => `${row.name}-${i}`}
         loading={loading}
         emptyMessage="No data"
-        minWidth={canEditAccess ? 820 : 700}
+        minWidth="100%"
+        maxHeight="calc(100vh - 220px)"
         onRowClick={(row) => openMid(row)}
       />
 

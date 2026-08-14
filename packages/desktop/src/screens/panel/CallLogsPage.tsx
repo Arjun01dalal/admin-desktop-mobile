@@ -222,7 +222,7 @@ function CallLogsPageBody({
     pauseBotCalls,
     viewSummary,
     onUpload,
-    reinitiateDeleted,
+    reinitiateStatus,
   } = useCallLogsActions({
     admin,
     load,
@@ -375,12 +375,21 @@ function CallLogsPageBody({
             botSummary={botSummary}
             loading={loading}
             actionLoading={actionLoading}
-            onReinitiateDeleted={reinitiateDeleted}
+            onReinitiate={reinitiateStatus}
           />
         </Box>
       )}
 
-      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          '& > *': { flex: 1, minHeight: 0 },
+        }}
+      >
         <CallLogsFiltersProvider value={filtersValue}>
           <CommonTable
             columns={columns}

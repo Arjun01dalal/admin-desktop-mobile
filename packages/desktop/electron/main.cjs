@@ -353,13 +353,27 @@ function hardenWebContents(wc) {
   });
 }
 
+function preferredBrowserBounds() {
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+  return {
+    sw,
+    sh,
+    width: Math.min(Math.max(1100, Math.round(sw * 0.92)), sw),
+    height: Math.min(Math.max(700, Math.round(sh * 0.92)), sh),
+  };
+}
+
 function createWindow(opts = {}) {
   const skipSite = Boolean(opts.skipSite);
+  // First paint must already be landscape — starting at portrait (390×720) then
+  // jumping to maximized caused several black flashes on Windows startup.
+  const bounds = preferredBrowserBounds();
   const win = new BrowserWindow({
-    width: skipSite ? 1200 : PORTRAIT_WIDTH,
-    height: skipSite ? 800 : PORTRAIT_HEIGHT,
-    resizable: skipSite,
-    maximizable: skipSite,
+    width: bounds.width,
+    height: bounds.height,
+    show: false,
+    resizable: true,
+    maximizable: true,
     title: 'Astro CS Panel',
     icon: iconPath(),
     backgroundColor: '#1c1c1e',
@@ -389,16 +403,24 @@ function createWindow(opts = {}) {
     } catch {
       // ignore
     }
-  }
-
-  if (skipSite) {
-    // Landscape ready — renderer jumps to panel/login (no Astro site BrowserView).
+  } else {
+    // Primary window: size once while hidden, then show maximized (one paint).
     try {
-      applyBrowserSize(rec);
+      applyBrowserSize(rec, { force: true });
     } catch {
       // ignore
     }
   }
+
+  win.once('ready-to-show', () => {
+    if (win.isDestroyed()) return;
+    try {
+      if (panelWindows.panelCount() <= 1 && !win.isMaximized()) win.maximize();
+    } catch {
+      // ignore
+    }
+    win.show();
+  });
 
   win.on('resize', () => {
     layoutSiteView(rec);
@@ -457,21 +479,42 @@ function applyLoginSize(rec) {
   applyPortraitSize(rec);
 }
 
-/** Chrome-like landscape browser window — site + admin panel */
-function applyBrowserSize(rec) {
+/**
+ * Chrome-like landscape browser window — site + admin panel.
+ * Idempotent: repeated showSite / welcome calls must not re-animate the window
+ * (that was the main cause of black flashes on initial load).
+ */
+function applyBrowserSize(rec, opts = {}) {
   const win = rec?.win;
   if (!win || win.isDestroyed()) return;
   if (win.isFullScreen()) win.setFullScreen(false);
 
-  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const browserW = Math.max(1100, Math.min(Math.round(sw * 0.92), 1600));
-  const browserH = Math.max(700, Math.min(Math.round(sh * 0.92), 1000));
-
+  const force = Boolean(opts.force);
+  const primary = panelWindows.panelCount() <= 1;
   win.setResizable(true);
   win.setMaximizable(true);
-  win.setMinimumSize(1024, 640);
-  win.setSize(browserW, browserH);
-  win.center();
+
+  const { sw, sh, width: browserW, height: browserH } = preferredBrowserBounds();
+  win.setMinimumSize(Math.min(1024, sw), Math.min(640, sh));
+
+  // Already in the final primary state — do nothing (avoids black flashes).
+  if (!force && primary && win.isMaximized()) return;
+
+  if (primary) {
+    // Set restore size only when not maximized yet; maximize once.
+    if (!win.isMaximized()) {
+      win.setSize(browserW, browserH);
+      win.center();
+      win.maximize();
+    }
+    return;
+  }
+
+  // Extra windows: keep cascaded restored size (no maximize).
+  const [cw, ch] = win.getSize();
+  if (force || Math.abs(cw - browserW) > 8 || Math.abs(ch - browserH) > 8) {
+    win.setSize(browserW, browserH);
+  }
 }
 
 function applyWelcomeSize(rec) {
@@ -614,6 +657,24 @@ function showSiteView(rec) {
   // to the window — never re-show it while an update prompt is active.
   if (blockSiteForUpdate) return;
 
+  const attachWhenReady = (view) => {
+    if (!view || view.webContents.isDestroyed() || win.isDestroyed()) return;
+    if (blockSiteForUpdate) return;
+    // Avoid detach/reattach churn (StrictMode remount / duplicate showSite).
+    try {
+      const current = win.getBrowserView();
+      if (current === view) {
+        layoutSiteView(rec);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    win.setBrowserView(view);
+    layoutSiteView(rec);
+    prefillSiteView(rec);
+  };
+
   if (!rec.siteView || rec.siteView.webContents.isDestroyed()) {
     rec.siteView = new BrowserView({
       webPreferences: {
@@ -636,11 +697,14 @@ function showSiteView(rec) {
     // SPA navigations: ensure preload listeners stay (preload reloads with page).
     rec.siteView.webContents.on('dom-ready', () => {
       console.log('[site] dom-ready — panel gate preload active');
+      // Attach only after first paint so users don't see an empty black BrowserView.
+      attachWhenReady(rec.siteView);
       prefillSiteView(rec);
     });
 
     // Prefill after first paint as well (some SPAs mount inputs late).
     rec.siteView.webContents.on('did-finish-load', () => {
+      attachWhenReady(rec.siteView);
       prefillSiteView(rec);
       setTimeout(() => prefillSiteView(rec), 400);
       setTimeout(() => prefillSiteView(rec), 1200);
@@ -665,11 +729,11 @@ function showSiteView(rec) {
     });
 
     rec.siteView.webContents.loadURL(ASTRO_SITE_URL);
+    // Keep React "Loading Astro Admin…" visible until dom-ready / finish-load.
+    return;
   }
 
-  win.setBrowserView(rec.siteView);
-  layoutSiteView(rec);
-  prefillSiteView(rec);
+  attachWhenReady(rec.siteView);
 }
 
 function sendToRenderer(channel, payload) {

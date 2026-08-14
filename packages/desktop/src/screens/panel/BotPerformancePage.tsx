@@ -599,6 +599,7 @@ export function BotPerformancePage() {
         emptyMessage="No records found"
         virtualize={false}
         getRowKey={(row) => row._id}
+        maxHeight="calc(100vh - 315px)"
       />
 
       {totalPages > 1 && (
