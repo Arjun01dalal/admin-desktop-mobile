@@ -15,6 +15,20 @@ import { laxmiActionBtnSx } from './laxmiButtonSx';
 
 type Props = { userId: string };
 
+/** White Laxmi-style card on dark panel — force readable input text. */
+const lightFormFieldSx = {
+  '& .MuiInputBase-root': {
+    bgcolor: '#fff',
+    color: '#111',
+  },
+  '& .MuiInputBase-input': {
+    color: '#111 !important',
+    WebkitTextFillColor: '#111 !important',
+  },
+  '& .MuiInputLabel-root': { color: '#5c5c62' },
+  '& .MuiSelect-icon': { color: '#5c5c62' },
+} as const;
+
 const REASON_OPTIONS = [
   { value: 'manualBonusUserFirstDeposit', label: 'User First Deposit Bonus' },
   { value: 'manualBonusUserOtherDeposit', label: 'User Other Deposit Bonus' },
@@ -92,6 +106,7 @@ export function AddBonusCoinsTab({ userId }: Props) {
             fullWidth
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            sx={lightFormFieldSx}
           />
           <TextField
             select
@@ -100,6 +115,7 @@ export function AddBonusCoinsTab({ userId }: Props) {
             fullWidth
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            sx={lightFormFieldSx}
           >
             {REASON_OPTIONS.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
@@ -116,6 +132,7 @@ export function AddBonusCoinsTab({ userId }: Props) {
               minRows={2}
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
+              sx={lightFormFieldSx}
             />
           ) : null}
           <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>

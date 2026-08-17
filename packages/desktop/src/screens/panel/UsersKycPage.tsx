@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Pagination, Stack, Typography } from '@mui/material';
+import { Box, Pagination, Typography } from '@mui/material';
 import {
   canAccessNavItem,
   hasPermission,
   Permissions,
 } from '@/auth/permissions';
 import { CommonTable } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { KycDialogs } from '@/screens/panel/kyc/KycDialogs';
 import {
@@ -79,10 +80,6 @@ export function UsersKycPage() {
   return (
     <KycFiltersProvider value={filtersCtx}>
       <Box>
-        <Typography variant="h5" fontWeight={700} mb={2}>
-          KYC
-        </Typography>
-
         {query.error ? (
           <Typography variant="body2" color="error" mb={2}>
             {query.error}
@@ -102,34 +99,39 @@ export function UsersKycPage() {
             query.setPage(1);
           }}
           onApply={query.applyDates}
+          onRefresh={() => void query.reload()}
           onKycList={() => navigate('/kycList')}
           onEnableKycFlow={actions.enableOtp.openDialog}
         />
 
-        <CommonTable
-          columns={columns}
-          rows={query.rows}
-          getRowKey={(row, i) => row._id || i}
-          loading={query.loading}
-          emptyMessage="No KYC records found"
-          stickyHeader
-          dense
-          minWidth={1500}
-          maxHeight="calc(100vh - 300px)"
-        />
-
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
-          <Typography variant="body2" color="text.secondary">
-            Total: {query.total}
-          </Typography>
-          <Pagination
-            count={Math.max(1, query.totalPages)}
-            page={query.page}
-            onChange={(_e, p) => query.setPage(p)}
-            color="primary"
-            disabled={query.loading}
+        <TablePanel
+          footer={
+            <>
+              <Typography variant="body2" color="text.secondary">
+                Total: {query.total}
+              </Typography>
+              <Pagination
+                count={Math.max(1, query.totalPages)}
+                page={query.page}
+                onChange={(_e, p) => query.setPage(p)}
+                color="primary"
+                disabled={query.loading}
+              />
+            </>
+          }
+        >
+          <CommonTable
+            columns={columns}
+            rows={query.rows}
+            getRowKey={(row, i) => row._id || i}
+            loading={query.loading}
+            emptyMessage="No KYC records found"
+            stickyHeader
+            dense
+            minWidth={1500}
+            maxHeight="100%"
           />
-        </Stack>
+        </TablePanel>
 
         <KycDialogs
           approve={actions.approve}

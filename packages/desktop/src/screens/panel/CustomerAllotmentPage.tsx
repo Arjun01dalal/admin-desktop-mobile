@@ -29,7 +29,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { display, maskMobile } from '@/screens/panel/shared';
@@ -622,38 +624,27 @@ export function CustomerAllotmentPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, p: 2 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5" fontWeight={700}>
-          Customer Allotment
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-          onClick={() => {
-            void loadCustomers(page);
-          }}
-          disabled={loading}
-          sx={{
-            borderColor: 'rgba(255,255,255,0.2)',
-            color: '#e8e8ea',
-            textTransform: 'none',
-            '&:hover': {
-              borderColor: '#ff9f0a',
-              bgcolor: 'rgba(255,159,10,0.08)',
-            },
-          }}
-        >
-          Refresh
-        </Button>
-      </Stack>
-
-      {error ? (
-        <Typography variant="body2" color="error" mb={2}>
-          {error}
-        </Typography>
-      ) : null}
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', overflowX: 'auto' }}>
+      <CollapsibleFilterPanel
+        title="Customer Allotment"
+        summary={`${pageSize} per page · ${total} total`}
+        headerActions={
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              void loadCustomers(page);
+            }}
+            disabled={loading}
+            sx={{ textTransform: 'none' }}
+          >
+            Refresh
+          </Button>
+        }
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -688,29 +679,40 @@ export function CustomerAllotmentPage() {
             Total: {total}
           </Typography>
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row, i) => row?._id || i}
-        loading={loading}
-        emptyMessage="No callers found"
-        stickyHeader
-        dense
-        minWidth={1400}
-        maxHeight="calc(100vh - 360px)"
-      />
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
 
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row, i) => row?._id || i}
+          loading={loading}
+          emptyMessage="No callers found"
+          stickyHeader
+          dense
+          minWidth={1400}
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
 
       <Dialog
         open={Boolean(blockTarget)}

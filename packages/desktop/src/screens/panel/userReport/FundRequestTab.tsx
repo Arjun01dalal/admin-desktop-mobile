@@ -3,15 +3,14 @@ import {
   Box,
   Button,
   CircularProgress,
-  MenuItem,
   Pagination,
   Stack,
-  TextField,
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
@@ -19,6 +18,7 @@ import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
 import {
   HISTORY_PAGINATION_SX,
+  ItemsPerPageField,
   SearchFilter,
 } from './historyFilters';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -161,7 +161,8 @@ export function FundRequestTab({ userId }: Props) {
               placeholder="Order key id"
             />
           ),
-          render: (r) => String(r.orderKeyId || '-'),
+          render: (r) =>
+            String(r.orderKeyID || r.orderKeyId || r.order_key_id || '-'),
         },
         {
           id: 'gw',
@@ -325,7 +326,9 @@ export function FundRequestTab({ userId }: Props) {
           id: 'ifsc',
           label: 'IfscCode',
           filter: null,
-          render: (r) => String(r.ifsc || r.IfscCode || '-'),
+          // Laxmi FundRequestHistory: item.ifscCode
+          render: (r) =>
+            String(r.ifscCode || r.IfscCode || r.ifsc || r.IFSC || '-'),
         },
         {
           id: 'ubank',
@@ -349,7 +352,10 @@ export function FundRequestTab({ userId }: Props) {
           id: 'comm',
           label: 'CommissionAmount',
           filter: null,
-          render: (r) => formatAmount(r.CommissionAmount ?? r.commission ?? 0),
+          render: (r) =>
+            formatAmount(
+              r.commissionAmount ?? r.CommissionAmount ?? r.commission ?? 0,
+            ),
         },
         {
           id: 'date',
@@ -458,25 +464,21 @@ export function FundRequestTab({ userId }: Props) {
         {typeBtn('coin', 'Coins')}
       </Stack>
 
-      <Stack direction="row" spacing={1.5} alignItems="flex-end" mb={2}>
-        <TextField
-          select
-          size="small"
-          label="Items Per Page"
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+        mb={1.5}
+      >
+        <ItemsPerPageField
           value={itemsPerPage}
-          onChange={(e) => {
-            setItemsPerPage(e.target.value);
+          onChange={(v) => {
+            setItemsPerPage(v);
             setPage(1);
           }}
-          sx={{ bgcolor: '#fff', minWidth: 120 }}
-          InputLabelProps={{ shrink: true }}
-        >
-          {['20', '50', '100', '250'].map((o) => (
-            <MenuItem key={o} value={o}>
-              {o}
-            </MenuItem>
-          ))}
-        </TextField>
+        />
         <Button
           variant="contained"
           color="inherit"
@@ -490,26 +492,30 @@ export function FundRequestTab({ userId }: Props) {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No fund requests"
-        minWidth={type === 'deposit' ? 1600 : 1200}
-        dense
-      />
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" mt={2}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(_e, p) => setPage(p)}
-            sx={HISTORY_PAGINATION_SX}
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footerJustify="center"
+        footer={
+          totalPages > 1 ? (
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              sx={HISTORY_PAGINATION_SX}
+            />
+          ) : undefined
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r, i) => String(r._id || i)}
+          loading={loading}
+          emptyMessage="No fund requests"
+          minWidth={type === 'deposit' ? 1600 : 1200}
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

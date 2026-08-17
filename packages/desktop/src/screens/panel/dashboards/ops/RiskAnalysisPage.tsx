@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Alert, Box, Typography } from '@mui/material';
+import { Alert, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { DashboardFilterBar } from './DashboardFilterBar';
@@ -148,14 +148,9 @@ export function RiskAnalysisPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={0.5}>
-        Risk Analysis
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={2}>
-        Gochar books and Exaltation risk metrics.
-      </Typography>
-
       <DashboardFilterBar
+        title="Risk Analysis"
+        summary="Gochar books and Exaltation risk metrics."
         startDate={filters.startDate}
         endDate={filters.endDate}
         appClientName={filters.appClientName}

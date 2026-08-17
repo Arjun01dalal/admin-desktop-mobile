@@ -87,7 +87,11 @@ export function ProviderMetricCard({ card, onClick }: Props) {
         gap={1}
         mb={1.5}
       >
-        <Typography variant="subtitle1" fontWeight={800} sx={{ minWidth: 0 }}>
+        <Typography
+          variant="subtitle1"
+          fontWeight={800}
+          sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}
+        >
           {toDisplayText(card.title)}
         </Typography>
         {useLudoTable ? (
@@ -101,13 +105,19 @@ export function ProviderMetricCard({ card, onClick }: Props) {
           <TextField
             select
             size="small"
+            // The theme defaults TextField to fullWidth, which in this row would
+            // claim the whole card and squeeze the title to zero width.
+            fullWidth={false}
             value={card.selectValue ?? 'All'}
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               e.stopPropagation();
               card.onSelectChange?.(e.target.value);
             }}
-            sx={{ minWidth: 140, flexShrink: 0 }}
+            sx={{
+              width: { xs: '100%', sm: 140 },
+              flex: { xs: '1 1 100%', sm: '0 0 auto' },
+            }}
           >
             {card.selectOptions.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>

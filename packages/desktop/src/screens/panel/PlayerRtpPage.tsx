@@ -5,7 +5,6 @@ import {
   Button,
   CircularProgress,
   MenuItem,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -14,7 +13,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { BackButton } from '@/components/BackButton';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { appCodeForName } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { todayIST, formatAmount } from '@/utils/dates';
@@ -454,42 +455,40 @@ export function PlayerRtpPage() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        gap={1.5}
-        mb={2}
-      >
-        <Typography variant="h5" fontWeight={700}>
-          {toDisplayText('Players RTP')}
-        </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {fromUserReport ? <BackButton /> : null}
-          <Button
-            variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
-            onClick={() => void load()}
-            disabled={loading}
-            sx={{
-              borderColor: 'rgba(255,255,255,0.28)',
-              color: '#e8e8ea',
-              textTransform: 'none',
-              '&:hover': {
-                borderColor: '#ff9f0a',
-                bgcolor: 'rgba(255,159,10,0.08)',
-              },
-            }}
+      <CollapsibleFilterPanel
+        title={toDisplayText('Players RTP')}
+        summary={`${startDate} – ${endDate} · ${type}`}
+        headerActions={
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            onClick={(event) => event.stopPropagation()}
           >
-            Refresh
-          </Button>
-        </Stack>
-      </Stack>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
+            {fromUserReport ? <BackButton to="/users" /> : null}
+            <Button
+              variant="outlined"
+              startIcon={
+                loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+              }
+              onClick={() => void load()}
+              disabled={loading}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.28)',
+                color: '#e8e8ea',
+                textTransform: 'none',
+                '&:hover': {
+                  borderColor: '#ff9f0a',
+                  bgcolor: 'rgba(255,159,10,0.08)',
+                },
+              }}
+            >
+              Refresh
+            </Button>
+          </Stack>
+        }
+        sx={{ mb: 2 }}
+      >
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             type="date"
@@ -538,46 +537,48 @@ export function PlayerRtpPage() {
             Apply
           </Button>
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      {type === 'Qtech' ? (
-        <CommonTable
-          columns={qtechColumns}
-          rows={rows as QtechRow[]}
-          getRowKey={(row, index) => row.userId || index}
-          loading={loading}
-          emptyMessage="No RTP data found"
-          stickyHeader
-          dense
-          minWidth={1200}
-          maxHeight="calc(100vh - 300px)"
-          getRowSx={(row) => rowBgSx((row as QtechRow).combined?.winPercentage)}
-        />
-      ) : type === 'AAA Exchange' ? (
-        <CommonTable
-          columns={exchangeColumns}
-          rows={rows as ExchangeRow[]}
-          getRowKey={(row, index) => row.userId || index}
-          loading={loading}
-          emptyMessage="No RTP data found"
-          stickyHeader
-          dense
-          minWidth={1000}
-          maxHeight="calc(100vh - 300px)"
-        />
-      ) : (
-        <CommonTable
-          columns={exchangeColumns}
-          rows={[]}
-          getRowKey={(_row, index) => index}
-          loading={loading}
-          emptyMessage={`${type} RTP is not available yet`}
-          stickyHeader
-          dense
-          minWidth={1000}
-          maxHeight="calc(100vh - 300px)"
-        />
-      )}
+      <TablePanel>
+        {type === 'Qtech' ? (
+          <CommonTable
+            columns={qtechColumns}
+            rows={rows as QtechRow[]}
+            getRowKey={(row, index) => row.userId || index}
+            loading={loading}
+            emptyMessage="No RTP data found"
+            stickyHeader
+            dense
+            minWidth={1200}
+            maxHeight="100%"
+            getRowSx={(row) => rowBgSx((row as QtechRow).combined?.winPercentage)}
+          />
+        ) : type === 'AAA Exchange' ? (
+          <CommonTable
+            columns={exchangeColumns}
+            rows={rows as ExchangeRow[]}
+            getRowKey={(row, index) => row.userId || index}
+            loading={loading}
+            emptyMessage="No RTP data found"
+            stickyHeader
+            dense
+            minWidth={1000}
+            maxHeight="100%"
+          />
+        ) : (
+          <CommonTable
+            columns={exchangeColumns}
+            rows={[]}
+            getRowKey={(_row, index) => index}
+            loading={loading}
+            emptyMessage={`${type} RTP is not available yet`}
+            stickyHeader
+            dense
+            minWidth={1000}
+            maxHeight="100%"
+          />
+        )}
+      </TablePanel>
     </Box>
   );
 }

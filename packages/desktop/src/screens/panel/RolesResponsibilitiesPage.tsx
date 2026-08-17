@@ -24,6 +24,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { asList, display } from '@/screens/panel/shared';
 
 type Responsibility = {
@@ -350,7 +351,8 @@ export function RolesResponsibilitiesPage() {
         )}
       </Stack>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={roles}
         loading={loading}
@@ -360,7 +362,9 @@ export function RolesResponsibilitiesPage() {
         stickyHeader
         dense
         minWidth={800}
+        maxHeight="100%"
       />
+      </TablePanel>
 
       <Dialog open={cloneOpen} onClose={() => !submitting && setCloneOpen(false)} fullWidth maxWidth="xs">
         <Box component="form" onSubmit={(e) => void handleClone(e)}>

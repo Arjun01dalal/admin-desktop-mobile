@@ -3,17 +3,16 @@ import {
   Box,
   Button,
   CircularProgress,
-  MenuItem,
   Pagination,
   Stack,
-  TextField,
-  Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
+import { ItemsPerPageField } from './historyFilters';
 
 export type HistoryRow = Record<string, unknown> & { _id?: string };
 
@@ -131,33 +130,20 @@ export function HistoryTable<T extends HistoryRow>({
     <Box>
       <Stack
         direction="row"
-        spacing={1.5}
+        spacing={1.25}
         flexWrap="wrap"
         useFlexGap
-        alignItems="flex-end"
-        mb={2}
+        alignItems="center"
+        mb={1.5}
       >
-        <Box sx={{ minWidth: 120 }}>
-          <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
-            Items Per Page
-          </Typography>
-          <TextField
-            select
-            size="small"
-            value={itemsPerPage}
-            onChange={(e) => {
-              setItemsPerPage(e.target.value);
-              setPage(1);
-            }}
-            sx={{ bgcolor: '#fff', minWidth: 120 }}
-          >
-            {pageSizeOptions.map((o) => (
-              <MenuItem key={o} value={o}>
-                {o}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Box>
+        <ItemsPerPageField
+          value={itemsPerPage}
+          onChange={(v) => {
+            setItemsPerPage(v);
+            setPage(1);
+          }}
+          options={[...pageSizeOptions]}
+        />
         {toolbar}
         <Button
           variant="contained"
@@ -172,27 +158,31 @@ export function HistoryTable<T extends HistoryRow>({
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage={emptyMessage}
-        minWidth={minWidth}
-        dense
-      />
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" mt={2}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(_e, p) => setPage(p)}
-            color="primary"
-            sx={PAGINATION_SX}
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footerJustify="center"
+        footer={
+          totalPages > 1 ? (
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              sx={PAGINATION_SX}
+            />
+          ) : undefined
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r, i) => String(r._id || i)}
+          loading={loading}
+          emptyMessage={emptyMessage}
+          minWidth={minWidth}
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

@@ -14,6 +14,7 @@ import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
@@ -137,14 +138,17 @@ export function ActiveBotUsersPage() {
         </Stack>
       </Paper>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(r, i) => String(r._id || r.userId || i)}
         loading={loading}
         emptyMessage="No bot users"
         minWidth={800}
+        maxHeight="100%"
       />
+      </TablePanel>
     </Box>
   );
 }

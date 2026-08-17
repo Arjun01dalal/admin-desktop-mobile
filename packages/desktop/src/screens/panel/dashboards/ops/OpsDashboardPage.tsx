@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Box, Typography } from '@mui/material';
+import { Alert, Box } from '@mui/material';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { todayIST } from '@/utils/dates';
 import { ActiveExchangePanel } from './ActiveExchangePanel';
@@ -130,14 +130,9 @@ export function OpsDashboardPage({ mode }: Props) {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={0.5}>
-        {meta.title}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={2}>
-        {meta.description}
-      </Typography>
-
       <DashboardFilterBar
+        title={meta.title}
+        summary={meta.description}
         startDate={filters.startDate}
         endDate={filters.endDate}
         appClientName={filters.appClientName}

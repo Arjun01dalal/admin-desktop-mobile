@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { createTableFiltersContext } from '@/components/createTableFiltersContext';
 import { getStoredUser, formatAmount } from '@/utils/dates';
@@ -323,33 +324,37 @@ export function ProfitLossPage() {
         </Alert>
       )}
 
-      <ProfitLossFiltersProvider value={filtersValue}>
-        <CommonTable
-          columns={columns}
-          rows={deferredRows}
-          getRowKey={(row, i) => row._id || i}
-          loading={loading}
-          emptyMessage="No records found"
-          stickyHeader
-          dense
-          maxHeight="calc(100vh - 235px)"
-        />
-      </ProfitLossFiltersProvider>
-
-      <Stack alignItems="center" mt={2} spacing={1}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          color="primary"
-          onChange={(_e, nextPage) => setPage(nextPage)}
-          disabled={loading}
-        />
-        <Typography variant="caption" color="text.secondary">
-          {count > 0
-            ? `${count.toLocaleString()} records · page ${page} of ${totalPages.toLocaleString()}`
-            : 'No records'}
-        </Typography>
-      </Stack>
+      <TablePanel
+        footer={
+          <>
+            <Pagination
+              count={totalPages}
+              page={page}
+              color="primary"
+              onChange={(_e, nextPage) => setPage(nextPage)}
+              disabled={loading}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {count > 0
+                ? `${count.toLocaleString()} records · page ${page} of ${totalPages.toLocaleString()}`
+                : 'No records'}
+            </Typography>
+          </>
+        }
+      >
+        <ProfitLossFiltersProvider value={filtersValue}>
+          <CommonTable
+            columns={columns}
+            rows={deferredRows}
+            getRowKey={(row, i) => row._id || i}
+            loading={loading}
+            emptyMessage="No records found"
+            stickyHeader
+            dense
+            maxHeight="100%"
+          />
+        </ProfitLossFiltersProvider>
+      </TablePanel>
     </Box>
   );
 }

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  CircularProgress,
+  Collapse,
+  IconButton,
+  Stack,
+  Typography,
+} from '@mui/material';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { secureApi } from '@/api/secureClient';
 import { formatAmount, formatLocalDate } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -21,6 +31,7 @@ type BonusEarning = {
 type AvailedBonus = {
   totalAmount?: number;
   count?: number;
+  items?: Record<string, unknown>[];
 };
 
 const BAZAR_ROWS = ['Regular', 'Starline', 'King Bazar', 'Casino'] as const;
@@ -54,10 +65,58 @@ function unpackWalletSummary(data: unknown): Record<string, unknown> {
     : {};
 }
 
-function unpackPayload<T>(data: unknown): T | null {
-  if (!data || typeof data !== 'object') return null;
-  const rec = data as { payload?: T; data?: T };
-  return (rec.payload ?? rec.data ?? data) as T;
+/**
+ * Peel nested `payload` / `data` wrappers. Secure bridge usually returns the
+ * inner payload already, but number totals (user exposure) and nested envelopes
+ * still need a careful unwrap — `typeof number !== 'object'`.
+ */
+function unwrapDeep(data: unknown): unknown {
+  let cur: unknown = data;
+  for (let i = 0; i < 5; i += 1) {
+    if (cur == null) return cur;
+    if (typeof cur === 'number' || typeof cur === 'boolean') return cur;
+    if (typeof cur === 'string') return cur;
+    if (Array.isArray(cur)) return cur;
+    if (typeof cur !== 'object') return cur;
+    const o = cur as Record<string, unknown>;
+    if (o.payload !== undefined) {
+      cur = o.payload;
+      continue;
+    }
+    if (o.data !== undefined) {
+      cur = o.data;
+      continue;
+    }
+    return cur;
+  }
+  return cur;
+}
+
+function asBonusEarning(data: unknown): BonusEarning | null {
+  const v = unwrapDeep(data);
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  return v as BonusEarning;
+}
+
+function asAvailedBonus(data: unknown): AvailedBonus | null {
+  const v = unwrapDeep(data);
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  return v as AvailedBonus;
+}
+
+function asExposureTotal(data: unknown): number {
+  const v = unwrapDeep(data);
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>;
+    const n = Number(o.total ?? o.userExposure ?? o.exposure ?? 0);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
 }
 
 /** Laxmi `formatDate` — DD-MM-YYYY, but never NaN-NaN-NaN. */
@@ -78,6 +137,8 @@ function pickLastActivity(encrypted?: EncryptedUser | null): unknown {
 
 /** Wallet History tab — layout mirrors admin-panel WalletHistory.css */
 export function WalletHistoryView({ userId, encrypted }: Props) {
+  const navigate = useNavigate();
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [depositTotal, setDepositTotal] = useState(0);
   const [withdrawalTotal, setWithdrawalTotal] = useState(0);
@@ -116,15 +177,13 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
       }
 
       if (bonusRes.ok) {
-        setBonusData(unpackPayload<BonusEarning>(bonusRes.data));
+        setBonusData(asBonusEarning(bonusRes.data));
       }
       if (availedRes.ok) {
-        setAvailedBonus(unpackPayload<AvailedBonus>(availedRes.data));
+        setAvailedBonus(asAvailedBonus(availedRes.data));
       }
       if (exposureRes.ok) {
-        const expo = unpackPayload<number | { total?: number }>(exposureRes.data);
-        if (typeof expo === 'number') setUserExposure(expo);
-        else setUserExposure(Number(expo?.total) || 0);
+        setUserExposure(asExposureTotal(exposureRes.data));
       }
     } finally {
       setLoading(false);
@@ -135,131 +194,257 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
     void loadSummary();
   }, [loadSummary]);
 
+  const openBonusEarning = (Type?: string, obj?: AvailedBonus | null) => {
+    navigate('/bonus-wallet-referral-earning', {
+      state: { User_ID: userId, Type, obj },
+    });
+  };
+
+  const openUserExposure = () => {
+    if (userExposure > 0) {
+      navigate('/user_exposure', { state: userId });
+    }
+  };
+
   const profit = depositTotal - withdrawalTotal;
   const profitAfter =
     depositTotal - withdrawalTotal - balanceTotal - pendingWithdrawal;
 
-  return (
-    <Box>
+  const ownEarning = Number(bonusData?.userOwnEarning) || 0;
+  const ownEarningCount = Number(bonusData?.userOwnEarningCount) || 0;
+  const referralEarning = Number(bonusData?.userReferral) || 0;
+  const referralCount = Number(bonusData?.userReferralCount) || 0;
+  const availedAmount = Number(availedBonus?.totalAmount) || 0;
+  const availedCount = Number(availedBonus?.count) || 0;
+
+  const summaryBody = (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 1,
+        px: 1,
+        pb: 1,
+        pt: 0.5,
+        width: '100%',
+      }}
+    >
       <Box
         sx={{
+          flex: { md: '1 1 56%' },
+          width: { xs: '100%', md: '56%' },
+          minWidth: 0,
+          bgcolor: '#FF9A43',
+          px: 1,
+          py: 0.75,
           display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
           justifyContent: 'space-between',
-          alignItems: 'stretch',
-          gap: 1.25,
-          my: 2.5,
-          width: '100%',
+          color: '#000',
+          border: '1px solid #e7812d',
+          borderRadius: 1.5,
         }}
       >
-        {/* Orange bazar stub — ~70% (Laxmi wallet-history-count-box) */}
-        <Box
-          sx={{
-            flex: { md: '1 1 70%' },
-            width: { xs: '100%', md: '70%' },
-            minWidth: 0,
-            bgcolor: '#FF9A43',
-            p: 1.25,
-            display: 'flex',
-            justifyContent: 'space-between',
-            color: '#000',
-          }}
-        >
-          <BazarCol
-            header="Bazar"
-            rows={[...BAZAR_ROWS]}
-            footer="Grand Total"
-          />
-          <BazarCol
-            header={toDisplayText('(Win - Loss)')}
-            rows={['0 - 0', '0 - 0', '0 - 0', '0 - 0']}
-            footer="-"
-          />
-          <BazarCol
-            header="Total"
-            rows={[':0', ':0', ':0', ':0']}
-            footer=":0"
-          />
-        </Box>
-
-        {/* Stats panel — white + shadow (Laxmi deposit-withdrawal-container) */}
-        <Box
-          sx={{
-            flex: { md: '1 1 26%' },
-            width: { xs: '100%', md: '26%' },
-            minWidth: { md: 260 },
-            bgcolor: '#fff',
-            p: 1.25,
-            boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
-            color: '#000',
-          }}
-        >
-          {loading ? (
-            <Stack alignItems="center" py={3}>
-              <CircularProgress size={28} />
-            </Stack>
-          ) : (
-            <Stack spacing={0}>
-              <StatText>{`Deposit: ${formatAmount(depositTotal)}`}</StatText>
-              <StatText>{`Withdraw: ${formatAmount(withdrawalTotal)}`}</StatText>
-              <StatText>{`Balance: ${formatAmount(balanceTotal)}`}</StatText>
-              <StatText>{`Bonus Wallet Balance: ${formatAmount(bonusBalance)}`}</StatText>
-              <StatText>{`Pending withdrawal: ${formatAmount(pendingWithdrawal)}`}</StatText>
-              <StatText>{`Created At: ${formatReportDate(encrypted?.createdAt)}`}</StatText>
-              <StatText>{`Last Activity: ${formatReportDate(pickLastActivity(encrypted))}`}</StatText>
-
-              <Box sx={{ borderTop: '1px solid #000', mt: 1.25, pt: 1.25 }}>
-                <Typography
-                  sx={{
-                    fontSize: 15,
-                    py: 0.5,
-                    fontWeight: 600,
-                    color: profit < 0 ? 'red' : 'green',
-                  }}
-                >
-                  {profit < 0 ? 'Loss' : 'Profit'}: {formatAmount(profit)}
-                </Typography>
-              </Box>
-              <Box sx={{ borderTop: '1px solid #000', mt: 1.25, pt: 1.25 }}>
-                <Typography
-                  sx={{
-                    fontSize: 15,
-                    py: 0.5,
-                    fontWeight: 600,
-                    color: profitAfter < 0 ? 'red' : 'green',
-                  }}
-                >
-                  {toDisplayText(
-                    profitAfter < 0
-                      ? 'Loss After Withdrawal'
-                      : 'Profit After Withdrawal',
-                  )}
-                  : {formatAmount(profitAfter)}
-                </Typography>
-              </Box>
-
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
-                Bonus Earning ({bonusData?.userOwnEarningCount ?? 0}) :{' '}
-                {formatAmount(bonusData?.userOwnEarning ?? 0)}
-              </Typography>
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
-                {availedBonus?.totalAmount
-                  ? `Availed Bonus (${availedBonus?.count ?? 0}) : ${formatAmount(availedBonus.totalAmount)}`
-                  : 'Bonus Earning (0) : 0'}
-              </Typography>
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
-                {toDisplayText('Bonus Referral Earning')} ({bonusData?.userReferralCount ?? 0}) :{' '}
-                {formatAmount(bonusData?.userReferral ?? 0)}
-              </Typography>
-              <Typography sx={{ fontSize: 15, py: 0.5, fontWeight: 700, color: '#000' }}>
-                User Exposure Total Sum : {formatAmount(userExposure)}
-              </Typography>
-            </Stack>
-          )}
-        </Box>
+        <BazarCol header="Bazar" rows={[...BAZAR_ROWS]} footer="Grand Total" />
+        <BazarCol
+          header={toDisplayText('(Win - Loss)')}
+          rows={['0 - 0', '0 - 0', '0 - 0', '0 - 0']}
+          footer="-"
+        />
+        <BazarCol header="Total" rows={[':0', ':0', ':0', ':0']} footer=":0" />
       </Box>
 
-      <WalletLedgerTable userId={userId} />
+      <Box
+        sx={{
+          flex: { md: '1 1 44%' },
+          width: { xs: '100%', md: '44%' },
+          minWidth: { md: 320 },
+          bgcolor: '#fff',
+          px: 1,
+          py: 0.75,
+          border: '1px solid #d9dde3',
+          borderRadius: 1.5,
+          boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
+          color: '#000',
+        }}
+      >
+        {loading ? (
+          <Stack alignItems="center" py={2}>
+            <CircularProgress size={24} />
+          </Stack>
+        ) : (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))',
+              gap: 0.5,
+            }}
+          >
+            <CompactStat label="Deposit" value={formatAmount(depositTotal)} />
+            <CompactStat label="Withdraw" value={formatAmount(withdrawalTotal)} />
+            <CompactStat label="Balance" value={formatAmount(balanceTotal)} />
+            <CompactStat label="Bonus Wallet" value={formatAmount(bonusBalance)} />
+            <CompactStat
+              label="Pending Withdrawal"
+              value={formatAmount(pendingWithdrawal)}
+            />
+            <CompactStat
+              label="Created"
+              value={formatReportDate(encrypted?.createdAt)}
+            />
+            <CompactStat
+              label="Last Activity"
+              value={formatReportDate(pickLastActivity(encrypted))}
+            />
+            <CompactStat
+              label={profit < 0 ? 'Loss' : 'Profit'}
+              value={formatAmount(profit)}
+              tone={profit < 0 ? 'error' : 'success'}
+              strong
+            />
+            <CompactStat
+              label={toDisplayText(
+                profitAfter < 0
+                  ? 'Loss After Withdrawal'
+                  : 'Profit After Withdrawal',
+              )}
+              value={formatAmount(profitAfter)}
+              tone={profitAfter < 0 ? 'error' : 'success'}
+              strong
+            />
+            <CompactStat
+              label={`Bonus Earning (${ownEarningCount})`}
+              value={formatAmount(ownEarning)}
+              strong
+              clickable={ownEarning > 0}
+              onClick={() => openBonusEarning('bonus')}
+            />
+            <CompactStat
+              label={
+                availedAmount > 0
+                  ? `Availed Bonus (${availedCount})`
+                  : 'Bonus Earning (0)'
+              }
+              value={formatAmount(availedAmount)}
+              strong
+              clickable={availedAmount > 0}
+              onClick={() => openBonusEarning('availedBonus', availedBonus)}
+            />
+            <CompactStat
+              label={`${toDisplayText('Bonus Referral Earning')} (${referralCount})`}
+              value={formatAmount(referralEarning)}
+              strong
+              clickable={referralEarning > 0}
+              onClick={() => openBonusEarning()}
+            />
+            <CompactStat
+              label="User Exposure"
+              value={formatAmount(userExposure)}
+              strong
+              clickable={userExposure > 0}
+              onClick={openUserExposure}
+            />
+          </Box>
+        )}
+      </Box>
+    </Box>
+  );
+
+  return (
+    <Box>
+      <WalletLedgerTable
+        userId={userId}
+        wrapOverview={({ overview, table }) => (
+          <>
+            <Box
+              sx={{
+                my: 1,
+                bgcolor: '#fff',
+                border: '1px solid #dde2e8',
+                borderRadius: 1.5,
+                boxShadow: '0 2px 6px rgba(15,23,42,0.05)',
+                overflow: 'hidden',
+              }}
+            >
+              <Box
+                role="button"
+                tabIndex={0}
+                aria-expanded={summaryOpen}
+                onClick={() => setSummaryOpen((v) => !v)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSummaryOpen((v) => !v);
+                  }
+                }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1,
+                  px: 1,
+                  py: 0.65,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  bgcolor: summaryOpen ? '#f8fafc' : '#fff',
+                  '&:hover': { bgcolor: '#f8fafc' },
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 0.75,
+                    minWidth: 0,
+                  }}
+                >
+                  <Typography
+                    sx={{ fontSize: 13, fontWeight: 700, color: '#374151' }}
+                  >
+                    Wallet Overview
+                  </Typography>
+                  {!loading && (
+                    <Typography sx={{ fontSize: 11, color: '#667085' }}>
+                      · Deposit ₹{formatAmount(depositTotal)} · Balance ₹
+                      {formatAmount(balanceTotal)} ·{' '}
+                      {profit < 0 ? 'Loss' : 'Profit'} ₹{formatAmount(profit)}
+                    </Typography>
+                  )}
+                </Box>
+                <IconButton
+                  size="small"
+                  aria-label={
+                    summaryOpen
+                      ? 'Collapse wallet overview'
+                      : 'Expand wallet overview'
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSummaryOpen((v) => !v);
+                  }}
+                  sx={{ p: 0.25, color: '#667085' }}
+                >
+                  {summaryOpen ? (
+                    <ExpandLessIcon sx={{ fontSize: 18 }} />
+                  ) : (
+                    <ExpandMoreIcon sx={{ fontSize: 18 }} />
+                  )}
+                </IconButton>
+              </Box>
+
+              <Collapse in={summaryOpen} timeout="auto" unmountOnExit>
+                <Box sx={{ borderTop: '1px solid #eef1f4' }}>
+                  {summaryBody}
+                  <Box sx={{ px: 1, pb: 1 }}>{overview}</Box>
+                </Box>
+              </Collapse>
+            </Box>
+            {table}
+          </>
+        )}
+      />
     </Box>
   );
 }
@@ -274,28 +459,101 @@ function BazarCol({
   footer: string;
 }) {
   return (
-    <Box sx={{ width: '30%' }}>
-      <Box sx={{ borderBottom: '1px solid #000', mb: 1.25 }}>
-        <Typography sx={{ fontSize: 15, py: 0.5, mb: 0, color: '#000' }}>
+    <Box sx={{ width: '32%', minWidth: 0 }}>
+      <Box sx={{ borderBottom: '1px solid rgba(0,0,0,0.45)', mb: 0.25, pb: 0.25 }}>
+        <Typography noWrap sx={{ fontSize: 11, fontWeight: 700, color: '#000' }}>
           {header}
         </Typography>
       </Box>
       {rows.map((row, i) => (
-        <Typography key={`${header}-${i}`} sx={{ fontSize: 15, py: 0.5, color: '#000' }}>
+        <Typography
+          key={`${header}-${i}`}
+          noWrap
+          sx={{ fontSize: 11, lineHeight: 1.7, color: 'rgba(0,0,0,0.82)' }}
+        >
           {toDisplayText(row)}
         </Typography>
       ))}
-      <Box sx={{ borderTop: '1px solid #000', mt: 1.25 }}>
-        <Typography sx={{ fontSize: 15, py: 0.5, color: '#000' }}>{footer}</Typography>
+      <Box sx={{ borderTop: '1px solid rgba(0,0,0,0.45)', mt: 0.25, pt: 0.25 }}>
+        <Typography noWrap sx={{ fontSize: 11, fontWeight: 700, color: '#000' }}>
+          {footer}
+        </Typography>
       </Box>
     </Box>
   );
 }
 
-function StatText({ children }: { children: ReactNode }) {
+function CompactStat({
+  label,
+  value,
+  tone,
+  strong = false,
+  clickable = false,
+  onClick,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  tone?: 'success' | 'error';
+  strong?: boolean;
+  clickable?: boolean;
+  onClick?: () => void;
+}) {
+  const toneColor = tone === 'error' ? '#b42318' : tone === 'success' ? '#15803d' : '#111827';
+
   return (
-    <Typography sx={{ fontSize: 15, py: 0.5, mb: 0, color: '#000' }}>
-      {children}
-    </Typography>
+    <Box
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? onClick : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      sx={{
+        minWidth: 0,
+        px: 0.6,
+        py: 0.35,
+        bgcolor: tone ? (tone === 'error' ? '#fff1f0' : '#edfdf3') : '#f6f7f9',
+        border: `1px solid ${tone ? (tone === 'error' ? '#fecdca' : '#abefc6') : '#e5e7eb'}`,
+        borderRadius: 1,
+        cursor: clickable ? 'pointer' : 'default',
+        ...(clickable
+          ? {
+              '&:hover': {
+                borderColor: '#f97316',
+                bgcolor: '#fff7ed',
+              },
+            }
+          : null),
+      }}
+    >
+      <Typography
+        noWrap
+        title={String(label)}
+        sx={{ fontSize: 10, lineHeight: 1.15, color: '#667085' }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        noWrap
+        title={String(value)}
+        sx={{
+          fontSize: 12,
+          lineHeight: 1.35,
+          fontWeight: strong ? 700 : 600,
+          color: clickable ? '#c2410c' : toneColor,
+          textDecoration: clickable ? 'underline' : 'none',
+          textUnderlineOffset: 2,
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
   );
 }

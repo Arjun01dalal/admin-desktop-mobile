@@ -4,7 +4,6 @@ import {
   Button,
   CircularProgress,
   MenuItem,
-  Stack,
   TextField,
   Typography,
 } from '@mui/material';
@@ -12,10 +11,16 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount, todayIST } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
-import { StatusSelectFilter } from './historyFilters';
+import {
+  ItemsPerPageField,
+  StatusSelectFilter,
+  TOOLBAR_FIELD_SX,
+  TOOLBAR_ROW_SX,
+} from './historyFilters';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type Kind = 'qtech' | 'missing' | 'jetfair' | 'sm';
@@ -43,6 +48,7 @@ const ORANGE_BTN = {
   color: '#111',
   '&:hover': { bgcolor: '#e08c00', boxShadow: 'none !important' },
 };
+
 
 function asList(data: unknown, keys: string[]): HistoryRow[] {
   if (!data) return [];
@@ -517,42 +523,56 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
 
   return (
     <Box>
-      {(kind === 'qtech' || kind === 'missing') && (
-        <Stack spacing={0.5} mb={2} sx={{ color: '#111', fontWeight: 600 }}>
-          <Typography>
-            Total Bet Amount Provider : {num(totals.providerBet)} &nbsp;&nbsp;
-            Total Win Amount Provider : {num(totals.providerWin)} &nbsp;&nbsp;
-            Platform Commission Amount : {num(totals.platformComm)}
-          </Typography>
-          <Typography>
-            Platform Bet Amount : {num(totals.platformBet)} &nbsp;&nbsp;
-            Platform Win Amount : {num(totals.platformWin)}
-          </Typography>
-        </Stack>
+      {(kind === 'qtech' || kind === 'missing' || kind === 'sm') && (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'repeat(2, minmax(0, 1fr))',
+              md: 'repeat(5, minmax(120px, 1fr))',
+            },
+            gap: 0.75,
+            mb: 1,
+          }}
+        >
+          {[
+            ['Provider Bet', totals.providerBet],
+            ['Provider Win', totals.providerWin],
+            ['Platform Commission', totals.platformComm],
+            ['Platform Bet', totals.platformBet],
+            ['Platform Win', totals.platformWin],
+          ].map(([label, value]) => (
+            <Box
+              key={String(label)}
+              sx={{
+                minWidth: 0,
+                px: 1,
+                py: 0.75,
+                bgcolor: '#fff',
+                border: '1px solid #dfe3e8',
+                borderRadius: 1.25,
+                boxShadow: '0 1px 3px rgba(15,23,42,0.05)',
+              }}
+            >
+              <Typography
+                noWrap
+                title={String(label)}
+                sx={{ fontSize: 10.5, color: '#667085', lineHeight: 1.2 }}
+              >
+                {String(label)}
+              </Typography>
+              <Typography
+                noWrap
+                sx={{ mt: 0.2, fontSize: 14, fontWeight: 700, color: '#111827' }}
+              >
+                {num(value)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
       )}
 
-      {kind === 'sm' && (
-        <Stack spacing={0.5} mb={2} sx={{ color: '#111', fontWeight: 600 }}>
-          <Typography>
-            Total Bet Amount Provider : {num(totals.providerBet)} &nbsp;&nbsp;
-            Total Win Amount Provider : {num(totals.providerWin)} &nbsp;&nbsp;
-            Platform Commission Amount : {num(totals.platformComm)}
-          </Typography>
-          <Typography>
-            Platform Bet Amount : {num(totals.platformBet)} &nbsp;&nbsp;
-            Platform Win Amount : {num(totals.platformWin)}
-          </Typography>
-        </Stack>
-      )}
-
-      <Stack
-        direction="row"
-        spacing={1.5}
-        flexWrap="wrap"
-        useFlexGap
-        alignItems="flex-end"
-        mb={1.5}
-      >
+      <Box sx={TOOLBAR_ROW_SX}>
         {(kind === 'qtech' || kind === 'missing') && (
           <>
             <TextField
@@ -562,7 +582,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               InputLabelProps={{ shrink: true }}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              sx={{ bgcolor: '#fff' }}
+              sx={TOOLBAR_FIELD_SX}
             />
             <TextField
               type="date"
@@ -571,7 +591,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               InputLabelProps={{ shrink: true }}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              sx={{ bgcolor: '#fff' }}
+              sx={TOOLBAR_FIELD_SX}
             />
           </>
         )}
@@ -584,7 +604,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               InputLabelProps={{ shrink: true }}
               value={marketDate}
               onChange={(e) => setMarketDate(e.target.value)}
-              sx={{ bgcolor: '#fff' }}
+              sx={TOOLBAR_FIELD_SX}
             />
             <TextField
               select
@@ -592,12 +612,12 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               label="Select Market"
               value={marketCode}
               onChange={(e) => setMarketCode(e.target.value)}
-              sx={{ bgcolor: '#fff', minWidth: 160 }}
+              sx={TOOLBAR_FIELD_SX}
               InputLabelProps={{ shrink: true }}
             >
               {SM_MARKETS.map((m) => (
                 <MenuItem key={m.value} value={m.value}>
-                  {m.label}
+                  {toDisplayText(m.label)}
                 </MenuItem>
               ))}
             </TextField>
@@ -609,10 +629,16 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
             label="Market Id"
             value={marketId}
             onChange={(e) => setMarketId(e.target.value)}
-            sx={{ bgcolor: '#fff', minWidth: 160 }}
+            sx={TOOLBAR_FIELD_SX}
             InputLabelProps={{ shrink: true }}
           />
         )}
+
+        <ItemsPerPageField
+          value={itemsPerPage}
+          onChange={setItemsPerPage}
+          options={['100', '250', '500', '1000']}
+        />
 
         <Button
           variant="contained"
@@ -641,7 +667,12 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               variant="contained"
               color="inherit"
               disableElevation
-              sx={ORANGE_BTN}
+              sx={{
+                ...ORANGE_BTN,
+                bgcolor:
+                  viewType === 'Missing Provider' ? '#1565c0' : '#ff9f0a',
+                color: viewType === 'Missing Provider' ? '#fff' : '#111',
+              }}
               onClick={() => setViewType('Missing Provider')}
             >
               Missing Providers
@@ -650,7 +681,12 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               variant="contained"
               color="inherit"
               disableElevation
-              sx={ORANGE_BTN}
+              sx={{
+                ...ORANGE_BTN,
+                bgcolor:
+                  viewType === 'Missing Platforms' ? '#1565c0' : '#ff9f0a',
+                color: viewType === 'Missing Platforms' ? '#fff' : '#111',
+              }}
               onClick={() => setViewType('Missing Platforms')}
             >
               Missing Platforms
@@ -658,39 +694,38 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
           </>
         )}
 
-        <TextField
-          select
-          size="small"
-          label="Items Per Page"
-          value={itemsPerPage}
-          onChange={(e) => setItemsPerPage(e.target.value)}
-          sx={{ bgcolor: '#fff', minWidth: 120 }}
-          InputLabelProps={{ shrink: true }}
+        <Box
+          sx={{
+            ml: { md: 'auto' },
+            px: 1,
+            py: 0.6,
+            bgcolor: '#f2f4f7',
+            borderRadius: 1,
+            color: '#344054',
+            fontSize: 12,
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+          }}
         >
-          {['100', '250', '500', '1000'].map((o) => (
-            <MenuItem key={o} value={o}>
-              {o}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <Typography sx={{ color: '#111', fontWeight: 600, ml: 1 }}>
           {kind === 'missing'
-            ? `Total Missing Bets : ${betCount}`
-            : `Total Number of bets : ${betCount}`}
-        </Typography>
+            ? `Total Missing Bets: ${betCount}`
+            : `Total Bets: ${betCount}`}
+        </Box>
         {loading && <CircularProgress size={22} />}
-      </Stack>
+      </Box>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(r, i) => String(r._id || r.roundId || i)}
-        loading={loading}
-        emptyMessage="No provider data"
-        minWidth={1400}
-        dense
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r, i) => String(r._id || r.roundId || i)}
+          loading={loading}
+          emptyMessage="No provider data"
+          minWidth={1400}
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       {!raw && !loading && null}
     </Box>

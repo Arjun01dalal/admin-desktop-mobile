@@ -8,14 +8,16 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getStoredUser, todayIST, formatAmount } from '@/utils/dates';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import {
   orangeBtnSx,
   fieldSx,
-  toolbarBoxSx,
   unpackPayload,
 } from '@/screens/panel/transactions/shared';
 
@@ -273,11 +275,10 @@ export function StateWiseDepositPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
-        State Wise Deposit
-      </Typography>
-
-      <Box sx={toolbarBoxSx}>
+      <CollapsibleFilterPanel
+        title="State Wise Deposit"
+        summary={`${startDate} → ${endDate}`}
+      >
         <Stack
           direction="row"
           spacing={1.25}
@@ -313,6 +314,17 @@ export function StateWiseDepositPage() {
           </Button>
           <Button
             variant="contained"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            disabled={loading}
+            onClick={() => void load()}
+            sx={orangeBtnSx}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
             disabled={loading}
             onClick={() => void load({ allData: true })}
             sx={orangeBtnSx}
@@ -334,25 +346,26 @@ export function StateWiseDepositPage() {
             label={`Total Amount Sum: ${Math.floor(depositTotalAmt + coinTotalAmt)}`}
             sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
           />
-          {loading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
           {allData ? (
             <Typography variant="caption" color="text.secondary">
               Showing all data
             </Typography>
           ) : null}
         </Stack>
-      </Box>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => row.state}
-        loading={loading}
-        emptyMessage="No state wise deposits found"
-        stickyHeader
-        dense
-        maxHeight="calc(100vh - 260px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row.state}
+          loading={loading}
+          emptyMessage="No state wise deposits found"
+          stickyHeader
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

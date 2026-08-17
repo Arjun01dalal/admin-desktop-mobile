@@ -13,7 +13,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getSessionUser, hasPermission, Permissions } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { display } from '@/screens/panel/shared';
 import { canShowFundEditBtn } from '@/screens/panel/funds/constants';
 import {
@@ -253,41 +255,36 @@ export function FundsPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        mb={2}
-        flexWrap="wrap"
-        gap={1}
+      <CollapsibleFilterPanel
+        title="Funds"
+        summary={`${startDate} → ${endDate}`}
+        headerActions={
+          <Button
+            startIcon={
+              loading ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              void load();
+            }}
+            disabled={loading}
+            sx={orangeBtnSx}
+          >
+            Refresh
+          </Button>
+        }
       >
-        <Typography variant="h5" fontWeight={700}>
-          Funds
-        </Typography>
-        <Button
-          startIcon={
-            loading ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : (
-              <RefreshIcon />
-            )
-          }
-          onClick={() => void load()}
-          disabled={loading}
-          sx={orangeBtnSx}
+        <Stack
+          direction="row"
+          flexWrap="wrap"
+          gap={1.5}
+          alignItems="center"
+          sx={{ '& > *': { flexShrink: 0 } }}
         >
-          Refresh
-        </Button>
-      </Stack>
-
-      <Stack
-        direction="row"
-        flexWrap="wrap"
-        gap={1.5}
-        alignItems="center"
-        mb={2}
-        sx={{ '& > *': { flexShrink: 0 } }}
-      >
         <TextField
           fullWidth={false}
           size="small"
@@ -341,18 +338,21 @@ export function FundsPage() {
             </Typography>
           </Paper>
         )}
-      </Stack>
+        </Stack>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, i) => `${row.name}-${i}`}
-        loading={loading}
-        emptyMessage="No data"
-        minWidth="100%"
-        maxHeight="calc(100vh - 220px)"
-        onRowClick={(row) => openMid(row)}
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, i) => `${row.name}-${i}`}
+          loading={loading}
+          emptyMessage="No data"
+          minWidth="100%"
+          maxHeight="100%"
+          onRowClick={(row) => openMid(row)}
+        />
+      </TablePanel>
 
       <FundsEditAccessModal
         open={editOpen}

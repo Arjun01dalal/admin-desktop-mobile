@@ -6,7 +6,6 @@ import {
   MenuItem,
   Modal,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -15,6 +14,8 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { canAccessNavItem, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { dateTime, formatDisplayDate, todayIST } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
@@ -394,11 +395,12 @@ export function KycListPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        KYC User List
-      </Typography>
-
-      <Paper sx={{ p: 2, pt: 3, mb: 2, bgcolor: 'background.paper', overflow: 'visible' }}>
+      <CollapsibleFilterPanel
+        title="KYC User List"
+        summary={`${startDate} → ${endDate}`}
+        sx={{ overflow: 'visible' }}
+        contentSx={{ pt: 2.25 }}
+      >
         <Box sx={{ overflowX: 'auto', overflowY: 'visible', pb: 0.25 }}>
         <Stack
           direction="row"
@@ -462,29 +464,34 @@ export function KycListPage() {
           </Button>
         </Stack>
         </Box>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, i) => row._id || i}
-        loading={loading}
-        emptyMessage="No KYC records found"
-        stickyHeader
-        dense
-        minWidth={1600}
-        maxHeight="calc(100vh - 300px)"
-      />
-
-      <Stack direction="row" justifyContent="flex-end" mt={2}>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, i) => row._id || i}
+          loading={loading}
+          emptyMessage="No KYC records found"
+          stickyHeader
+          dense
+          minWidth={1600}
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
 
       <Modal open={Boolean(previewImage)} onClose={() => setPreviewImage('')}>
         <Box

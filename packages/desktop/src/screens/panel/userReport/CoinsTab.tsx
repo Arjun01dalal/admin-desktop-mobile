@@ -20,6 +20,20 @@ import { canAddCoinsAction, canRemoveCoinsAction } from './coinAccess';
 
 type Props = { userId: string };
 
+/** White Laxmi-style card on dark panel — force readable input text. */
+const lightFormFieldSx = {
+  '& .MuiInputBase-root': {
+    bgcolor: '#fff',
+    color: '#111',
+  },
+  '& .MuiInputBase-input': {
+    color: '#111 !important',
+    WebkitTextFillColor: '#111 !important',
+  },
+  '& .MuiInputLabel-root': { color: '#5c5c62' },
+  '& .MuiSelect-icon': { color: '#5c5c62' },
+} as const;
+
 type MidOption = { mid?: string; _id?: string; name?: string };
 
 const REASON_OPTIONS = [
@@ -187,6 +201,7 @@ export function CoinsTab({ userId }: Props) {
             fullWidth
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            sx={lightFormFieldSx}
           />
           <TextField
             select
@@ -198,6 +213,7 @@ export function CoinsTab({ userId }: Props) {
               setReason(e.target.value);
               setSelectedMid(null);
             }}
+            sx={lightFormFieldSx}
           >
             {REASON_OPTIONS.map((opt) => (
               <MenuItem key={opt} value={opt}>
@@ -216,6 +232,7 @@ export function CoinsTab({ userId }: Props) {
               onChange={(e) => setPaymentDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               inputProps={{ min: minDate, max: maxDate }}
+              sx={lightFormFieldSx}
             />
           ) : null}
 
@@ -226,6 +243,7 @@ export function CoinsTab({ userId }: Props) {
               fullWidth
               value={transactionId}
               onChange={(e) => setTransactionId(e.target.value)}
+              sx={lightFormFieldSx}
             />
           ) : null}
 
@@ -237,6 +255,7 @@ export function CoinsTab({ userId }: Props) {
                 fullWidth
                 value={utr}
                 onChange={(e) => setUtr(e.target.value)}
+                sx={lightFormFieldSx}
               />
               <TextField
                 label="TransactionId"
@@ -244,6 +263,7 @@ export function CoinsTab({ userId }: Props) {
                 fullWidth
                 value={transactionId}
                 onChange={(e) => setTransactionId(e.target.value)}
+                sx={lightFormFieldSx}
               />
               <Autocomplete
                 size="small"
@@ -253,7 +273,7 @@ export function CoinsTab({ userId }: Props) {
                 onChange={(_e, next) => setSelectedMid(next)}
                 isOptionEqualToValue={(a, b) => a.mid === b.mid}
                 renderInput={(params) => (
-                  <TextField {...params} label="Search & Select MID" />
+                  <TextField {...params} label="Search & Select MID" sx={lightFormFieldSx} />
                 )}
               />
             </>
@@ -267,6 +287,7 @@ export function CoinsTab({ userId }: Props) {
             onChange={(e) => setRemark(e.target.value)}
             multiline
             minRows={2}
+            sx={lightFormFieldSx}
           />
 
           <Stack direction="row" spacing={1.5} justifyContent="center" pt={1}>

@@ -20,6 +20,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { asList, display } from '@/screens/panel/shared';
 
 type WhatsappMidRow = {
@@ -330,12 +331,15 @@ export function WhatsappMidPage() {
         </Stack>
       </Stack>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={sortedRows}
         loading={loading}
         getRowKey={(row) => getRowId(row) || String(row.mid || Math.random())}
+        maxHeight="100%"
       />
+      </TablePanel>
 
       <Dialog
         open={addOpen}

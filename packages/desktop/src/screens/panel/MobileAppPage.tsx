@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
 import { getStoredUser } from '@/utils/dates';
 import { buildMobileAppLinks } from '@/constants/mobileAppLinks';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import type { MobileAppLink } from '@/constants/mobileAppLinks';
 
 /** Shared by default until the 6th copy click unlocks the real CDN URL. */
@@ -71,14 +72,16 @@ export function MobileAppPage() {
         Mobile App
       </Typography>
 
-      <CommonTable
-        columns={columns}
-        rows={apps}
-        getRowKey={(row) => row.key}
-        emptyMessage="No apps"
-        minWidth="100%"
-        maxHeight="calc(100vh - 180px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={apps}
+          getRowKey={(row) => row.key}
+          emptyMessage="No apps"
+          minWidth="100%"
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

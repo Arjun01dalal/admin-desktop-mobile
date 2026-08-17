@@ -4,12 +4,14 @@ import {
   Button,
   CircularProgress,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { hasPermission } from '@/auth/permissions';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
@@ -172,11 +174,11 @@ export function AllUserLoginReportPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        All User Login Report
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
+      <CollapsibleFilterPanel
+        title="All User Login Report"
+        summary={`${startDate} – ${endDate} · Total: ${total}`}
+        sx={{ mb: 2 }}
+      >
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
           <TextField
             type="date"
@@ -204,31 +206,46 @@ export function AllUserLoginReportPage() {
           >
             Apply
           </Button>
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={() => void load(page, appliedFilters)}
+            disabled={loading}
+            sx={{ fontWeight: 700 }}
+          >
+            Refresh
+          </Button>
           <Typography fontWeight={700} color="text.secondary">
             Total Count:- {total}
           </Typography>
-          {loading && <CircularProgress size={22} />}
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row) => row._id}
-        loading={loading}
-        emptyMessage="No login records found"
-        minWidth={1100}
-        maxHeight="calc(100vh - 300px)"
-      />
-
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          color="secondary"
-          onChange={(_e, nextPage) => setPage(nextPage)}
+      <TablePanel
+        footer={
+          <>
+            <Pagination
+              count={totalPages}
+              page={page}
+              color="secondary"
+              onChange={(_e, nextPage) => setPage(nextPage)}
+            />
+          </>
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row) => row._id}
+          loading={loading}
+          emptyMessage="No login records found"
+          minWidth={1100}
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

@@ -3,10 +3,8 @@ import {
   Box,
   Button,
   CircularProgress,
-  MenuItem,
   Pagination,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
@@ -17,11 +15,13 @@ import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
 import {
   HISTORY_PAGINATION_SX,
+  ItemsPerPageField,
   QTECH_STATUS_OPTIONS,
   SearchFilter,
   StatusSelectFilter,
   formatDt,
 } from './historyFilters';
+import { TablePanel } from '@/components/TablePanel';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type Props = { userId: string };
@@ -264,28 +264,21 @@ export function QtechHistoryTab({ userId }: Props) {
 
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} alignItems="flex-end" mb={2}>
-        <Box sx={{ minWidth: 120 }}>
-          <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
-            Items Per Page
-          </Typography>
-          <TextField
-            select
-            size="small"
-            value={itemsPerPage}
-            onChange={(e) => {
-              setItemsPerPage(e.target.value);
-              setPage(1);
-            }}
-            sx={{ bgcolor: '#fff', minWidth: 120 }}
-          >
-            {['20', '50', '100', '250'].map((o) => (
-              <MenuItem key={o} value={o}>
-                {o}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Box>
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+        mb={1.5}
+      >
+        <ItemsPerPageField
+          value={itemsPerPage}
+          onChange={(v) => {
+            setItemsPerPage(v);
+            setPage(1);
+          }}
+        />
         <Button
           variant="contained"
           color="inherit"
@@ -299,27 +292,37 @@ export function QtechHistoryTab({ userId }: Props) {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No Qtech history"
-        minWidth={1500}
-        dense
-        getRowSx={(r) => ({ bgcolor: rowBg(r.status) })}
-      />
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" mt={2}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(_e, p) => setPage(p)}
-            sx={HISTORY_PAGINATION_SX}
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footerJustify="center"
+        footerSx={{ bgcolor: '#f4f6f8', borderColor: '#dde2e8' }}
+        footer={
+          totalPages > 1 ? (
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              sx={HISTORY_PAGINATION_SX}
+            />
+          ) : (
+            <Typography sx={{ fontSize: 12, color: '#667085' }}>
+              Page 1 of 1
+            </Typography>
+          )
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r, i) => String(r._id || i)}
+          loading={loading}
+          emptyMessage="No Qtech history"
+          minWidth={1500}
+          dense
+          virtualize
+          maxHeight="100%"
+          getRowSx={(r) => ({ bgcolor: rowBg(r.status) })}
+        />
+      </TablePanel>
     </Box>
   );
 }

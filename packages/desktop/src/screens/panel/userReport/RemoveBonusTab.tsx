@@ -17,6 +17,18 @@ import { laxmiActionBtnSx } from './laxmiButtonSx';
 
 type Props = { userId: string };
 
+const lightFormFieldSx = {
+  '& .MuiInputBase-root': {
+    bgcolor: '#fff',
+    color: '#111',
+  },
+  '& .MuiInputBase-input': {
+    color: '#111 !important',
+    WebkitTextFillColor: '#111 !important',
+  },
+  '& .MuiInputLabel-root': { color: '#5c5c62' },
+} as const;
+
 /** Remove Bonus Coins — centered popup form + confirm dialog. */
 export function RemoveBonusTab({ userId }: Props) {
   const [amount, setAmount] = useState('');
@@ -95,6 +107,7 @@ export function RemoveBonusTab({ userId }: Props) {
                 onChange={(e) => setAmount(e.target.value)}
                 fullWidth
                 size="small"
+                sx={lightFormFieldSx}
               />
             </Box>
             <Box>
@@ -109,6 +122,7 @@ export function RemoveBonusTab({ userId }: Props) {
                 size="small"
                 multiline
                 minRows={2}
+                sx={lightFormFieldSx}
               />
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>

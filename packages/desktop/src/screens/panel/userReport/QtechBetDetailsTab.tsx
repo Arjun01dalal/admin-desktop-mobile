@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Stack,
-  TextField,
-} from '@mui/material';
+import { Box, Button, CircularProgress, TextField } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount, todayIST } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
+import { TOOLBAR_FIELD_SX, TOOLBAR_ROW_SX } from './historyFilters';
 
 type Props = { userId: string };
 
@@ -95,14 +91,7 @@ export function QtechBetDetailsTab({ userId }: Props) {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={1.5}
-        flexWrap="wrap"
-        useFlexGap
-        alignItems="flex-end"
-        mb={2}
-      >
+      <Box sx={TOOLBAR_ROW_SX}>
         <TextField
           type="date"
           size="small"
@@ -110,7 +99,7 @@ export function QtechBetDetailsTab({ userId }: Props) {
           InputLabelProps={{ shrink: true }}
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
-          sx={{ bgcolor: '#fff' }}
+          sx={TOOLBAR_FIELD_SX}
         />
         <TextField
           type="date"
@@ -119,7 +108,7 @@ export function QtechBetDetailsTab({ userId }: Props) {
           InputLabelProps={{ shrink: true }}
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
-          sx={{ bgcolor: '#fff' }}
+          sx={TOOLBAR_FIELD_SX}
         />
         <Button
           variant="contained"
@@ -131,25 +120,40 @@ export function QtechBetDetailsTab({ userId }: Props) {
             bgcolor: '#ff9f0a',
             backgroundImage: 'none',
             color: '#111',
-            minWidth: 120,
             '&:hover': { bgcolor: '#e08c00', boxShadow: 'none !important' },
           }}
           onClick={() => void load()}
         >
           Apply
         </Button>
+        <Button
+          variant="contained"
+          color="inherit"
+          disableElevation
+          disableRipple
+          sx={laxmiActionBtnSx('white')}
+          onClick={() => {
+            setStartDate(todayIST());
+            setEndDate(todayIST());
+          }}
+        >
+          Today
+        </Button>
         {loading && <CircularProgress size={22} />}
-      </Stack>
+      </Box>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(r, i) => String(r.gameName || r._id || i)}
-        loading={loading}
-        emptyMessage="No bet details"
-        minWidth={800}
-        dense
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r, i) => String(r.gameName || r._id || i)}
+          loading={loading}
+          emptyMessage="No bet details"
+          minWidth={800}
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

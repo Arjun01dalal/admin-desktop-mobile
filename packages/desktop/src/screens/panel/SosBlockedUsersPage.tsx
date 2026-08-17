@@ -11,6 +11,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
@@ -191,7 +192,8 @@ export function SosBlockedUsersPage() {
         Total: {rows.length}
       </Typography>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row, i) =>
@@ -201,7 +203,9 @@ export function SosBlockedUsersPage() {
         emptyMessage="No SOS blocks found"
         stickyHeader
         dense
+        maxHeight="100%"
       />
+      </TablePanel>
     </Box>
   );
 }

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Box, Paper, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount } from '@/utils/dates';
 import { providerLabel, type ActivityRow } from './gameActivity/utils';
 import { useRevealCodes } from '@/context/useRevealCodes';
@@ -111,13 +112,16 @@ export function GameActivityDetailsPage() {
         {providerLabel(provider)} — Games
       </Typography>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={games}
         getRowKey={(row, i) => String(row.gameId || row.Name || i)}
         emptyMessage="No games for this provider"
         minWidth={900}
+        maxHeight="100%"
       />
+      </TablePanel>
     </Box>
   );
 }

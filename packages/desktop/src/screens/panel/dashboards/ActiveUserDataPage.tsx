@@ -12,7 +12,9 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { hasPermission } from '@/auth/permissions';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { display, maskMobile } from '@/screens/panel/shared';
@@ -141,13 +143,6 @@ export function ActiveUserDataPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={0.5}>
-        {toDisplayText('Active User Data')}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={2}>
-        {toDisplayText(customerKey || 'provider')} · {startDate} → {endDate}
-      </Typography>
-
       {!customerKey && (
         <Paper sx={{ p: 2, mb: 2 }}>
           <Typography color="text.secondary">
@@ -156,64 +151,71 @@ export function ActiveUserDataPage() {
         </Paper>
       )}
 
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={1.5}
-        alignItems={{ sm: 'flex-end' }}
-        mb={2}
+      <CollapsibleFilterPanel
+        title={toDisplayText('Active User Data')}
+        summary={`${toDisplayText(customerKey || 'provider')} · ${startDate} → ${endDate}`}
       >
-        <TextField
-          label="From Date"
-          type="date"
-          size="small"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-        />
-        <TextField
-          label="To Date"
-          type="date"
-          size="small"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-        />
-        <Button
-          variant="contained"
-          color="warning"
-          onClick={() => {
-            setPage(1);
-            void load();
-          }}
-          disabled={loading || !customerKey}
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+          alignItems={{ sm: 'flex-end' }}
         >
-          Apply
-        </Button>
-      </Stack>
+          <TextField
+            label="From Date"
+            type="date"
+            size="small"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="To Date"
+            type="date"
+            size="small"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={() => {
+              setPage(1);
+              void load();
+            }}
+            disabled={loading || !customerKey}
+          >
+            Apply
+          </Button>
+        </Stack>
+      </CollapsibleFilterPanel>
 
       {loading ? (
         <Stack alignItems="center" py={4}>
           <CircularProgress size={28} />
         </Stack>
       ) : (
-        <>
-          <CommonTable
-            columns={columns}
-            rows={rows}
-            getRowKey={(r, i) => String(r._id || i)}
-            emptyMessage="No Data Found"
-          />
-          {totalPages > 1 && (
-            <Stack alignItems="center" mt={2}>
+        <TablePanel
+          footerJustify="center"
+          footer={
+            totalPages > 1 ? (
               <Pagination
                 count={totalPages}
                 page={page}
                 onChange={(_e, p) => setPage(p)}
                 color="primary"
               />
-            </Stack>
-          )}
-        </>
+            ) : undefined
+          }
+        >
+          <CommonTable
+            columns={columns}
+            rows={rows}
+            getRowKey={(r, i) => String(r._id || i)}
+            emptyMessage="No Data Found"
+            maxHeight="100%"
+          />
+        </TablePanel>
       )}
     </Box>
   );

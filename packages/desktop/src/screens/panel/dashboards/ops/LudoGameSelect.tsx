@@ -112,6 +112,9 @@ export function LudoGameSelect({ value, options, statsMap, onChange }: Props) {
     <TextField
       select
       size="small"
+      // The theme defaults TextField to fullWidth, which in the card header row
+      // would claim the whole card and squeeze the title to zero width.
+      fullWidth={false}
       value={value || 'All'}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => {
@@ -166,9 +169,9 @@ export function LudoGameSelect({ value, options, statsMap, onChange }: Props) {
         },
       }}
       sx={{
-        minWidth: { xs: '100%', sm: 168 },
+        width: { xs: '100%', sm: 168 },
         maxWidth: '100%',
-        flex: { xs: '1 1 100%', sm: '0 1 auto' },
+        flex: { xs: '1 1 100%', sm: '0 0 auto' },
         '& .MuiInputBase-root': {
           bgcolor: 'background.default',
           borderRadius: 1,

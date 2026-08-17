@@ -16,7 +16,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { todayIST } from '@/utils/dates';
 import { asList, display } from '@/screens/panel/shared';
@@ -294,16 +296,9 @@ export function LeaderboardPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      {/* Filter bar */}
-      <Box
-        sx={{
-          width: '100%',
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 1.5,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
+      <CollapsibleFilterPanel
+        title="Leaderboard"
+        summary={`${startDate} → ${endDate}`}
       >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
@@ -377,34 +372,35 @@ export function LeaderboardPage() {
             </Box>
           ))}
         </Box>
-      </Box>
 
-      {/* Refresh row */}
-      <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
-        <Button
-          variant="contained"
-          startIcon={<RefreshIcon sx={{ fontSize: 16 }} />}
-          onClick={() => void load()}
-          disabled={loading}
-          sx={refreshBtnSx}
-        >
-          Refresh
-        </Button>
-      </Stack>
+        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1.5 }}>
+          <Button
+            variant="contained"
+            startIcon={<RefreshIcon sx={{ fontSize: 16 }} />}
+            onClick={() => void load()}
+            disabled={loading}
+            sx={refreshBtnSx}
+          >
+            Refresh
+          </Button>
+        </Stack>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        getRowKey={(row) => row._id}
-        emptyMessage="No leaderboard data for selected dates"
-        getRowSx={(_row, index) =>
-          index % 2 === 1
-            ? { bgcolor: 'rgba(255,255,255,0.03)', '& td': { bgcolor: 'transparent' } }
-            : undefined
-        }
-        maxHeight="calc(100vh - 255px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          getRowKey={(row) => row._id}
+          emptyMessage="No leaderboard data for selected dates"
+          getRowSx={(_row, index) =>
+            index % 2 === 1
+              ? { bgcolor: 'rgba(255,255,255,0.03)', '& td': { bgcolor: 'transparent' } }
+              : undefined
+          }
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       <Dialog open={cityOpen} onClose={() => setCityOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Edit City</DialogTitle>

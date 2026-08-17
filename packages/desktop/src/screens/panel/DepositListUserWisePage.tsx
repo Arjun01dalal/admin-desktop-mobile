@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Box, Paper, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { display } from '@/screens/panel/shared';
 
 type MidRow = {
@@ -64,13 +65,16 @@ export function DepositListUserWisePage() {
       <Typography variant="h5" fontWeight={700} mb={2}>
         Deposit List — MID Breakdown
       </Typography>
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row, i) => String(row.mid || i)}
         emptyMessage="No MID data"
         minWidth={480}
+        maxHeight="100%"
       />
+      </TablePanel>
     </Box>
   );
 }

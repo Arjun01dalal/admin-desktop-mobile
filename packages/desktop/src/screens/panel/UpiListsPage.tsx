@@ -22,6 +22,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { asList, useReportQuery } from '@/screens/panel/shared';
 
 type UpiRow = {
@@ -242,17 +243,19 @@ export function UpiListsPage() {
         </Stack>
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => row._id}
-        loading={loading}
-        emptyMessage="No UPI records found"
-        stickyHeader
-        dense
-        minWidth={600}
-        maxHeight="calc(100vh - 220px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row._id}
+          loading={loading}
+          emptyMessage="No UPI records found"
+          stickyHeader
+          dense
+          minWidth={600}
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
         <form onSubmit={handleCreate}>

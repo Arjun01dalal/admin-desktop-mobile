@@ -10,15 +10,17 @@ import {
   IconButton,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
+import { TablePanel } from '@/components/TablePanel';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { appCodeForName } from '@/constants/clientNames';
@@ -570,19 +572,9 @@ export function UpiPaymentsPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        UPI Payments
-      </Typography>
-
-      <Paper
-        sx={{
-          p: 2,
-          mb: 2,
-          bgcolor: 'background.paper',
-          width: '100%',
-          maxWidth: '100%',
-          minWidth: 0,
-        }}
+      <CollapsibleFilterPanel
+        title="UPI Payments"
+        summary={`${startDate} → ${endDate}`}
       >
         <Stack
           direction="row"
@@ -619,6 +611,22 @@ export function UpiPaymentsPage() {
             Apply
           </Button>
           <Button
+            variant="outlined"
+            color="warning"
+            startIcon={
+              loading ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+            onClick={() => void reloadAll()}
+            disabled={loading}
+            sx={{ fontWeight: 700, flexShrink: 0 }}
+          >
+            Refresh
+          </Button>
+          <Button
             variant="contained"
             color="warning"
             onClick={clearDates}
@@ -650,62 +658,82 @@ export function UpiPaymentsPage() {
         <Typography fontWeight={700} mt={1.5}>
           Total Count : {notifTotal}
         </Typography>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <Typography variant="h6" fontWeight={700} mb={1}>
-        Transaction Notifications
-      </Typography>
-      <CommonTable
-        columns={notifColumns}
-        rows={notifRows}
-        getRowKey={(r, i) => r._id || i}
-        loading={loading}
-        emptyMessage="No notifications found"
-        stickyHeader
-        dense
-        getRowSx={(row) => {
-          const s = String(row.status || '').toLowerCase();
-          if (s === 'pending') return { bgcolor: 'rgba(255, 235, 59, 0.12)' };
-          if (s === 'failed') return { bgcolor: 'rgba(245, 86, 86, 0.2)' };
-          if (s === 'hold') return { bgcolor: 'rgba(33, 150, 243, 0.15)' };
-          return { bgcolor: 'rgba(119, 178, 84, 0.12)' };
-        }}
-        maxHeight={360}
-      />
-      <Stack alignItems="center" mt={1.5} mb={3}>
-        <Pagination
-          count={notifTotalPages}
-          page={notifPage}
-          color="secondary"
-          onChange={(_e, p) => setNotifPage(p)}
-        />
-      </Stack>
+      <TablePanel>
+        <Box
+          sx={{
+            height: '100%',
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateRows: 'minmax(0, 1fr) minmax(0, 1fr)',
+            gap: 1.5,
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
+            <Typography variant="h6" fontWeight={700} mb={1}>
+              Transaction Notifications
+            </Typography>
+            <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <CommonTable
+                columns={notifColumns}
+                rows={notifRows}
+                getRowKey={(r, i) => r._id || i}
+                loading={loading}
+                emptyMessage="No notifications found"
+                stickyHeader
+                dense
+                getRowSx={(row) => {
+                  const s = String(row.status || '').toLowerCase();
+                  if (s === 'pending') return { bgcolor: 'rgba(255, 235, 59, 0.12)' };
+                  if (s === 'failed') return { bgcolor: 'rgba(245, 86, 86, 0.2)' };
+                  if (s === 'hold') return { bgcolor: 'rgba(33, 150, 243, 0.15)' };
+                  return { bgcolor: 'rgba(119, 178, 84, 0.12)' };
+                }}
+                maxHeight="100%"
+              />
+            </Box>
+            <Stack alignItems="center" sx={{ flexShrink: 0, py: 1 }}>
+              <Pagination
+                count={notifTotalPages}
+                page={notifPage}
+                color="secondary"
+                onChange={(_e, p) => setNotifPage(p)}
+              />
+            </Stack>
+          </Box>
 
-      <Typography variant="h6" fontWeight={700} mb={1}>
-        Transaction Requests
-      </Typography>
-      <CommonTable
-        columns={reqColumns}
-        rows={reqRows}
-        getRowKey={(r, i) => r._id || r.orderId || i}
-        loading={loading}
-        emptyMessage="No transaction requests found"
-        stickyHeader
-        dense
-        getRowSx={(row) => {
-          const bg = requestRowBg(row);
-          return bg ? { bgcolor: bg } : undefined;
-        }}
-        maxHeight={480}
-      />
-      <Stack alignItems="center" mt={1.5}>
-        <Pagination
-          count={reqTotalPages}
-          page={reqPage}
-          color="secondary"
-          onChange={(_e, p) => setReqPage(p)}
-        />
-      </Stack>
+          <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
+            <Typography variant="h6" fontWeight={700} mb={1}>
+              Transaction Requests
+            </Typography>
+            <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <CommonTable
+                columns={reqColumns}
+                rows={reqRows}
+                getRowKey={(r, i) => r._id || r.orderId || i}
+                loading={loading}
+                emptyMessage="No transaction requests found"
+                stickyHeader
+                dense
+                getRowSx={(row) => {
+                  const bg = requestRowBg(row);
+                  return bg ? { bgcolor: bg } : undefined;
+                }}
+                maxHeight="100%"
+              />
+            </Box>
+            <Stack alignItems="center" sx={{ flexShrink: 0, py: 1 }}>
+              <Pagination
+                count={reqTotalPages}
+                page={reqPage}
+                color="secondary"
+                onChange={(_e, p) => setReqPage(p)}
+              />
+            </Stack>
+          </Box>
+        </Box>
+      </TablePanel>
 
       <Dialog open={approveOpen} onClose={() => setApproveOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Manual settle Transaction</DialogTitle>

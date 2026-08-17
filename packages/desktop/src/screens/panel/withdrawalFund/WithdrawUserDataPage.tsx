@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { hasPermission } from '@/auth/permissions';
 import {
   formatAmount,
@@ -67,7 +68,6 @@ function istDateTime(utcDate?: string): string {
 
 /** Agent / MID withdrawal list (old WithdrawUserData columns). */
 export function WithdrawUserDataPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state || {}) as LocationState;
   const admin = getStoredUser<{ serverId?: string | number }>();
@@ -314,9 +314,6 @@ export function WithdrawUserDataPage() {
         <Typography variant="h5" fontWeight={700}>
           {title}
         </Typography>
-        <Button variant="contained" onClick={() => navigate('/withdrawal-fund')} sx={orangeBtnSx}>
-          Back
-        </Button>
       </Stack>
 
       <Box sx={toolbarBoxSx}>
@@ -336,17 +333,19 @@ export function WithdrawUserDataPage() {
         </Stack>
       </Box>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => String(row._id || row.transactionId || index)}
-        loading={false}
-        emptyMessage="No withdrawals found"
-        stickyHeader
-        dense
-        minWidth={2200}
-        maxHeight="calc(100vh - 260px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => String(row._id || row.transactionId || index)}
+          loading={false}
+          emptyMessage="No withdrawals found"
+          stickyHeader
+          dense
+          minWidth={2200}
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       <Dialog
         open={commentOpen}

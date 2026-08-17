@@ -2,16 +2,19 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   Box,
   Button,
+  CircularProgress,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from 'react-router-dom';
 import { getSessionUser, hasPermission } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, formatDisplayTime, todayIST, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import {
@@ -291,11 +294,10 @@ export function NewDepositsPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        New Deposits
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
+      <CollapsibleFilterPanel
+        title="New Deposits"
+        summary={`${startDate} – ${endDate} · ${itemsPerPage} per page · ${total} total`}
+      >
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             type="date"
@@ -340,33 +342,52 @@ export function NewDepositsPage() {
           >
             Apply
           </Button>
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+            onClick={() => void load()}
+            disabled={loading}
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            Refresh
+          </Button>
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || index}
-        loading={loading}
-        emptyMessage="No new deposits found"
-        stickyHeader
-        minWidth={2200}
-        dense
-        maxHeight="calc(100vh - 300px)"
-      />
-
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
-        <Typography variant="body2" color="text.secondary">
-          Total: {total}
-        </Typography>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Total: {total}
+            </Typography>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || index}
+          loading={loading}
+          emptyMessage="No new deposits found"
+          stickyHeader
+          minWidth={2200}
+          dense
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { Box, Button, Stack, Typography } from '@mui/material';
+import { Badge, Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { Link as RouterLink } from 'react-router-dom';
 import { hasPermission } from '@/auth/permissions';
@@ -44,12 +45,6 @@ import {
   pickUserComesFrom,
 } from './utils';
 
-const actionStackSx = {
-  minWidth: 118,
-  py: 0.25,
-  gap: 0.75,
-};
-
 const actionBtnSx = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -69,6 +64,12 @@ const actionBtnSx = {
   '& .MuiButton-startIcon': { mr: 0.5, ml: 0 },
   '& .MuiButton-startIcon > *:nth-of-type(1)': { fontSize: 14 },
 };
+
+const iconActionSx = {
+  p: 0.35,
+  border: '1px solid',
+  borderRadius: 1,
+} as const;
 
 
 function AadharAddressCell({ row }: { row: UserRow }) {
@@ -549,43 +550,64 @@ export function useNewRegistersColumns({
             Add <br /> Comment
           </>
         ),
-        width: 132,
+        width: 72,
         filter: null,
-        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'middle' },
+        cellSx: { whiteSpace: 'nowrap', overflow: 'hidden', verticalAlign: 'middle' },
         render: (row) => {
           const count = registrationComments(row).length;
           return (
-            <Stack alignItems="stretch" sx={actionStackSx}>
-              <Button
-                size="small"
-                variant="contained"
-                color="primary"
-                startIcon={<ChatBubbleOutlineIcon />}
-                onClick={() => onAddComment(row)}
-                sx={actionBtnSx}
-              >
-                Comment
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="inherit"
-                startIcon={<VisibilityIcon />}
-                onClick={() => onViewComments(row)}
-                sx={{
-                  ...actionBtnSx,
-                  borderColor: 'divider',
-                  color: 'text.primary',
-                  bgcolor: 'transparent',
-                  '&:hover': {
-                    borderColor: 'text.secondary',
-                    bgcolor: 'action.hover',
-                    boxShadow: 'none',
-                  },
-                }}
-              >
-                View All{count > 0 ? ` (${count})` : ''}
-              </Button>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="center"
+              spacing={0.35}
+            >
+              <Tooltip title="Add Comment">
+                <IconButton
+                  size="small"
+                  aria-label="Add Comment"
+                  onClick={() => onAddComment(row)}
+                  sx={{
+                    ...iconActionSx,
+                    color: '#1a1200',
+                    borderColor: '#f1a144',
+                    bgcolor: '#ff9f0a',
+                    '&:hover': { bgcolor: '#e09030' },
+                  }}
+                >
+                  <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={count > 0 ? `View All (${count})` : 'View All'}>
+                <IconButton
+                  size="small"
+                  aria-label="View All Comments"
+                  onClick={() => onViewComments(row)}
+                  sx={{
+                    ...iconActionSx,
+                    color: 'text.primary',
+                    borderColor: 'divider',
+                    bgcolor: 'transparent',
+                    '&:hover': { bgcolor: 'action.hover', borderColor: 'text.secondary' },
+                  }}
+                >
+                  <Badge
+                    badgeContent={count || undefined}
+                    color="warning"
+                    max={99}
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        fontSize: 9,
+                        height: 14,
+                        minWidth: 14,
+                        px: 0.4,
+                      },
+                    }}
+                  >
+                    <RateReviewOutlinedIcon sx={{ fontSize: 15 }} />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
             </Stack>
           );
         },
@@ -597,44 +619,67 @@ export function useNewRegistersColumns({
             Call <br /> Logs
           </>
         ),
-        width: 132,
+        width: 88,
         filter: null,
-        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'middle' },
+        cellSx: { whiteSpace: 'nowrap', overflow: 'hidden', verticalAlign: 'middle' },
         render: (row) => {
           const logs = registrationCallLogs(row);
           const count = logs.length;
           const latest = count > 0 ? logs[count - 1] : null;
+          const lastLabel =
+            count > 0 ? `Last: ${latest?.who?.userName || '-'}` : 'No calls yet';
           return (
-            <Stack alignItems="stretch" sx={actionStackSx}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="center"
+              spacing={0.4}
+            >
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ textAlign: 'center', fontSize: 11, lineHeight: 1.3 }}
-              >
-                {count > 0
-                  ? `Last: ${latest?.who?.userName || '-'}`
-                  : 'No calls yet'}
-              </Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                color="inherit"
-                startIcon={<VisibilityIcon />}
-                onClick={() => onViewCallLogs(row)}
+                title={lastLabel}
                 sx={{
-                  ...actionBtnSx,
-                  borderColor: 'divider',
-                  color: 'text.primary',
-                  bgcolor: 'transparent',
-                  '&:hover': {
-                    borderColor: 'text.secondary',
-                    bgcolor: 'action.hover',
-                    boxShadow: 'none',
-                  },
+                  fontSize: 10,
+                  lineHeight: 1.1,
+                  maxWidth: 42,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                View Logs{count > 0 ? ` (${count})` : ''}
-              </Button>
+                {count > 0 ? latest?.who?.userName || '-' : '—'}
+              </Typography>
+              <Tooltip title={count > 0 ? `View Logs (${count})` : 'View Logs'}>
+                <IconButton
+                  size="small"
+                  aria-label="View Call Logs"
+                  onClick={() => onViewCallLogs(row)}
+                  sx={{
+                    ...iconActionSx,
+                    color: 'text.primary',
+                    borderColor: 'divider',
+                    bgcolor: 'transparent',
+                    '&:hover': { bgcolor: 'action.hover', borderColor: 'text.secondary' },
+                  }}
+                >
+                  <Badge
+                    badgeContent={count || undefined}
+                    color="warning"
+                    max={99}
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        fontSize: 9,
+                        height: 14,
+                        minWidth: 14,
+                        px: 0.4,
+                      },
+                    }}
+                  >
+                    <VisibilityIcon sx={{ fontSize: 15 }} />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
             </Stack>
           );
         },

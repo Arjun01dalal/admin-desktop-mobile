@@ -26,6 +26,7 @@ import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatMaskedAmount, formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { maskMobile } from '@/screens/panel/shared';
@@ -877,7 +878,22 @@ export function CallerDetailsPage() {
         </Tabs>
       </Box>
 
-      <Box sx={{ width: '100%', minWidth: 0, flex: 1 }}>
+      <TablePanel
+        sx={{ width: '100%', minWidth: 0, flex: 1 }}
+        footer={
+          tab === 'Today' && todayTotalPages > 1 ? (
+            <>
+              <Pagination
+                color="primary"
+                page={todayPage}
+                count={todayTotalPages}
+                onChange={(_e, p) => setTodayPage(p)}
+              />
+            </>
+          ) : undefined
+        }
+        footerJustify="center"
+      >
         <CommonTable
           columns={columns}
           rows={filtered}
@@ -886,20 +902,9 @@ export function CallerDetailsPage() {
           emptyMessage="No users in this tab"
           stickyHeader
           minWidth={1600}
-          maxHeight="calc(100vh - 220px)"
+          maxHeight="100%"
         />
-      </Box>
-
-      {tab === 'Today' && todayTotalPages > 1 && (
-        <Stack direction="row" justifyContent="center" py={1}>
-          <Pagination
-            color="primary"
-            page={todayPage}
-            count={todayTotalPages}
-            onChange={(_e, p) => setTodayPage(p)}
-          />
-        </Stack>
-      )}
+      </TablePanel>
 
       <Dialog
         open={altOpen}

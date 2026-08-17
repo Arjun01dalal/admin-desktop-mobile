@@ -3,7 +3,11 @@
  * Used by AppShell to show a Back button automatically.
  */
 export function getBackPath(pathname: string): string | null {
+  // User Report mounts its section dropdown beside this Back via BackRowActions.
   if (pathname.startsWith('/users/report/')) return '/users';
+  if (pathname === '/bonus-wallet-referral-earning' || pathname === '/user_exposure') {
+    return '/users';
+  }
   if (pathname.startsWith('/player-activity/details')) return '/player-activity';
   if (pathname.startsWith('/game-activity/details')) return '/game-activity';
   if (

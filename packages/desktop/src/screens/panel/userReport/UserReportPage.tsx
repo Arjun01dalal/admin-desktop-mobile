@@ -8,12 +8,16 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  ListSubheader,
+  MenuItem,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { BackRowActions } from '@/layout/BackRowActions';
 import { WalletHistoryView } from './WalletHistoryView';
 import { GameHistoryTab } from './GameHistoryTab';
 import { MatkaHistoryTab } from './MatkaHistoryTab';
@@ -26,7 +30,6 @@ import { FundRequestTab } from './FundRequestTab';
 import { ProviderHistoryTab } from './ProviderHistoryTab';
 import { QtechBetDetailsTab } from './QtechBetDetailsTab';
 import { SettleJetfairModal } from './SettleJetfairModal';
-import { laxmiTabBtnSx } from './laxmiButtonSx';
 import {
   canShowAddBonusCoinsTab,
   canShowCoinsTab,
@@ -38,6 +41,67 @@ import {
 } from './types';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+
+/** Short labels in the Back-adjacent dropdown. */
+const SHORT_LABEL: Partial<Record<UserReportTab, string>> = {
+  wallet_history: 'Wallet',
+  game_history: 'Game',
+  starline_history: 'Starline',
+  king_bazar_history: 'King Bazar',
+  worli_history: 'Instant Win',
+  qtech_history: 'Qtech',
+  jetfair_history: 'JetFair',
+  falcon_history: 'Falcon',
+  remove_bonus_coins: 'Remove Bonus',
+  add_bonus_coins: 'Add Bonus',
+  fund_request: 'Fund Request',
+  provider_history: 'Qtech Provider',
+  Qtech_Missing_Bets: 'Qtech Missing',
+  jetfairprovider_history: 'Jetfair Provider',
+  'sm_provider-history': 'SM Provider',
+  qtech_bet_details: 'Qtech Bets',
+  crazzy_wheel: 'Crazy Wheel',
+  settle_sm: 'Settle SM',
+  settle_jetfair: 'Settle Jetfair',
+  player_rtp: 'Player RTP',
+};
+
+const HISTORY_IDS: UserReportTab[] = [
+  'wallet_history',
+  'game_history',
+  'starline_history',
+  'king_bazar_history',
+  'worli_history',
+  'qtech_history',
+  'jetfair_history',
+  'falcon_history',
+  'crazzy_wheel',
+];
+
+const WALLET_IDS: UserReportTab[] = [
+  'coins',
+  'add_bonus_coins',
+  'remove_bonus_coins',
+  'fund_request',
+];
+
+const PROVIDER_IDS: UserReportTab[] = [
+  'provider_history',
+  'Qtech_Missing_Bets',
+  'jetfairprovider_history',
+  'sm_provider-history',
+  'qtech_bet_details',
+];
+
+const ACTION_IDS: UserReportTab[] = [
+  'settle_sm',
+  'settle_jetfair',
+  'player_rtp',
+];
+
+function tabLabel(id: UserReportTab, fullLabel: string): string {
+  return toDisplayText(SHORT_LABEL[id] || fullLabel);
+}
 
 function TabBody({
   tab,
@@ -114,12 +178,35 @@ export function UserReportPage() {
       }),
     [showCoinsTab, showAddBonusTab],
   );
+  const byId = useMemo(
+    () => new Map(visibleTabs.map((t) => [t.id, t])),
+    [visibleTabs],
+  );
+
+  const pickGroup = useCallback(
+    (ids: UserReportTab[]) =>
+      ids
+        .map((id) => byId.get(id))
+        .filter((t): t is { id: UserReportTab; label: string } => Boolean(t)),
+    [byId],
+  );
+
+  const historyTabs = useMemo(() => pickGroup(HISTORY_IDS), [pickGroup]);
+  const walletTabs = useMemo(() => pickGroup(WALLET_IDS), [pickGroup]);
+  const providerTabs = useMemo(() => pickGroup(PROVIDER_IDS), [pickGroup]);
+  const actionTabs = useMemo(() => pickGroup(ACTION_IDS), [pickGroup]);
+
   const [tab, setTab] = useState<UserReportTab>('wallet_history');
   const [loading, setLoading] = useState(true);
   const [encrypted, setEncrypted] = useState<EncryptedUser | null>(null);
   const [smSettleOpen, setSmSettleOpen] = useState(false);
   const [smBusy, setSmBusy] = useState(false);
   const [jetfairSettleOpen, setJetfairSettleOpen] = useState(false);
+
+  const currentLabel = useMemo(() => {
+    const hit = byId.get(tab);
+    return hit ? tabLabel(hit.id, hit.label) : 'Wallet';
+  }, [byId, tab]);
 
   const loadEncrypted = useCallback(async () => {
     if (!userId) return;
@@ -206,14 +293,135 @@ export function UserReportPage() {
 
   if (!canOpen) return null;
 
+  const renderGroup = (
+    title: string,
+    items: { id: UserReportTab; label: string }[],
+  ) => {
+    if (items.length === 0) return null;
+    return [
+      <ListSubheader
+        key={`${title}-h`}
+        sx={{
+          lineHeight: '24px',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+          color: '#8a94a4',
+          bgcolor: '#f7f8fa',
+          borderTop: '1px solid #edf0f4',
+          borderBottom: '1px solid #edf0f4',
+        }}
+      >
+        {title}
+      </ListSubheader>,
+      ...items.map((item) => (
+        <MenuItem key={item.id} value={item.id} dense>
+          {tabLabel(item.id, item.label)}
+        </MenuItem>
+      )),
+    ];
+  };
+
+  const sectionSelect = useMemo(
+    () => (
+      <TextField
+        select
+        size="small"
+        value={tab}
+        onChange={(e) => {
+          const id = e.target.value as UserReportTab;
+          onTabClick(id);
+        }}
+        SelectProps={{
+          displayEmpty: true,
+          renderValue: () => currentLabel,
+          MenuProps: {
+            MenuListProps: { dense: true, sx: { py: 0 } },
+            PaperProps: {
+              sx: {
+                mt: 0.5,
+                minWidth: 180,
+                maxHeight: 380,
+                bgcolor: '#fff',
+                borderRadius: '8px',
+                border: '1px solid #e3e7ed',
+                boxShadow: '0 10px 28px rgba(15,23,42,0.14)',
+                '& .MuiMenuItem-root': {
+                  fontSize: 12,
+                  minHeight: 30,
+                  color: '#344054',
+                  '&:hover': { bgcolor: '#f2f4f7' },
+                  '&.Mui-selected': {
+                    bgcolor: '#e8f1fd',
+                    color: '#1565c0',
+                    fontWeight: 700,
+                    '&:hover': { bgcolor: '#dceafb' },
+                  },
+                },
+              },
+            },
+          },
+        }}
+        sx={{
+          width: 136,
+          '& .MuiOutlinedInput-root': {
+            bgcolor: '#fff',
+            color: '#111',
+            fontSize: 11,
+            fontWeight: 600,
+            height: 32,
+            borderRadius: '6px !important',
+            boxShadow: '0 1px 2px rgba(15,23,42,0.06)',
+            '& fieldset': {
+              borderColor: '#b8c2cf',
+              borderWidth: '1px !important',
+              borderRadius: '6px !important',
+            },
+            '&:hover fieldset': { borderColor: '#1976d2' },
+            '&.Mui-focused fieldset': {
+              borderColor: '#1976d2',
+              borderWidth: '1px !important',
+            },
+          },
+          '& .MuiSelect-select': {
+            display: 'flex',
+            alignItems: 'center',
+            color: '#344054 !important',
+            WebkitTextFillColor: '#344054 !important',
+            py: '0 !important',
+            pl: '10px !important',
+            pr: '30px !important',
+            minHeight: '0 !important',
+          },
+          '& .MuiSelect-icon': {
+            color: '#667085',
+            fontSize: 18,
+            right: 7,
+          },
+        }}
+      >
+        {renderGroup('History', historyTabs)}
+        {renderGroup('Wallet', walletTabs)}
+        {renderGroup('Providers', providerTabs)}
+        {renderGroup('Actions', actionTabs)}
+      </TextField>
+    ),
+    // onTabClick closes over navigate/userId — intentional refresh when those change via tab/label/groups
+    [tab, currentLabel, historyTabs, walletTabs, providerTabs, actionTabs, userId],
+  );
+
   return (
-    <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100%', p: { xs: 1, md: 1.5 } }}>
+    <Box sx={{ bgcolor: '#f4f6f8', minHeight: '100%', p: { xs: 0.5, md: 0.75 } }}>
+      {/* Renders beside AppShell Back button (same row, right side). */}
+      <BackRowActions>{sectionSelect}</BackRowActions>
+
       <Typography
         sx={{
-          fontSize: 14,
+          fontSize: 12,
           color: 'rgba(0,0,0,0.55)',
-          mb: 1.5,
-          px: 0.5,
+          mb: 0.75,
+          px: 0.25,
         }}
       >
         <Box component="span" sx={{ opacity: 0.7 }}>
@@ -224,29 +432,6 @@ export function UserReportPage() {
           ? ` / ${encrypted.encryptedUserName}`
           : ''}
       </Typography>
-
-      <Box
-        sx={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          mb: 1,
-        }}
-      >
-        {visibleTabs.map((item) => (
-          <Button
-            key={item.id}
-            variant="contained"
-            color="inherit"
-            disableElevation
-            disableRipple
-            onClick={() => onTabClick(item.id)}
-            sx={laxmiTabBtnSx(tab === item.id)}
-          >
-            {toDisplayText(item.label)}
-          </Button>
-        ))}
-      </Box>
 
       {loading && !encrypted ? (
         <Stack alignItems="center" py={6}>

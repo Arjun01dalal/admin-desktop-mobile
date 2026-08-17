@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   FormControlLabel,
   MenuItem,
   Pagination,
@@ -13,7 +14,9 @@ import {
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
@@ -22,6 +25,7 @@ import {
   formatDisplayTime,
   todayIST,
 } from '@/utils/dates';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { asPaged, display } from '@/screens/panel/shared';
 
@@ -672,15 +676,10 @@ export function StateWiseRegistrationPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Box
-        sx={{
-          width: '100%',
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 1.5,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
+      <CollapsibleFilterPanel
+        title="State Wise Registration"
+        summary={`${startDate} → ${endDate} · Total: ${totalCount}`}
+        contentSx={{ overflowX: 'auto' }}
       >
         <Stack
           direction="row"
@@ -691,103 +690,120 @@ export function StateWiseRegistrationPage() {
           sx={{
             width: '100%',
             overflowX: 'auto',
+            pt: 0.5,
             pb: 0.25,
             '& > *': { flexShrink: 0 },
           }}
         >
-          <TextField
-            size="small"
-            type="date"
-            label="From Date"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={dateFieldSx}
-          />
-          <TextField
-            size="small"
-            type="date"
-            label="To Date"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={dateFieldSx}
-          />
-          <TextField
-            select
-            size="small"
-            label="Items Per Page"
-            value={String(itemsPerPage)}
-            onChange={(e) => {
-              const perPage = Number(e.target.value);
-              setItemsPerPage(perPage);
-              setPageNo(1);
-              localStorage.setItem(PER_PAGE_KEY, String(perPage));
-            }}
-            sx={selectFieldSx}
-          >
-            {PER_PAGE_OPTIONS.map((n) => (
-              <MenuItem key={n} value={String(n)}>
-                {n}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <FormControlLabel
-            control={
-              <Checkbox
+              <TextField
                 size="small"
-                checked={hasActiveUser}
-                onChange={(e) => setHasActiveUser(e.target.checked)}
+                type="date"
+                label="From Date"
+                fullWidth={false}
+                InputLabelProps={{ shrink: true }}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                sx={dateFieldSx}
               />
-            }
-            label="Active User"
-            sx={checkboxSx}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
+              <TextField
                 size="small"
-                checked={activeUserToday}
-                onChange={(e) => setActiveUserToday(e.target.checked)}
+                type="date"
+                label="To Date"
+                fullWidth={false}
+                InputLabelProps={{ shrink: true }}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                sx={dateFieldSx}
               />
-            }
-            label="Active Today"
-            sx={checkboxSx}
-          />
+              <TextField
+                select
+                size="small"
+                label="Items Per Page"
+                fullWidth={false}
+                value={String(itemsPerPage)}
+                onChange={(e) => {
+                  const perPage = Number(e.target.value);
+                  setItemsPerPage(perPage);
+                  setPageNo(1);
+                  localStorage.setItem(PER_PAGE_KEY, String(perPage));
+                }}
+                sx={selectFieldSx}
+              >
+                {PER_PAGE_OPTIONS.map((n) => (
+                  <MenuItem key={n} value={String(n)}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-          <Button variant="contained" onClick={handleApply} disabled={loading} sx={applyBtnSx}>
-            Apply
-          </Button>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={hasActiveUser}
+                    onChange={(e) => setHasActiveUser(e.target.checked)}
+                  />
+                }
+                label="Active User"
+                sx={checkboxSx}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={activeUserToday}
+                    onChange={(e) => setActiveUserToday(e.target.checked)}
+                  />
+                }
+                label="Active Today"
+                sx={checkboxSx}
+              />
+
+              <Button variant="contained" onClick={handleApply} disabled={loading} sx={applyBtnSx}>
+                Apply
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={
+                  loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+                }
+                onClick={() => void loadReport(pageNo, columnFiltersRef.current)}
+                disabled={loading}
+                sx={applyBtnSx}
+              >
+                Refresh
+              </Button>
         </Stack>
 
         {hasActiveUser && (
           <Stack direction="row" spacing={1.5} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
-            <TextField
-              size="small"
-              type="date"
-              label="Active From"
-              InputLabelProps={{ shrink: true }}
-              value={activeUserStartDate}
-              onChange={(e) => setActiveUserStartDate(e.target.value)}
-              sx={dateFieldSx}
-            />
-            <TextField
-              size="small"
-              type="date"
-              label="Active To"
-              InputLabelProps={{ shrink: true }}
-              value={activeUserEndDate}
-              onChange={(e) => setActiveUserEndDate(e.target.value)}
-              sx={dateFieldSx}
-            />
+                <TextField
+                  size="small"
+                  type="date"
+                  label="Active From"
+                  fullWidth={false}
+                  InputLabelProps={{ shrink: true }}
+                  value={activeUserStartDate}
+                  onChange={(e) => setActiveUserStartDate(e.target.value)}
+                  sx={dateFieldSx}
+                />
+                <TextField
+                  size="small"
+                  type="date"
+                  label="Active To"
+                  fullWidth={false}
+                  InputLabelProps={{ shrink: true }}
+                  value={activeUserEndDate}
+                  onChange={(e) => setActiveUserEndDate(e.target.value)}
+                  sx={dateFieldSx}
+                />
           </Stack>
         )}
 
-        <Typography sx={{ mt: 1.5, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
+        <Typography sx={{ mt: 1.5, fontSize: 14, color: 'text.secondary' }}>
           Total Users: <b>{totalCount}</b>
         </Typography>
-      </Box>
+      </CollapsibleFilterPanel>
 
       {stateWisePlayers.length > 0 && (
         <Box
@@ -848,27 +864,31 @@ export function StateWiseRegistrationPage() {
         </Box>
       )}
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        getRowKey={(row, index) => row._id || index}
-        emptyMessage="No registered users for selected filters"
-        getRowSx={(_row, index) =>
-          index % 2 === 1
-            ? { bgcolor: 'rgba(255,255,255,0.03)', '& td': { bgcolor: 'transparent' } }
-            : undefined
+      <TablePanel
+        footer={
+          <Pagination
+            count={totalPages}
+            page={pageNo}
+            color="secondary"
+            onChange={(_e, nextPage) => setPageNo(nextPage)}
+          />
         }
-      />
-
-      <Stack direction="row" justifyContent="center" sx={{ mt: 2, mb: 1 }}>
-        <Pagination
-          count={totalPages}
-          page={pageNo}
-          color="secondary"
-          onChange={(_e, nextPage) => setPageNo(nextPage)}
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          getRowKey={(row, index) => row._id || index}
+          emptyMessage="No registered users for selected filters"
+          getRowSx={(_row, index) =>
+            index % 2 === 1
+              ? { bgcolor: 'rgba(255,255,255,0.03)', '& td': { bgcolor: 'transparent' } }
+              : undefined
+          }
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

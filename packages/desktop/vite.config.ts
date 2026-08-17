@@ -1,12 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const sharedSrc = path.resolve(__dirname, '../shared/src');
+const pkg = JSON.parse(
+  readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'),
+) as { version?: string };
 
 export default defineConfig({
   plugins: [react()],
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
+  },
   resolve: {
     // More specific aliases MUST come first — otherwise `@astro/shared`
     // steals `@astro/shared/permissions` (etc.) and resolution fails.

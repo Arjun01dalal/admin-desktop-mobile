@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -40,7 +39,6 @@ const ghostBtnSx = {
 };
 
 export function MidGroupsPage() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [groups, setGroups] = useState<MidGroupMap>({});
@@ -162,9 +160,6 @@ export function MidGroupsPage() {
         mb={2}
       >
         <Box>
-          <Button size="small" onClick={() => navigate('/funds')} sx={{ mb: 0.5, ...ghostBtnSx }}>
-            ← Back
-          </Button>
           <Typography variant="overline" color="text.secondary">
             Funds
           </Typography>

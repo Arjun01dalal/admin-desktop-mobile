@@ -14,6 +14,8 @@ import {
   Typography,
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import BlockIcon from '@mui/icons-material/Block';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import { type CommonTableColumn } from '@/components/CommonTable';
 import {
@@ -47,7 +49,6 @@ import {
   CALLER_COL,
   AMOUNT_COL,
   DATETIME_COL,
-  ACTION_COL,
   REASON_COL,
   NAME_COL_WIDTH,
   NAME_COL_SX,
@@ -1067,40 +1068,18 @@ if (userType === 'In_Active_Deposit') {
   );
 
   if (!isCaller) {
-    cols.push(
-      {
-        id: 'action',
-        label: 'Action',
-        filter: null,
-        render: (r) => {
-          const blocked = Boolean(r.blockUser || r.block);
-          const busy = actionBusyId === r._id || otpSending;
-          return (
-            <Button
-              size="small"
-              variant="contained"
-              color={blocked ? 'success' : 'error'}
-              disabled={busy}
-              onClick={() => void startBlockWithOtp(r)}
-            >
-              {blocked ? 'Unblock' : 'Block'}
-            </Button>
-          );
-        },
-      },
-      {
-        id: 'blockReason',
-        label: (
-          <>
-            Block User
-            <br />
-            Reason
-          </>
-        ),
-        filter: null,
-        render: (r) => String(r.blockUserReason || '-'),
-      },
-    );
+    cols.push({
+      id: 'blockReason',
+      label: (
+        <>
+          Block User
+          <br />
+          Reason
+        </>
+      ),
+      filter: null,
+      render: (r) => String(r.blockUserReason || '-'),
+    });
   }
 
   return cols;
@@ -1138,26 +1117,64 @@ const cols: CommonTableColumn<UserRow>[] = [
           userType === 'Non_Performing_User' ||
           userType === 'Todays_Active' ||
           userType === 'Active_User') && (
-          <Button
-            size="small"
-            variant="contained"
-            disabled={actionBusyId === r._id}
-            onClick={() => openDump(r)}
-            sx={{
-              minWidth: 56,
-              px: 1.25,
-              py: 0.25,
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'none',
-              bgcolor: '#f1a144',
-              color: '#000',
-              boxShadow: 'none',
-              '&:hover': { bgcolor: '#e09030', boxShadow: 'none' },
-            }}
-          >
-            Dump
-          </Button>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Button
+              size="small"
+              variant="contained"
+              disabled={actionBusyId === r._id}
+              onClick={() => openDump(r)}
+              sx={{
+                minWidth: 56,
+                px: 1.25,
+                py: 0.25,
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: 'none',
+                bgcolor: '#f1a144',
+                color: '#000',
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#e09030', boxShadow: 'none' },
+              }}
+            >
+              Dump
+            </Button>
+            {!isCaller && (
+              <IconButton
+                size="small"
+                disabled={actionBusyId === r._id || otpSending}
+                onClick={() => void startBlockWithOtp(r)}
+                title={Boolean(r.blockUser || r.block) ? 'Unblock' : 'Block'}
+                aria-label={
+                  Boolean(r.blockUser || r.block) ? 'Unblock user' : 'Block user'
+                }
+                sx={{
+                  p: 0.35,
+                  color: Boolean(r.blockUser || r.block)
+                    ? 'success.main'
+                    : 'error.main',
+                  border: '1px solid',
+                  borderColor: Boolean(r.blockUser || r.block)
+                    ? 'success.main'
+                    : 'error.main',
+                  borderRadius: 1,
+                  bgcolor: Boolean(r.blockUser || r.block)
+                    ? 'rgba(46,125,50,0.12)'
+                    : 'rgba(211,47,47,0.12)',
+                  '&:hover': {
+                    bgcolor: Boolean(r.blockUser || r.block)
+                      ? 'rgba(46,125,50,0.22)'
+                      : 'rgba(211,47,47,0.22)',
+                  },
+                }}
+              >
+                {Boolean(r.blockUser || r.block) ? (
+                  <LockOpenIcon sx={{ fontSize: 16 }} />
+                ) : (
+                  <BlockIcon sx={{ fontSize: 16 }} />
+                )}
+              </IconButton>
+            )}
+          </Stack>
         )}
       </Stack>
     ),
@@ -1501,77 +1518,51 @@ cols.push(
   },
 );
 
-// Caller panel: hide Action + Block Reason
+// Caller panel: hide Block Reason
 if (
   !isCaller &&
   (userType === 'User' || userType === 'Todays_Active')
 ) {
-  cols.push(
-    {
-      id: 'action',
-      label: 'Action',
-      width: ACTION_COL.width,
-      headSx: ACTION_COL.sx,
-      cellSx: { ...ACTION_COL.sx, whiteSpace: 'normal' },
-      filter: (
-        <TextField
-          select
-          size="small"
-          fullWidth
-          value={draft.blockStatus}
-          onChange={(e) => {
-            setDraftField('blockStatus')(e.target.value);
-          }}
-          sx={{
-            width: '100%',
-            maxWidth: '100%',
-            '& .MuiInputBase-root': {
-              bgcolor: '#fff',
-              color: '#111',
-              fontSize: 11,
-            },
-          }}
-        >
-          {BLOCK_STATUS_OPTIONS.map((opt) => (
-            <MenuItem key={opt.value || 'all'} value={opt.value}>
-              {opt.label}
-            </MenuItem>
-          ))}
-        </TextField>
-      ),
-      render: (r) => {
-        const blocked = Boolean(r.blockUser || r.block);
-        const busy = actionBusyId === r._id || otpSending;
-        return (
-          <Button
-            size="small"
-            variant="contained"
-            color={blocked ? 'success' : 'error'}
-            disabled={busy}
-            onClick={() => void startBlockWithOtp(r)}
-            sx={{ minWidth: 72, px: 1, fontSize: 11 }}
-          >
-            {blocked ? 'Unblock' : 'Block'}
-          </Button>
-        );
-      },
-    },
-    {
-      id: 'blockReason',
-      label: (
-        <>
-          Block
-          <br />
-          Reason
-        </>
-      ),
-      width: REASON_COL.width,
-      headSx: REASON_COL.sx,
-      cellSx: REASON_COL.sx,
-      filter: null,
-      render: (r) => String(r.blockUserReason || '-'),
-    },
-  );
+  cols.push({
+    id: 'blockReason',
+    label: (
+      <>
+        Block
+        <br />
+        Reason
+      </>
+    ),
+    width: REASON_COL.width,
+    headSx: REASON_COL.sx,
+    cellSx: REASON_COL.sx,
+    filter: (
+      <TextField
+        select
+        size="small"
+        fullWidth
+        value={draft.blockStatus}
+        onChange={(e) => {
+          setDraftField('blockStatus')(e.target.value);
+        }}
+        sx={{
+          width: '100%',
+          maxWidth: '100%',
+          '& .MuiInputBase-root': {
+            bgcolor: '#fff',
+            color: '#111',
+            fontSize: 11,
+          },
+        }}
+      >
+        {BLOCK_STATUS_OPTIONS.map((opt) => (
+          <MenuItem key={opt.value || 'all'} value={opt.value}>
+            {opt.label}
+          </MenuItem>
+        ))}
+      </TextField>
+    ),
+    render: (r) => String(r.blockUserReason || '-'),
+  });
 }
 
 return cols;

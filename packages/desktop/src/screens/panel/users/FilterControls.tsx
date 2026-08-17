@@ -24,7 +24,7 @@ export function StateMultiFilter({
 }) {
   return (
     <Stack
-      spacing={0.5}
+      spacing={0.35}
       alignItems="stretch"
       sx={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
     >
@@ -57,15 +57,23 @@ export function StateMultiFilter({
           '& .MuiInputBase-root': {
             bgcolor: '#fff',
             color: '#111',
-            fontSize: 11,
+            fontSize: 10.5,
+            minHeight: 26,
+            height: 26,
+            borderRadius: '999px',
             maxWidth: '100%',
             overflow: 'hidden',
+          },
+          '& .MuiInputBase-input': {
+            py: 0.25,
+            px: 1,
           },
           '& .MuiSelect-select': {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            pr: '24px !important',
+            py: 0.25,
+            pr: '22px !important',
           },
         }}
       >
@@ -75,7 +83,21 @@ export function StateMultiFilter({
           </MenuItem>
         ))}
       </TextField>
-      <Button size="small" variant="outlined" onClick={onSearch}>
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={onSearch}
+        sx={{
+          minHeight: 24,
+          py: 0.15,
+          px: 1,
+          fontSize: 10.5,
+          fontWeight: 700,
+          lineHeight: 1.2,
+          textTransform: 'none',
+          borderRadius: '999px',
+        }}
+      >
         Search
       </Button>
     </Stack>
@@ -156,7 +178,14 @@ export function FilterInput({
         '& .MuiInputBase-root': {
           bgcolor: '#fff',
           color: '#111',
-          fontSize: compact ? 11 : 12,
+          fontSize: compact ? 10.5 : 11,
+          minHeight: 26,
+          height: 26,
+          borderRadius: '999px',
+        },
+        '& .MuiInputBase-input': {
+          py: 0.25,
+          px: 1,
         },
       }}
     />

@@ -2,10 +2,11 @@ import {
   Button,
   CircularProgress,
   MenuItem,
-  Paper,
   Stack,
   TextField,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 
 type CoinRemovalToolbarProps = {
@@ -18,6 +19,7 @@ type CoinRemovalToolbarProps = {
   onItemsPerPageChange: (value: number) => void;
   onClearDates: () => void;
   onApply: () => void;
+  onRefresh: () => void;
 };
 
 export function CoinRemovalToolbar({
@@ -30,9 +32,14 @@ export function CoinRemovalToolbar({
   onItemsPerPageChange,
   onClearDates,
   onApply,
+  onRefresh,
 }: CoinRemovalToolbarProps) {
   return (
-    <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', width: '100%' }}>
+    <CollapsibleFilterPanel
+      title="Coin Removal List"
+      summary={`${startDate || 'Any date'} → ${endDate || 'Any date'}`}
+      contentSx={{ overflowX: 'auto' }}
+    >
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
         <TextField
           type="date"
@@ -82,8 +89,18 @@ export function CoinRemovalToolbar({
         >
           Apply
         </Button>
-        {loading && <CircularProgress size={22} />}
+        <Button
+          variant="outlined"
+          startIcon={
+            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+          }
+          onClick={onRefresh}
+          disabled={loading}
+          sx={{ flexShrink: 0, fontWeight: 700 }}
+        >
+          Refresh
+        </Button>
       </Stack>
-    </Paper>
+    </CollapsibleFilterPanel>
   );
 }

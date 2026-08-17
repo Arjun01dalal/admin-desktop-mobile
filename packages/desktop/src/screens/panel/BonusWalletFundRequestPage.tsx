@@ -9,6 +9,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { todayIST } from '@/utils/dates';
@@ -183,6 +184,15 @@ export function BonusWalletFundRequestPage() {
             sx={orangeBtnSx}
           >
             Apply
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            disabled={loading}
+            onClick={() => void loadSummary({ allData: false })}
+            sx={orangeBtnSx}
+          >
+            Refresh
           </Button>
           <Button
             variant="contained"

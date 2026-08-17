@@ -3,11 +3,11 @@ import { useLocation } from 'react-router-dom';
 import {
   Box,
   Pagination,
-  Stack,
   Typography,
 } from '@mui/material';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import {
   asPaged,
@@ -276,28 +276,32 @@ export function BonusWalletFundRequestTablePage() {
         Bonus Wallet Table — {TITLE_BY_TYPE[type]}
       </Typography>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        getRowKey={(row, index) => row._id || index}
-        emptyMessage="No records found"
-        stickyHeader
-        dense
-        minWidth={1400}
-        virtualize={false}
-      />
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" sx={{ mt: 1.5 }}>
-          <Pagination
-            count={Math.max(1, totalPages)}
-            page={page}
-            color="secondary"
-            onChange={(_e, next) => setPage(next)}
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footer={
+          totalPages > 1 ? (
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              color="secondary"
+              onChange={(_e, next) => setPage(next)}
+            />
+          ) : undefined
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          getRowKey={(row, index) => row._id || index}
+          emptyMessage="No records found"
+          stickyHeader
+          dense
+          minWidth={1400}
+          virtualize={false}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

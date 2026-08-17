@@ -20,6 +20,7 @@ import {
 import { getRoleId } from '@/auth/permissions';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
@@ -285,73 +286,73 @@ export function NewRegistersPage() {
         maxWidth: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        height: 'calc(100vh - 96px)',
-        minHeight: 480,
       }}
     >
-      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
-        New Registration
-      </Typography>
+      <Stack
+        direction="row"
+        alignItems="flex-start"
+        spacing={1.5}
+        sx={{ mb: 1, flexShrink: 0 }}
+      >
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <NewRegistersToolbar
+            title="New Registration"
+            startDate={startDate}
+            endDate={endDate}
+            itemsPerPage={itemsPerPage}
+            campaignName={campaignName}
+            activeStatus={activeStatus}
+            newRegistration={newRegistration}
+            otherState={otherState}
+            nonPerforming={nonPerforming}
+            total={total}
+            loading={loading}
+            dialerLoading={dialerLoading}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onItemsPerPageChange={(value) => {
+              setItemsPerPage(value);
+              setPage(1);
+            }}
+            onCampaignNameChange={setCampaignName}
+            onActiveStatusChange={(v) => {
+              setActiveStatus(v);
+              setPage(1);
+            }}
+            onNewRegistrationChange={(v) => {
+              setNewRegistration(v);
+              setPage(1);
+            }}
+            onOtherStateChange={(v) => {
+              setOtherState(v);
+              if (v) setSelectedState([]);
+              setPage(1);
+            }}
+            onNonPerformingChange={(v) => {
+              setNonPerforming(v);
+              setPage(1);
+            }}
+            onApply={applyFilters}
+            onRefresh={applyFilters}
+            onAddToDialer={() => {
+              void addToDialer(campaignName, rows).then((ok) => {
+                if (ok) setCampaignName('');
+              });
+            }}
+          />
+        </Box>
+      </Stack>
 
-      <Box sx={{ flexShrink: 0 }}>
-        <NewRegistersToolbar
-          startDate={startDate}
-          endDate={endDate}
-          itemsPerPage={itemsPerPage}
-          campaignName={campaignName}
-          activeStatus={activeStatus}
-          newRegistration={newRegistration}
-          otherState={otherState}
-          nonPerforming={nonPerforming}
-          total={total}
-          loading={loading}
-          dialerLoading={dialerLoading}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onItemsPerPageChange={(value) => {
-            setItemsPerPage(value);
-            setPage(1);
-          }}
-          onCampaignNameChange={setCampaignName}
-          onActiveStatusChange={(v) => {
-            setActiveStatus(v);
-            setPage(1);
-          }}
-          onNewRegistrationChange={(v) => {
-            setNewRegistration(v);
-            setPage(1);
-          }}
-          onOtherStateChange={(v) => {
-            setOtherState(v);
-            if (v) setSelectedState([]);
-            setPage(1);
-          }}
-          onNonPerformingChange={(v) => {
-            setNonPerforming(v);
-            setPage(1);
-          }}
-          onApply={applyFilters}
-          onAddToDialer={() => {
-            void addToDialer(campaignName, rows).then((ok) => {
-              if (ok) setCampaignName('');
-            });
-          }}
-        />
-      </Box>
-
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          // CommonTable wraps its scrollport in an auto-height Box; without this
-          // the virtualized table renders full height and paints under the pager.
-          '& > *': { flex: 1, minHeight: 0 },
-        }}
+      <TablePanel
+        footerJustify="center"
+        footer={
+          <Pagination
+            count={Math.max(1, Math.ceil(total / itemsPerPage))}
+            page={page}
+            onChange={(_e, p) => setPage(p)}
+            color="primary"
+          />
+        }
       >
         <NewRegistersFiltersProvider value={filtersValue}>
           <CommonTable
@@ -368,16 +369,7 @@ export function NewRegistersPage() {
             paper
           />
         </NewRegistersFiltersProvider>
-      </Box>
-
-      <Stack alignItems="center" mt={1.5} mb={0.5} sx={{ flexShrink: 0 }}>
-        <Pagination
-          count={Math.max(1, Math.ceil(total / itemsPerPage))}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-        />
-      </Stack>
+      </TablePanel>
 
       <Dialog open={Boolean(block.target)} onClose={block.close}>
         <DialogTitle>

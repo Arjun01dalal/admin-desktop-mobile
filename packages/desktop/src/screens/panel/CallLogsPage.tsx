@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { todayIST, getStoredUser } from '@/utils/dates';
 import { CommonTable } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { COMMENT_FILTER_OPTIONS } from './callLogs/constants';
 import { CallLogsToolbar } from './callLogs/CallLogsToolbar';
 import { BotStatusTable } from './callLogs/BotStatusTable';
@@ -222,7 +223,7 @@ function CallLogsPageBody({
     pauseBotCalls,
     viewSummary,
     onUpload,
-    reinitiateStatus,
+    reinitiateStatuses,
   } = useCallLogsActions({
     admin,
     load,
@@ -328,46 +329,46 @@ function CallLogsPageBody({
         minWidth: 0,
         overflowX: 'hidden',
         boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        // Fill panel viewport; bot summary stays compact, logs fill the rest.
-        height: 'calc(100vh - 96px)',
-        minHeight: 480,
       }}
     >
-      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
-        Call Logs
-      </Typography>
-
-      <Box sx={{ flexShrink: 0 }}>
-        <CallLogsToolbar
-          startDate={startDate}
-          endDate={endDate}
-          campaignId={campaignId}
-          itemsPerPage={itemsPerPage}
-          total={total}
-          loading={loading}
-          actionLoading={actionLoading}
-          fileRef={fileRef}
-          isCaller={isCaller}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onCampaignChange={setCampaignId}
-          onItemsPerPageChange={(value) => {
-            setItemsPerPage(value);
-            setPage(1);
-          }}
-          onApply={applyFilters}
-          onBotCall={() => void botCall()}
-          onDialerCall={() => void dialerCall()}
-          onUpload={(file) => {
-            void onUpload(file).finally(() => {
-              if (fileRef.current) fileRef.current.value = '';
-            });
-          }}
-          onPauseOpen={() => setPauseOpen(true)}
-        />
-      </Box>
+      <Stack
+        direction="row"
+        alignItems="flex-start"
+        spacing={1.5}
+        sx={{ mb: 1.5, flexShrink: 0 }}
+      >
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <CallLogsToolbar
+            title="Call Logs"
+            startDate={startDate}
+            endDate={endDate}
+            campaignId={campaignId}
+            itemsPerPage={itemsPerPage}
+            total={total}
+            loading={loading}
+            actionLoading={actionLoading}
+            fileRef={fileRef}
+            isCaller={isCaller}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onCampaignChange={setCampaignId}
+            onItemsPerPageChange={(value) => {
+              setItemsPerPage(value);
+              setPage(1);
+            }}
+            onApply={applyFilters}
+            onRefresh={() => void load()}
+            onBotCall={() => void botCall()}
+            onDialerCall={() => void dialerCall()}
+            onUpload={(file) => {
+              void onUpload(file).finally(() => {
+                if (fileRef.current) fileRef.current.value = '';
+              });
+            }}
+            onPauseOpen={() => setPauseOpen(true)}
+          />
+        </Box>
+      </Stack>
 
       {!isCaller && (
         <Box sx={{ flexShrink: 0 }}>
@@ -375,20 +376,22 @@ function CallLogsPageBody({
             botSummary={botSummary}
             loading={loading}
             actionLoading={actionLoading}
-            onReinitiate={reinitiateStatus}
+            onReinitiate={reinitiateStatuses}
           />
         </Box>
       )}
 
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          '& > *': { flex: 1, minHeight: 0 },
-        }}
+      <TablePanel
+        footerJustify="center"
+        footer={
+          <Pagination
+            count={Math.max(1, Math.ceil(total / itemsPerPage))}
+            page={page}
+            onChange={(_e, p) => setPage(p)}
+            color="primary"
+            size="small"
+          />
+        }
       >
         <CallLogsFiltersProvider value={filtersValue}>
           <CommonTable
@@ -403,17 +406,7 @@ function CallLogsPageBody({
             maxHeight="100%"
           />
         </CallLogsFiltersProvider>
-      </Box>
-
-      <Stack alignItems="center" mt={1.5} mb={0.5} sx={{ flexShrink: 0 }}>
-        <Pagination
-          count={Math.max(1, Math.ceil(total / itemsPerPage))}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          size="small"
-        />
-      </Stack>
+      </TablePanel>
 
       <Dialog
         open={!isCaller && pauseOpen}

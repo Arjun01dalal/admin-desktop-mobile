@@ -26,7 +26,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import {
@@ -1038,14 +1040,12 @@ export function DepositProvidersPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Box
-        sx={{
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 1.5,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
+      <CollapsibleFilterPanel
+        title="Deposit Providers"
+        summary={
+          appliedStart && appliedEnd ? `${appliedStart} → ${appliedEnd}` : 'All dates'
+        }
+        contentSx={{ overflowX: 'auto' }}
       >
         <Stack
           direction="row"
@@ -1053,7 +1053,7 @@ export function DepositProvidersPage() {
           alignItems="center"
           flexWrap="nowrap"
           useFlexGap
-          sx={{ overflowX: 'auto', '& > *': { flexShrink: 0 } }}
+          sx={{ overflowX: 'auto', pt: 1, pb: 0.25, '& > *': { flexShrink: 0 } }}
         >
           <TextField
             size="small"
@@ -1115,18 +1115,20 @@ export function DepositProvidersPage() {
             </Button>
           )}
         </Stack>
-      </Box>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={filteredRows}
-        loading={loading}
-        getRowKey={(row) => row._id}
-        emptyMessage="No deposit providers"
-        dense
-        virtualize
-        maxHeight="calc(100vh - 220px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={filteredRows}
+          loading={loading}
+          getRowKey={(row) => row._id}
+          emptyMessage="No deposit providers"
+          dense
+          virtualize
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       {/* Add provider */}
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="sm">

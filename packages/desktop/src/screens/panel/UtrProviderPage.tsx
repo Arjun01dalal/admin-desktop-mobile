@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  Paper,
   Stack,
   Switch,
   TextField,
@@ -21,6 +20,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { todayIST, formatAmount } from '@/utils/dates';
 import { asList, useReportQuery } from '@/screens/panel/shared';
 
@@ -248,18 +249,11 @@ export function UtrProviderPage() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        gap={1.5}
-        mb={2}
+      <CollapsibleFilterPanel
+        title="UTR Providers"
+        summary={`${startDate} → ${endDate}`}
       >
-        <Typography variant="h5" fontWeight={700}>
-          UTR Providers
-        </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" mb={2}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -288,9 +282,6 @@ export function UtrProviderPage() {
             Refresh
           </Button>
         </Stack>
-      </Stack>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             type="date"
@@ -319,19 +310,21 @@ export function UtrProviderPage() {
             Apply
           </Button>
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => row._id}
-        loading={loading}
-        emptyMessage="No UTR providers found"
-        stickyHeader
-        dense
-        minWidth={1000}
-        maxHeight="calc(100vh - 300px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row._id}
+          loading={loading}
+          emptyMessage="No UTR providers found"
+          stickyHeader
+          dense
+          minWidth={1000}
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
         <form onSubmit={handleCreate}>

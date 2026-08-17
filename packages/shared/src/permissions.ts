@@ -381,6 +381,16 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'Bot Data',
     'bot_data',
   ],
+  house_game: [
+    'house_game',
+    'house_games',
+    'House_Game',
+    'House_Games',
+    'House Game',
+    'House Games',
+    'HouseGame',
+    'HouseGames',
+  ],
   hide_show_games: [
     'hide_show_games',
     'Hide_Show_Games',

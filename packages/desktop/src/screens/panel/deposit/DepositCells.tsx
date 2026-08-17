@@ -3,17 +3,22 @@ import {
   Box,
   Button,
   Checkbox,
-  Chip,
   IconButton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
+import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
@@ -136,15 +141,29 @@ export function openTelegram(row: DepositRow) {
   }
 }
 
-function statusChipColor(
-  status: string,
-): 'default' | 'success' | 'warning' | 'error' | 'info' {
+function statusVisual(status: string): {
+  color: string;
+  Icon: typeof CheckCircleOutlineIcon;
+  label: string;
+} {
   const s = status.toLowerCase();
-  if (s === 'approved' || s === 'success' || s === 'approved-clr') return 'success';
-  if (s === 'pending' || s === 'processing') return 'warning';
-  if (s === 'rejected' || s === 'failed' || s === 'cancel') return 'error';
-  if (s === 'on hold' || s === 'reverse') return 'info';
-  return 'default';
+  const label = status.trim() || '—';
+  if (s === 'approved' || s === 'success' || s === 'approved-clr') {
+    return { color: '#9AFF4D', Icon: CheckCircleOutlineIcon, label };
+  }
+  if (s === 'pending' || s === 'processing') {
+    return { color: '#ff9f0a', Icon: HourglassTopOutlinedIcon, label };
+  }
+  if (s === 'rejected' || s === 'failed' || s === 'cancel') {
+    return { color: '#ef5350', Icon: CancelOutlinedIcon, label };
+  }
+  if (s === 'on hold') {
+    return { color: '#42a5f5', Icon: PauseCircleOutlineIcon, label };
+  }
+  if (s === 'reverse') {
+    return { color: '#29b6f6', Icon: ReplayOutlinedIcon, label };
+  }
+  return { color: '#9e9e9e', Icon: InfoOutlinedIcon, label };
 }
 
 export { depositRowBg } from './logic';
@@ -168,10 +187,10 @@ export const MobileCell = memo(function MobileCell({
   if (!mobile) return <>—</>;
   if (!canShowMobile) return <>**********</>;
 
-  const iconSize = compact ? 14 : 30;
+  const iconSize = compact ? 18 : 32;
   const chat =
     canWhatsApp && pending ? (
-      <Stack direction="row" alignItems="center" spacing={compact ? 0.25 : 0.75} sx={{ flexShrink: 0 }}>
+      <Stack direction="row" alignItems="center" spacing={compact ? 0.5 : 0.85} sx={{ flexShrink: 0 }}>
         <Box
           component="button"
           type="button"
@@ -237,12 +256,10 @@ export const MobileCell = memo(function MobileCell({
 
   return (
     <Stack
-      direction="row"
       alignItems="center"
       justifyContent="center"
-      spacing={compact ? 0.35 : 0.5}
-      flexWrap="nowrap"
-      sx={{ py: 0, minHeight: compact && pending ? 22 : undefined }}
+      spacing={compact ? 0.25 : 0.4}
+      sx={{ py: 0, minWidth: 0, width: '100%' }}
     >
       {number}
       {chat}
@@ -264,6 +281,10 @@ export const PaymentMethodCell = memo(function PaymentMethodCell({
   compact,
 }: PaymentMethodCellProps) {
   const pending = String(row.status || '').toLowerCase() === 'pending';
+  const gateway = display(row.paymentGatewayName);
+  const mid = display(row.mid);
+  const title = [gateway, mid].filter((v) => v && v !== '—').join(' · ');
+
   if (compact) {
     return (
       <Stack
@@ -271,7 +292,15 @@ export const PaymentMethodCell = memo(function PaymentMethodCell({
         alignItems="center"
         justifyContent="center"
         spacing={0.35}
-        sx={{ width: '100%', px: 0.25, flexWrap: 'nowrap' }}
+        title={title}
+        sx={{
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          px: 0.25,
+          flexWrap: 'nowrap',
+          overflow: 'hidden',
+        }}
       >
         <Typography
           sx={{
@@ -281,10 +310,11 @@ export const PaymentMethodCell = memo(function PaymentMethodCell({
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            maxWidth: 110,
+            minWidth: 0,
+            flex: '1 1 auto',
           }}
         >
-          {display(row.paymentGatewayName)}
+          {gateway}
         </Typography>
         <Typography
           sx={{
@@ -292,9 +322,13 @@ export const PaymentMethodCell = memo(function PaymentMethodCell({
             opacity: 0.85,
             lineHeight: 1.05,
             whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            flexShrink: 0,
+            maxWidth: 48,
           }}
         >
-          {display(row.mid)}
+          {mid}
         </Typography>
         {canEdit ? (
           <IconButton size="small" onClick={() => onEdit?.(row)} sx={{ p: 0.05, flexShrink: 0 }}>
@@ -306,27 +340,50 @@ export const PaymentMethodCell = memo(function PaymentMethodCell({
   }
 
   return (
-    <Stack alignItems="center" spacing={0.25} sx={{ width: '100%', px: 0.25 }}>
+    <Stack
+      alignItems="center"
+      spacing={0.25}
+      title={title}
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        px: 0.25,
+        overflow: 'hidden',
+      }}
+    >
       <Typography
         sx={{
           fontSize: 12,
           fontWeight: 600,
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
           whiteSpace: 'normal',
+          overflowWrap: 'anywhere',
           wordBreak: 'break-word',
           textAlign: 'center',
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
         }}
       >
-        {display(row.paymentGatewayName)}
+        {gateway}
       </Typography>
       <Typography
         sx={{
           fontSize: 11,
-          whiteSpace: 'normal',
-          wordBreak: 'break-word',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
           textAlign: 'center',
         }}
       >
-        {display(row.mid)}
+        {mid}
       </Typography>
       {canEdit ? (
         <IconButton size="small" onClick={() => onEdit?.(row)} sx={{ p: 0.25 }}>
@@ -339,97 +396,29 @@ export const PaymentMethodCell = memo(function PaymentMethodCell({
 
 type TxnDetailsCellProps = {
   row: DepositRow;
-  canEdit: boolean;
-  onEdit: (row: DepositRow) => void;
   compact?: boolean;
 };
 
 export const TxnDetailsCell = memo(function TxnDetailsCell({
   row,
-  canEdit,
-  onEdit,
   compact,
 }: TxnDetailsCellProps) {
-  const status = String(row.status || '');
-  const isPending = status.toLowerCase() === 'pending';
-  const isApproved = ['approved', 'success', 'approved-clr'].includes(status.toLowerCase());
-  // Light rows need a darker green for contrast; dark rows need a brighter one.
-  const approvedSx = isApproved
-    ? {
-        borderColor: (t: Theme) => (t.palette.mode === 'light' ? '#1a7f4b' : '#34c778'),
-        color: (t: Theme) => (t.palette.mode === 'light' ? '#1a7f4b' : '#34c778'),
-        bgcolor: 'transparent',
-      }
-    : null;
-  const chip = status ? (
-    <Chip
-      size="small"
-      label={status}
-      color={statusChipColor(status)}
-      variant={
-        status.toLowerCase() === 'approved' || status.toLowerCase() === 'success'
-          ? 'outlined'
-          : 'filled'
-      }
-      sx={{
-        height: compact ? (isPending ? 15 : 16) : 22,
-        fontSize: compact ? (isPending ? 10 : 10.5) : 11,
-        fontWeight: 700,
-        ...(compact ? { '& .MuiChip-label': { px: 0.5, py: 0 } } : null),
-        ...approvedSx,
-      }}
-    />
-  ) : (
-    '—'
-  );
-
   if (compact) {
     return (
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="center"
-        spacing={0.4}
-        flexWrap="nowrap"
-        sx={{ minHeight: isPending ? 20 : undefined }}
-      >
-        <Typography sx={{ fontSize: isPending ? 11 : 11.5, lineHeight: 1.05, whiteSpace: 'nowrap' }}>
-          {`${formatDisplayDate(row.createdOn) || '—'} ${formatDisplayTime(row.createdOn) || ''}`.trim()}
-        </Typography>
-        {chip}
-        {canEdit ? (
-          <IconButton
-            size="small"
-            onClick={() => onEdit(row)}
-            sx={{ p: 0.05 }}
-            aria-label="Settle deposit"
-          >
-            <EditIcon sx={{ fontSize: 13, color: '#ff9f0a' }} />
-          </IconButton>
-        ) : null}
-      </Stack>
+      <Typography sx={{ fontSize: 11.5, lineHeight: 1.05, whiteSpace: 'nowrap' }}>
+        {`${formatDisplayDate(row.createdOn) || '—'} ${formatDisplayTime(row.createdOn) || ''}`.trim()}
+      </Typography>
     );
   }
 
   return (
-    <Stack alignItems="center" spacing={0.5} sx={{ py: 0.25 }}>
+    <Stack alignItems="center" spacing={0.25} sx={{ py: 0.25 }}>
       <Typography sx={{ fontSize: 12, lineHeight: 1.2 }}>
         {formatDisplayDate(row.createdOn) || '—'}
       </Typography>
       <Typography sx={{ fontSize: 11, opacity: 0.75, lineHeight: 1.2 }}>
         {formatDisplayTime(row.createdOn) || '—'}
       </Typography>
-      {chip}
-      {canEdit ? (
-        <IconButton
-          size="small"
-          onClick={() => onEdit(row)}
-          sx={{ p: 0.25 }}
-          aria-label="Settle deposit"
-        >
-          <EditIcon sx={{ fontSize: 16, color: '#ff9f0a' }} />
-        </IconButton>
-      ) : null}
     </Stack>
   );
 });
@@ -536,10 +525,11 @@ export const SecondaryNameCell = memo(function SecondaryNameCell({
 }: SecondaryNameCellProps) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  /** Compact rows keep the add form hidden so one screen fits more deposits. */
+  /** Keep the add form collapsed so pending rows stay one-line tall. */
   const [formOpen, setFormOpen] = useState(false);
   const names = Array.isArray(row.oldMultipleNames) ? row.oldMultipleNames : [];
   const pending = String(row.status || '').toLowerCase() === 'pending';
+  const namesLabel = names.length ? names.join(', ') : '—';
 
   const add = async (e: FormEvent) => {
     e.preventDefault();
@@ -569,95 +559,92 @@ export const SecondaryNameCell = memo(function SecondaryNameCell({
     }
   };
 
-  if (compact) {
-    return (
-      <Stack spacing={0} sx={{ minWidth: 140, maxWidth: 200, mx: 'auto' }}>
-        <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.25}>
-          <Typography
+  return (
+    <Stack
+      spacing={formOpen ? 0.5 : 0}
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        mx: 'auto',
+        overflow: 'hidden',
+      }}
+    >
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="center"
+        spacing={0.35}
+        sx={{ minWidth: 0, width: '100%' }}
+      >
+        <Typography
+          title={namesLabel === '—' ? undefined : namesLabel}
+          sx={{
+            fontSize: compact ? 11 : 12,
+            color: 'text.secondary',
+            lineHeight: 1.15,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            minWidth: 0,
+            flex: '1 1 auto',
+            textAlign: 'center',
+          }}
+        >
+          {namesLabel}
+        </Typography>
+        {pending ? (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              setFormOpen((v) => !v);
+            }}
+            aria-label="Add secondary name"
+            title="Add secondary name"
             sx={{
-              fontSize: 11,
-              color: 'text.secondary',
-              lineHeight: 1.05,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              p: 0.2,
+              flexShrink: 0,
+              color: '#ff9f0a',
+              border: '1px solid rgba(255,159,10,0.4)',
+              borderRadius: 1,
+              bgcolor: formOpen ? 'rgba(255,159,10,0.18)' : 'rgba(255,159,10,0.08)',
+              '&:hover': { bgcolor: 'rgba(255,159,10,0.2)' },
             }}
           >
-            {names.length ? names.join(', ') : '—'}
-          </Typography>
-          {pending ? (
-            <IconButton
-              size="small"
-              onClick={() => setFormOpen((v) => !v)}
-              aria-label="Add secondary name"
-              sx={{ p: 0.05, color: '#ff9f0a' }}
-            >
-              <AddCircleOutlineIcon sx={{ fontSize: 14 }} />
-            </IconButton>
-          ) : null}
-        </Stack>
-        {pending && formOpen ? (
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <TextField
-              size="small"
-              placeholder="Secondary name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              sx={{
-                '& .MuiInputBase-root': {
-                  bgcolor: 'background.paper',
-                  color: 'text.primary',
-                  fontSize: 11,
-                },
-                '& .MuiInputBase-input': { py: 0.4, color: 'text.primary' },
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
-              }}
-            />
-            <Button
-              variant="contained"
-              size="small"
-              disabled={busy || !name.trim()}
-              onClick={(e) => void add(e)}
-              sx={{
-                textTransform: 'none',
-                minWidth: 44,
-                py: 0.15,
-                fontSize: 11,
-                background: 'linear-gradient(135deg, #ffd60a, #ff9f0a)',
-                bgcolor: '#ff9f0a',
-                color: '#1a1200',
-                fontWeight: 700,
-                boxShadow: '0 2px 8px rgba(255,159,10,0.4)',
-                '&:hover': { bgcolor: '#ffb340' },
-              }}
-            >
-              ADD
-            </Button>
-          </Stack>
+            <AddCircleOutlineIcon sx={{ fontSize: compact ? 14 : 15 }} />
+          </IconButton>
         ) : null}
       </Stack>
-    );
-  }
 
-  return (
-    <Stack spacing={0.75} sx={{ minWidth: 160, maxWidth: 200, py: 0.5, mx: 'auto' }}>
-      <Typography sx={{ fontSize: 11, color: 'text.secondary', textAlign: 'center' }}>
-        {names.length ? names.join(', ') : '—'}
-      </Typography>
-      {pending ? (
-        <>
+      {pending && formOpen ? (
+        <Stack
+          direction="row"
+          spacing={0.5}
+          alignItems="center"
+          sx={{ width: '100%', minWidth: 0 }}
+        >
           <TextField
             size="small"
             placeholder="Secondary name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void add(e);
+            }}
             sx={{
+              flex: 1,
+              minWidth: 0,
               '& .MuiInputBase-root': {
                 bgcolor: 'background.paper',
                 color: 'text.primary',
-                fontSize: 12,
+                fontSize: compact ? 11 : 12,
+                minHeight: compact ? 26 : 30,
               },
-              '& .MuiInputBase-input': { color: 'text.primary' },
+              '& .MuiInputBase-input': {
+                py: compact ? 0.35 : 0.5,
+                color: 'text.primary',
+              },
               '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
             }}
           />
@@ -668,17 +655,20 @@ export const SecondaryNameCell = memo(function SecondaryNameCell({
             onClick={(e) => void add(e)}
             sx={{
               textTransform: 'none',
-              background: 'linear-gradient(135deg, #ffd60a, #ff9f0a)',
+              minWidth: compact ? 40 : 48,
+              px: 1,
+              py: compact ? 0.2 : 0.35,
+              fontSize: compact ? 10.5 : 11,
               bgcolor: '#ff9f0a',
               color: '#1a1200',
               fontWeight: 700,
-              boxShadow: '0 2px 8px rgba(255,159,10,0.4)',
-              '&:hover': { bgcolor: '#ffb340' },
+              boxShadow: 'none',
+              '&:hover': { bgcolor: '#ffb340', boxShadow: 'none' },
             }}
           >
             ADD
           </Button>
-        </>
+        </Stack>
       ) : null}
     </Stack>
   );
@@ -693,6 +683,8 @@ type IndexCellProps = {
   selected: boolean;
   onToggle: (row: DepositRow, checked: boolean) => void;
   compact?: boolean;
+  canEdit?: boolean;
+  onEdit?: (row: DepositRow) => void;
 };
 
 export const IndexCell = memo(function IndexCell({
@@ -704,23 +696,70 @@ export const IndexCell = memo(function IndexCell({
   selected,
   onToggle,
   compact,
+  canEdit,
+  onEdit,
 }: IndexCellProps) {
+  const status = String(row.status || '');
+  const visual = status ? statusVisual(status) : null;
+  const StatusIcon = visual?.Icon;
+
   return (
     <Stack
-      direction={compact ? 'row' : 'column'}
       alignItems="center"
       justifyContent="center"
-      spacing={0.25}
+      spacing={0.2}
+      sx={{ minWidth: 0 }}
     >
-      <Typography sx={{ fontSize: 12 }}>{(page - 1) * itemsPerPage + index + 1}</Typography>
-      {selectable ? (
-        <Checkbox
-          size="small"
-          checked={selected}
-          onChange={(e) => onToggle(row, e.target.checked)}
-          sx={compact ? { p: 0.05, '& .MuiSvgIcon-root': { fontSize: 16 } } : { p: 0.25 }}
-        />
-      ) : null}
+      <Typography sx={{ fontSize: 12, lineHeight: 1.1 }}>
+        {(page - 1) * itemsPerPage + index + 1}
+      </Typography>
+      <Stack direction="row" alignItems="center" spacing={0.15}>
+        {visual && StatusIcon ? (
+          <Tooltip title={visual.label} arrow>
+            <IconButton
+              size="small"
+              aria-label={visual.label}
+              onClick={
+                canEdit && onEdit
+                  ? (e) => {
+                      e.stopPropagation();
+                      onEdit(row);
+                    }
+                  : undefined
+              }
+              sx={{
+                p: 0.1,
+                color: visual.color,
+                border: '1px solid',
+                borderColor: visual.color,
+                borderRadius: 1,
+                bgcolor: `${visual.color}22`,
+                cursor: canEdit ? 'pointer' : 'default',
+                ...(canEdit
+                  ? {
+                      '&:hover': {
+                        bgcolor: `${visual.color}33`,
+                        boxShadow: `0 0 0 1px ${visual.color}`,
+                      },
+                    }
+                  : {
+                      '&:hover': { bgcolor: `${visual.color}22` },
+                    }),
+              }}
+            >
+              <StatusIcon sx={{ fontSize: compact ? 12 : 13 }} />
+            </IconButton>
+          </Tooltip>
+        ) : null}
+        {selectable ? (
+          <Checkbox
+            size="small"
+            checked={selected}
+            onChange={(e) => onToggle(row, e.target.checked)}
+            sx={{ p: 0.05, '& .MuiSvgIcon-root': { fontSize: 16 } }}
+          />
+        ) : null}
+      </Stack>
     </Stack>
   );
 });

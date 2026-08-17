@@ -1,4 +1,7 @@
-import { Box, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Box, Collapse, IconButton, Typography } from '@mui/material';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { formatAmount } from '@/utils/dates';
 
 export type BarItem = { name: string; amount: number };
@@ -9,7 +12,7 @@ const GRADIENTS: Record<string, [string, string]> = {
   SATTAMATKA: ['#ef4444', '#991b1b'],
 };
 
-type Props = { data: BarItem[] };
+type Props = { data: BarItem[]; collapsible?: boolean };
 
 /** Round axis max up to a clean step (matches recharts-ish scale). */
 function niceMax(value: number): number {
@@ -37,11 +40,13 @@ function formatLabel(amt: number): string {
   return `₹${shown}`;
 }
 
-/** Bet Amount Overview — matches Laxmi recharts chart. */
-export function BetAmountBars({ data }: Props) {
-  const width = 720;
-  const height = 280;
-  const margin = { top: 32, right: 24, left: 56, bottom: 52 };
+/** Bet Amount Overview — optional collapsible chart + legend. */
+export function BetAmountBars({ data, collapsible = true }: Props) {
+  const [open, setOpen] = useState(!collapsible);
+  const height = 180;
+  const margin = { top: 24, right: 16, left: 46, bottom: 26 };
+  const slot = 104;
+  const width = margin.left + margin.right + Math.max(1, data.length) * slot;
   const chartW = width - margin.left - margin.right;
   const chartH = height - margin.top - margin.bottom;
 
@@ -51,50 +56,41 @@ export function BetAmountBars({ data }: Props) {
   });
   const rawMax = Math.max(0, ...amounts);
   const maxVal = niceMax(rawMax);
+  const total = amounts.reduce((sum, n) => sum + n, 0);
   const ticks = [0, 0.2, 0.4, 0.6, 0.8, 1].map((t) => t * maxVal);
   const barSlot = data.length ? chartW / data.length : chartW;
-  const barW = Math.min(56, Math.max(28, barSlot * 0.35));
+  const barW = Math.min(52, Math.max(30, barSlot * 0.5));
 
-  return (
-    <Box
-      sx={{
-        mt: 1,
-        p: 2,
-        bgcolor: '#f9fafb',
-        borderRadius: '16px',
-        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.08)',
-        width: '100%',
-      }}
-    >
-      <Typography
-        sx={{
-          fontSize: { xs: 16, md: 18 },
-          fontWeight: 600,
-          mb: 1,
-          color: '#374151',
-        }}
-      >
-        Bet Amount Overview
-      </Typography>
-
+  const body = (
+    <Box sx={{ px: 1, pb: 1, pt: 0.25, borderTop: '1px solid #eef1f4' }}>
       {data.length === 0 ? (
-        <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>
+        <Typography
+          color="text.secondary"
+          sx={{ py: 2, fontSize: 12, textAlign: 'center' }}
+        >
           No bet data
         </Typography>
       ) : (
-        <Box sx={{ width: '100%', overflowX: 'auto' }}>
-          <Box sx={{ minWidth: 420, width: '100%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1.5,
+            width: '100%',
+          }}
+        >
+          <Box sx={{ width: 'fit-content', maxWidth: '100%', overflowX: 'auto' }}>
             <svg
               viewBox={`0 0 ${width} ${height}`}
-              width="100%"
-              height={280}
+              width={width}
+              height={height}
               role="img"
               aria-label="Bet amount overview"
             >
               <defs>
                 {data.map((entry) => {
-                  const [c0, c1] =
-                    GRADIENTS[entry.name] || ['#64748b', '#334155'];
+                  const [c0, c1] = GRADIENTS[entry.name] || ['#64748b', '#334155'];
                   return (
                     <linearGradient
                       key={entry.name}
@@ -111,7 +107,6 @@ export function BetAmountBars({ data }: Props) {
                 })}
               </defs>
 
-              {/* Baseline */}
               <line
                 x1={margin.left}
                 x2={margin.left + chartW}
@@ -121,7 +116,6 @@ export function BetAmountBars({ data }: Props) {
                 strokeWidth={1}
               />
 
-              {/* Y ticks (no full grid — matches Laxmi) */}
               {ticks.map((tick) => {
                 const y = margin.top + chartH - (tick / maxVal) * chartH;
                 return (
@@ -139,7 +133,7 @@ export function BetAmountBars({ data }: Props) {
                       y={y + 4}
                       textAnchor="end"
                       fill="#6b7280"
-                      fontSize={11}
+                      fontSize={10}
                     >
                       {formatAxis(tick)}
                     </text>
@@ -176,18 +170,17 @@ export function BetAmountBars({ data }: Props) {
                         y={y - 8}
                         textAnchor="middle"
                         fill="#374151"
-                        fontSize={11}
+                        fontSize={10}
                       >
                         {formatLabel(amt)}
                       </text>
                     )}
                     <text
                       x={x + barW / 2}
-                      y={margin.top + chartH + 16}
-                      textAnchor="end"
+                      y={margin.top + chartH + 15}
+                      textAnchor="middle"
                       fill="#6b7280"
-                      fontSize={12}
-                      transform={`rotate(-25 ${x + barW / 2} ${margin.top + chartH + 16})`}
+                      fontSize={10}
                     >
                       {item.name}
                     </text>
@@ -196,7 +189,141 @@ export function BetAmountBars({ data }: Props) {
               })}
             </svg>
           </Box>
+
+          <Box
+            sx={{
+              flex: '1 1 220px',
+              minWidth: 200,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: 0.5,
+            }}
+          >
+            {data.map((item, i) => {
+              const amt = amounts[i] ?? 0;
+              const share = total > 0 ? Math.round((amt / total) * 100) : 0;
+              const [c0] = GRADIENTS[item.name] || ['#64748b', '#334155'];
+              return (
+                <Box
+                  key={`legend-${item.name}`}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.75,
+                    px: 0.75,
+                    py: 0.5,
+                    bgcolor: '#f8fafc',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      bgcolor: c0,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography noWrap sx={{ fontSize: 10, color: '#667085' }}>
+                      {item.name} · {share}%
+                    </Typography>
+                    <Typography
+                      noWrap
+                      sx={{ fontSize: 12, fontWeight: 700, color: '#111827' }}
+                    >
+                      {formatLabel(amt)}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
         </Box>
+      )}
+    </Box>
+  );
+
+  return (
+    <Box
+      sx={{
+        mt: 0.75,
+        bgcolor: '#fff',
+        border: '1px solid #dde2e8',
+        borderRadius: 1.5,
+        boxShadow: '0 2px 6px rgba(15,23,42,0.05)',
+        width: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      <Box
+        role={collapsible ? 'button' : undefined}
+        tabIndex={collapsible ? 0 : undefined}
+        aria-expanded={collapsible ? open : undefined}
+        onClick={collapsible ? () => setOpen((v) => !v) : undefined}
+        onKeyDown={
+          collapsible
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setOpen((v) => !v);
+                }
+              }
+            : undefined
+        }
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+          px: 1,
+          py: 0.65,
+          cursor: collapsible ? 'pointer' : 'default',
+          userSelect: 'none',
+          bgcolor: open || !collapsible ? '#f8fafc' : '#fff',
+          '&:hover': collapsible ? { bgcolor: '#f8fafc' } : undefined,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
+            Bet Amount Overview
+          </Typography>
+          {data.length > 0 && (
+            <Typography sx={{ fontSize: 11, color: '#667085' }}>
+              · Total ₹{formatAmount(total)}
+            </Typography>
+          )}
+        </Box>
+        {collapsible ? (
+          <IconButton
+            size="small"
+            aria-label={
+              open ? 'Collapse bet amount overview' : 'Expand bet amount overview'
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen((v) => !v);
+            }}
+            sx={{ p: 0.25, color: '#667085' }}
+          >
+            {open ? (
+              <ExpandLessIcon sx={{ fontSize: 18 }} />
+            ) : (
+              <ExpandMoreIcon sx={{ fontSize: 18 }} />
+            )}
+          </IconButton>
+        ) : null}
+      </Box>
+
+      {collapsible ? (
+        <Collapse in={open} timeout="auto" unmountOnExit>
+          {body}
+        </Collapse>
+      ) : (
+        body
       )}
     </Box>
   );

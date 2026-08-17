@@ -30,6 +30,10 @@ import { NAV_ITEMS } from './navItems';
 import { getBackPath } from './backPaths';
 import { AstroLogo } from '@/components/AstroLogo';
 import { BackButton } from '@/components/BackButton';
+import {
+  BackRowActionsProvider,
+  useBackRowActionsSlot,
+} from '@/layout/BackRowActions';
 import { RevealCodesOtpModal } from '@/components/RevealCodesOtpModal';
 import { ProfileMenu } from '@/components/ProfileMenu';
 import { secureApi } from '@/api/secureClient';
@@ -57,7 +61,15 @@ type Props = {
   onUserChanged: (user: AuthUser) => void;
 };
 
-export function AppShell({ onLogout, onUserChanged }: Props) {
+export function AppShell(props: Props) {
+  return (
+    <BackRowActionsProvider>
+      <AppShellInner {...props} />
+    </BackRowActionsProvider>
+  );
+}
+
+function AppShellInner({ onLogout, onUserChanged }: Props) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const shellBg = isDark ? '#0f0f12' : '#f0f0f2';
@@ -112,6 +124,9 @@ export function AppShell({ onLogout, onUserChanged }: Props) {
     }
     if (paths.includes('/deposit') || paths.includes('/state-wise-deposit')) {
       paths.push('/state-wise-deposit');
+    }
+    if (paths.includes('/users')) {
+      paths.push('/bonus-wallet-referral-earning', '/user_exposure');
     }
     if (paths.includes('/withdrawal-fund')) {
       paths.push('/withdraw-user-data');
@@ -187,6 +202,7 @@ export function AppShell({ onLogout, onUserChanged }: Props) {
 
   const showSosControls = showSos || (sosEnabled && sosExempt);
   const backTo = getBackPath(location.pathname);
+  const backRowActions = useBackRowActionsSlot();
 
   // Keep Responsibilities in sync with Role_ID after panel opens / storage updates.
   useEffect(() => {
@@ -519,6 +535,7 @@ export function AppShell({ onLogout, onUserChanged }: Props) {
 
       <Box
         component="main"
+        data-app-scroll="true"
         sx={{
           flexGrow: 1,
           p: 3,
@@ -528,11 +545,24 @@ export function AppShell({ onLogout, onUserChanged }: Props) {
           minWidth: 0,
         }}
       >
-        {backTo && (
-          <Box sx={{ mb: 1.5 }}>
-            <BackButton to={backTo} />
+        {backTo || backRowActions ? (
+          <Box
+            sx={{
+              mb: 1.5,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: 'wrap',
+            }}
+          >
+            {backTo ? <BackButton to={backTo} /> : null}
+            {backRowActions ? (
+              <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                {backRowActions}
+              </Box>
+            ) : null}
           </Box>
-        )}
+        ) : null}
         {/* Remount the active route when OTP reveal toggles. Some legacy
             screens call the label mapper directly and do not subscribe to the
             reveal store themselves. */}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Box, Typography } from '@mui/material';
+import { Alert, Box } from '@mui/material';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { secureApi } from '@/api/secureClient';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
@@ -212,14 +212,9 @@ export function MasterDashboardPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={0.5}>
-        Master Dashboard
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={2}>
-        Master / VIP exchange books (fairbets).
-      </Typography>
-
       <DashboardFilterBar
+        title="Master Dashboard"
+        summary="Master / VIP exchange books (fairbets)."
         startDate={filters.startDate}
         endDate={filters.endDate}
         appClientName={filters.appClientName}

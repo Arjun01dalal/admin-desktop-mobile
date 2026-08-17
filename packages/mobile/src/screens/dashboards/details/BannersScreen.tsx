@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -22,6 +23,7 @@ import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
+import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import {
   BANNER_CATEGORY_OPTIONS,
@@ -207,6 +209,15 @@ export function BannersScreen() {
   const [positionDraft, setPositionDraft] = useState('');
   const [savingPosition, setSavingPosition] = useState(false);
   const [positionMsg, setPositionMsg] = useState('');
+
+  // Update Image (desktop parity)
+  const [updateImageOpen, setUpdateImageOpen] = useState(false);
+  const [updateImageId, setUpdateImageId] = useState('');
+  const [updateImagePath, setUpdateImagePath] = useState('');
+  const [updateImageName, setUpdateImageName] = useState('');
+  const [updatingImage, setUpdatingImage] = useState(false);
+  const [updateImageMsg, setUpdateImageMsg] = useState('');
+
   const genRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -221,7 +232,10 @@ export function BannersScreen() {
         setRows([]);
         return;
       }
-      const list = asList<Row>(res.data);
+      const list = asList<Row>(res.data).map((banner) => ({
+        ...banner,
+        imagePath: replaceS3WithCloudfront(banner.imagePath),
+      }));
       const sorted = [...list].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       setSheetRow(null);
       setRows(sorted);
@@ -334,6 +348,7 @@ export function BannersScreen() {
         deepLink: true,
         mobileRouter: addForm.mobilePage,
         mobileOptions: addForm.mobileOptions,
+        status: true,
       };
       if (addForm.type === 'bonusScreenBanners') {
         payload.decryption = {
@@ -521,8 +536,8 @@ export function BannersScreen() {
     const row = positionRow;
     if (!row) return;
     const position = Number(positionDraft);
-    if (!position || position < 1) {
-      setPositionMsg('Please enter a valid position');
+    if (!position || position < 1 || position > 25) {
+      setPositionMsg('Please select a valid position (1-25)');
       return;
     }
     setSavingPosition(true);
@@ -542,6 +557,56 @@ export function BannersScreen() {
       setSavingPosition(false);
     }
   }, [positionRow, positionDraft, load]);
+
+  const openUpdateImage = useCallback((row: Row) => {
+    setUpdateImageId(String(row._id || ''));
+    setUpdateImagePath(row.imagePath || '');
+    setUpdateImageName(row.gameName || '');
+    setUpdateImageMsg('');
+    setUpdateImageOpen(true);
+    setSheetRow(null);
+  }, []);
+
+  const closeUpdateImage = useCallback(() => {
+    if (updatingImage) return;
+    setUpdateImageOpen(false);
+    setUpdateImageId('');
+    setUpdateImagePath('');
+    setUpdateImageName('');
+    setUpdateImageMsg('');
+  }, [updatingImage]);
+
+  const submitUpdateImage = useCallback(async () => {
+    const imagePath = updateImagePath.trim();
+    if (!updateImageId) {
+      setUpdateImageMsg('Banner id is missing');
+      return;
+    }
+    if (!imagePath) {
+      setUpdateImageMsg('Please enter image URL');
+      return;
+    }
+    setUpdatingImage(true);
+    setUpdateImageMsg('');
+    try {
+      const res = await secureApi<unknown>('ops.bannersUpdateImage', {
+        _id: updateImageId,
+        imagePath,
+      });
+      if (!res.ok) {
+        setUpdateImageMsg(res.message || 'Failed to update banner image');
+        return;
+      }
+      Alert.alert('Success', 'Banner image updated successfully');
+      setUpdateImageOpen(false);
+      setUpdateImageId('');
+      setUpdateImagePath('');
+      setUpdateImageName('');
+      void load();
+    } finally {
+      setUpdatingImage(false);
+    }
+  }, [load, updateImageId, updateImagePath]);
 
   const deleteBanner = useCallback(
     (row: Row) => {
@@ -604,6 +669,11 @@ export function BannersScreen() {
         setPositionMsg('');
         setSheetRow(null);
       },
+    });
+    sheetActions.push({
+      label: 'Update Image',
+      tone: 'primary',
+      onPress: () => openUpdateImage(sheetRow),
     });
     if (canDelete) {
       sheetActions.push({
@@ -692,7 +762,11 @@ export function BannersScreen() {
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.gameName) : ''}
-        imageUri={sheetRow?.imagePath || undefined}
+        imageUri={
+          sheetRow?.imagePath
+            ? replaceS3WithCloudfront(sheetRow.imagePath)
+            : undefined
+        }
         fields={
           sheetRow
             ? columns
@@ -743,6 +817,47 @@ export function BannersScreen() {
           onPress={() => void submitPosition()}
         >
           <Text style={styles.submitBtnText}>{savingPosition ? 'Saving…' : 'Save'}</Text>
+        </TouchableOpacity>
+      </ModalShell>
+
+      <ModalShell
+        visible={updateImageOpen}
+        title={`Update Banner Image${updateImageName ? ` — ${updateImageName}` : ''}`}
+        onClose={closeUpdateImage}
+      >
+        <Text style={styles.fieldLabel}>Image URL *</Text>
+        <TextInput
+          style={styles.input}
+          value={updateImagePath}
+          onChangeText={setUpdateImagePath}
+          placeholder="https://d1abp4kt5r84bg.cloudfront.net/..."
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {updateImagePath.trim() &&
+        !updateImagePath.toLowerCase().includes('.mp4') &&
+        !updateImagePath.toLowerCase().includes('video') ? (
+          <Image
+            source={{ uri: replaceS3WithCloudfront(updateImagePath.trim()) }}
+            style={styles.previewImage}
+            resizeMode="contain"
+          />
+        ) : null}
+        {updateImagePath.trim() &&
+        (updateImagePath.toLowerCase().includes('.mp4') ||
+          updateImagePath.toLowerCase().includes('video')) ? (
+          <Text style={styles.videoHint}>Video URL set — preview opens after save</Text>
+        ) : null}
+        {updateImageMsg ? <Text style={styles.modalMsg}>{updateImageMsg}</Text> : null}
+        <TouchableOpacity
+          style={[styles.submitBtn, updatingImage && styles.btnDisabled]}
+          disabled={updatingImage}
+          onPress={() => void submitUpdateImage()}
+        >
+          <Text style={styles.submitBtnText}>
+            {updatingImage ? 'Updating…' : 'Update Image'}
+          </Text>
         </TouchableOpacity>
       </ModalShell>
 
@@ -1139,6 +1254,18 @@ const styles = StyleSheet.create({
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
   modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
+  previewImage: {
+    width: '100%',
+    height: 160,
+    marginTop: spacing(2),
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  videoHint: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: spacing(2),
+  },
   btnDisabled: { opacity: 0.5 },
   submitBtn: {
     marginTop: spacing(4),

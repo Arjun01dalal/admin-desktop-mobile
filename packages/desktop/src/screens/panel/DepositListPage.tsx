@@ -15,7 +15,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import {
   formatDisplayDate,
@@ -447,18 +449,21 @@ export function DepositListPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        Deposit List
-      </Typography>
-
-      <Stack
-        direction="row"
-        flexWrap="wrap"
-        gap={1.5}
-        alignItems="center"
-        mb={2}
-        sx={{ '& > *': { flexShrink: 0 } }}
+      <CollapsibleFilterPanel
+        title="Deposit List"
+        summary={
+          query.startDate && query.endDate
+            ? `${query.startDate} → ${query.endDate}`
+            : 'All dates'
+        }
       >
+        <Stack
+          direction="row"
+          flexWrap="wrap"
+          gap={1.5}
+          alignItems="center"
+          sx={{ '& > *': { flexShrink: 0 } }}
+        >
         <TextField
           fullWidth={false}
           size="small"
@@ -551,31 +556,36 @@ export function DepositListPage() {
             </MenuItem>
           ))}
         </TextField>
-      </Stack>
+        </Stack>
+      </CollapsibleFilterPanel>
 
       <Typography fontWeight={600} mb={1}>
         Details List
       </Typography>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, i) => String(row.userId || i)}
-        loading={loading}
-        emptyMessage="No data"
-        minWidth={1200}
-      />
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" mt={2}>
+      <TablePanel
+        footer={
+          totalPages > 1 ? (
           <Pagination
             count={totalPages}
             page={page}
             color="secondary"
             onChange={(_e, next) => setPage(next)}
           />
-        </Stack>
-      )}
+          ) : undefined
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, i) => String(row.userId || i)}
+          loading={loading}
+          emptyMessage="No data"
+          minWidth={1200}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

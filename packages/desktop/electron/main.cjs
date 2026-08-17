@@ -982,6 +982,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('app:open-new-window', async () => openNewPanelWindow());
+  ipcMain.handle('app:get-version', () => app.getVersion());
 
   ipcMain.on('astro:site-identity', (_event, payload = {}) => {
     rememberSiteIdentity(payload);

@@ -8,6 +8,7 @@ import {
   hasPermission,
 } from '@/auth/permissions';
 import { CommonTable } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { getStoredUser } from '@/utils/dates';
 import { AddUserDataDialog } from './users/AddUserDataDialog';
 import {
@@ -191,116 +192,129 @@ export function UsersPage() {
   });
 
   return (
-    <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        Users
-      </Typography>
-
-      <UsersToolbar
-        startDate={query.startDate}
-        endDate={query.endDate}
-        userType={query.userType}
-        typeOptions={query.typeOptions}
-        itemsPerPage={query.itemsPerPage}
-        uniqueUser={query.uniqueUser}
-        clientName={query.clientName}
-        playedIn={query.playedIn}
-        botId={dialer.botId}
-        campaignId={dialer.campaignId}
-        globalCount={dialer.globalCount}
-        total={query.total}
-        loading={query.loading}
-        dialerLoading={dialer.dialerLoading}
-        dialerCount={
-          query.total ||
-          (query.dialerData.length
-            ? query.dialerData.length
-            : query.rows.length)
-        }
-        showDates={showDates}
-        canRegister={canRegister}
-        canAddToBot={canAddToBot}
-        canAddUserData={canAddUserData}
-        canAddToDialer={canAddToDialer}
-        canCreateUser={canCreateUser}
-        canCreateAdmin={canCreateAdmin}
-        isCaller={isCaller}
-        onStartDate={query.setStartDate}
-        onEndDate={query.setEndDate}
-        onClearDates={() => {
-          query.setStartDate('');
-          query.setEndDate('');
-        }}
-        onApply={() => {
-          query.handleApply();
-          void dialer.loadGlobals();
-        }}
-        onUserType={(v) => {
-          query.setUserType(v);
-          query.setPage(1);
-        }}
-        onItemsPerPage={(v) => {
-          query.setItemsPerPage(v);
-          query.setPage(1);
-        }}
-        onUniqueUser={(v) => {
-          query.setUniqueUser(v);
-          query.setPage(1);
-        }}
-        onClientName={(v) => {
-          query.setClientName(v);
-          query.setPage(1);
-        }}
-        onPlayedIn={(v) => {
-          query.setPlayedIn(v);
-          query.setPage(1);
-        }}
-        onBotId={dialer.setBotId}
-        onCampaignId={dialer.setCampaignId}
-        onRegister={() => setCreateMode('user')}
-        onGlobalUser={() => {
-          void dialer.loadGlobals().then((count) => {
-            toast.info(`Global users: ${count}`);
-          });
-        }}
-        onAddToBot={() => void dialer.handleAddToBot()}
-        onAddUserData={() => setAddUserDataOpen(true)}
-        onAddToDialer={() => void dialer.handleAddToDialer()}
-        onCreateUser={() => setCreateMode('user')}
-        onCreateAdmin={() => setCreateMode('admin')}
-      />
-
-      <CommonTable
-        columns={columns}
-        rows={query.tableRows}
-        getRowKey={(row, i) => String(row._id || i)}
-        loading={query.loading}
-        emptyMessage="No users found"
-        stickyHeader
-        minWidth={
-          query.userType === 'Sub_Admin'
-            ? 1600
-            : query.userType === 'Non_Performing_Active_User'
-              ? 1000
-              : query.userType === 'LAXMI_999_Users'
-                ? 1800
-                : query.userType === 'In_Active_Deposit'
-                  ? 2000
-                  : isCaller
-                    ? 1500
-                    : 2000
-        }
-        dense
-      />
-
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={query.totalPages}
-          page={query.page}
-          onChange={(_e, p) => query.setPage(p)}
-          color="primary"
-        />
+    <Box sx={{ minWidth: 0 }}>
+      <Stack
+        direction="row"
+        alignItems="flex-start"
+        spacing={1.5}
+        sx={{ mb: 1, flexShrink: 0 }}
+      >
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <UsersToolbar
+            title="Users"
+            startDate={query.startDate}
+            endDate={query.endDate}
+            userType={query.userType}
+            typeOptions={query.typeOptions}
+            itemsPerPage={query.itemsPerPage}
+            uniqueUser={query.uniqueUser}
+            clientName={query.clientName}
+            playedIn={query.playedIn}
+            botId={dialer.botId}
+            campaignId={dialer.campaignId}
+            globalCount={dialer.globalCount}
+            total={query.total}
+            loading={query.loading}
+            dialerLoading={dialer.dialerLoading}
+            dialerCount={
+              query.total ||
+              (query.dialerData.length
+                ? query.dialerData.length
+                : query.rows.length)
+            }
+            showDates={showDates}
+            canRegister={canRegister}
+            canAddToBot={canAddToBot}
+            canAddUserData={canAddUserData}
+            canAddToDialer={canAddToDialer}
+            canCreateUser={canCreateUser}
+            canCreateAdmin={canCreateAdmin}
+            isCaller={isCaller}
+            onStartDate={query.setStartDate}
+            onEndDate={query.setEndDate}
+            onClearDates={() => {
+              query.setStartDate('');
+              query.setEndDate('');
+            }}
+            onApply={() => {
+              query.handleApply();
+              void dialer.loadGlobals();
+            }}
+            onRefresh={() => void query.load(query.page)}
+            onUserType={(v) => {
+              query.setUserType(v);
+              query.setPage(1);
+            }}
+            onItemsPerPage={(v) => {
+              query.setItemsPerPage(v);
+              query.setPage(1);
+            }}
+            onUniqueUser={(v) => {
+              query.setUniqueUser(v);
+              query.setPage(1);
+            }}
+            onClientName={(v) => {
+              query.setClientName(v);
+              query.setPage(1);
+            }}
+            onPlayedIn={(v) => {
+              query.setPlayedIn(v);
+              query.setPage(1);
+            }}
+            onBotId={dialer.setBotId}
+            onCampaignId={dialer.setCampaignId}
+            onRegister={() => setCreateMode('user')}
+            onGlobalUser={() => {
+              void dialer.loadGlobals().then((count) => {
+                toast.info(`Global users: ${count}`);
+              });
+            }}
+            onAddToBot={() => void dialer.handleAddToBot()}
+            onAddUserData={() => setAddUserDataOpen(true)}
+            onAddToDialer={() => void dialer.handleAddToDialer()}
+            onCreateUser={() => setCreateMode('user')}
+            onCreateAdmin={() => setCreateMode('admin')}
+          />
+        </Box>
       </Stack>
+
+      <TablePanel
+        footerJustify="center"
+        footer={
+          <Pagination
+            count={query.totalPages}
+            page={query.page}
+            onChange={(_e, p) => query.setPage(p)}
+            color="primary"
+            size="medium"
+          />
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={query.tableRows}
+          getRowKey={(row, i) => String(row._id || i)}
+          loading={query.loading}
+          emptyMessage="No users found"
+          stickyHeader
+          minWidth={
+            query.userType === 'Sub_Admin'
+              ? 1600
+              : query.userType === 'Non_Performing_Active_User'
+                ? 1000
+                : query.userType === 'LAXMI_999_Users'
+                  ? 1800
+                  : query.userType === 'In_Active_Deposit'
+                    ? 2000
+                    : isCaller
+                      ? 1500
+                      : 2000
+          }
+          dense
+          maxHeight="100%"
+          virtualize
+        />
+      </TablePanel>
 
       <CreateUserDialog
         open={createMode !== null}

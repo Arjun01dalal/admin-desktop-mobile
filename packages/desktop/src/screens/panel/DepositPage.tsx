@@ -29,6 +29,7 @@ import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import {
@@ -38,6 +39,7 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
+import { logSheetDownload } from '@/utils/sheetDownloadAudit';
 import { asList, asPaged, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import {
@@ -399,6 +401,10 @@ export function DepositPage() {
       toast.warn('No data to export!');
       return;
     }
+    logSheetDownload({
+      mid: query.filters.mid || midValue || 'All',
+      type: isScanner ? 'Scanner Deposit' : 'Deposit',
+    });
     const worksheet = XLSX.utils.json_to_sheet(source);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Deposit Data');
@@ -412,7 +418,7 @@ export function DepositPage() {
     a.download = `deposit_data_${Date.now()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [isScanner, scannerRows, rows]);
+  }, [isScanner, scannerRows, rows, query.filters.mid, midValue]);
 
   const toggleOrder = useCallback((row: DepositRow, checked: boolean) => {
     const orderId = row.orderId || '';
@@ -604,7 +610,7 @@ export function DepositPage() {
       {
         id: 'index',
         label: 'Sr No',
-        width: 58,
+        width: 64,
         stickyLeft: true,
         render: (row, index) => (
           <IndexCell
@@ -616,6 +622,8 @@ export function DepositPage() {
             selected={selectedSet.has(row.orderId || '')}
             onToggle={toggleOrder}
             compact={compactRows}
+            canEdit={canEditDeposit(row, canPencil)}
+            onEdit={openEdit}
           />
         ),
       },
@@ -651,7 +659,12 @@ export function DepositPage() {
         label: 'Payment Method',
         width: 180,
         stickyLeft: true,
-        cellSx: { whiteSpace: 'normal', overflow: 'visible' },
+        cellSx: {
+          whiteSpace: 'normal',
+          overflow: 'hidden',
+          maxWidth: 180,
+          verticalAlign: 'middle',
+        },
         filter: selectFilter('mid', midOptions),
         render: (row) => <PaymentMethodCell row={row} compact={compactRows} />,
       },
@@ -697,8 +710,6 @@ export function DepositPage() {
         render: (row) => (
           <TxnDetailsCell
             row={row}
-            canEdit={canEditDeposit(row, canPencil)}
-            onEdit={openEdit}
             compact={compactRows}
           />
         ),
@@ -771,7 +782,13 @@ export function DepositPage() {
       {
         id: 'secondaryName',
         label: 'Secondary User Name',
-        width: 200,
+        width: 160,
+        cellSx: {
+          overflow: 'hidden',
+          maxWidth: 160,
+          whiteSpace: 'normal',
+          verticalAlign: 'middle',
+        },
         render: (row) => (
           <SecondaryNameCell row={row} onSaved={() => void load()} compact={compactRows} />
         ),
@@ -966,11 +983,15 @@ export function DepositPage() {
     (row: DepositRow) => {
       const status = String(row.status || '').toLowerCase();
       const isPending = status === 'pending' || status === 'processing';
+      const isApproved =
+        status === 'approved' || status === 'approved-clr' || status === 'success';
       const bg = depositRowBg(row.status, isLightMode ? 'light' : 'dark');
       const text = isLightMode ? '#1a1a1f' : '#e8e8ea';
       const border = isLightMode
         ? 'rgba(0, 0, 0, 0.12) !important'
-        : 'rgba(52, 199, 120, 0.22) !important';
+        : isApproved
+          ? 'rgba(154, 255, 77, 0.35) !important'
+          : 'rgba(255, 255, 255, 0.10) !important';
       const pendingTighten = isPending
         ? {
             '& td': {
@@ -1001,16 +1022,6 @@ export function DepositPage() {
     [isLightMode],
   );
 
-  /**
-   * Page chrome (title + toolbar header + pagination) is fixed height, so the
-   * table takes whatever is left of the viewport.
-   */
-  const tableMaxHeight = toolbarOpen
-    ? 'calc(100vh - 250px)'
-    : compactRows
-      ? 'calc(100vh - 132px)'
-      : 'calc(100vh - 140px)';
-
   return (
     <Box
       sx={{
@@ -1018,73 +1029,15 @@ export function DepositPage() {
         maxWidth: '100%',
         minWidth: 0,
         px: 1.5,
-        py: compactRows ? 0.75 : 1.25,
+        py: compactRows ? 0.75 : 1,
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        useFlexGap
-        gap={1}
-        mb={compactRows ? 0.75 : 1.5}
-      >
-        <Typography variant={compactRows ? 'h6' : 'h5'} fontWeight={700}>
-          Deposits
-        </Typography>
-        <Stack direction="row" alignItems="center" gap={1}>
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={requestType}
-            onChange={(_event, value: RequestType | null) => {
-              if (value) setRequestType(value);
-            }}
-            aria-label="Deposit data source"
-            sx={{
-              height: 36,
-              '& .MuiToggleButton-root': {
-                px: 1.5,
-                py: 0.5,
-                fontWeight: 700,
-                textTransform: 'none',
-              },
-              '& .Mui-selected': {
-                bgcolor: 'rgba(255,159,10,0.18) !important',
-                color: '#ff9f0a !important',
-              },
-            }}
-          >
-            <ToggleButton value="automatic">Automatic</ToggleButton>
-            <ToggleButton value="scannerDeposit">Scanner</ToggleButton>
-          </ToggleButtonGroup>
-          <Button
-            startIcon={
-              loading || scannerLoading || summaryLoading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
-            disabled={loading || scannerLoading || summaryLoading}
-            onClick={() => {
-              if (isScanner) void loadScannerRows();
-              else void load();
-              void loadSummary();
-            }}
-            sx={{ ...orangeBtnSx, height: 36 }}
-          >
-            Refresh
-          </Button>
-        </Stack>
-      </Stack>
-
       <Box
         sx={{
           ...toolbarBoxSx,
           p: 0,
-          mb: compactRows ? 0.75 : 1.5,
+          mb: compactRows ? 0.75 : 1,
+          flexShrink: 0,
           overflow: 'hidden',
         }}
       >
@@ -1113,7 +1066,7 @@ export function DepositPage() {
             sx={{ minWidth: 0 }}
           >
             <Typography variant="subtitle2" fontWeight={700} color="text.primary">
-              Filters & Actions
+              Deposits
             </Typography>
             {activeFilterCount > 0 ? (
               <Chip
@@ -1158,6 +1111,53 @@ export function DepositPage() {
             ) : null}
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1}>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={requestType}
+              onChange={(_event, value: RequestType | null) => {
+                if (value) setRequestType(value);
+              }}
+              aria-label="Deposit data source"
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                height: 32,
+                '& .MuiToggleButton-root': {
+                  px: 1.25,
+                  py: 0.25,
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  borderColor: 'divider',
+                },
+                '& .Mui-selected': {
+                  bgcolor: 'rgba(255,159,10,0.18) !important',
+                  color: '#ff9f0a !important',
+                },
+              }}
+            >
+              <ToggleButton value="automatic">Automatic</ToggleButton>
+              <ToggleButton value="scannerDeposit">Scanner</ToggleButton>
+            </ToggleButtonGroup>
+            <Button
+              size="small"
+              startIcon={
+                loading || scannerLoading || summaryLoading ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : (
+                  <RefreshIcon sx={{ fontSize: 16 }} />
+                )
+              }
+              disabled={loading || scannerLoading || summaryLoading}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isScanner) void loadScannerRows();
+                else void load();
+                void loadSummary();
+              }}
+              sx={{ ...orangeBtnSx, height: 32, py: 0 }}
+            >
+              Refresh
+            </Button>
             <Button
               size="small"
               variant="outlined"
@@ -1199,7 +1199,7 @@ export function DepositPage() {
           </Stack>
         </Stack>
 
-        <Collapse in={toolbarOpen} timeout="auto" unmountOnExit={false}>
+        <Collapse in={toolbarOpen} timeout="auto" unmountOnExit>
           <Box sx={{ p: 1.5, pt: 1.25 }}>
             <Box
               sx={{
@@ -1304,7 +1304,7 @@ export function DepositPage() {
               <Chip
                 size="small"
                 label={`Approved (${depositData?.depositApprovedCount ?? 0}): ${formatAmount(depositData?.depositApprovedTotal ?? 0)}`}
-                sx={statusChipSx('#2e7d32', 'rgba(46,125,50,0.12)')}
+                sx={statusChipSx('#8BE03A', 'rgba(154,255,77,0.16)')}
               />
               <Chip
                 size="small"
@@ -1375,57 +1375,87 @@ export function DepositPage() {
         </Collapse>
       </Box>
 
-      {isScanner ? (
-        <CommonTable
-          columns={scannerColumns}
-          rows={scannerRows}
-          getRowKey={(row, index) => row._id || row.userId || index}
-          loading={scannerLoading}
-          emptyMessage="No scanner data found"
-          stickyHeader
-          dense
-          compact={compactRows}
-          virtualize={false}
-          minWidth={1600}
-          maxHeight={tableMaxHeight}
-        />
-      ) : (
-        <CommonTable
-          columns={columns}
-          rows={rows}
-          getRowKey={(row, index) => row._id || row.orderId || index}
-          loading={loading}
-          emptyMessage="No deposits found"
-          stickyHeader
-          dense
-          compact={compactRows}
-          virtualize={false}
-          minWidth={2800}
-          maxHeight={tableMaxHeight}
-          getRowSx={getRowSx}
-        />
-      )}
-
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        mt={compactRows ? 1 : 2}
+      <TablePanel
+        footerSx={{ minHeight: 40, px: 1.25, py: 0.5, borderRadius: 1.5 }}
+        footer={
+          <>
+            <Chip
+              size="small"
+              label={`Total: ${isScanner ? scannerRows.length : total}`}
+              sx={{
+                height: 24,
+                fontWeight: 700,
+                color: '#c77a18',
+                bgcolor: 'rgba(255,159,10,0.12)',
+              }}
+            />
+            {!isScanner ? (
+              <Pagination
+                count={Math.max(1, totalPages)}
+                page={page}
+                onChange={(_e, p) => setPage(p)}
+                color="primary"
+                size={compactRows ? 'small' : 'medium'}
+                disabled={loading}
+              />
+            ) : null}
+          </>
+        }
       >
-        <Typography variant="body2" color="text.secondary">
-          Total: {isScanner ? scannerRows.length : total}
-        </Typography>
-        {!isScanner ? (
-          <Pagination
-            count={Math.max(1, totalPages)}
-            page={page}
-            onChange={(_e, p) => setPage(p)}
-            color="primary"
-            size={compactRows ? 'small' : 'medium'}
-            disabled={loading}
-          />
-        ) : null}
-      </Stack>
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            overflow: 'hidden',
+            bgcolor: 'background.paper',
+            boxShadow: isLightMode
+              ? '0 4px 18px rgba(0,0,0,0.08)'
+              : '0 4px 20px rgba(0,0,0,0.24)',
+            // Slight column breathing room without widening the whole table much.
+            '& .MuiTableCell-root': {
+              px: compactRows ? '10px !important' : '14px !important',
+            },
+          }}
+        >
+          {isScanner ? (
+            <CommonTable
+              columns={scannerColumns}
+              rows={scannerRows}
+              getRowKey={(row, index) => row._id || row.userId || index}
+              loading={scannerLoading}
+              emptyMessage="No scanner data found"
+              stickyHeader
+              dense
+              compact={compactRows}
+              virtualize
+              minWidth={1600}
+              maxHeight="100%"
+              hover
+            />
+          ) : (
+            <CommonTable
+              columns={columns}
+              rows={rows}
+              getRowKey={(row, index) => row._id || row.orderId || index}
+              loading={loading}
+              emptyMessage="No deposits found"
+              stickyHeader
+              dense
+              compact={compactRows}
+              virtualize
+              minWidth={2800}
+              maxHeight="100%"
+              getRowSx={getRowSx}
+              hover
+            />
+          )}
+        </Box>
+      </TablePanel>
 
       <SettleDialog
         open={settleOpen}

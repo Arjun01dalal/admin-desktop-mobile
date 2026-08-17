@@ -5,20 +5,23 @@
  *   master -> dashboard.finalBookVip
  *   both   -> dashboard.finalBookBoth
  * Also fetches dashboard.oddsGameList for live odds and merges by match name.
- * Polls every ~4s while focused, plus pull-to-refresh.
+ * Polls every 5s while focused, plus pull-to-refresh.
  */
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -30,6 +33,7 @@ import { LiveStreamModal } from '../../../dashboards/ui/LiveStreamModal';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { todayIST } from '../../../utils/dates';
+import { DetailFilterBar } from './DetailFilterBar';
 
 type Variant = 'laxmi' | 'master' | 'both';
 
@@ -62,7 +66,7 @@ const TITLES: Record<Variant, string> = {
   both: 'Live Match Total (Master & Laxmi)',
 };
 
-const POLL_MS = 4000;
+const POLL_MS = 5000;
 
 function buildRunnerUI(input: unknown): Array<{
   eventName?: string;
@@ -239,18 +243,24 @@ function fmt(value: number): string {
 
 export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const startDate =
+  const initialStartDate =
     typeof params.startDate === 'string' ? params.startDate : todayIST();
-  const endDate =
+  const initialEndDate =
     typeof params.endDate === 'string' ? params.endDate : todayIST();
 
   const isFocused = useIsFocused();
   const orderRef = useRef<string[]>([]);
   const firstLoad = useRef(true);
   const mountedRef = useRef(true);
+  const pollingActiveRef = useRef(false);
+  const fetchInFlightRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
+  const [draftStart, setDraftStart] = useState(initialStartDate);
+  const [draftEnd, setDraftEnd] = useState(initialEndDate);
   const [groupedData, setGroupedData] = useState<Array<[string, MatchRow[]]>>(
     [],
   );
@@ -258,10 +268,62 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [streamId, setStreamId] = useState('');
   const [streamOpen, setStreamOpen] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchAllData = useCallback(async () => {
+  const matchList = useMemo(
+    () =>
+      groupedData.flatMap(([sport, matches]) =>
+        matches.map((match) => ({
+          sport,
+          matchName: match.matchName,
+          code: match.code,
+          live: Boolean(match.code),
+          marketCount: Object.keys(match.teams || {}).length,
+          fancyCount: (match.fancy || []).length,
+        })),
+      ),
+    [groupedData],
+  );
+
+  const filteredMatchList = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return matchList;
+    return matchList.filter((m) =>
+      String(m.matchName || '')
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [matchList, searchQuery]);
+
+  /** Detail view keeps only the picked match; list view shows every active match. */
+  const visibleGroups = useMemo(() => {
+    if (!selectedMatch) return groupedData;
+    return groupedData
+      .map(
+        ([sport, matches]) =>
+          [sport, matches.filter((m) => m.matchName === selectedMatch)] as [
+            string,
+            MatchRow[],
+          ],
+      )
+      .filter(([, matches]) => matches.length > 0);
+  }, [groupedData, selectedMatch]);
+
+  useEffect(() => {
+    if (!selectedMatch) return;
+    if (matchList.length === 0) return;
+    if (!matchList.some((m) => m.matchName === selectedMatch)) {
+      setSelectedMatch(null);
+    }
+  }, [matchList, selectedMatch]);
+
+  const fetchAllData = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (fetchInFlightRef.current) return;
+    fetchInFlightRef.current = true;
     try {
-      if (firstLoad.current) setLoading(true);
+      if (!silent && firstLoad.current) setLoading(true);
 
       let matches: Array<{
         eventName?: string;
@@ -282,11 +344,14 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         matches = [];
       }
 
+      // Screen left / blur — stop applying odds + book updates.
+      if (!mountedRef.current || !pollingActiveRef.current) return;
+
       const bookRes = await secureApi(BOOK_ACTION[variant], {
         startDate,
         endDate,
       });
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !pollingActiveRef.current) return;
       if (!bookRes.ok) {
         setError(bookRes.message || 'Failed to load live match book');
         setGroupedData([]);
@@ -306,11 +371,13 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
           orderRef.current.indexOf(b.matchName),
       );
 
+      if (!mountedRef.current || !pollingActiveRef.current) return;
       setError('');
       setGroupedData(sortSports(groupBySport(stableSorted)));
       firstLoad.current = false;
     } finally {
-      if (mountedRef.current) setLoading(false);
+      fetchInFlightRef.current = false;
+      if (mountedRef.current && !silent) setLoading(false);
     }
   }, [endDate, startDate, variant]);
 
@@ -318,19 +385,40 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      pollingActiveRef.current = false;
     };
   }, []);
 
   useEffect(() => {
-    if (!isFocused) return undefined;
+    if (!isFocused) {
+      pollingActiveRef.current = false;
+      return undefined;
+    }
+
     let active = true;
-    void fetchAllData();
+    pollingActiveRef.current = true;
+    void fetchAllData({ silent: false });
+
     const id = setInterval(() => {
-      if (active) void fetchAllData();
+      if (!active || !pollingActiveRef.current) return;
+      void fetchAllData({ silent: true });
     }, POLL_MS);
+
+    const appSub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') {
+        pollingActiveRef.current = false;
+        return;
+      }
+      if (!active || !isFocused) return;
+      pollingActiveRef.current = true;
+      void fetchAllData({ silent: true });
+    });
+
     return () => {
       active = false;
+      pollingActiveRef.current = false;
       clearInterval(id);
+      appSub.remove();
     };
   }, [isFocused, fetchAllData]);
 
@@ -341,15 +429,100 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
       refreshControl={
         <RefreshControl
           refreshing={loading}
-          onRefresh={() => void fetchAllData()}
+          onRefresh={() => void fetchAllData({ silent: false })}
           tintColor={colors.primary}
         />
       }
     >
       <Text style={styles.title}>{toDisplayText(TITLES[variant])}</Text>
-      <Text style={styles.dateRange}>
-        {startDate} → {endDate}
-      </Text>
+      <DetailFilterBar
+        startDate={draftStart}
+        endDate={draftEnd}
+        loading={loading}
+        onStartDateChange={setDraftStart}
+        onEndDateChange={setDraftEnd}
+        onApply={() => {
+          firstLoad.current = true;
+          orderRef.current = [];
+          if (draftStart === startDate && draftEnd === endDate) {
+            void fetchAllData({ silent: false });
+            return;
+          }
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+        }}
+      />
+
+      <View style={styles.searchWrap}>
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search match name…"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+        {searchQuery.trim() ? (
+          <TouchableOpacity
+            style={styles.searchClear}
+            onPress={() => setSearchQuery('')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.searchClearText}>✕</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {selectedMatch && filteredMatchList.length > 0 ? (
+        <View style={styles.switcherBox}>
+          <View style={styles.switcherHeader}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedMatch(null);
+                setOpenKey(null);
+              }}
+            >
+              <Text style={styles.backText}>‹ All matches</Text>
+            </TouchableOpacity>
+            <Text style={styles.matchCount}>{filteredMatchList.length}</Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.switcherContent}
+          >
+            {filteredMatchList.map((match, index) => {
+              const active = match.matchName === selectedMatch;
+              return (
+                <TouchableOpacity
+                  key={`${match.matchName}-${match.code || index}`}
+                  style={[styles.switcherChip, active && styles.switcherChipActive]}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSelectedMatch(match.matchName);
+                    setOpenKey(null);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.switcherChipText,
+                      active && styles.switcherChipTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {match.matchName || 'Unnamed match'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {error ? (
         <View style={styles.errorBox}>
@@ -371,7 +544,60 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         </View>
       ) : null}
 
-      {groupedData.map(([sport, matches]) => (
+      {!selectedMatch && filteredMatchList.length > 0
+        ? (() => {
+            const bySport = filteredMatchList.reduce<
+              Record<string, typeof filteredMatchList>
+            >((acc, item) => {
+              const key = item.sport || 'Other';
+              if (!acc[key]) acc[key] = [];
+              acc[key].push(item);
+              return acc;
+            }, {});
+            return Object.entries(bySport).map(([sport, items]) => (
+              <View style={styles.sportBlock} key={`list-${sport}`}>
+                <Text style={styles.sportHeader}>{sport}</Text>
+                {items.map((match, index) => (
+                  <TouchableOpacity
+                    key={`${match.matchName}-${match.code || index}`}
+                    style={styles.listRow}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedMatch(match.matchName);
+                      setOpenKey(null);
+                    }}
+                  >
+                    <View style={styles.listRowMain}>
+                      <Text style={styles.listRowName} numberOfLines={2}>
+                        {match.matchName || 'Unnamed match'}
+                      </Text>
+                      <Text style={styles.listRowMeta}>
+                        {match.marketCount} market · {match.fancyCount} fancy
+                      </Text>
+                    </View>
+                    {match.live ? (
+                      <Text style={styles.liveDot}>● LIVE</Text>
+                    ) : null}
+                    <Text style={styles.listChevron}>›</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ));
+          })()
+        : null}
+
+      {!selectedMatch &&
+      !loading &&
+      matchList.length > 0 &&
+      filteredMatchList.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>
+            No matches matching “{searchQuery.trim()}”.
+          </Text>
+        </View>
+      ) : null}
+
+      {(selectedMatch ? visibleGroups : []).map(([sport, matches]) => (
         <View style={styles.sportBlock} key={sport}>
           <Text style={styles.sportHeader}>{sport || 'Other'}</Text>
           {matches.map((match, mi) => {
@@ -540,11 +766,102 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  dateRange: {
-    color: colors.muted,
-    fontSize: 13,
-    marginTop: spacing(1),
+  searchWrap: {
+    marginTop: spacing(3),
     marginBottom: spacing(3),
+    position: 'relative',
+  },
+  searchInput: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    fontSize: 14,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    paddingRight: spacing(10),
+  },
+  searchClear: {
+    position: 'absolute',
+    right: spacing(3),
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  searchClearText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
+  switcherBox: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    marginTop: spacing(3),
+    marginBottom: spacing(3),
+    paddingVertical: spacing(2),
+  },
+  switcherHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing(3),
+    marginBottom: spacing(2),
+  },
+  backBtn: { paddingVertical: spacing(0.5) },
+  backText: { color: colors.primary, fontSize: 13, fontWeight: '800' },
+  matchCount: {
+    color: colors.primary,
+    backgroundColor: 'rgba(255,159,10,0.14)',
+    borderRadius: radius.sm,
+    fontSize: 11,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: spacing(0.5),
+  },
+  switcherContent: { paddingHorizontal: spacing(3), gap: spacing(1.5) },
+  switcherChip: {
+    maxWidth: 190,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1.5),
+  },
+  switcherChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(255,159,10,0.16)',
+  },
+  switcherChipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  switcherChipTextActive: { color: colors.primary },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    marginBottom: spacing(2),
+  },
+  listRowMain: { flex: 1 },
+  listRowName: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  listRowMeta: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: spacing(0.5),
+  },
+  listChevron: { color: colors.muted, fontSize: 20, fontWeight: '700' },
+  liveDot: {
+    color: colors.destructive,
+    fontSize: 9,
+    fontWeight: '800',
   },
   loading: { paddingVertical: spacing(8), alignItems: 'center' },
   errorBox: {

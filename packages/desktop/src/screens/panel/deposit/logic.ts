@@ -81,7 +81,8 @@ export function depositRowBg(
   const light = mode === 'light';
   // Light mode needs pale tints — the dark greens/reds turn rows unreadable.
   if (s === 'approved' || s === 'approved-clr' || s === 'success') {
-    return light ? '#e3f6ea' : '#14352a';
+    // Brighter parrot / lime green (not forest-dark).
+    return light ? '#e8fbc8' : '#2f5f1c';
   }
   if (s === 'rejected' || s === 'failed' || s === 'cancel') {
     return light ? '#fde8e8' : '#3d1b1b';

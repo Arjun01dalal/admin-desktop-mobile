@@ -21,6 +21,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { getStoredUser, todayIST } from '@/utils/dates';
 import { asList, display, useReportQuery } from '@/screens/panel/shared';
@@ -588,14 +589,17 @@ export function WithdrawalProvidersPage() {
         </Stack>
       </Box>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={filteredRows}
         loading={loading}
         getRowKey={(row) => row._id}
         emptyMessage="No withdrawal providers"
         virtualize={false}
+        maxHeight="100%"
       />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Add Withdrawal Provider</DialogTitle>

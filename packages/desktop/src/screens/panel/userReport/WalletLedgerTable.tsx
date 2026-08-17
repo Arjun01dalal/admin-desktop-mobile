@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Box,
   Button,
@@ -18,11 +18,22 @@ import {
   formatDisplayTime,
 } from '@/utils/dates';
 import { BetAmountBars } from './BetAmountBars';
+import { TablePanel } from '@/components/TablePanel';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { WalletRow } from './types';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
-type Props = { userId: string };
+type Props = {
+  userId: string;
+  /**
+   * Optional layout wrapper: `overview` = filters + bet chart, `table` = ledger + pagination.
+   * Used to nest overview inside a parent collapse while keeping the table visible.
+   */
+  wrapOverview?: (parts: {
+    overview: ReactNode;
+    table: ReactNode;
+  }) => ReactNode;
+};
 
 const PAGE_SIZE_OPTIONS = ['75', '150', '250', '500'] as const;
 
@@ -136,7 +147,7 @@ function parseChartPayload(raw: unknown): { name: string; amount: number }[] {
   });
 }
 
-export function WalletLedgerTable({ userId }: Props) {
+export function WalletLedgerTable({ userId, wrapOverview }: Props) {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<WalletRow[]>([]);
   const [page, setPage] = useState(1);
@@ -390,25 +401,44 @@ export function WalletLedgerTable({ userId }: Props) {
     [action, amount, itemsPerPage, load, page, provider, txnType],
   );
 
+  /** White toolbar on dark theme — force visible outline + dark text. */
   const fieldSx = {
     bgcolor: '#fff',
-    '& .MuiOutlinedInput-root': { bgcolor: '#fff' },
+    '& .MuiOutlinedInput-root': {
+      bgcolor: '#fff',
+      color: '#111',
+      fontSize: 12,
+      minHeight: 32,
+      '& fieldset': { borderColor: '#c4cad3' },
+      '&:hover fieldset': { borderColor: '#9aa4b2' },
+      '&.Mui-focused fieldset': { borderColor: '#1976d2' },
+    },
+    '& .MuiInputBase-input': {
+      py: 0.6,
+      color: '#111 !important',
+      WebkitTextFillColor: '#111 !important',
+    },
+    '& .MuiSelect-icon': { color: '#5c6470' },
   };
 
-  return (
+  const overview = (
     <Box>
-      {/* Row 1: Items Per Page + Market ID + Submit */}
+      {/* Compact filter toolbar */}
       <Box
         sx={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: 2,
+          gap: 1,
           alignItems: 'flex-end',
-          mb: 2,
+          p: 1,
+          mb: 1,
+          bgcolor: '#fff',
+          border: '1px solid #dde2e8',
+          borderRadius: 1.5,
         }}
       >
-        <Box sx={{ minWidth: 140 }}>
-          <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
+        <Box sx={{ width: 110 }}>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
             Items Per Page
           </Typography>
           <TextField
@@ -429,8 +459,8 @@ export function WalletLedgerTable({ userId }: Props) {
             ))}
           </TextField>
         </Box>
-        <Box sx={{ minWidth: 160 }}>
-          <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
+        <Box sx={{ width: 140 }}>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
             Market ID
           </Typography>
           <TextField
@@ -441,34 +471,8 @@ export function WalletLedgerTable({ userId }: Props) {
             sx={fieldSx}
           />
         </Box>
-        <Button
-          variant="contained"
-          color="inherit"
-          disableElevation
-          disableRipple
-          disabled={!marketId.trim()}
-          onClick={() => {
-            setPage(1);
-            void load();
-          }}
-          sx={laxmiActionBtnSx('white')}
-        >
-          Submit
-        </Button>
-      </Box>
-
-      {/* Row 2: dates + Apply / Clear */}
-      <Box
-        sx={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 2,
-          alignItems: 'flex-end',
-          mb: 2,
-        }}
-      >
-        <Box sx={{ minWidth: 160 }}>
-          <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
+        <Box sx={{ width: 140 }}>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
             From Date
           </Typography>
           <TextField
@@ -481,8 +485,8 @@ export function WalletLedgerTable({ userId }: Props) {
             sx={fieldSx}
           />
         </Box>
-        <Box sx={{ minWidth: 160 }}>
-          <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
+        <Box sx={{ width: 140 }}>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
             To Date
           </Typography>
           <TextField
@@ -495,54 +499,71 @@ export function WalletLedgerTable({ userId }: Props) {
             sx={fieldSx}
           />
         </Box>
-        <Button
-          variant="contained"
-          color="inherit"
-          disableElevation
-          disableRipple
-          sx={laxmiActionBtnSx('black')}
-          onClick={() => {
-            setPage(1);
-            void load();
-            void loadChart();
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            ml: { md: 'auto' },
           }}
         >
-          Apply
-        </Button>
-        <Button
-          variant="contained"
-          color="inherit"
-          disableElevation
-          disableRipple
-          sx={laxmiActionBtnSx('black')}
-          onClick={() => {
-            setStartDate('');
-            setEndDate('');
-            setPage(1);
-          }}
-        >
-          Clear Dates
-        </Button>
+          <Button
+            variant="contained"
+            color="inherit"
+            disableElevation
+            disableRipple
+            disabled={!marketId.trim()}
+            onClick={() => {
+              setPage(1);
+              void load();
+            }}
+            sx={laxmiActionBtnSx('white')}
+          >
+            Submit
+          </Button>
+          <Button
+            variant="contained"
+            color="inherit"
+            disableElevation
+            disableRipple
+            sx={laxmiActionBtnSx('black')}
+            onClick={() => {
+              setPage(1);
+              void load();
+              void loadChart();
+            }}
+          >
+            Apply
+          </Button>
+          <Button
+            variant="contained"
+            color="inherit"
+            disableElevation
+            disableRipple
+            sx={laxmiActionBtnSx('black')}
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+              setPage(1);
+            }}
+          >
+            Clear Dates
+          </Button>
+        </Box>
         {loading && <CircularProgress size={22} />}
       </Box>
 
-      <BetAmountBars data={chartData} />
+      <BetAmountBars data={chartData} collapsible={false} />
+    </Box>
+  );
 
-      <Box mt={2}>
-        <CommonTable
-          columns={columns}
-          rows={rows}
-          getRowKey={(r, i) => String(r._id || i)}
-          loading={loading}
-          emptyMessage="No wallet history"
-          minWidth={1400}
-          dense
-          getRowSx={(r) => ({ bgcolor: rowBg(r.action) })}
-        />
-      </Box>
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" mt={2}>
+  const table = (
+    <TablePanel
+      sx={{ mt: wrapOverview ? 1 : 2 }}
+      footerJustify="center"
+      footerSx={{ bgcolor: '#f4f6f8', borderColor: '#dde2e8' }}
+      footer={
+        totalPages > 1 ? (
           <Pagination
             count={totalPages}
             page={page}
@@ -565,8 +586,37 @@ export function WalletLedgerTable({ userId }: Props) {
               '& .MuiPaginationItem-ellipsis': { color: '#666' },
             }}
           />
-        </Stack>
-      )}
+        ) : (
+          <Typography sx={{ fontSize: 12, color: '#667085' }}>
+            Page 1 of 1
+          </Typography>
+        )
+      }
+    >
+      <CommonTable
+        columns={columns}
+        rows={rows}
+        getRowKey={(r, i) => String(r._id || i)}
+        loading={loading}
+        emptyMessage="No wallet history"
+        minWidth={1400}
+        dense
+        virtualize
+        maxHeight="100%"
+        estimateRowHeight={40}
+        getRowSx={(r) => ({ bgcolor: rowBg(r.action) })}
+      />
+    </TablePanel>
+  );
+
+  if (wrapOverview) {
+    return <>{wrapOverview({ overview, table })}</>;
+  }
+
+  return (
+    <Box>
+      {overview}
+      {table}
     </Box>
   );
 }

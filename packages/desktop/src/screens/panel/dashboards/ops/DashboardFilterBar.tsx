@@ -2,16 +2,19 @@ import {
   Button,
   CircularProgress,
   MenuItem,
-  Paper,
   Stack,
   TextField,
 } from '@mui/material';
+import type { ReactNode } from 'react';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { appCodeForName } from '@/constants/clientNames';
 import type { ProviderFilter } from './types';
 import { PROVIDER_FILTER_META, toDisplayText } from './constants';
 import { useRevealCodes } from '@/context/useRevealCodes';
 
 type Props = {
+  title: ReactNode;
+  summary?: ReactNode;
   startDate: string;
   endDate: string;
   appClientName: string;
@@ -30,6 +33,8 @@ type Props = {
 
 /** Shared filter bar — dates / Apply / App / Filter By / Refresh. */
 export function DashboardFilterBar({
+  title,
+  summary,
   startDate,
   endDate,
   appClientName,
@@ -47,19 +52,7 @@ export function DashboardFilterBar({
 }: Props) {
   useRevealCodes();
   return (
-    <Paper
-      sx={{
-        p: 2,
-        mb: 2,
-        bgcolor: 'background.paper',
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-        boxSizing: 'border-box',
-        border: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
+    <CollapsibleFilterPanel title={title} summary={summary}>
       <Stack
         direction="row"
         spacing={1.5}
@@ -152,6 +145,6 @@ export function DashboardFilterBar({
         )}
         {loading && <CircularProgress size={22} />}
       </Stack>
-    </Paper>
+    </CollapsibleFilterPanel>
   );
 }

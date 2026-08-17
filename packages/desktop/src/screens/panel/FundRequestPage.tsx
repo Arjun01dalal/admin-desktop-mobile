@@ -24,6 +24,8 @@ import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
+import { TablePanel } from '@/components/TablePanel';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import {
   formatAmount,
@@ -32,6 +34,7 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
+import { logSheetDownload } from '@/utils/sheetDownloadAudit';
 import { asPaged, display, maskMobile } from '@/screens/panel/shared';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
 import type { UserRow } from '@/screens/panel/users/utils';
@@ -170,15 +173,17 @@ export function FundRequestPage() {
   const navigate = useNavigate();
   const admin = getStoredUser<{ name?: string; _id?: string }>();
 
-  const canViewDeposit =
-    hasPermission(Permissions.View_Fund_Deposit) ||
-    hasPermission(Permissions.View_Deposits) ||
-    hasPermission(Permissions.Fund_Request);
-  const canViewWithdrawal =
-    hasPermission(Permissions.View_Withdrawals) || hasPermission(Permissions.Fund_Request);
+  // Match Laxmi: Fund_Request grants page/list access, while aggregate
+  // amounts require View_Fund_Deposit and are hidden for restricted contacts.
+  const canViewFundAmounts =
+    hasPermission(Permissions.View_Fund_Deposit) &&
+    !hasPermission(Permissions.contact_visibility_none);
+  const canViewDeposit = canViewFundAmounts;
+  const canViewWithdrawal = canViewFundAmounts;
   const canPencil = hasPermission(Permissions.Deposit_Pensil);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
-  const canViewBonusWallet = hasPermission(Permissions.Bonus_Wallet_Fund_Request);
+  const canViewBonusWallet =
+    canViewFundAmounts && hasPermission(Permissions.Bonus_Wallet_Fund_Request);
   const canStateWise = hasPermission(Permissions.State_Wise_Deposit);
 
   const today = todayIST();
@@ -363,6 +368,10 @@ export function FundRequestPage() {
       toast.warn('No data to export!');
       return;
     }
+    logSheetDownload({
+      mid: 'All',
+      type: drillType === 'deposit' ? 'Fund Request Deposit' : 'Fund Request Withdrawal',
+    });
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Fund Requests');
@@ -764,11 +773,10 @@ export function FundRequestPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
-        Fund Request
-      </Typography>
-
-      <Box sx={toolbarBoxSx}>
+      <CollapsibleFilterPanel
+        title="Fund Request"
+        summary={`${startDate} → ${endDate}`}
+      >
         <Stack direction="row" spacing={1.25} alignItems="flex-end" flexWrap="wrap" useFlexGap>
           {dateField('From Date', startDate, setStartDate)}
           {dateField('To Date', endDate, setEndDate)}
@@ -802,7 +810,7 @@ export function FundRequestPage() {
             Download Excel
           </Button>
         </Stack>
-      </Box>
+      </CollapsibleFilterPanel>
 
       {summaryLoading ? (
         <Stack alignItems="center" py={4}>
@@ -898,31 +906,35 @@ export function FundRequestPage() {
             Transactions
           </Typography>
 
-          <CommonTable
-            columns={drillType === 'deposit' ? depositColumns : withdrawalColumns}
-            rows={rows}
-            getRowKey={(row, index) => row._id || row.orderId || index}
-            loading={tableLoading}
-            emptyMessage="No transactions found"
-            stickyHeader
-            dense
-            virtualize={false}
-            minWidth={1800}
-            maxHeight="calc(100vh - 340px)"
-          />
-
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
-            <Typography variant="body2" color="text.secondary">
-              Total: {total}
-            </Typography>
-            <Pagination
-              count={Math.max(1, totalPages)}
-              page={page}
-              onChange={(_e, p) => setPage(p)}
-              color="primary"
-              disabled={tableLoading}
+          <TablePanel
+            footer={
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  Total: {total}
+                </Typography>
+                <Pagination
+                  count={Math.max(1, totalPages)}
+                  page={page}
+                  onChange={(_e, p) => setPage(p)}
+                  color="primary"
+                  disabled={tableLoading}
+                />
+              </>
+            }
+          >
+            <CommonTable
+              columns={drillType === 'deposit' ? depositColumns : withdrawalColumns}
+              rows={rows}
+              getRowKey={(row, index) => row._id || row.orderId || index}
+              loading={tableLoading}
+              emptyMessage="No transactions found"
+              stickyHeader
+              dense
+              virtualize={false}
+              minWidth={1800}
+              maxHeight="100%"
             />
-          </Stack>
+          </TablePanel>
         </Box>
       ) : null}
 

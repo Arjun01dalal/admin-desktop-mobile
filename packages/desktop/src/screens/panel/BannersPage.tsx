@@ -29,6 +29,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { asList, useReportQuery } from '@/screens/panel/shared';
 import { AddGameLaunchBannerModal } from '@/screens/panel/banners/AddGameLaunchBannerModal';
 import { replaceS3WithCloudfront } from '@/utils/cdnUrl';
@@ -644,17 +645,19 @@ export function BannersPage() {
         </Stack>
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => row._id}
-        loading={loading}
-        emptyMessage="No banners found"
-        stickyHeader
-        dense
-        minWidth={1000}
-        maxHeight="calc(100vh - 220px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row._id}
+          loading={loading}
+          emptyMessage="No banners found"
+          stickyHeader
+          dense
+          minWidth={1000}
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="sm">
         <form onSubmit={(e) => void handleCreate(e)}>

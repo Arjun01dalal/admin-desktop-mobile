@@ -24,6 +24,7 @@ import { AppShell } from '@/layout/AppShell';
 import { UpdateToast } from '@/components/UpdateToast';
 import { TokenValidator } from '@/components/TokenValidator';
 import { BlockedUserCheck } from '@/components/BlockedUserCheck';
+import { ActivityTracker } from '@/components/ActivityTracker';
 import {
   clearAuthStorage,
   isJwtExpired,
@@ -284,6 +285,14 @@ const UsersPage = lazyNamed(() => import('@/screens/panel/UsersPage'), 'UsersPag
 const UserReportPage = lazyNamed(
   () => import('@/screens/panel/userReport/UserReportPage'),
   'UserReportPage',
+);
+const BonusEarningPage = lazyNamed(
+  () => import('@/screens/panel/userReport/BonusEarningPage'),
+  'BonusEarningPage',
+);
+const UserExposurePage = lazyNamed(
+  () => import('@/screens/panel/userReport/UserExposurePage'),
+  'UserExposurePage',
 );
 const BetConstructGamesPage = lazyNamed(
   () => import('@/screens/panel/BetConstructGamesPage'),
@@ -639,6 +648,7 @@ function AppInner() {
           <MemoryRouter initialEntries={['/welcome']}>
             <TokenValidator />
             <BlockedUserCheck />
+            <ActivityTracker userId={user?._id} />
             <Suspense fallback={<PanelRouteFallback />}>
               <Routes>
                 <Route
@@ -869,6 +879,11 @@ function AppInner() {
                     path="/users/report/:userId/:userName"
                     element={<UserReportPage />}
                   />
+                  <Route
+                    path="/bonus-wallet-referral-earning"
+                    element={<BonusEarningPage />}
+                  />
+                  <Route path="/user_exposure" element={<UserExposurePage />} />
                   <Route path="/dumpUsers" element={<DumpUsersPage />} />
                   <Route
                     path="/callerAllotment"

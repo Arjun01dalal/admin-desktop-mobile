@@ -5,13 +5,15 @@ import {
   CircularProgress,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { monthStartIST, todayIST, formatAmount } from '@/utils/dates';
 import { canAccessNavItem, Permissions } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
+import { TablePanel } from '@/components/TablePanel';
 import TransactionTable from './houseGames/TransactionTable';
 import UpdateBetStatusModal from './houseGames/UpdateBetStatusModal';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -82,92 +84,121 @@ export function HouseGamesPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        {toDisplayText('House Krida')}
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', overflow: 'auto' }}>
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
-          <TextField
-            type="date"
-            label="From Date"
-            size="small"
-            fullWidth={false}
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={{ width: 170, flexShrink: 0 }}
-          />
-          <TextField
-            type="date"
-            label="To Date"
-            size="small"
-            fullWidth={false}
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={{ width: 170, flexShrink: 0 }}
-          />
-          <TextField
-            select
-            label="Items Per Page"
-            size="small"
-            fullWidth={false}
-            value={String(itemsPerPage)}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            sx={{ width: 140, flexShrink: 0 }}
+      <Stack
+        direction="row"
+        alignItems="flex-start"
+        spacing={1.5}
+        sx={{ mb: 1.5 }}
+      >
+        <Typography
+          variant="h5"
+          fontWeight={700}
+          sx={{ flexShrink: 0, lineHeight: '46px', mb: 0 }}
+        >
+          {toDisplayText('House Krida')}
+        </Typography>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <CollapsibleFilterPanel
+            title="Filters"
+            summary={`${startDate} – ${endDate} · ${totalCount} total${totalAmount !== undefined ? ` · ${formatAmount(Math.round(Number(totalAmount) || 0))}` : ''}`}
+            sx={{ mb: 0 }}
+            contentSx={{ overflowX: 'auto' }}
           >
-            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button
-            variant="contained"
-            onClick={handleSearch}
-            disabled={loader}
-            sx={{ flexShrink: 0, fontWeight: 700 }}
-          >
-            Search
-          </Button>
-          {loader && <CircularProgress size={22} />}
-          <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-            {toDisplayText('Total')}: {totalCount}
-          </Typography>
-          {totalAmount !== undefined && (
-            <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
-              Total Amount: {formatAmount(Math.round(Number(totalAmount) || 0))}
-            </Typography>
-          )}
-        </Stack>
-      </Paper>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
+              <TextField
+                type="date"
+                label="From Date"
+                size="small"
+                fullWidth={false}
+                InputLabelProps={{ shrink: true }}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                sx={{ width: 170, flexShrink: 0 }}
+              />
+              <TextField
+                type="date"
+                label="To Date"
+                size="small"
+                fullWidth={false}
+                InputLabelProps={{ shrink: true }}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                sx={{ width: 170, flexShrink: 0 }}
+              />
+              <TextField
+                select
+                label="Items Per Page"
+                size="small"
+                fullWidth={false}
+                value={String(itemsPerPage)}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                sx={{ width: 140, flexShrink: 0 }}
+              >
+                {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+                  <MenuItem key={opt} value={opt}>
+                    {opt}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant="contained"
+                onClick={handleSearch}
+                disabled={loader}
+                sx={{ flexShrink: 0, fontWeight: 700 }}
+              >
+                Search
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => void getTransactions(currentPage)}
+                disabled={loader}
+                sx={{ flexShrink: 0, fontWeight: 700 }}
+              >
+                Refresh
+              </Button>
+              {loader && <CircularProgress size={22} />}
+              <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
+                {toDisplayText('Total')}: {totalCount}
+              </Typography>
+              {totalAmount !== undefined && (
+                <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
+                  Total Amount: {formatAmount(Math.round(Number(totalAmount) || 0))}
+                </Typography>
+              )}
+            </Stack>
+          </CollapsibleFilterPanel>
+        </Box>
+      </Stack>
 
-      <TransactionTable
-        data={dataArr}
-        currentPage={currentPage}
-        itemsPerPage={itemsPerPage}
-        filters={filters}
-        loading={loader}
-        onFilterChange={updateFilter}
-        onCheckboxChange={updateCheckboxFilter}
-        onSearch={handleSearch}
-        onEdit={onEdit}
-      />
-
-      {totalPages > 0 && (
-        <Stack alignItems="center" mt={2}>
-          <Pagination
-            count={totalPages}
-            color="primary"
-            page={currentPage}
-            onChange={(_e, newPage) => setCurrentPage(newPage)}
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footer={
+          totalPages > 0 ? (
+            <Pagination
+              count={totalPages}
+              color="primary"
+              page={currentPage}
+              onChange={(_e, newPage) => setCurrentPage(newPage)}
+            />
+          ) : undefined
+        }
+        footerJustify="center"
+      >
+        <TransactionTable
+          data={dataArr}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          filters={filters}
+          loading={loader}
+          onFilterChange={updateFilter}
+          onCheckboxChange={updateCheckboxFilter}
+          onSearch={handleSearch}
+          onEdit={onEdit}
+        />
+      </TablePanel>
 
       <UpdateBetStatusModal
         isOpen={showUpdateModal}

@@ -20,6 +20,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { canAccessNavItem, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { display } from '@/screens/panel/shared';
 import {
   CURRENCY_OPTIONS,
@@ -499,19 +500,21 @@ export function CasinoTopupBalancePage() {
               </Button>
             </Stack>
 
-            <CommonTable
-              columns={remainingColumns}
-              rows={remainingRows}
-              getRowKey={(row, i) =>
-                String(row._id || row.id || row.gameId || row.provider || i)
-              }
-              loading={qtechRemainingLoading && remainingRows.length === 0}
-              emptyMessage="No data found"
-              stickyHeader
-              dense
-              minWidth={900}
-              maxHeight={420}
-            />
+            <TablePanel>
+              <CommonTable
+                columns={remainingColumns}
+                rows={remainingRows}
+                getRowKey={(row, i) =>
+                  String(row._id || row.id || row.gameId || row.provider || i)
+                }
+                loading={qtechRemainingLoading && remainingRows.length === 0}
+                emptyMessage="No data found"
+                stickyHeader
+                dense
+                minWidth={900}
+                maxHeight="100%"
+              />
+            </TablePanel>
           </>
         )}
       </Paper>

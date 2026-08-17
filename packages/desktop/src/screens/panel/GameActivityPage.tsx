@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Typography } from '@mui/material';
+import { Box } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { todayIST } from '@/utils/dates';
 import { useRevealCodes } from '@/context/useRevealCodes';
-import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { ActivityFilterBar } from './activity/ActivityFilterBar';
 import {
   betCount,
@@ -191,33 +191,33 @@ export function GameActivityPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        {toDisplayText('Games Activity')}
-      </Typography>
-
       <ActivityFilterBar
+        title="Games Activity"
         startDate={startDate}
         endDate={endDate}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
         onApply={() => void load()}
+        onRefresh={() => void load()}
         loading={loading}
         showSourceToggle={!lockedSource}
         isQtech={isQtech}
         onSourceChange={setIsQtech}
       />
 
-      <CommonTable
-        columns={columns}
-        rows={sorted}
-        getRowKey={(row, i) =>
-          String(row.providerId || row.provider || row.providerName || i)
-        }
-        loading={loading}
-        emptyMessage="No data"
-        minWidth={1100}
-        maxHeight="calc(100vh - 230px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={sorted}
+          getRowKey={(row, i) =>
+            String(row.providerId || row.provider || row.providerName || i)
+          }
+          loading={loading}
+          emptyMessage="No data"
+          minWidth={1100}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

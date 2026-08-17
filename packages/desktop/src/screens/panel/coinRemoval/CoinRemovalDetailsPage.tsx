@@ -10,6 +10,7 @@ import {
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, formatDisplayTime, todayIST, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import {
@@ -186,27 +187,32 @@ export function CoinRemovalDetailsPage() {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, i) => String(row._id || i)}
-        loading={loading}
-        emptyMessage="No coin removal transactions found"
-        stickyHeader
-        dense
-        maxHeight="calc(100vh - 280px)"
-      />
-
-      {!hasSeededDocs && (
-        <Stack alignItems="center" mt={2}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            color="secondary"
-            onChange={(_e, next) => setPage(next)}
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footer={
+          !hasSeededDocs ? (
+            <>
+              <Pagination
+                count={totalPages}
+                page={page}
+                color="secondary"
+                onChange={(_e, next) => setPage(next)}
+              />
+            </>
+          ) : undefined
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, i) => String(row._id || i)}
+          loading={loading}
+          emptyMessage="No coin removal transactions found"
+          stickyHeader
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
 
     </Box>
   );

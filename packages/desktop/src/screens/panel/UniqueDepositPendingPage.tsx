@@ -22,6 +22,8 @@ import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import {
@@ -31,6 +33,7 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
+import { logSheetDownload } from '@/utils/sheetDownloadAudit';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { asPaged, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
@@ -395,15 +398,9 @@ export function UniqueDepositPendingPage() {
         return;
       }
       // Fire-and-forget audit log (lax OtpModal sendSheetData)
-      void secureApi('reports.sheetDownloadAuditCreate', {
-        downloadedBy: {
-          name: admin?.name || '',
-          userId: admin?._id || '',
-        },
-        filter: {
-          mid: 'All',
-          type: 'Unique Pending Deposit',
-        },
+      logSheetDownload({
+        mid: 'All',
+        type: 'Unique Pending Deposit',
       });
       toast.success('OTP Verified');
       downloadExcel();
@@ -742,18 +739,9 @@ export function UniqueDepositPendingPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
-        Unique Deposit Pending User
-      </Typography>
-
-      <Box
-        sx={{
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 1.5,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
+      <CollapsibleFilterPanel
+        title="Unique Deposit Pending User"
+        summary={`${startDate} → ${endDate}`}
       >
         <Box
           sx={{
@@ -854,7 +842,7 @@ export function UniqueDepositPendingPage() {
             ) : null}
           </Stack>
         </Box>
-      </Box>
+      </CollapsibleFilterPanel>
 
       <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
         <Chip
@@ -864,31 +852,35 @@ export function UniqueDepositPendingPage() {
         {summaryLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || row.orderId || index}
-        loading={loading}
-        emptyMessage="No unique pending deposits found"
-        stickyHeader
-        dense
-        virtualize={false}
-        minWidth={2000}
-        maxHeight="calc(100vh - 340px)"
-      />
-
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
-        <Typography variant="body2" color="text.secondary">
-          Total: {total}
-        </Typography>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Total: {total}
+            </Typography>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || row.orderId || index}
+          loading={loading}
+          emptyMessage="No unique pending deposits found"
+          stickyHeader
+          dense
+          virtualize={false}
+          minWidth={2000}
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
 
       <Dialog
         open={statusOpen}

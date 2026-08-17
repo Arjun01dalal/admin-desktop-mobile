@@ -5,7 +5,6 @@ import {
   CircularProgress,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -16,6 +15,8 @@ import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { asPaged, display, maskMobile } from '@/screens/panel/shared';
@@ -165,11 +166,10 @@ export function DashboardUsersListPage({ mode }: Props) {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        {toDisplayText(meta.title)}
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
+      <CollapsibleFilterPanel
+        title={toDisplayText(meta.title)}
+        summary={`${startDate} → ${endDate}`}
+      >
         <Stack
           direction="row"
           spacing={1.5}
@@ -257,25 +257,29 @@ export function DashboardUsersListPage({ mode }: Props) {
             </Typography>
           )}
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        emptyMessage="No users"
-        stickyHeader
-        dense
-      />
-
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
+      <TablePanel
+        footer={
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(_e, p) => setPage(p)}
+            color="primary"
+          />
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          emptyMessage="No users"
+          stickyHeader
+          dense
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

@@ -17,6 +17,8 @@ import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import {
@@ -26,6 +28,7 @@ import {
   todayIST,
 } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { logSheetDownload } from '@/utils/sheetDownloadAudit';
 import { asList, asPaged, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 
@@ -342,6 +345,13 @@ export function DepositApprovedReportPage() {
       toast.warn('No data to export!');
       return;
     }
+    logSheetDownload({
+      mid:
+        selectedGateway?.mid != null && selectedGateway.mid !== ''
+          ? String(selectedGateway.mid)
+          : 'All',
+      type: isScanner ? 'Scanner Deposit Approved Report' : 'Deposit Approved Report',
+    });
     const worksheet = XLSX.utils.json_to_sheet(source);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Deposit Data');
@@ -355,7 +365,7 @@ export function DepositApprovedReportPage() {
     a.download = `deposit_data_${Date.now()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [isScanner, scannerRows, rows]);
+  }, [isScanner, scannerRows, rows, selectedGateway?.mid]);
 
   const refreshAll = useCallback(() => {
     if (isScanner) void loadScannerData();
@@ -776,25 +786,12 @@ export function DepositApprovedReportPage() {
         px: 1.5,
         py: 1.25,
         boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        height: 'calc(100vh - 96px)',
-        minHeight: 480,
       }}
     >
-      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
-        Deposit Approved Report
-      </Typography>
-
-      <Box
-        sx={{
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 1.5,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.08)',
-          flexShrink: 0,
-        }}
+      <CollapsibleFilterPanel
+        title="Deposit Approved Report"
+        summary={`${startDate} → ${endDate}`}
+        sx={{ flexShrink: 0 }}
       >
         <Box
           sx={{
@@ -911,7 +908,7 @@ export function DepositApprovedReportPage() {
             </Button>
           </Stack>
         </Box>
-      </Box>
+      </CollapsibleFilterPanel>
 
       <Stack
         direction="row"
@@ -931,15 +928,23 @@ export function DepositApprovedReportPage() {
         {sumLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
       </Stack>
 
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          '& > *': { flex: 1, minHeight: 0 },
-        }}
+      <TablePanel
+        footer={
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Total: {isScanner ? scannerRows.length : total}
+            </Typography>
+            {!isScanner ? (
+              <Pagination
+                count={Math.max(1, totalPages)}
+                page={page}
+                onChange={(_e, p) => setPage(p)}
+                color="primary"
+                disabled={loading}
+              />
+            ) : null}
+          </>
+        }
       >
         {isScanner ? (
           <CommonTable
@@ -966,29 +971,7 @@ export function DepositApprovedReportPage() {
             maxHeight="100%"
           />
         )}
-      </Box>
-
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        mt={1.5}
-        mb={0.5}
-        sx={{ flexShrink: 0 }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          Total: {isScanner ? scannerRows.length : total}
-        </Typography>
-        {!isScanner ? (
-          <Pagination
-            count={Math.max(1, totalPages)}
-            page={page}
-            onChange={(_e, p) => setPage(p)}
-            color="primary"
-            disabled={loading}
-          />
-        ) : null}
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

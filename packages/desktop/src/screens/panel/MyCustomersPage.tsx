@@ -17,6 +17,7 @@ import { todayIST, formatDisplayDate, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { Button } from '@/components/ui/button';
+import { TablePanel } from '@/components/TablePanel';
 import { appCodeForName } from '@/constants/clientNames';
 import {
   ReportPage,
@@ -561,24 +562,29 @@ export function MyCustomersPage() {
         </>
       }
     >
-      <DataTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row, i) => row._id || i}
-        loading={loading}
-        emptyMessage="No customers found"
-        minWidth={1600}
-      />
-
-      {paginated && (
-        <ReportPager
-          page={page}
-          totalPages={totalPages}
-          onChange={setPage}
-          disabled={loading}
-          total={total}
+      <TablePanel
+        footer={
+          paginated ? (
+            <ReportPager
+              page={page}
+              totalPages={totalPages}
+              onChange={setPage}
+              disabled={loading}
+              total={total}
+            />
+          ) : undefined
+        }
+      >
+        <DataTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row, i) => row._id || i}
+          loading={loading}
+          emptyMessage="No customers found"
+          minWidth={1600}
+          maxHeight="100%"
         />
-      )}
+      </TablePanel>
 
       <ReportDialog
         open={Boolean(commentTarget)}

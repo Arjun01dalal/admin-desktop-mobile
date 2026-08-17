@@ -61,6 +61,18 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  'auth.updateActiveTime': {
+    method: 'POST',
+    path: '/SubAdmin/update-activeTime-time',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'auth.updateInactiveTime': {
+    method: 'POST',
+    path: '/SubAdmin/update-inactive-time',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
 
   // House Games
   'houseGames.transactions': {
@@ -250,8 +262,8 @@ module.exports = {
   },
   'users.sendBlockOtp': {
     method: 'POST',
-    path: '/User/sendOtp-walletToWallet',
-    // Laxminarayan Users.tsx sends plain body (not encrypted token)
+    path: '/SubAdmin/send-verification-otp',
+    // Plain body: { mobile }
     encryptRequest: false,
     decryptResponse: false,
   },
@@ -1481,6 +1493,36 @@ module.exports = {
   'userReport.userExposure': {
     method: 'POST',
     path: '/User/user-exposer',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.userExposureLists': {
+    method: 'POST',
+    path: '/User/user-exposer-lists',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.bonusWalletHistory': {
+    method: 'POST',
+    path: '/bonus-wallet/getUserBonusWalletHistory',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.bonusWalletHistoryReferral': {
+    method: 'POST',
+    path: '/bonus-wallet/getUserBonusWalletHistoryReferral',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.wcoPendingBet': {
+    method: 'POST',
+    path: '/User/find-wco-pending-bet',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.exchangePendingBet': {
+    method: 'POST',
+    path: '/User/find-exchange-pending-bet',
     encryptRequest: true,
     decryptResponse: true,
   },

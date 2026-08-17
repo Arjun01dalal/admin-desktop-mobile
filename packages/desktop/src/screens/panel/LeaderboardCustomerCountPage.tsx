@@ -13,6 +13,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { display, maskMobile } from '@/screens/panel/shared';
@@ -197,21 +198,24 @@ export function LeaderboardCustomerCountPage() {
           <CircularProgress size={32} />
         </Box>
       ) : (
-        <>
-          <CommonTable
-            columns={columns}
-            rows={rows}
-            getRowKey={(row, index) => row._id || `${index}`}
-          />
-          <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+        <TablePanel
+          footerJustify="center"
+          footer={
             <Pagination
               count={totalPages}
               page={page}
               color="secondary"
               onChange={(_e, nextPage) => setPage(nextPage)}
             />
-          </Stack>
-        </>
+          }
+        >
+          <CommonTable
+            columns={columns}
+            rows={rows}
+            getRowKey={(row, index) => row._id || `${index}`}
+            maxHeight="100%"
+          />
+        </TablePanel>
       )}
     </Box>
   );

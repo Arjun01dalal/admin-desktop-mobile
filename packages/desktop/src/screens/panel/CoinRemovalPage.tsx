@@ -1,7 +1,8 @@
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Pagination, Stack, Typography } from '@mui/material';
+import { Box, Pagination } from '@mui/material';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { todayIST, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { CoinRemovalToolbar } from './coinRemoval/CoinRemovalToolbar';
@@ -114,10 +115,6 @@ export function CoinRemovalPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        Coin Removal List
-      </Typography>
-
       <CoinRemovalToolbar
         startDate={startDate}
         endDate={endDate}
@@ -131,28 +128,34 @@ export function CoinRemovalPage() {
         }}
         onClearDates={clearDates}
         onApply={applyFilters}
+        onRefresh={() => void load(page)}
       />
 
-      <CommonTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row) => row._id}
-        loading={loading}
-        emptyMessage="No coin removal records found"
-        stickyHeader
-        dense
-        maxHeight="calc(100vh - 320px)"
-        onRowClick={openDetails}
-      />
-
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          color="secondary"
-          onChange={(_e, nextPage) => setPage(nextPage)}
+      <TablePanel
+        footer={
+          <>
+            <Pagination
+              count={totalPages}
+              page={page}
+              color="secondary"
+              onChange={(_e, nextPage) => setPage(nextPage)}
+            />
+          </>
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row) => row._id}
+          loading={loading}
+          emptyMessage="No coin removal records found"
+          stickyHeader
+          dense
+          maxHeight="100%"
+          onRowClick={openDetails}
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

@@ -1,4 +1,6 @@
-import { Box, Button, MenuItem, Paper, Stack, TextField } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { Box, Button, CircularProgress, MenuItem, Stack, TextField } from '@mui/material';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { orangeBtnSx, toolbarFieldSx } from './styles';
 
@@ -12,6 +14,7 @@ type Props = {
   onEndDateChange: (value: string) => void;
   onPageSizeChange: (value: number) => void;
   onApply: () => void;
+  onRefresh: () => void;
   onKycList: () => void;
   onEnableKycFlow: () => void;
 };
@@ -26,11 +29,16 @@ export function KycToolbar({
   onEndDateChange,
   onPageSizeChange,
   onApply,
+  onRefresh,
   onKycList,
   onEnableKycFlow,
 }: Props) {
   return (
-    <Paper sx={{ p: 2, pt: 3, mb: 2, bgcolor: 'background.paper', overflow: 'visible' }}>
+    <CollapsibleFilterPanel
+      title="KYC"
+      summary={`${startDate} → ${endDate}`}
+      contentSx={{ pt: 2, overflow: 'visible' }}
+    >
       <Box sx={{ overflowX: 'auto', overflowY: 'visible', pb: 0.25 }}>
         <Stack
           direction="row"
@@ -77,6 +85,21 @@ export function KycToolbar({
           <Button variant="contained" onClick={onApply} disabled={loading} sx={orangeBtnSx}>
             Apply
           </Button>
+          <Button
+            variant="outlined"
+            color="warning"
+            startIcon={
+              loading ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+            onClick={onRefresh}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
           <Button variant="contained" onClick={onKycList} sx={orangeBtnSx}>
             KYC List
           </Button>
@@ -87,6 +110,6 @@ export function KycToolbar({
           ) : null}
         </Stack>
       </Box>
-    </Paper>
+    </CollapsibleFilterPanel>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import {
   Avatar,
   Box,
@@ -27,6 +27,7 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import CheckIcon from '@mui/icons-material/Check';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { toast } from 'react-toastify';
 import {
   useColorMode,
@@ -34,6 +35,12 @@ import {
 } from '@/context/ColorModeContext';
 import type { AuthUser } from '@/types/gcalc';
 import { getRoleOptions, selectActiveRole } from '@/auth/roleSelection';
+
+function resolveAppVersion() {
+  const fromBridge = String(window.gcalc?.version || '').trim();
+  if (fromBridge) return fromBridge;
+  return typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
+}
 
 const THEME_OPTIONS: {
   value: ColorModePreference;
@@ -87,7 +94,24 @@ export function ProfileMenu({
   const [roleOpen, setRoleOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [roleLoading, setRoleLoading] = useState(false);
+  const [appVersion, setAppVersion] = useState(resolveAppVersion);
   const roleOptions = getRoleOptions(user);
+
+  useEffect(() => {
+    let alive = true;
+    void window.gcalc
+      ?.getAppVersion?.()
+      .then((version) => {
+        const next = String(version || '').trim();
+        if (alive && next) setAppVersion(next);
+      })
+      .catch(() => {
+        // Keep build-time / preload fallback.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const name = String(user?.name || '').trim();
   const mobile = String(user?.mobile || '').trim();
@@ -272,6 +296,28 @@ export function ProfileMenu({
           </ListItemIcon>
           <ListItemText>Logout</ListItemText>
         </MenuItem>
+
+        {appVersion ? (
+          <>
+            <Divider />
+            <Box
+              sx={{
+                px: 2,
+                py: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              <InfoOutlinedIcon
+                sx={{ fontSize: 16, color: 'text.disabled' }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                Desktop v{appVersion}
+              </Typography>
+            </Box>
+          </>
+        ) : null}
       </Menu>
 
       <Dialog open={roleOpen} onClose={() => !roleLoading && setRoleOpen(false)} fullWidth maxWidth="xs">

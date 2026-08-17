@@ -15,6 +15,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import {
   collectColumns,
   defaultFraudEndDate,
@@ -167,7 +168,8 @@ export function AAAFraudBetReportPage() {
         </Button>
       </Stack>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={rows}
         loading={loading}
@@ -175,7 +177,9 @@ export function AAAFraudBetReportPage() {
           String(row._id || row.id || row.userId || index)
         }
         emptyMessage="No fraud bets found for the selected filters."
+        maxHeight="100%"
       />
+      </TablePanel>
 
       <Dialog open={Boolean(previewImage)} onClose={() => setPreviewImage(null)} maxWidth="md">
         <DialogContent sx={{ position: 'relative', p: 1 }}>

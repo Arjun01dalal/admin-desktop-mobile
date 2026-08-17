@@ -4,6 +4,7 @@ import { Box, Button, Paper, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { getSessionUser, hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { display } from '@/screens/panel/shared';
 import { canShowFundEditBtn } from '@/screens/panel/funds/constants';
 import {
@@ -230,14 +231,17 @@ export function FundsMidPage() {
       <Typography color="text.secondary" mb={1.5} fontSize={13}>
         Click a MID row to open the payment list
       </Typography>
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={mids}
         getRowKey={(row, i) => `${row.mid}-${i}`}
         emptyMessage="No MID Data"
         minWidth={canEditAccess ? 1220 : 1100}
         onRowClick={gatewayOnly ? undefined : (row) => openPayin(row)}
+        maxHeight="100%"
       />
+      </TablePanel>
 
       <FundsEditAccessModal
         open={editOpen}

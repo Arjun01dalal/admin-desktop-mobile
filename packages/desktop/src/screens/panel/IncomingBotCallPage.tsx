@@ -22,6 +22,7 @@ import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { display, useReportQuery } from '@/screens/panel/shared';
 import { todayIST } from '@/utils/dates';
@@ -445,7 +446,8 @@ export function IncomingBotCallPage() {
         </Button>
       </Stack>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={filteredRows}
         loading={loading}
@@ -455,7 +457,9 @@ export function IncomingBotCallPage() {
         stickyHeader
         dense
         minWidth={1100}
+        maxHeight="100%"
       />
+      </TablePanel>
 
       <Dialog
         open={summaryOpen}

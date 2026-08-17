@@ -36,7 +36,7 @@ function resolveRegisteredMobile(): string {
 
 /**
  * Header reveal-codes OTP — sends to registered login mobile via
- * User/sendOtp-walletToWallet + verifyOtp-walletToWallet (laxminarayan / KYC pattern).
+ * SubAdmin/send-verification-otp + User/verifyOtp-walletToWallet.
  */
 export function RevealCodesOtpModal({ open, onClose }: Props) {
   const [otp, setOtp] = useState('');

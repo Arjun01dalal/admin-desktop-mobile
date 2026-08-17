@@ -8,6 +8,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
   Collapse,
   IconButton,
@@ -28,8 +29,12 @@ type BotStatusTableProps = {
   botSummary: Record<string, unknown>;
   loading: boolean;
   actionLoading: boolean;
-  onReinitiate: (botId: number, status: 'deleted' | 'failed') => void;
+  onReinitiate: (
+    targets: Array<{ botId: number; status: 'deleted' | 'failed' | 'no-answer' }>,
+  ) => void;
 };
+
+const REINIT_STATUSES = ['failed', 'deleted', 'no-answer'] as const;
 
 type StatusKey = (typeof BOT_STATUS_KEYS)[number];
 
@@ -126,9 +131,8 @@ export function BotStatusTable({
   actionLoading,
   onReinitiate,
 }: BotStatusTableProps) {
-  // Keep the large bot matrix collapsed by default so the call-log table gets
-  // the available viewport. The summary header acts as the dropdown trigger.
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => buildBotSummaryRows(botSummary), [botSummary]);
 
   const visibleKeys = useMemo(() => {
@@ -149,9 +153,49 @@ export function BotStatusTable({
     return acc;
   }, [rows]);
 
+  const availableTargets = useMemo(
+    () =>
+      rows.flatMap((row) =>
+        REINIT_STATUSES.filter((status) => Number(row[status]) > 0).map((status) => ({
+          key: `${row.botId}:${status}`,
+          botId: row.botId,
+          status,
+        })),
+      ),
+    [rows],
+  );
+  const selectedTargets = availableTargets.filter((target) => selected.has(target.key));
+  const allSelected =
+    availableTargets.length > 0 && selectedTargets.length === availableTargets.length;
+
+  const toggleTarget = (key: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected(
+      allSelected ? new Set() : new Set(availableTargets.map((target) => target.key)),
+    );
+  };
+
+  const reinitiateSelected = () => {
+    if (!selectedTargets.length) return;
+    onReinitiate(
+      selectedTargets.map(({ botId, status }) => ({ botId, status })),
+    );
+    setSelected(new Set());
+  };
+
   if (!loading && rows.length === 0) return null;
 
-  const keysToShow = visibleKeys.length > 0 ? visibleKeys : (['completed', 'failed', 'no-answer'] as StatusKey[]);
+  // Show full status matrix when open (not only non-empty columns).
+  const keysToShow =
+    visibleKeys.length > 0 ? BOT_STATUS_KEYS : (['completed', 'failed', 'no-answer'] as StatusKey[]);
 
   return (
     <Paper
@@ -213,6 +257,43 @@ export function BotStatusTable({
               />
             ) : null,
           )}
+          {availableTargets.length > 0 ? (
+            <Stack direction="row" alignItems="center" spacing={0.25}>
+              <Checkbox
+                size="small"
+                checked={allSelected}
+                indeterminate={selectedTargets.length > 0 && !allSelected}
+                disabled={actionLoading}
+                onClick={(event) => event.stopPropagation()}
+                onChange={toggleAll}
+                inputProps={{ 'aria-label': 'Select all reinitiate statuses' }}
+                sx={{ p: 0.25, color: '#ff9f0a' }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                Select all
+              </Typography>
+            </Stack>
+          ) : null}
+          <Button
+            size="small"
+            variant="contained"
+            color="warning"
+            disabled={!selectedTargets.length || actionLoading}
+            onClick={(event) => {
+              event.stopPropagation();
+              reinitiateSelected();
+            }}
+            sx={{
+              minHeight: 28,
+              py: 0.25,
+              px: 1.25,
+              fontSize: 11,
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Reinit Selected ({selectedTargets.length})
+          </Button>
         </Stack>
         <IconButton
           size="small"
@@ -223,16 +304,17 @@ export function BotStatusTable({
         </IconButton>
       </Stack>
 
-      <Collapse in={open} timeout="auto" unmountOnExit={false}>
+      <Collapse in={open} timeout="auto" unmountOnExit>
         <TableContainer
           sx={{
-            maxHeight: 156,
             width: '100%',
-            overflow: 'auto',
+            maxHeight: 'none',
+            overflowX: 'auto',
+            overflowY: 'visible',
             bgcolor: 'transparent',
           }}
         >
-          <Table size="small" stickyHeader sx={{ minWidth: 520 }}>
+          <Table size="small" sx={{ minWidth: 720 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ ...headSx, position: 'sticky', left: 0, zIndex: 3, minWidth: 56 }}>
@@ -272,30 +354,46 @@ export function BotStatusTable({
                   </TableCell>
                   {keysToShow.map((key) => {
                     const count = Number(row[key]) || 0;
-                    if ((key === 'deleted' || key === 'failed') && count > 0) {
+                    const canReinit =
+                      (key === 'deleted' || key === 'failed' || key === 'no-answer') &&
+                      count > 0;
+                    if (canReinit) {
                       const tone = TONE[key] ?? TONE.deleted;
+                      const selectionKey = `${row.botId}:${key}`;
                       return (
                         <TableCell key={key} sx={cellSx}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="secondary"
-                            disabled={actionLoading}
-                            onClick={() => void onReinitiate(row.botId, key)}
-                            sx={{
-                              textTransform: 'none',
-                              fontSize: 10,
-                              fontWeight: 700,
-                              py: 0.1,
-                              px: 0.75,
-                              minWidth: 0,
-                              lineHeight: 1.25,
-                              borderColor: tone.fg,
-                              color: tone.fg,
-                            }}
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="center"
+                            spacing={0.25}
                           >
-                            Reinit {count}
-                          </Button>
+                            <Checkbox
+                              size="small"
+                              checked={selected.has(selectionKey)}
+                              onChange={() => toggleTarget(selectionKey)}
+                              inputProps={{
+                                'aria-label': `Select bot ${row.botId} ${key} calls`,
+                              }}
+                              sx={{
+                                p: 0.25,
+                                color: tone.fg,
+                                '&.Mui-checked': { color: tone.fg },
+                              }}
+                              disabled={actionLoading}
+                            />
+                            <Box
+                              component="span"
+                              sx={{
+                                minWidth: 24,
+                                color: tone.fg,
+                                fontWeight: 700,
+                                fontSize: 12,
+                              }}
+                            >
+                              {count.toLocaleString('en-IN')}
+                            </Box>
+                          </Stack>
                         </TableCell>
                       );
                     }

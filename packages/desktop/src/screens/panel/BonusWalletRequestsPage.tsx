@@ -16,7 +16,9 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { createTableFiltersContext } from '@/components/createTableFiltersContext';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import {
   formatAmount,
@@ -456,25 +458,12 @@ export function BonusWalletRequestsPage() {
         px: 1.5,
         py: 1.25,
         boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        height: 'calc(100vh - 96px)',
-        minHeight: 480,
       }}
     >
-      <Typography variant="h5" fontWeight={700} mb={1.5} sx={{ flexShrink: 0 }}>
-        Bonus Wallet Requests
-      </Typography>
-
-      <Box
-        sx={{
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 1.5,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.08)',
-          flexShrink: 0,
-        }}
+      <CollapsibleFilterPanel
+        title="Bonus Wallet Requests"
+        summary={`${startDate} → ${endDate}`}
+        sx={{ flexShrink: 0 }}
       >
         <Box
           sx={{
@@ -588,7 +577,7 @@ export function BonusWalletRequestsPage() {
             </Button>
           </Stack>
         </Box>
-      </Box>
+      </CollapsibleFilterPanel>
 
       <Stack
         direction="row"
@@ -613,15 +602,21 @@ export function BonusWalletRequestsPage() {
         {summaryLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
       </Stack>
 
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          '& > *': { flex: 1, minHeight: 0 },
-        }}
+      <TablePanel
+        footer={
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Total: {total}
+            </Typography>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
       >
         <CommonTable
           columns={columns}
@@ -634,27 +629,7 @@ export function BonusWalletRequestsPage() {
           minWidth={1400}
           maxHeight="100%"
         />
-      </Box>
-
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        mt={1.5}
-        mb={0.5}
-        sx={{ flexShrink: 0 }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          Total: {total}
-        </Typography>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
-        />
-      </Stack>
+      </TablePanel>
     </Box>
     </BonusFiltersProvider>
   );

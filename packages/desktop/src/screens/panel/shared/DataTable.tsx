@@ -58,16 +58,17 @@ export function DataTable<T>({
   minWidth = 900,
   tableClassName,
   stickyHeader = true,
-  maxHeight = 'calc(100vh - 280px)',
+  maxHeight = '100%',
 }: Props<T>) {
   useRevealCodes();
   const hasFilters = columns.some((col) => col.filter);
+  const fillParent = maxHeight === '100%' || maxHeight === '100vh';
 
   return (
-    <Card className="relative overflow-hidden border-border bg-card">
+    <Card className={cn('relative overflow-hidden border-border bg-card', fillParent && 'h-full')}>
       <div
         className="relative w-full max-w-full overflow-auto"
-        style={{ maxHeight }}
+        style={{ maxHeight, height: fillParent ? '100%' : undefined }}
       >
         <Table
           className={cn(tableClassName)}

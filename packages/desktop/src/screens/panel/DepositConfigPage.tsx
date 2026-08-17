@@ -18,6 +18,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { asList, display, useReportQuery } from '@/screens/panel/shared';
 import { appCodeForName } from '@/constants/clientNames';
 
@@ -233,18 +234,20 @@ export function DepositConfigPage() {
         )}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        getRowKey={(row) => row._id}
-        emptyMessage="No deposit config"
-        stickyHeader
-        dense
-        virtualize
-        maxHeight="calc(100vh - 180px)"
-        minWidth={900}
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          getRowKey={(row) => row._id}
+          emptyMessage="No deposit config"
+          stickyHeader
+          dense
+          virtualize
+          maxHeight="100%"
+          minWidth={900}
+        />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Add Deposit Config</DialogTitle>

@@ -21,6 +21,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { asList, display, useReportQuery } from '@/screens/panel/shared';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -268,18 +269,20 @@ export function CasinoSwitchPage() {
         </Stack>
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || index}
-        loading={loading}
-        emptyMessage="No casino providers found"
-        stickyHeader
-        dense
-        minWidth={900}
-        maxHeight="calc(100vh - 220px)"
-        virtualize={false}
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || index}
+          loading={loading}
+          emptyMessage="No casino providers found"
+          stickyHeader
+          dense
+          minWidth={900}
+          maxHeight="100%"
+          virtualize={false}
+        />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
         <Box component="form" onSubmit={(e) => void handleCreate(e)}>

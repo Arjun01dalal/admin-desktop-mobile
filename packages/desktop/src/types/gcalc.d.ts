@@ -50,6 +50,8 @@ export type IpLocationResult = {
 
 export type GCalcApi = {
   version: string;
+  /** Packaged Electron app version (`app.getVersion()`). */
+  getAppVersion?: () => Promise<string>;
   showLogin: () => void;
   showWelcome: () => void;
   /** @deprecated Use showSite */

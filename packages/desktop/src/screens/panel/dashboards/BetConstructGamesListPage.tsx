@@ -13,6 +13,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { display } from '@/screens/panel/shared';
 import { todayIST } from '@/utils/dates';
 import { floorNum, toNum } from '@/screens/panel/dashboards/ops/mergeMetrics';
@@ -218,14 +219,17 @@ export function BetConstructGamesListPage() {
         </Stack>
       </Paper>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={rows}
         loading={loading}
         emptyMessage="No BetConstruct game data"
         stickyHeader
         dense
+        maxHeight="100%"
       />
+      </TablePanel>
     </Box>
   );
 }

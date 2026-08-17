@@ -9,6 +9,7 @@ import {
 } from 'react';
 import {
   Box,
+  CircularProgress,
   IconButton,
   InputBase,
   List,
@@ -20,6 +21,7 @@ import {
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
 import { toast } from 'react-toastify';
@@ -83,6 +85,7 @@ export function WhatsappPage() {
   const [message, setMessage] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +112,16 @@ export function WhatsappPage() {
       isFetchingRef.current = false;
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    setManualRefreshing(true);
+    try {
+      await fetchWhatsappData(false);
+    } finally {
+      setManualRefreshing(false);
+    }
+  }, [fetchWhatsappData]);
 
   useEffect(() => {
     void fetchWhatsappData(false);
@@ -333,6 +346,19 @@ export function WhatsappPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 sx={{ ml: 1, fontSize: 13, py: 0.75 }}
               />
+              <IconButton
+                size="small"
+                aria-label="Refresh chats"
+                title="Refresh chats"
+                disabled={manualRefreshing}
+                onClick={() => void handleRefresh()}
+              >
+                {manualRefreshing ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <RefreshIcon sx={{ fontSize: 19 }} />
+                )}
+              </IconButton>
             </Paper>
           </Box>
           <List

@@ -6,8 +6,17 @@ function safeInvoke(channel, payload) {
   return ipcRenderer.invoke(channel, payload);
 }
 
+function readPackageVersion() {
+  try {
+    return String(require('../package.json').version || '').trim() || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 contextBridge.exposeInMainWorld('gcalc', {
-  version: '1.0.0',
+  version: readPackageVersion(),
+  getAppVersion: () => safeInvoke('app:get-version'),
 
   showLogin: () => ipcRenderer.send('gcalc:show-login'),
   showWelcome: () => ipcRenderer.send('gcalc:show-welcome'),

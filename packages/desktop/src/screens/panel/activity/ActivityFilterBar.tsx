@@ -1,21 +1,24 @@
 import {
   Button,
   CircularProgress,
-  Paper,
   Stack,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type ActivityFilterBarProps = {
+  title: string;
   startDate: string;
   endDate: string;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onApply: () => void;
+  onRefresh?: () => void;
   loading?: boolean;
   /** When false, hide Qtech / WCO source buttons (e.g. locked deep-link). */
   showSourceToggle?: boolean;
@@ -57,11 +60,13 @@ const sourceToggleSx = {
 };
 
 export function ActivityFilterBar({
+  title,
   startDate,
   endDate,
   onStartDateChange,
   onEndDateChange,
   onApply,
+  onRefresh,
   loading = false,
   showSourceToggle = true,
   isQtech,
@@ -69,15 +74,10 @@ export function ActivityFilterBar({
 }: ActivityFilterBarProps) {
   useRevealCodes();
   return (
-    <Paper
-      sx={{
-        p: 2,
-        mb: 2,
-        bgcolor: 'background.paper',
-        border: '1px solid',
-        borderColor: 'divider',
-        overflow: 'auto',
-      }}
+    <CollapsibleFilterPanel
+      title={toDisplayText(title)}
+      summary={`${startDate} → ${endDate} · ${isQtech ? 'Qtech' : 'WCO'}`}
+      contentSx={{ overflowX: 'auto' }}
     >
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
         <TextField
@@ -106,6 +106,17 @@ export function ActivityFilterBar({
         >
           Apply
         </Button>
+        {onRefresh && (
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={onRefresh}
+            disabled={loading}
+            sx={actionBtnSx}
+          >
+            Refresh
+          </Button>
+        )}
         {showSourceToggle && (
           <ToggleButtonGroup
             exclusive
@@ -124,6 +135,6 @@ export function ActivityFilterBar({
         )}
         {loading && <CircularProgress size={22} />}
       </Stack>
-    </Paper>
+    </CollapsibleFilterPanel>
   );
 }

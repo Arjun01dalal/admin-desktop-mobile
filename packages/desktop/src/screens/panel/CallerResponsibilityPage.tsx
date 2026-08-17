@@ -3,16 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
+  Collapse,
+  IconButton,
   MenuItem,
-  Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import CurrencyExchangeOutlinedIcon from '@mui/icons-material/CurrencyExchangeOutlined';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import TuneIcon from '@mui/icons-material/Tune';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { todayIST, getStoredUser } from '@/utils/dates';
 import { CALLER_HEAD_ROLE_IDS, OFFICE_LOCATIONS, type CallerRow } from './callerResponsibility/constants';
 import { CsvUploadModal } from './callerResponsibility/CsvUploadModal';
@@ -21,6 +32,7 @@ import {
   displayName,
   ecs,
   filterCallerRows,
+  minutesForDate,
   pnl,
   roleFlags,
   roundAmt,
@@ -28,13 +40,20 @@ import {
   type StoredCallerUser,
 } from './callerResponsibility/utils';
 
-const viewBtnSx = {
-  fontSize: 10,
-  py: 0.25,
-  px: 1,
-  minWidth: 0,
-  whiteSpace: 'nowrap',
+const viewIconBtnSx = {
+  p: 0.45,
+  color: '#ff9f0a',
+  border: '1px solid rgba(255,159,10,0.45)',
+  borderRadius: 1,
+  bgcolor: 'rgba(255,159,10,0.08)',
+  '&:hover': {
+    bgcolor: 'rgba(255,159,10,0.18)',
+    borderColor: '#ff9f0a',
+  },
 } as const;
+
+/** Header labels split with `\n`: keep each line intact so it stays 2 lines. */
+const twoLineHeadSx = { whiteSpace: 'nowrap', lineHeight: 1.3, py: 0.9 } as const;
 
 export function CallerResponsibilityPage() {
   const navigate = useNavigate();
@@ -68,6 +87,7 @@ export function CallerResponsibilityPage() {
   const [botCount, setBotCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [validateOpen, setValidateOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('callerResponsibilityStartDate', startDate);
@@ -252,7 +272,8 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wApp',
-        label: 'Total Refund Approved Amount',
+        label: 'Total Refund\nApproved Amount',
+        headSx: twoLineHeadSx,
         render: (r) => roundAmt(r.withdrawalApprovedAmount),
       },
       {
@@ -262,17 +283,20 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wPend',
-        label: 'Total Refund Pending Amount',
+        label: 'Total Refund\nPending Amount',
+        headSx: twoLineHeadSx,
         render: (r) => roundAmt(r.withdrawalPendingAmount),
       },
       {
         id: 'wAppC',
-        label: 'Total Refund Approved Count',
+        label: 'Refund Approved\nCount',
+        headSx: twoLineHeadSx,
         render: (r) => cellText(r.withdrawalApprovedCount),
       },
       {
         id: 'wPendC',
-        label: 'Total Refund Pending Count',
+        label: 'Refund Pending\nCount',
+        headSx: twoLineHeadSx,
         render: (r) => cellText(r.withdrawalPendingCount),
       },
     ],
@@ -314,7 +338,8 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wAppAmt',
-        label: 'Total Refund Approved Amount',
+        label: 'Total Refund\nApproved Amount',
+        headSx: twoLineHeadSx,
         render: (r) => roundAmt(r.withdrawalApprovedAmount),
       },
       {
@@ -324,113 +349,131 @@ export function CallerResponsibilityPage() {
       },
       {
         id: 'wPendAmt',
-        label: 'Total Refund Pending Amount',
+        label: 'Total Refund\nPending Amount',
+        headSx: twoLineHeadSx,
         render: (r) => roundAmt(r.withdrawalPendingAmount),
       },
       {
         id: 'wAppCnt',
-        label: 'Refund Approved Count',
+        label: 'Refund Approved\nCount',
+        headSx: twoLineHeadSx,
         render: (r) => cellText(r.withdrawalApprovedCount),
       },
       {
         id: 'wPendCnt',
-        label: 'Refund Pending Count',
+        label: 'Refund Pending\nCount',
+        headSx: twoLineHeadSx,
         render: (r) => cellText(r.withdrawalPendingCount),
       },
       {
         id: 'activeCust',
         label: 'Active Customers',
-        cellSx: { whiteSpace: 'normal', minWidth: 140 },
+        cellSx: { whiteSpace: 'nowrap', minWidth: 120 },
         render: (r) => (
-          <Stack spacing={0.75} alignItems="center">
+          <Stack spacing={0.5} alignItems="center">
             <span>{cellText(r.transactionCount)}</span>
-            <Button
-              size="small"
-              variant="outlined"
-              sx={viewBtnSx}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                navigate('/caller-responsibility/deposit-list', {
-                  state: { list: r },
-                });
-              }}
-            >
-              View Deposit
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              sx={viewBtnSx}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                navigate('/caller-responsibility/deposit-list', {
-                  state: {
-                    list: r,
-                    type: 'withdrawal',
-                    empCode: r.empCode,
-                    startDate,
-                    endDate,
-                  },
-                });
-              }}
-            >
-              View Refund List
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              sx={viewBtnSx}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                navigate('/caller-responsibility/deposit-list', {
-                  state: {
-                    list: r,
-                    type: 'uniquePending',
-                    empCode: r.empCode,
-                    startDate,
-                    endDate,
-                  },
-                });
-              }}
-            >
-              View Unique Pending
-            </Button>
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="nowrap">
+              <Tooltip title="View Deposit">
+                <IconButton
+                  size="small"
+                  aria-label="View Deposit"
+                  sx={viewIconBtnSx}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate('/caller-responsibility/deposit-list', {
+                      state: { list: r },
+                    });
+                  }}
+                >
+                  <AccountBalanceWalletOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="View Refund List">
+                <IconButton
+                  size="small"
+                  aria-label="View Refund List"
+                  sx={viewIconBtnSx}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate('/caller-responsibility/deposit-list', {
+                      state: {
+                        list: r,
+                        type: 'withdrawal',
+                        empCode: r.empCode,
+                        startDate,
+                        endDate,
+                      },
+                    });
+                  }}
+                >
+                  <CurrencyExchangeOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="View Unique Pending">
+                <IconButton
+                  size="small"
+                  aria-label="View Unique Pending"
+                  sx={viewIconBtnSx}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate('/caller-responsibility/deposit-list', {
+                      state: {
+                        list: r,
+                        type: 'uniquePending',
+                        empCode: r.empCode,
+                        startDate,
+                        endDate,
+                      },
+                    });
+                  }}
+                >
+                  <PendingActionsOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
           </Stack>
         ),
       },
     );
 
-    if (!isCaller) {
-      cols.push(
-        {
-          id: 'ex',
-          label: 'E',
-          render: (r) => cellText(r.activeUserCount),
-        },
-        {
-          id: 'casino',
-          label: 'C',
-          render: (r) => cellText(ecs(r).E),
-        },
-        {
-          id: 'matka',
-          label: 'S',
-          render: (r) => cellText(ecs(r).C),
-        },
-      );
-    }
-
-    cols.push({
-      id: 'daily',
-      label: 'Daily Deposit',
-      render: (r) => roundAmt(ecs(r).S),
-    });
+    cols.push(
+      {
+        id: 'ex',
+        label: 'E',
+        render: (r) => cellText(r.activeUserCount),
+      },
+      {
+        id: 'casino',
+        label: 'C',
+        render: (r) => cellText(ecs(r).E),
+      },
+      {
+        id: 'matka',
+        label: 'S',
+        render: (r) => cellText(ecs(r).C),
+      },
+      {
+        id: 'daily',
+        label: 'Activity Time',
+        cellSx: { minWidth: 130 },
+        render: (r) => (
+          <Stack spacing={0.2} alignItems="flex-start">
+            <Typography variant="caption" sx={{ color: '#69f0ae', whiteSpace: 'nowrap' }}>
+              Active: {minutesForDate(r.activeTime, startDate)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#ff8a80', whiteSpace: 'nowrap' }}>
+              Inactive: {minutesForDate(r.inactiveTime, startDate)}
+            </Typography>
+          </Stack>
+        ),
+      },
+    );
 
     if (!isCaller) {
       cols.push({ id: 'status', label: 'Status', render: (r) => cellText(r.time) });
@@ -455,112 +498,225 @@ export function CallerResponsibilityPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        Caller Responsibility
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', width: '100%', maxWidth: '100%', minWidth: 0 }}>
+      <Box
+        sx={{
+          mb: 1.5,
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}
+      >
           <Stack
             direction="row"
-            spacing={1.5}
             alignItems="center"
-            flexWrap="wrap"
-            useFlexGap
-            sx={{ minWidth: 0, maxWidth: '100%' }}
-          >
-            <TextField
-              type="date"
-              label="From Date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              sx={{ width: 170, flexShrink: 0 }}
-            />
-            <TextField
-              type="date"
-              label="To Date"
-              size="small"
-              InputLabelProps={{ shrink: true }}
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              sx={{ width: 170, flexShrink: 0 }}
-            />
-            {showCallerHead && (
-              <TextField
-                select
-                label="Caller Head"
-                size="small"
-                value={callerHead}
-                onChange={(e) => setCallerHead(e.target.value)}
-                sx={{ width: 200, flexShrink: 0 }}
-              >
-                <MenuItem value="">
-                  <em>Select</em>
-                </MenuItem>
-                {heads.map((h) => (
-                  <MenuItem key={String(h._id || h.name)} value={String(h.name || '')}>
-                    {String(h.name || h.empCode || '-')}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-            {showLocation && (
-              <TextField
-                select
-                label="Location"
-                size="small"
-                value={office}
-                onChange={(e) => setOffice(e.target.value)}
-                sx={{ width: 180, flexShrink: 0 }}
-              >
-                <MenuItem value="">
-                  <em>Select</em>
-                </MenuItem>
-                {OFFICE_LOCATIONS.map((o) => (
-                  <MenuItem key={o} value={o}>
-                    {o}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-            <Button
-              variant="contained"
-              onClick={() => void loadMain()}
-              disabled={loading}
-              sx={{ flexShrink: 0, fontWeight: 700 }}
-            >
-              Apply
-            </Button>
-            {!isCaller && (
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => setValidateOpen(true)}
-                sx={{ flexShrink: 0, fontWeight: 700 }}
-              >
-                Validate Data
-              </Button>
-            )}
-            {loading && <CircularProgress size={22} />}
-          </Stack>
-
-          <Typography
-            variant="body2"
-            mt={1.5}
-            onClick={openBotUsers}
+            justifyContent="space-between"
+            gap={1}
+            onClick={() => setFiltersOpen((open) => !open)}
             sx={{
-              cursor: displayedBotCount > 0 ? 'pointer' : 'default',
-              width: 'fit-content',
+              minHeight: 44,
+              px: 1.5,
+              py: 0.75,
+              cursor: 'pointer',
+              userSelect: 'none',
+              borderBottom: filtersOpen ? '1px solid' : 'none',
+              borderColor: 'divider',
+              '&:hover': { bgcolor: 'action.hover' },
             }}
           >
-            <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
-          </Typography>
-        </Paper>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              flexWrap="wrap"
+              useFlexGap
+              sx={{ minWidth: 0 }}
+            >
+              <TuneIcon sx={{ color: '#ff9f0a', fontSize: 20 }} />
+              <Typography variant="subtitle2" fontWeight={800}>
+                Caller Responsibility
+              </Typography>
+              {!filtersOpen ? (
+                <>
+                  <Chip
+                    size="small"
+                    label={`${startDate} → ${endDate}`}
+                    variant="outlined"
+                    sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
+                  />
+                  <Chip
+                    size="small"
+                    label={`Bots: ${displayedBotCount}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openBotUsers();
+                    }}
+                    sx={{
+                      height: 24,
+                      fontWeight: 700,
+                      color: '#c77a18',
+                      bgcolor: 'rgba(255,159,10,0.12)',
+                      cursor: displayedBotCount > 0 ? 'pointer' : 'default',
+                    }}
+                  />
+                </>
+              ) : null}
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Tooltip title="Refresh">
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label="Refresh"
+                    disabled={loading}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void loadMain();
+                    }}
+                    sx={{
+                      color: '#e8e8ea',
+                      border: '1px solid',
+                      borderColor: 'rgba(255,255,255,0.28)',
+                      borderRadius: '8px',
+                      width: 34,
+                      height: 34,
+                      '&:hover': {
+                        borderColor: '#ff9f0a',
+                        bgcolor: 'rgba(255,159,10,0.08)',
+                      },
+                    }}
+                  >
+                    {loading ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <RefreshIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <IconButton
+              size="small"
+              aria-label={filtersOpen ? 'Collapse filters' : 'Expand filters'}
+              onClick={(event) => {
+                event.stopPropagation();
+                setFiltersOpen((open) => !open);
+              }}
+            >
+              {filtersOpen ? (
+                <ExpandLessIcon fontSize="small" />
+              ) : (
+                <ExpandMoreIcon fontSize="small" />
+              )}
+            </IconButton>
+            </Stack>
+          </Stack>
+
+          <Collapse in={filtersOpen} timeout="auto" unmountOnExit>
+            <Box sx={{ p: 1.5 }}>
+              <Stack
+                direction="row"
+                spacing={1.5}
+                alignItems="center"
+                flexWrap="wrap"
+                useFlexGap
+                sx={{ minWidth: 0, maxWidth: '100%' }}
+              >
+                <TextField
+                  type="date"
+                  label="From Date"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  sx={{ width: 170, flexShrink: 0 }}
+                />
+                <TextField
+                  type="date"
+                  label="To Date"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  sx={{ width: 170, flexShrink: 0 }}
+                />
+                {showCallerHead && (
+                  <TextField
+                    select
+                    label="Caller Head"
+                    size="small"
+                    value={callerHead}
+                    onChange={(e) => setCallerHead(e.target.value)}
+                    sx={{ width: 200, flexShrink: 0 }}
+                  >
+                    <MenuItem value="">
+                      <em>Select</em>
+                    </MenuItem>
+                    {heads.map((h) => (
+                      <MenuItem key={String(h._id || h.name)} value={String(h.name || '')}>
+                        {String(h.name || h.empCode || '-')}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+                {showLocation && (
+                  <TextField
+                    select
+                    label="Location"
+                    size="small"
+                    value={office}
+                    onChange={(e) => setOffice(e.target.value)}
+                    sx={{ width: 180, flexShrink: 0 }}
+                  >
+                    <MenuItem value="">
+                      <em>Select</em>
+                    </MenuItem>
+                    {OFFICE_LOCATIONS.map((o) => (
+                      <MenuItem key={o} value={o}>
+                        {o}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+                <Button
+                  variant="contained"
+                  onClick={() => void loadMain()}
+                  disabled={loading}
+                  sx={{ flexShrink: 0, fontWeight: 700 }}
+                >
+                  Apply
+                </Button>
+                {!isCaller && (
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => setValidateOpen(true)}
+                    sx={{ flexShrink: 0, fontWeight: 700 }}
+                  >
+                    Validate Data
+                  </Button>
+                )}
+                {loading && <CircularProgress size={22} />}
+              </Stack>
+
+              <Typography
+                variant="body2"
+                mt={1.25}
+                onClick={openBotUsers}
+                sx={{
+                  cursor: displayedBotCount > 0 ? 'pointer' : 'default',
+                  width: 'fit-content',
+                }}
+              >
+                <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
+              </Typography>
+            </Box>
+          </Collapse>
+        </Box>
 
       {showTotalDeposit && (
         <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-          <Typography variant="h6" fontWeight={700} mb={1}>
+          <Typography variant="h6" fontWeight={700} mb={1} sx={{ fontSize: '0.95rem' }}>
             Summary
           </Typography>
           <CommonTable
@@ -575,7 +731,7 @@ export function CallerResponsibilityPage() {
 
       {showTotalDeposit && showLocation && (
         <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-          <Typography variant="h6" fontWeight={700} mb={1}>
+          <Typography variant="h6" fontWeight={700} mb={1} sx={{ fontSize: '0.95rem' }}>
             By Office Location
           </Typography>
           <CommonTable
@@ -589,29 +745,31 @@ export function CallerResponsibilityPage() {
       )}
 
       <Box mb={2} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-        <Typography variant="h6" fontWeight={700} mb={1}>
+        <Typography variant="h6" fontWeight={700} mb={1} sx={{ fontSize: '0.95rem' }}>
           Caller Data
         </Typography>
-        <CommonTable
-          columns={callerColumns}
-          rows={callerRows}
-          getRowKey={(r, i) => String(r.empCode || r._id || i)}
-          loading={loading}
-          emptyMessage="No caller data"
-          stickyHeader
-          dense
-          maxHeight="calc(100vh - 360px)"
-          hover
-          onRowClick={(r) =>
-            navigate('/caller-responsibility/details', {
-              state: {
-                empCode: r.empCode,
-                deposit: r.totalDeposit,
-                activePlayersECS: r.activePlayersECS,
-              },
-            })
-          }
-        />
+        <TablePanel>
+          <CommonTable
+            columns={callerColumns}
+            rows={callerRows}
+            getRowKey={(r, i) => String(r.empCode || r._id || i)}
+            loading={loading}
+            emptyMessage="No caller data"
+            stickyHeader
+            dense
+            maxHeight="100%"
+            hover
+            onRowClick={(r) =>
+              navigate('/caller-responsibility/details', {
+                state: {
+                  empCode: r.empCode,
+                  deposit: r.totalDeposit,
+                  activePlayersECS: r.activePlayersECS,
+                },
+              })
+            }
+          />
+        </TablePanel>
       </Box>
 
       <CsvUploadModal open={validateOpen} onClose={() => setValidateOpen(false)} />

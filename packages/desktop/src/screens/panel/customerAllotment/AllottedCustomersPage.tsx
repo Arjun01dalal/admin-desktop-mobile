@@ -15,6 +15,7 @@ import { formatDisplayDate, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { appCodeForName } from '@/constants/clientNames';
+import { TablePanel } from '@/components/TablePanel';
 import {
   ReportPage,
   DataTable,
@@ -214,16 +215,21 @@ export function AllottedCustomersPage() {
         />
       }
     >
-      <DataTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row, i) => row._id || i}
-        loading={loading}
-        emptyMessage="No allotted customers found"
-        minWidth={1500}
-      />
-
-      <ReportPager page={page} totalPages={totalPages} onChange={setPage} disabled={loading} total={total} />
+      <TablePanel
+        footer={
+          <ReportPager page={page} totalPages={totalPages} onChange={setPage} disabled={loading} total={total} />
+        }
+      >
+        <DataTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row, i) => row._id || i}
+          loading={loading}
+          emptyMessage="No allotted customers found"
+          minWidth={1500}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </ReportPage>
   );
 }

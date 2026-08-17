@@ -227,26 +227,78 @@ export function useCallLogsActions({
     [admin?._id, admin?.name, load],
   );
 
-  const reinitiateDeleted = useCallback(
-    async (botId: number) => {
+  const reinitiateStatuses = useCallback(
+    async (
+      targets: Array<{ botId: number; status: 'deleted' | 'failed' | 'no-answer' }>,
+    ) => {
+      if (!targets.length) {
+        toast.error('Select at least one bot status');
+        return;
+      }
       setActionLoading(true);
       try {
         const { startDate, endDate } = getDateRange();
-        const res = await secureApi<CallLogRow[]>('callLogs.fetchDeleted', {
-          startDate,
-          endDate,
-          botId,
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to fetch deleted calls');
+        const results = await Promise.all(
+          targets.map(async ({ botId, status }) => {
+            if (status === 'deleted') {
+              const res = await secureApi<CallLogRow[]>('callLogs.fetchDeleted', {
+                startDate,
+                endDate,
+                botId,
+              });
+              return {
+                ok: res.ok,
+                message: res.message,
+                rows: Array.isArray(res.data) ? res.data : [],
+              };
+            }
+
+            const dialerStatus = status === 'no-answer' ? 'no-answer' : 'failed';
+            const res = await secureApi<CallLogsListResponse>('callLogs.getDialerData', {
+              userId: '',
+              filter: {
+                status: dialerStatus,
+                startDate: formatDdMmYyyy(startDate),
+                endDate: formatDdMmYyyy(endDate),
+                botId: [botId],
+                index: 1,
+                limit: 5000,
+              },
+            });
+            const raw = Array.isArray(res.data?.calls) ? res.data.calls : [];
+            return {
+              ok: res.ok,
+              message: res.message,
+              rows: raw.filter(
+                (row) =>
+                  String(row.status || '').toLowerCase() === dialerStatus &&
+                  Number(row.bot_id) === Number(botId),
+              ),
+            };
+          }),
+        );
+
+        const failed = results.filter((result) => !result.ok);
+        if (failed.length) {
+          toast.error(failed[0]?.message || `Failed to fetch ${failed.length} selection(s)`);
+        }
+
+        const uniqueRows = Array.from(
+          new Map(
+            results
+              .filter((result) => result.ok)
+              .flatMap((result) => result.rows)
+              .map((row, index) => [
+                String(row.call_sid || row._id || `${row.bot_id}:${index}`),
+                row,
+              ]),
+          ).values(),
+        );
+        if (!uniqueRows.length) {
+          toast.info('No calls found to reinitiate');
           return;
         }
-        const rows = Array.isArray(res.data) ? res.data : [];
-        if (!rows.length) {
-          toast.info('No deleted calls to reinitiate');
-          return;
-        }
-        await botCall(rows);
+        await botCall(uniqueRows);
       } finally {
         setActionLoading(false);
       }
@@ -254,51 +306,18 @@ export function useCallLogsActions({
     [botCall, getDateRange],
   );
 
-  /** Reinitiate failed calls for a bot — same dialer push as deleted reinit. */
-  const reinitiateFailed = useCallback(
+  const reinitiateDeleted = useCallback(
     async (botId: number) => {
-      setActionLoading(true);
-      try {
-        const { startDate, endDate } = getDateRange();
-        const res = await secureApi<CallLogsListResponse>('callLogs.getDialerData', {
-          userId: '',
-          filter: {
-            status: 'failed',
-            startDate: formatDdMmYyyy(startDate),
-            endDate: formatDdMmYyyy(endDate),
-            botId: [botId],
-            index: 1,
-            limit: 5000,
-          },
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to fetch failed calls');
-          return;
-        }
-        const raw = Array.isArray(res.data?.calls) ? res.data.calls : [];
-        const rows = raw.filter(
-          (r) =>
-            String(r.status || '').toLowerCase() === 'failed' &&
-            Number(r.bot_id) === Number(botId),
-        );
-        if (!rows.length) {
-          toast.info('No failed calls to reinitiate');
-          return;
-        }
-        await botCall(rows);
-      } finally {
-        setActionLoading(false);
-      }
+      await reinitiateStatuses([{ botId, status: 'deleted' }]);
     },
-    [botCall, getDateRange],
+    [reinitiateStatuses],
   );
 
   const reinitiateStatus = useCallback(
-    async (botId: number, status: 'deleted' | 'failed') => {
-      if (status === 'failed') await reinitiateFailed(botId);
-      else await reinitiateDeleted(botId);
+    async (botId: number, status: 'deleted' | 'failed' | 'no-answer') => {
+      await reinitiateStatuses([{ botId, status }]);
     },
-    [reinitiateDeleted, reinitiateFailed],
+    [reinitiateStatuses],
   );
 
   return {
@@ -315,5 +334,6 @@ export function useCallLogsActions({
     onUpload,
     reinitiateDeleted,
     reinitiateStatus,
+    reinitiateStatuses,
   };
 }

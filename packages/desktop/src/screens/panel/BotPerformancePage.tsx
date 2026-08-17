@@ -14,7 +14,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { formatDisplayDate, todayIST } from '@/utils/dates';
@@ -104,8 +106,9 @@ const orangeBtnSx = {
 };
 
 const fieldSx = {
-  width: '100%',
-  minWidth: 0,
+  width: 150,
+  flexShrink: 0,
+  flex: '0 0 auto',
   '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 13 },
 };
 
@@ -443,178 +446,170 @@ export function BotPerformancePage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Box
-        sx={{
-          mb: 1.5,
-          p: 1.5,
-          borderRadius: 1.5,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
+      <CollapsibleFilterPanel
+        title="Bot Performance"
+        summary={`${startDate} → ${endDate}${type ? ` · ${type}` : ''}`}
+        contentSx={{ overflowX: 'auto' }}
       >
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: 'repeat(2, minmax(0, 1fr))',
-              sm: 'repeat(3, minmax(0, 1fr))',
-              md: 'repeat(4, minmax(0, 1fr))',
-              lg: 'repeat(6, minmax(0, 1fr))',
-            },
-            gap: 1.25,
-            alignItems: 'center',
-            width: '100%',
-          }}
+        <Stack
+          direction="row"
+          spacing={1.25}
+          alignItems="center"
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ '& > *': { flexShrink: 0 } }}
         >
-          <TextField
-            size="small"
-            type="date"
-            label="From Date"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            size="small"
-            type="date"
-            label="To Date"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            select
-            size="small"
-            label="Items / Page"
-            value={String(itemsPerPage)}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value) || 10);
-              setPage(1);
-              setSelectedIds(new Set());
-            }}
-            sx={fieldSx}
-          >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <MenuItem key={n} value={n}>
-                {n}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            size="small"
-            label="Type"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            sx={fieldSx}
-          >
-            {TYPE_OPTIONS.map((t) => (
-              <MenuItem key={t} value={t}>
-                {t}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            size="small"
-            label="Bot ID"
-            SelectProps={{
-              multiple: true,
-              renderValue: (v) => {
-                const vals = v as string[];
-                return vals.length > 3
-                  ? `${vals.slice(0, 3).join(', ')} +${vals.length - 3}`
-                  : vals.join(', ') || 'All';
-              },
-            }}
-            value={botIds}
-            onChange={(e) => setBotIds(e.target.value as unknown as string[])}
-            sx={fieldSx}
-          >
-            {BOT_ID_OPTIONS.map((id) => (
-              <MenuItem key={id} value={id}>
-                <Checkbox size="small" checked={botIds.includes(id)} />
-                {id}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            size="small"
-            label="Campaign"
-            value={campaignId}
-            onChange={(e) => setCampaignId(e.target.value)}
-            sx={fieldSx}
-          >
-            <MenuItem value="">Select</MenuItem>
-            {CAMPAIGN_LIST.map((c) => (
-              <MenuItem key={c.id} value={c.id.trim()}>
-                {c.id.trim()}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-            useFlexGap
-            sx={{ gridColumn: '1 / -1', pt: 0.25 }}
-          >
-            <Button
-              variant="contained"
-              disabled={loading}
-              onClick={() => commitQuery()}
-              sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
-            >
-              Apply
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<RefreshIcon />}
-              disabled={loading}
-              onClick={() => void load()}
-              sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="contained"
-              disabled={pushing || !selectedIds.size}
-              onClick={() => void addToDialer()}
-              sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
-            >
-              Add to Dialer
-            </Button>
-          </Stack>
-        </Box>
-      </Box>
-
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        emptyMessage="No records found"
-        virtualize={false}
-        getRowKey={(row) => row._id}
-        maxHeight="calc(100vh - 315px)"
-      />
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" sx={{ mt: 1.5 }}>
-          <Pagination
-            count={Math.max(1, totalPages)}
-            page={page}
-            color="secondary"
-            onChange={(_e, next) => {
-              setPage(next);
-              setSelectedIds(new Set());
-            }}
-          />
+              <TextField
+                size="small"
+                type="date"
+                label="From Date"
+                fullWidth={false}
+                InputLabelProps={{ shrink: true }}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="To Date"
+                fullWidth={false}
+                InputLabelProps={{ shrink: true }}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                select
+                size="small"
+                label="Items / Page"
+                fullWidth={false}
+                value={String(itemsPerPage)}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value) || 10);
+                  setPage(1);
+                  setSelectedIds(new Set());
+                }}
+                sx={fieldSx}
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <MenuItem key={n} value={n}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                size="small"
+                label="Type"
+                fullWidth={false}
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                sx={fieldSx}
+              >
+                {TYPE_OPTIONS.map((t) => (
+                  <MenuItem key={t} value={t}>
+                    {t}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                size="small"
+                label="Bot ID"
+                fullWidth={false}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (v) => {
+                    const vals = v as string[];
+                    return vals.length > 3
+                      ? `${vals.slice(0, 3).join(', ')} +${vals.length - 3}`
+                      : vals.join(', ') || 'All';
+                  },
+                }}
+                value={botIds}
+                onChange={(e) => setBotIds(e.target.value as unknown as string[])}
+                sx={{ ...fieldSx, width: 180 }}
+              >
+                {BOT_ID_OPTIONS.map((id) => (
+                  <MenuItem key={id} value={id}>
+                    <Checkbox size="small" checked={botIds.includes(id)} />
+                    {id}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                size="small"
+                label="Campaign"
+                fullWidth={false}
+                value={campaignId}
+                onChange={(e) => setCampaignId(e.target.value)}
+                sx={{ ...fieldSx, width: 170 }}
+              >
+                <MenuItem value="">Select</MenuItem>
+                {CAMPAIGN_LIST.map((c) => (
+                  <MenuItem key={c.id} value={c.id.trim()}>
+                    {c.id.trim()}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() => commitQuery()}
+                sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
+              >
+                Apply
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<RefreshIcon />}
+                disabled={loading}
+                onClick={() => void load()}
+                sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="contained"
+                disabled={pushing || !selectedIds.size}
+                onClick={() => void addToDialer()}
+                sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
+              >
+                Add to Dialer
+              </Button>
         </Stack>
-      )}
+      </CollapsibleFilterPanel>
+
+      <TablePanel
+        footer={
+          totalPages > 1 ? (
+            <>
+              <Pagination
+                count={Math.max(1, totalPages)}
+                page={page}
+                color="secondary"
+                onChange={(_e, next) => {
+                  setPage(next);
+                  setSelectedIds(new Set());
+                }}
+              />
+            </>
+          ) : undefined
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          emptyMessage="No records found"
+          virtualize={false}
+          getRowKey={(row) => row._id}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

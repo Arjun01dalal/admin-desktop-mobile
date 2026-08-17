@@ -16,6 +16,7 @@ import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { display, maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
@@ -451,14 +452,17 @@ export function FundsPayinPage() {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={activeRows}
         getRowKey={(row, i) => String(row._id || row.orderId || i)}
         loading={loading}
         emptyMessage="No data"
         minWidth={1200}
+        maxHeight="100%"
       />
+      </TablePanel>
     </Box>
   );
 }

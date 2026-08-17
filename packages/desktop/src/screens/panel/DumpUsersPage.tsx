@@ -6,7 +6,6 @@ import {
   CircularProgress,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -16,7 +15,9 @@ import UndoIcon from '@mui/icons-material/Undo';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getRoleId, hasPermission } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { appCodeForName } from '@/constants/clientNames';
 import { formatAmount, formatDisplayDate } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
@@ -309,39 +310,27 @@ export function DumpUsersPage() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        gap={1.5}
-        mb={2}
+      <CollapsibleFilterPanel
+        title="Dump Users"
+        summary={`${itemsPerPage} per page · ${total} total`}
+        headerActions={
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              void load();
+            }}
+            disabled={loading}
+            sx={{ textTransform: 'none' }}
+          >
+            Refresh
+          </Button>
+        }
       >
-        <Typography variant="h5" fontWeight={700}>
-          Dump Users
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={
-            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-          }
-          onClick={() => void load()}
-          disabled={loading}
-          sx={{
-            borderColor: 'rgba(255,255,255,0.28)',
-            color: '#e8e8ea',
-            textTransform: 'none',
-            '&:hover': {
-              borderColor: '#ff9f0a',
-              bgcolor: 'rgba(255,159,10,0.08)',
-            },
-          }}
-        >
-          Refresh
-        </Button>
-      </Stack>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             select
@@ -369,32 +358,36 @@ export function DumpUsersPage() {
             Search
           </Button>
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || index}
-        loading={loading}
-        emptyMessage="No dump users found"
-        stickyHeader
-        dense
-        minWidth={1400}
-        maxHeight="calc(100vh - 300px)"
-      />
-
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
-        <Typography variant="body2" color="text.secondary">
-          Total: {total}
-        </Typography>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Total: {total}
+            </Typography>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || index}
+          loading={loading}
+          emptyMessage="No dump users found"
+          stickyHeader
+          dense
+          minWidth={1400}
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

@@ -3,13 +3,14 @@ import {
   Box,
   Button,
   CircularProgress,
-  Paper,
   Stack,
   TextField,
-  Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { secureApi } from '@/api/secureClient';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { todayIST } from '@/utils/dates';
@@ -102,11 +103,10 @@ export function CheckersReportPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        Checkers Report
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', width: '100%' }}>
+      <CollapsibleFilterPanel
+        title="Checkers Report"
+        summary={`${startDate} → ${endDate}`}
+      >
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             type="date"
@@ -134,20 +134,32 @@ export function CheckersReportPage() {
           >
             Apply
           </Button>
-          {loading && <CircularProgress size={22} />}
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={() => void load()}
+            disabled={loading}
+            sx={{ fontWeight: 700, flexShrink: 0 }}
+          >
+            Refresh
+          </Button>
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row) => row.name}
-        loading={loading}
-        emptyMessage="No data available"
-        stickyHeader
-        dense
-        maxHeight="calc(100vh - 280px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row) => row.name}
+          loading={loading}
+          emptyMessage="No data available"
+          stickyHeader
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

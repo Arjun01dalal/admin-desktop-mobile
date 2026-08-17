@@ -24,6 +24,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import {
   formatDisplayDate,
@@ -341,13 +342,16 @@ export function InstantDepositProvidersPage() {
         </Button>
       </Stack>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={rows}
         loading={loading}
         getRowKey={(row) => row._id}
         emptyMessage="No instant deposit providers"
+        maxHeight="100%"
       />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Add Instant Deposit Provider</DialogTitle>

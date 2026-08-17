@@ -27,6 +27,8 @@ const SKIP_SESSION_RECHECK = new Set<SecureAction>([
   'auth.getAllBlockedUserIds',
   'auth.getSosFlag',
   'auth.getAllSosBlocks',
+  'auth.updateActiveTime',
+  'auth.updateInactiveTime',
 ]);
 
 /** @deprecated Prefer ApiResult from @astro/shared/api — alias kept for existing imports. */

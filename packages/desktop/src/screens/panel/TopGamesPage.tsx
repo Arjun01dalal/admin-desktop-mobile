@@ -19,6 +19,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { AddTopGamePanel } from '@/screens/panel/topGames/AddTopGamePanel';
 import {
   buildGameRows,
@@ -433,18 +434,20 @@ export function TopGamesPage() {
         Showing: {games.length} | Active: {activeCount}
       </Typography>
 
-      <CommonTable
-        columns={columns}
-        rows={games}
-        getRowKey={(row, i) =>
-          `${row._categoryKey}-${row.gameId || row._id || i}-${row._position}`
-        }
-        loading={busy}
-        emptyMessage="No top games found"
-        minWidth={1200}
-        maxHeight="calc(100vh - 280px)"
-        estimateRowHeight={84}
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={games}
+          getRowKey={(row, i) =>
+            `${row._categoryKey}-${row.gameId || row._id || i}-${row._position}`
+          }
+          loading={busy}
+          emptyMessage="No top games found"
+          minWidth={1200}
+          maxHeight="100%"
+          estimateRowHeight={84}
+        />
+      </TablePanel>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>Remove game</DialogTitle>

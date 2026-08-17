@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Box, Paper, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount } from '@/utils/dates';
 import {
   getMetric,
@@ -199,13 +200,16 @@ export function PlayerActivityDetailsPage() {
         {id || 'Player'} — Providers
       </Typography>
 
-      <CommonTable
+      <TablePanel>
+<CommonTable
         columns={columns}
         rows={rows}
         getRowKey={(row) => row.id}
         emptyMessage="No providers for this player"
         minWidth={900}
+        maxHeight="100%"
       />
+      </TablePanel>
     </Box>
   );
 }

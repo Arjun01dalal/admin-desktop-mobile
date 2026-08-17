@@ -1,4 +1,5 @@
 import {
+  Fragment,
   memo,
   useCallback,
   useLayoutEffect,
@@ -31,7 +32,17 @@ import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 function displayColLabel(label: ReactNode): ReactNode {
   if (typeof label === 'string' || typeof label === 'number') {
-    return toDisplayText(String(label));
+    const text = toDisplayText(String(label));
+    // `\n` in column labels → explicit 2+ line headers (keeps Jyotish mapping).
+    if (text.includes('\n')) {
+      return text.split('\n').map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 ? <br /> : null}
+          {line}
+        </Fragment>
+      ));
+    }
+    return text;
   }
   return label;
 }
@@ -394,7 +405,14 @@ export function CommonTable<T>({
         '& .MuiInputBase-input': { py: 0.35 },
       }
     : dense
-      ? { ...styles.filter, fontSize: 11, py: 0.75 }
+      ? {
+          ...styles.filter,
+          fontSize: 10.5,
+          py: 0.4,
+          px: 0.5,
+          '& .MuiInputBase-root': { fontSize: 10.5 },
+          '& .MuiInputBase-input': { py: 0.25 },
+        }
       : styles.filter;
 
   const showFilters = columns.some((col) => col.filter != null);
@@ -641,6 +659,9 @@ export function CommonTable<T>({
     </Table>
   );
 
+  const fillParent =
+    shouldVirtualize || maxHeight === '100%' || maxHeight === '100vh';
+
   // Keep the scrollport width-bound so wide tables scroll inside the paper
   // instead of expanding the page (overflow:auto alone is not enough).
   const scrollSx: SxProps<Theme> = {
@@ -655,11 +676,15 @@ export function CommonTable<T>({
       ? {
           height: maxHeight,
           maxHeight,
+          flex: fillParent ? 1 : undefined,
+          minHeight: fillParent ? 0 : undefined,
           overflow: 'auto',
           willChange: 'scroll-position',
         }
       : paper && maxHeight
-        ? { maxHeight }
+        ? fillParent
+          ? { height: '100%', maxHeight, flex: 1, minHeight: 0 }
+          : { maxHeight }
         : null),
     ...(hasStickyLeft
       ? {
@@ -687,6 +712,10 @@ export function CommonTable<T>({
         width: '100%',
         maxWidth: '100%',
         minWidth: 0,
+        height: fillParent ? '100%' : undefined,
+        maxHeight: fillParent ? undefined : maxHeight || undefined,
+        display: fillParent ? 'flex' : undefined,
+        flexDirection: fillParent ? 'column' : undefined,
         // overflow:hidden clips / breaks left-sticky columns in Chromium
         overflow: hasStickyLeft ? 'visible' : 'hidden',
       }}

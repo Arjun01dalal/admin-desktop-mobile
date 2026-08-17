@@ -3,21 +3,20 @@ import {
   Box,
   Button,
   CircularProgress,
-  MenuItem,
   Pagination,
   Stack,
-  TextField,
-  Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import type { SecureAction } from '@/api/secureActions';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
 import {
   HISTORY_PAGINATION_SX,
+  ItemsPerPageField,
   SearchFilter,
   formatDt,
 } from './historyFilters';
@@ -321,7 +320,17 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
         id: 'commission',
         label: 'Commission Amount',
         filter: null,
-        render: (r) => formatAmount(r.commission ?? r.commissionAmount ?? 0),
+        // Falcon API uses PascalCase `CommissionAmount` (Laxmi: Math.round).
+        render: (r) => {
+          const raw = pick(
+            r,
+            'CommissionAmount',
+            'commissionAmount',
+            'commission',
+          );
+          const n = Number(raw === '-' || raw == null ? 0 : raw);
+          return formatAmount(Number.isFinite(n) ? Math.round(n) : 0);
+        },
       },
       {
         id: 'pl',
@@ -361,28 +370,21 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
 
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} alignItems="flex-end" mb={2}>
-        <Box sx={{ minWidth: 120 }}>
-          <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
-            Items Per Page
-          </Typography>
-          <TextField
-            select
-            size="small"
-            value={itemsPerPage}
-            onChange={(e) => {
-              setItemsPerPage(e.target.value);
-              setPage(1);
-            }}
-            sx={{ bgcolor: '#fff', minWidth: 120 }}
-          >
-            {['20', '50', '100', '250'].map((o) => (
-              <MenuItem key={o} value={o}>
-                {o}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Box>
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+        mb={1.5}
+      >
+        <ItemsPerPageField
+          value={itemsPerPage}
+          onChange={(v) => {
+            setItemsPerPage(v);
+            setPage(1);
+          }}
+        />
         <Button
           variant="contained"
           color="inherit"
@@ -396,26 +398,30 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage={`No ${variant === 'jetfair' ? 'JetFair' : 'Falcon'} history`}
-        minWidth={1800}
-        dense
-      />
-
-      {totalPages > 1 && (
-        <Stack alignItems="center" mt={2}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(_e, p) => setPage(p)}
-            sx={HISTORY_PAGINATION_SX}
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footerJustify="center"
+        footer={
+          totalPages > 1 ? (
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              sx={HISTORY_PAGINATION_SX}
+            />
+          ) : undefined
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r, i) => String(r._id || i)}
+          loading={loading}
+          emptyMessage={`No ${variant === 'jetfair' ? 'JetFair' : 'Falcon'} history`}
+          minWidth={1800}
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

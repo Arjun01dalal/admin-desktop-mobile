@@ -20,6 +20,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { copyToClipboard } from '@/utils/clipboard';
 import { asList, useReportQuery } from '@/screens/panel/shared';
 
@@ -272,17 +273,19 @@ export function SocialMediaPage() {
         </Stack>
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => row._id}
-        loading={loading}
-        emptyMessage="No social media links found"
-        stickyHeader
-        dense
-        minWidth={600}
-        maxHeight="calc(100vh - 220px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row._id}
+          loading={loading}
+          emptyMessage="No social media links found"
+          stickyHeader
+          dense
+          minWidth={600}
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
         <form onSubmit={handleCreate}>

@@ -5,12 +5,14 @@ import {
   CircularProgress,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { useSheetDownloadQuery } from './sheetDownloadReport/useSheetDownloadQuery';
@@ -103,11 +105,11 @@ export function SheetDownloadReportPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        Sheet Download Report
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', width: '100%' }}>
+      <CollapsibleFilterPanel
+        title="Sheet Download Report"
+        summary={`${startDate} – ${endDate} · Total: ${total}`}
+        sx={{ mb: 2 }}
+      >
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             type="date"
@@ -154,32 +156,47 @@ export function SheetDownloadReportPage() {
           >
             Apply
           </Button>
+          <Button
+            variant="outlined"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={() => void load(page)}
+            disabled={loading}
+            sx={{ fontWeight: 700, flexShrink: 0 }}
+          >
+            Refresh
+          </Button>
           <Typography fontWeight={700} color="text.secondary" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
             Total Record : {total}
           </Typography>
-          {loading && <CircularProgress size={22} />}
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row, index) => row._id || index}
-        loading={loading}
-        emptyMessage="No download records found"
-        stickyHeader
-        dense
-        maxHeight="calc(100vh - 320px)"
-      />
-
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          color="secondary"
-          onChange={(_e, nextPage) => setPage(nextPage)}
+      <TablePanel
+        footer={
+          <>
+            <Pagination
+              count={totalPages}
+              page={page}
+              color="secondary"
+              onChange={(_e, nextPage) => setPage(nextPage)}
+            />
+          </>
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row, index) => row._id || index}
+          loading={loading}
+          emptyMessage="No download records found"
+          stickyHeader
+          dense
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

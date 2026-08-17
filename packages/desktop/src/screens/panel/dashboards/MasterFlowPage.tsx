@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { hasPermission } from '@/auth/permissions';
@@ -271,18 +272,20 @@ export function MasterFlowPage() {
         </Stack>
       </Paper>
 
-      <CommonTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row, index) => row._id || index}
-        loading={loading}
-        emptyMessage="No Data Found"
-        stickyHeader
-        dense
-        hover
-        onRowClick={onRowClick}
-        maxHeight="calc(100vh - 280px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row, index) => row._id || index}
+          loading={loading}
+          emptyMessage="No Data Found"
+          stickyHeader
+          dense
+          hover
+          onRowClick={onRowClick}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

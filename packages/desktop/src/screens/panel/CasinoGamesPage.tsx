@@ -19,7 +19,6 @@ import {
   FormControlLabel,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   Switch,
   TextField,
@@ -30,7 +29,9 @@ import HideImageOutlinedIcon from '@mui/icons-material/HideImageOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { display } from '@/screens/panel/shared';
@@ -573,45 +574,27 @@ export function CasinoGamesPage() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        gap={1.5}
-        mb={2}
+      <CollapsibleFilterPanel
+        title={toDisplayText('Casino Games')}
+        summary={`${toDisplayText(activeProvider)} · ${gameCategory || 'All categories'} · ${pageSize} per page`}
+        headerActions={
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={
+              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              void load(page);
+            }}
+            disabled={loading}
+            sx={{ textTransform: 'none' }}
+          >
+            Refresh
+          </Button>
+        }
       >
-        <Typography variant="h5" fontWeight={700}>
-          {toDisplayText('Casino Games')}
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={
-            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-          }
-          onClick={() => void load(page)}
-          disabled={loading}
-          sx={{
-            borderColor: 'rgba(255,255,255,0.28)',
-            color: '#e8e8ea',
-            textTransform: 'none',
-            '&:hover': {
-              borderColor: '#ff9f0a',
-              bgcolor: 'rgba(255,159,10,0.08)',
-            },
-          }}
-        >
-          Refresh
-        </Button>
-      </Stack>
-
-      {error ? (
-        <Typography variant="body2" color="error" mb={2}>
-          {error}
-        </Typography>
-      ) : null}
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             select
@@ -706,29 +689,38 @@ export function CasinoGamesPage() {
             </TextField>
           ) : null}
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={deferredRows}
-        getRowKey={(row, i) => row._id || i}
-        loading={loading}
-        emptyMessage="No casino games found"
-        stickyHeader
-        dense
-        minWidth={1100}
-        maxHeight="calc(100vh - 360px)"
-      />
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
 
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <Pagination
+            count={Math.max(1, totalPages)}
+            page={page}
+            onChange={(_e, p) => setPage(p)}
+            color="primary"
+            disabled={loading}
+          />
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={deferredRows}
+          getRowKey={(row, i) => row._id || i}
+          loading={loading}
+          emptyMessage="No casino games found"
+          stickyHeader
+          dense
+          minWidth={1100}
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
 
       <Dialog open={providerConfirmOpen} onClose={() => setProviderConfirmOpen(false)}>
         <DialogTitle>Are You Sure?</DialogTitle>

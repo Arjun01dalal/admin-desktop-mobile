@@ -6,7 +6,6 @@ import {
   CircularProgress,
   MenuItem,
   Pagination,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -14,7 +13,9 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { PLAY_IN_CODES } from '@astro/shared/botIds';
@@ -467,36 +468,34 @@ export function TodaysActivePage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, p: 2 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5" fontWeight={700}>
-          Todays Active
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-          onClick={() => void load()}
-          disabled={loading}
-          sx={{
-            borderColor: 'rgba(255,255,255,0.2)',
-            color: '#e8e8ea',
-            textTransform: 'none',
-            '&:hover': {
-              borderColor: '#ff9f0a',
-              bgcolor: 'rgba(255,159,10,0.08)',
-            },
-          }}
-        >
-          Refresh
-        </Button>
-      </Stack>
-
-      {error ? (
-        <Typography variant="body2" color="error" mb={2}>
-          {error}
-        </Typography>
-      ) : null}
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', overflowX: 'auto' }}>
+      <CollapsibleFilterPanel
+        title="Todays Active"
+        summary={`${startDate && endDate ? `${startDate} – ${endDate} · ` : ''}Total: ${total}`}
+        headerActions={
+          <Button
+            variant="outlined"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+            onClick={(event) => {
+              event.stopPropagation();
+              void load();
+            }}
+            disabled={loading}
+            sx={{
+              borderColor: 'rgba(255,255,255,0.2)',
+              color: '#e8e8ea',
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#ff9f0a',
+                bgcolor: 'rgba(255,159,10,0.08)',
+              },
+            }}
+          >
+            Refresh
+          </Button>
+        }
+        sx={{ mb: 2 }}
+        contentSx={{ overflowX: 'auto' }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -557,29 +556,40 @@ export function TodaysActivePage() {
             Total: {total}
           </Typography>
         </Stack>
-      </Paper>
+      </CollapsibleFilterPanel>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || index}
-        loading={loading}
-        emptyMessage="No active users found"
-        stickyHeader
-        dense
-        minWidth={1800}
-        maxHeight="calc(100vh - 360px)"
-      />
+      {error ? (
+        <Typography variant="body2" color="error" mb={2}>
+          {error}
+        </Typography>
+      ) : null}
 
-      <Stack alignItems="center" mt={2}>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || index}
+          loading={loading}
+          emptyMessage="No active users found"
+          stickyHeader
+          dense
+          minWidth={1800}
+          maxHeight="100%"
         />
-      </Stack>
+      </TablePanel>
     </Box>
   );
 }

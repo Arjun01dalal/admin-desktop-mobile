@@ -3,15 +3,21 @@ import {
   Box,
   Button,
   CircularProgress,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
+import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { display } from './shared';
 import {
@@ -56,20 +62,34 @@ const fieldSx = {
   '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
 };
 
-/** Matches old UI outlined action buttons. */
-const actionBtnSx = {
-  textTransform: 'uppercase' as const,
-  fontSize: 11,
-  fontWeight: 600,
-  whiteSpace: 'nowrap' as const,
-  px: 1.5,
-  py: 0.5,
+const actionIconBtnSx = {
+  width: 32,
+  height: 32,
+  border: '1px solid',
   borderColor: '#64b5f6',
   color: '#64b5f6',
-  bgcolor: 'transparent',
+  borderRadius: '8px',
   '&:hover': {
     borderColor: '#90caf9',
-    bgcolor: 'rgba(100,181,246,0.1)',
+    bgcolor: 'rgba(100,181,246,0.12)',
+  },
+  '&.Mui-disabled': {
+    borderColor: 'rgba(100,181,246,0.35)',
+    color: 'rgba(100,181,246,0.45)',
+  },
+};
+
+const removeIconBtnSx = {
+  ...actionIconBtnSx,
+  borderColor: '#ef5350',
+  color: '#ef5350',
+  '&:hover': {
+    borderColor: '#e57373',
+    bgcolor: 'rgba(239,83,80,0.12)',
+  },
+  '&.Mui-disabled': {
+    borderColor: 'rgba(239,83,80,0.35)',
+    color: 'rgba(239,83,80,0.45)',
   },
 };
 
@@ -451,54 +471,75 @@ export function CallerAllotmentPage() {
       {
         id: 'action',
         label: 'Action',
-        width: 180,
-        render: (row) =>
-          row.block ? (
-            <Typography variant="caption" color="error.light">
-              Blocked
-            </Typography>
-          ) : (
-            <Stack spacing={1} alignItems="center">
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={savingKey === `${row._id}:head`}
-                onClick={() => void updateCallerHead(row)}
-                sx={actionBtnSx}
-              >
-                {savingKey === `${row._id}:head` ? 'Updating…' : 'Update Caller Head'}
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                disabled={savingKey === `${row._id}:removeHead`}
-                onClick={() => void removeCallerHead(row)}
-                sx={{
-                  ...actionBtnSx,
-                  borderColor: '#ef5350',
-                  color: '#ef5350',
-                  '&:hover': {
-                    borderColor: '#e57373',
-                    bgcolor: 'rgba(239,83,80,0.1)',
-                  },
-                }}
-              >
-                {savingKey === `${row._id}:removeHead`
-                  ? 'Removing…'
-                  : 'Remove Caller Head'}
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={savingKey === `${row._id}:other`}
-                onClick={() => void updateOtherData(row._id)}
-                sx={actionBtnSx}
-              >
-                {savingKey === `${row._id}:other` ? 'Updating…' : 'Update Other Data'}
-              </Button>
+        width: 130,
+        cellSx: { whiteSpace: 'nowrap' },
+        render: (row) => {
+          if (row.block) {
+            return (
+              <Typography variant="caption" color="error.light">
+                Blocked
+              </Typography>
+            );
+          }
+          const headSaving = savingKey === `${row._id}:head`;
+          const removeSaving = savingKey === `${row._id}:removeHead`;
+          const otherSaving = savingKey === `${row._id}:other`;
+          return (
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+              <Tooltip title="Update Caller Head">
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label="Update Caller Head"
+                    disabled={headSaving}
+                    onClick={() => void updateCallerHead(row)}
+                    sx={actionIconBtnSx}
+                  >
+                    {headSaving ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <ManageAccountsOutlinedIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Remove Caller Head">
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label="Remove Caller Head"
+                    disabled={removeSaving}
+                    onClick={() => void removeCallerHead(row)}
+                    sx={removeIconBtnSx}
+                  >
+                    {removeSaving ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <PersonRemoveOutlinedIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Update Other Data">
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label="Update Other Data"
+                    disabled={otherSaving}
+                    onClick={() => void updateOtherData(row._id)}
+                    sx={actionIconBtnSx}
+                  >
+                    {otherSaving ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <EditNoteOutlinedIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Stack>
-          ),
+          );
+        },
       },
     ],
     [
@@ -547,22 +588,24 @@ export function CallerAllotmentPage() {
         </Button>
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => row._id}
-        loading={loading}
-        emptyMessage="No callers found"
-        stickyHeader
-        dense
-        minWidth={1500}
-        maxHeight="calc(100vh - 220px)"
-        getRowSx={(row) =>
-          row.block
-            ? { bgcolor: 'rgba(244,67,54,0.12)', '&:hover': { bgcolor: 'rgba(244,67,54,0.18)' } }
-            : undefined
-        }
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row._id}
+          loading={loading}
+          emptyMessage="No callers found"
+          stickyHeader
+          dense
+          minWidth={1500}
+          maxHeight="100%"
+          getRowSx={(row) =>
+            row.block
+              ? { bgcolor: 'rgba(244,67,54,0.12)', '&:hover': { bgcolor: 'rgba(244,67,54,0.18)' } }
+              : undefined
+          }
+        />
+      </TablePanel>
     </Box>
   );
 }

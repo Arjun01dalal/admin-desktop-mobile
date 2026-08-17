@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount } from '@/utils/dates';
 import { display } from '../shared';
 import { useRevealCodes } from '@/context/useRevealCodes';
@@ -75,16 +76,18 @@ export function PlayerRtpDetailsPage() {
         {toDisplayText('Players RTP Details')}
       </Typography>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => `${row.gameId || 'game'}-${index}`}
-        emptyMessage="No game data available"
-        stickyHeader
-        dense
-        minWidth={900}
-        maxHeight="calc(100vh - 220px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => `${row.gameId || 'game'}-${index}`}
+          emptyMessage="No game data available"
+          stickyHeader
+          dense
+          minWidth={900}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

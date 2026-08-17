@@ -17,6 +17,8 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
+import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { formatAmount, formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
@@ -457,12 +459,18 @@ export function CallerDepositListPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        {title} — {String(list?.subAdminName || empCode || '')}
-      </Typography>
+      {!isWithdrawal && !isUniquePending && (
+        <Typography variant="h5" fontWeight={700} mb={2}>
+          {title} — {String(list?.subAdminName || empCode || '')}
+        </Typography>
+      )}
 
       {(isWithdrawal || isUniquePending) && (
-        <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper', overflow: 'auto' }}>
+        <CollapsibleFilterPanel
+          title={`${title} — ${String(list?.subAdminName || empCode || '')}`}
+          summary={`${startDate} → ${endDate}`}
+          contentSx={{ overflow: 'auto' }}
+        >
           <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="nowrap">
             {isWithdrawal && (
               <>
@@ -642,28 +650,34 @@ export function CallerDepositListPage() {
               </Typography>
             </Stack>
           )}
-        </Paper>
+        </CollapsibleFilterPanel>
       )}
 
-      <CommonTable
-        columns={columns}
-        rows={depositRows}
-        getRowKey={(r, i) => String(r._id || r.orderId || i)}
-        loading={loading}
-        emptyMessage="No records"
-        minWidth={1100}
-      />
-
-      {(isWithdrawal || isUniquePending) && totalPages > 1 && (
-        <Stack alignItems="center" mt={2}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(_e, p) => setPage(p)}
-            color="primary"
-          />
-        </Stack>
-      )}
+      <TablePanel
+        footer={
+          (isWithdrawal || isUniquePending) && totalPages > 1 ? (
+            <>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(_e, p) => setPage(p)}
+                color="primary"
+              />
+            </>
+          ) : undefined
+        }
+        footerJustify="center"
+      >
+        <CommonTable
+          columns={columns}
+          rows={depositRows}
+          getRowKey={(r, i) => String(r._id || r.orderId || i)}
+          loading={loading}
+          emptyMessage="No records"
+          minWidth={1100}
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

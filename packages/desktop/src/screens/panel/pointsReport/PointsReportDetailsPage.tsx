@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { hasPermission } from '@/auth/permissions';
 import { appCodeForName } from '@/constants/clientNames';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
@@ -90,15 +91,17 @@ export function PointsReportDetailsPage() {
         Coins Reports Report
       </Typography>
 
-      <CommonTable
-        columns={columns}
-        rows={docs}
-        getRowKey={(row, index) => row._id || index}
-        emptyMessage="No documents found"
-        stickyHeader
-        dense
-        maxHeight="calc(100vh - 220px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={docs}
+          getRowKey={(row, index) => row._id || index}
+          emptyMessage="No documents found"
+          stickyHeader
+          dense
+          maxHeight="100%"
+        />
+      </TablePanel>
     </Box>
   );
 }

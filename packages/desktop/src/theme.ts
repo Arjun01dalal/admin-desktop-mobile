@@ -14,6 +14,9 @@ const shared: ThemeOptions = {
   typography: {
     // Fixed stack — never use system-ui so OS font settings do not change the panel.
     fontFamily: '"SF Pro Display", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    h5: {
+      fontSize: '1.125rem',
+    },
     button: {
       textTransform: 'none',
       fontWeight: 600,

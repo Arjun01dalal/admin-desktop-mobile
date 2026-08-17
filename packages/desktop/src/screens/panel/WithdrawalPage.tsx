@@ -6,6 +6,7 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -21,12 +22,17 @@ import { useTheme } from '@mui/material/styles';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import TuneIcon from '@mui/icons-material/Tune';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { useLocationController } from '@/controllers/LocationProvider';
@@ -37,6 +43,7 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
+import { logSheetDownload } from '@/utils/sheetDownloadAudit';
 import { copyToClipboard } from '@/utils/clipboard';
 import { asPaged, asList, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
@@ -127,6 +134,7 @@ function Copyable({ value, masked }: { value?: string; masked: string }) {
 
 /** Withdrawal — CommonTable UI + old panel action contracts (check/lock/status/bulk/bene). */
 export function WithdrawalPage() {
+  const navigate = useNavigate();
   const isLightMode = useTheme().palette.mode === 'light';
   const admin = getStoredUser<{
     _id?: string;
@@ -137,6 +145,7 @@ export function WithdrawalPage() {
   }>();
   const loc = useLocationController();
 
+  const canOpenUserReport = hasPermission('wallet_history');
   const canAct = hasPermission('withdrawals_button');
   const canReject = hasPermission('View_Reject') || canAct;
   const canReverse = hasPermission('View_Reverse') || canAct;
@@ -153,6 +162,7 @@ export function WithdrawalPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
   const [query, setQuery] = useState<QueryState>({
     startDate: today,
@@ -749,6 +759,18 @@ export function WithdrawalPage() {
       toast.warn('No data to export!');
       return;
     }
+    logSheetDownload(
+      {
+        mid: query.filters.mid || 'withdrawal',
+        type: 'Withdrawal Sheet',
+      },
+      {
+        lat: loc.coords?.latitude,
+        long: loc.coords?.longitude,
+        city: loc.address?.city || (loc.address as { city_district?: string } | null)?.city_district,
+        state: loc.address?.state,
+      },
+    );
     const data = rows.map((row, index) => ({
       'Sr No': index + 1,
       Date: row.createdOn ? formatDisplayDate(row.createdOn) : '',
@@ -778,13 +800,22 @@ export function WithdrawalPage() {
     a.download = `Withdrawal_Data_${Date.now()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [rows]);
+  }, [rows, query.filters.mid, loc.coords, loc.address]);
 
   const downloadYesBank = useCallback(() => {
     if (!rows.length) {
       toast.warn('No data to export!');
       return;
     }
+    logSheetDownload(
+      { mid: 'yesBank', type: 'Withdrawal Sheet' },
+      {
+        lat: loc.coords?.latitude,
+        long: loc.coords?.longitude,
+        city: loc.address?.city || (loc.address as { city_district?: string } | null)?.city_district,
+        state: loc.address?.state,
+      },
+    );
     const data = rows.map((row, index) => ({
       'Sr No': index + 1,
       Name: displayUserName(row),
@@ -808,13 +839,22 @@ export function WithdrawalPage() {
     a.download = `yes_bank_sheet_${Date.now()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [rows]);
+  }, [rows, loc.coords, loc.address]);
 
   const downloadPayOk = useCallback(() => {
     if (!rows.length) {
       toast.warn('No data to export!');
       return;
     }
+    logSheetDownload(
+      { mid: 'payok', type: 'Withdrawal Sheet' },
+      {
+        lat: loc.coords?.latitude,
+        long: loc.coords?.longitude,
+        city: loc.address?.city || (loc.address as { city_district?: string } | null)?.city_district,
+        state: loc.address?.state,
+      },
+    );
     const data = rows.map((row) => ({
       'Bank Name (IFSC)': row.ifscCode || '',
       'Bank Account': row.accountNo || '',
@@ -836,7 +876,7 @@ export function WithdrawalPage() {
     a.download = `pay_ok_sheet_${Date.now()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [rows]);
+  }, [rows, loc.coords, loc.address]);
 
   const toCallingItem = useCallback(
     (row: WithdrawalRow): UserRow => ({
@@ -1016,7 +1056,43 @@ export function WithdrawalPage() {
         width: 140,
         stickyLeft: true,
         filter: searchFilter('userName', 'User name'),
-        render: (row) => displayUserName(row),
+        render: (row) => {
+          const label = displayUserName(row);
+          // Withdrawal rows carry the user id in `dp_id` (same as Add Bene flow).
+          const userId = String(row.dp_id || row.userId || '').trim();
+          if (!canOpenUserReport || !userId || label === '—') return label;
+          return (
+            <Typography
+              component="button"
+              type="button"
+              title={label}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(
+                  `/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(
+                    row.userName || row.accountHolderName || label,
+                  )}`,
+                );
+              }}
+              sx={{
+                all: 'unset',
+                cursor: 'pointer',
+                // Row background styling sets `td { color: … !important }`
+                color: '#4fc3f7 !important',
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: 'underline',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                '&:hover': { color: '#81d4fa !important' },
+              }}
+            >
+              {label}
+            </Typography>
+          );
+        },
       },
       {
         id: 'sendToBank',
@@ -1470,6 +1546,7 @@ export function WithdrawalPage() {
     canReverse,
     canWhatsApp,
     canDelay,
+    canOpenUserReport,
     hideContact,
     busyId,
     selectedIds,
@@ -1485,6 +1562,7 @@ export function WithdrawalPage() {
     toggleSelect,
     renderCheckCell,
     setDelayReason,
+    navigate,
   ]);
 
   const getRowSx = useCallback(
@@ -1515,13 +1593,93 @@ export function WithdrawalPage() {
   );
 
   return (
-    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
-        Withdrawal
-      </Typography>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        px: 1.5,
+        py: 1,
+      }}
+    >
+      <Box
+        sx={{
+          ...toolbarBoxSx,
+          flexShrink: 0,
+          mb: 1,
+          p: 0,
+          overflow: 'hidden',
+        }}
+      >
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            gap={1}
+            onClick={() => setFiltersOpen((open) => !open)}
+            sx={{
+              minHeight: 44,
+              px: 1.5,
+              py: 0.75,
+              cursor: 'pointer',
+              userSelect: 'none',
+              borderBottom: filtersOpen ? '1px solid' : 'none',
+              borderColor: 'divider',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+              <TuneIcon sx={{ color: '#ff9f0a', fontSize: 20 }} />
+              <Typography variant="subtitle2" fontWeight={800}>
+                Withdrawal
+              </Typography>
+              {!filtersOpen ? (
+                <>
+                  <Chip
+                    size="small"
+                    label={`${startDate} → ${endDate}`}
+                    variant="outlined"
+                    sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
+                  />
+                  <Chip
+                    size="small"
+                    label={`${itemsPerPage} / page`}
+                    sx={{
+                      display: { xs: 'none', sm: 'inline-flex' },
+                      height: 24,
+                      fontWeight: 700,
+                      color: '#c77a18',
+                      bgcolor: 'rgba(255,159,10,0.12)',
+                    }}
+                  />
+                </>
+              ) : null}
+            </Stack>
+            <IconButton
+              size="small"
+              aria-label={filtersOpen ? 'Collapse filters' : 'Expand filters'}
+              onClick={(event) => {
+                event.stopPropagation();
+                setFiltersOpen((open) => !open);
+              }}
+            >
+              {filtersOpen ? (
+                <ExpandLessIcon fontSize="small" />
+              ) : (
+                <ExpandMoreIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Stack>
 
-      <Box sx={toolbarBoxSx}>
-        <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1.25} alignItems="center">
+          <Collapse in={filtersOpen} timeout="auto" unmountOnExit>
+            <Box sx={{ p: 1.5 }}>
+              <Stack
+                direction="row"
+                flexWrap="wrap"
+                useFlexGap
+                spacing={1.25}
+                alignItems="center"
+              >
           <TextField
             size="small"
             type="date"
@@ -1593,17 +1751,17 @@ export function WithdrawalPage() {
               </Button>
             </>
           ) : null}
-        </Stack>
+              </Stack>
 
-        {canAct ? (
-          <Stack
-            direction="row"
-            flexWrap="wrap"
-            useFlexGap
-            spacing={1}
-            alignItems="center"
-            sx={{ mt: 1.25 }}
-          >
+              {canAct ? (
+                <Stack
+                  direction="row"
+                  flexWrap="wrap"
+                  useFlexGap
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ mt: 1.25 }}
+                >
             <Typography variant="caption" color="text.secondary">
               Selected: {selectedIds.length}
             </Typography>
@@ -1661,11 +1819,20 @@ export function WithdrawalPage() {
               Add Bene List
             </Button>
             {bulkBusy ? <CircularProgress size={16} sx={{ color: '#ff9f0a' }} /> : null}
-          </Stack>
-        ) : null}
-      </Box>
+                </Stack>
+              ) : null}
+            </Box>
+          </Collapse>
+        </Box>
 
-      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap mb={1.5}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+        sx={{ mb: 1, flexShrink: 0 }}
+      >
         <Chip
           label={withdrawalStatLabel(
             'Approved',
@@ -1717,32 +1884,36 @@ export function WithdrawalPage() {
         {summaryLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || orderIdOf(row) || index}
-        loading={loading}
-        emptyMessage="No withdrawals found"
-        stickyHeader
-        dense
-        virtualize={false}
-        minWidth={3000}
-        maxHeight="calc(100vh - 360px)"
-        getRowSx={getRowSx}
-      />
-
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
-        <Typography variant="body2" color="text.secondary">
-          Total: {total}
-        </Typography>
-        <Pagination
-          count={Math.max(1, totalPages)}
-          page={page}
-          onChange={(_e, p) => setPage(p)}
-          color="primary"
-          disabled={loading}
+      <TablePanel
+        footer={
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Total: {total}
+            </Typography>
+            <Pagination
+              count={Math.max(1, totalPages)}
+              page={page}
+              onChange={(_e, p) => setPage(p)}
+              color="primary"
+              disabled={loading}
+            />
+          </>
+        }
+      >
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || orderIdOf(row) || index}
+          loading={loading}
+          emptyMessage="No withdrawals found"
+          stickyHeader
+          dense
+          virtualize
+          minWidth={3000}
+          maxHeight="100%"
+          getRowSx={getRowSx}
         />
-      </Stack>
+      </TablePanel>
 
       <ActionDialog
         open={actionOpen}

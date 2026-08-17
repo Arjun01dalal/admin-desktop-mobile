@@ -1,9 +1,17 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import TuneIcon from '@mui/icons-material/Tune';
 import {
+  Box,
   Button,
   Checkbox,
+  Chip,
   CircularProgress,
+  Collapse,
   FormControlLabel,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
@@ -15,7 +23,7 @@ import { CAMPAIGN_LIST } from '@/screens/panel/newRegisters/campaignList';
 import { PLAY_IN_OPTIONS, type UserType } from './constants';
 import { USERS_PAGE_SIZE_OPTIONS } from './toolbarHelpers';
 
-const fieldSx = { minWidth: 130, flex: '1 1 130px' };
+const fieldSx = { minWidth: 145, flex: '1 1 145px' };
 
 const orangeBtnSx = {
   bgcolor: '#f1a144',
@@ -23,15 +31,30 @@ const orangeBtnSx = {
   fontWeight: 700,
   textTransform: 'uppercase' as const,
   boxShadow: 'none',
-  px: 1.5,
+  px: 1.75,
   py: 0.75,
-  fontSize: 12,
+  fontSize: 11.5,
+  borderRadius: 1.5,
   whiteSpace: 'nowrap' as const,
   '&:hover': { bgcolor: '#e09030', boxShadow: 'none' },
   '&.Mui-disabled': { bgcolor: '#f7d2a8', color: '#666' },
 };
 
+const secondaryBtnSx = {
+  ...orangeBtnSx,
+  bgcolor: 'transparent',
+  color: 'text.secondary',
+  border: '1px solid',
+  borderColor: 'divider',
+  '&:hover': {
+    bgcolor: 'action.hover',
+    borderColor: '#f1a144',
+    boxShadow: 'none',
+  },
+};
+
 export type UsersToolbarProps = {
+  title?: string;
   startDate: string;
   endDate: string;
   userType: UserType;
@@ -61,6 +84,7 @@ export type UsersToolbarProps = {
   onEndDate: (v: string) => void;
   onClearDates: () => void;
   onApply: () => void;
+  onRefresh: () => void;
   onUserType: (v: UserType) => void;
   onItemsPerPage: (v: number) => void;
   onUniqueUser: (v: boolean) => void;
@@ -79,14 +103,120 @@ export type UsersToolbarProps = {
 
 /** Laxminarayan Users toolbar layout (dates → type → bot/dialer → create). */
 export function UsersToolbar(props: UsersToolbarProps) {
+  // Keep the table prominent on initial load; controls remain one click away.
+  const [open, setOpen] = useState(false);
   const campaignOptions = useMemo(
     () => CAMPAIGN_LIST.map((c) => ({ value: c.id.trim(), label: c.id.trim() })),
     [],
   );
 
   return (
-    <Stack spacing={1.5} sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, mb: 2 }}>
-      <Stack direction="row" spacing={1.25} alignItems="flex-end" flexWrap="wrap" useFlexGap>
+    <Box
+      sx={{
+        mb: 0,
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+        overflow: 'hidden',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+      }}
+    >
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={1}
+        onClick={() => setOpen((value) => !value)}
+        sx={{
+          minHeight: 44,
+          px: 1.5,
+          py: 0.75,
+          cursor: 'pointer',
+          userSelect: 'none',
+          borderBottom: open ? '1px solid' : 'none',
+          borderColor: 'divider',
+          '&:hover': { bgcolor: 'action.hover' },
+        }}
+      >
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+          <TuneIcon sx={{ color: '#f1a144', fontSize: 20 }} />
+          <Typography variant="subtitle2" fontWeight={800}>
+            {props.title || 'Filters & Actions'}
+          </Typography>
+          <Chip
+            size="small"
+            label={`${props.total.toLocaleString()} users`}
+            sx={{
+              height: 24,
+              fontWeight: 700,
+              color: '#c77a18',
+              bgcolor: 'rgba(241,161,68,0.12)',
+              border: '1px solid rgba(241,161,68,0.35)',
+            }}
+          />
+          {!open && props.userType ? (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={props.typeOptions.find((option) => option.value === props.userType)?.label}
+              sx={{ display: { xs: 'none', sm: 'inline-flex' }, height: 24 }}
+            />
+          ) : null}
+        </Stack>
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={
+              props.loading ? (
+                <CircularProgress size={12} color="inherit" />
+              ) : (
+                <RefreshIcon sx={{ fontSize: 16 }} />
+              )
+            }
+            disabled={props.loading}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onRefresh();
+            }}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 700,
+              py: 0.25,
+              px: 1,
+              minWidth: 0,
+              color: '#c77a18',
+              borderColor: '#f1a144',
+              bgcolor: 'rgba(241,161,68,0.10)',
+              '&:hover': {
+                borderColor: '#e09030',
+                bgcolor: 'rgba(241,161,68,0.2)',
+              },
+            }}
+          >
+            Refresh
+          </Button>
+          <IconButton
+            size="small"
+            aria-label={open ? 'Collapse filters and actions' : 'Expand filters and actions'}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpen((value) => !value);
+            }}
+          >
+            {open ? (
+              <ExpandLessIcon fontSize="small" />
+            ) : (
+              <ExpandMoreIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Stack>
+      </Stack>
+
+      <Collapse in={open} timeout="auto" unmountOnExit>
+        <Stack spacing={1.25} sx={{ p: 1.5 }}>
+          <Stack direction="row" spacing={1} alignItems="flex-end" flexWrap="wrap" useFlexGap>
         {props.showDates !== false && (
           <>
             <TextField
@@ -112,7 +242,7 @@ export function UsersToolbar(props: UsersToolbarProps) {
             </Button>
           </>
         )}
-        <Button sx={orangeBtnSx} onClick={props.onClearDates}>
+        <Button sx={secondaryBtnSx} onClick={props.onClearDates}>
           Clear Dates
         </Button>
         <TextField
@@ -173,9 +303,16 @@ export function UsersToolbar(props: UsersToolbarProps) {
           ))}
         </TextField>
         {props.loading && <CircularProgress size={22} />}
-      </Stack>
+          </Stack>
 
-      <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ py: 0.25 }}
+          >
         {!props.isCaller && (
           <FormControlLabel
             control={
@@ -241,20 +378,21 @@ export function UsersToolbar(props: UsersToolbarProps) {
             Add to Bot{props.dialerCount != null ? ` (${props.dialerCount})` : ''}
           </Button>
         )}
-      </Stack>
+          </Stack>
 
-      <Stack
-        direction="row"
-        spacing={1.5}
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        sx={{
-          pt: 0.5,
-          mt: 0.5,
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-        }}
-      >
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            sx={{
+              pt: 1.25,
+              mt: 0.25,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
         {props.canAddUserData && (
           <Button sx={orangeBtnSx} onClick={props.onAddUserData}>
             Add User Data
@@ -281,12 +419,22 @@ export function UsersToolbar(props: UsersToolbarProps) {
           </Button>
         )}
         <Typography
-          variant="body1"
-          sx={{ ml: 'auto', fontWeight: 700, color: 'text.primary' }}
+          variant="body2"
+          sx={{
+            ml: 'auto',
+            px: 1.25,
+            py: 0.65,
+            borderRadius: 1.5,
+            fontWeight: 800,
+            color: 'text.primary',
+            bgcolor: 'action.hover',
+          }}
         >
-          Total user count : {props.total}
+          Total users: {props.total.toLocaleString()}
         </Typography>
-      </Stack>
-    </Stack>
+          </Stack>
+        </Stack>
+      </Collapse>
+    </Box>
   );
 }

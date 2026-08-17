@@ -20,6 +20,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { TablePanel } from '@/components/TablePanel';
 import { formatAmount } from '@/utils/dates';
 import { asList, useReportQuery } from '@/screens/panel/shared';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -281,17 +282,19 @@ export function PercentagePage() {
         </Stack>
       </Stack>
 
-      <CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, index) => row._id || row.type || index}
-        loading={loading}
-        emptyMessage="No percentage records found"
-        stickyHeader
-        dense
-        minWidth={900}
-        maxHeight="calc(100vh - 220px)"
-      />
+      <TablePanel>
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, index) => row._id || row.type || index}
+          loading={loading}
+          emptyMessage="No percentage records found"
+          stickyHeader
+          dense
+          minWidth={900}
+          maxHeight="100%"
+        />
+      </TablePanel>
 
       <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
         <form onSubmit={submitForm}>

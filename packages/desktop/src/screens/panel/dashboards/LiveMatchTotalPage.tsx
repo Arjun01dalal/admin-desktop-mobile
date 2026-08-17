@@ -545,7 +545,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         alignItems="center"
         flexWrap="nowrap"
         mb={2}
-        sx={{ overflowX: 'auto', pb: 0.5 }}
+        sx={{ overflowX: 'auto', pt: 1, pb: 0.5 }}
       >
         <TextField
           label="From Date"
