@@ -22,6 +22,7 @@ import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { display, useReportQuery } from '@/screens/panel/shared';
@@ -244,6 +245,7 @@ export function IncomingBotCallPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
   const [summaryCall, setSummaryCall] = useState<IncomingCall | null>(null);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
   const buildPayload = useCallback(
     () => ({ since: startOfDayUtc(sinceDate) }),
@@ -390,9 +392,7 @@ export function IncomingBotCallPage() {
                 <Tooltip title="Play Recording">
                   <IconButton
                     size="small"
-                    onClick={() =>
-                      window.open(row.recording_url!, '_blank', 'noopener,noreferrer')
-                    }
+                    onClick={() => setRecordingUrl(row.recording_url!)}
                     sx={{ color: '#ff9f0a' }}
                   >
                     <PlayArrowOutlinedIcon fontSize="small" />
@@ -460,6 +460,11 @@ export function IncomingBotCallPage() {
         maxHeight="100%"
       />
       </TablePanel>
+
+      <RecordingPlayerDialog
+        url={recordingUrl}
+        onClose={() => setRecordingUrl(null)}
+      />
 
       <Dialog
         open={summaryOpen}

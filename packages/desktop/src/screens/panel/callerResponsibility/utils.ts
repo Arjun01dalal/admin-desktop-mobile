@@ -42,6 +42,21 @@ export function displayName(value: unknown, empty = '-'): string {
   return s;
 }
 
+/** Match laxmi caller-head assignment (array or comma/pipe-separated names). */
+export function matchesCallerHeadName(value: unknown, name: unknown): boolean {
+  const expected = String(name ?? '').trim().toLowerCase();
+  if (!expected || value == null) return false;
+
+  const assigned = Array.isArray(value)
+    ? value
+    : String(value).split(/[,|]/);
+
+  return assigned.some((entry) => {
+    const normalized = String(entry ?? '').trim().toLowerCase();
+    return normalized !== 'not assigned' && normalized === expected;
+  });
+}
+
 /** Look up minutes for the page startDate inside inactiveTime/activeTime arrays. */
 export function minutesForDate(data: unknown, startDate: string): string {
   if (!Array.isArray(data)) return '-';

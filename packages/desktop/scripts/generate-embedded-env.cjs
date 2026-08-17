@@ -20,7 +20,14 @@ const ENV_PATH = path.join(ROOT, '.env');
 const OUT_PATH = path.join(ROOT, 'electron', 'env.generated.cjs');
 
 const REQUIRED = ['API_BASE_URL', 'ENTK_VALUE'];
-const OPTIONAL = ['MOBILE_CDN_BASE', 'GH_UPDATE_TOKEN', 'SOS_PUSH_TOPIC', 'SOS_PUSH_SERVER'];
+const OPTIONAL = [
+  'MOBILE_CDN_BASE',
+  'GH_UPDATE_TOKEN',
+  'SOS_PUSH_TOPIC',
+  'SOS_PUSH_SERVER',
+  'RECORDING_BASIC_AUTH_USERNAME',
+  'RECORDING_BASIC_AUTH_PASSWORD',
+];
 
 if (!fs.existsSync(ENV_PATH)) {
   console.error('generate-embedded-env: .env not found. Copy .env.example to .env and fill it in.');

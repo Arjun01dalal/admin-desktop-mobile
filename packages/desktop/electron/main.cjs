@@ -3,7 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { autoUpdater } = require('electron-updater');
-const { useViteDevServer, getGhUpdateToken } = require('./config.cjs');
+const { useViteDevServer, getGhUpdateToken, optionalEnv } = require('./config.cjs');
 const { enforceSessionHttpsOnly, isBlockedCleartext } = require('./httpsOnly.cjs');
 const { installMainErrorMonitor, report: reportError } = require('./errorMonitor.cjs');
 const tokenVault = require('./tokenVault.cjs');
@@ -34,6 +34,16 @@ protocol.registerSchemesAsPrivileged([
       stream: true,
     },
   },
+  {
+    scheme: 'astro-recording',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
 ]);
 
 // Portrait phone-like window for Login
@@ -45,6 +55,11 @@ const ASTRO_SITE_URL = 'https://astrotalk.vip/';
 const SITE_LOGIN_BAR_HEIGHT = 56;
 
 const DIST_DIR = path.join(__dirname, '..', 'dist');
+
+const RECORDING_CACHE_MAX_ENTRIES = 4;
+const RECORDING_CACHE_TTL_MS = 5 * 60 * 1000;
+/** url -> { body: Buffer, type: string, at: number } */
+const recordingCache = new Map();
 
 let tray = null;
 /** When true, window close actually quits (tray Quit / before-quit). */
@@ -170,6 +185,117 @@ function createTray() {
   }
 }
 
+const RECORDING_AUDIO_TYPES = {
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.mp4': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.webm': 'audio/webm',
+  '.flac': 'audio/flac',
+};
+
+function recordingContentType(targetUrl, upstreamType) {
+  const upstream = String(upstreamType || '').split(';')[0].trim().toLowerCase();
+  if (upstream.startsWith('audio/') || upstream.startsWith('video/')) return upstream;
+  try {
+    const ext = path.extname(new URL(targetUrl).pathname).toLowerCase();
+    if (RECORDING_AUDIO_TYPES[ext]) return RECORDING_AUDIO_TYPES[ext];
+  } catch {
+    // fall through to default
+  }
+  return 'audio/mpeg';
+}
+
+/**
+ * Recordings must be fully buffered before they reach the media element:
+ * the upstream server streams without Content-Length, and Chromium reports
+ * duration 00:00 for media whose total size it cannot determine.
+ */
+async function loadRecording(targetUrl) {
+  const cached = recordingCache.get(targetUrl);
+  if (cached && Date.now() - cached.at < RECORDING_CACHE_TTL_MS) {
+    return cached;
+  }
+  recordingCache.delete(targetUrl);
+
+  const headers = new Headers({ Accept: 'audio/*,*/*;q=0.8' });
+  const username = optionalEnv('RECORDING_BASIC_AUTH_USERNAME');
+  const password = optionalEnv('RECORDING_BASIC_AUTH_PASSWORD');
+  if (username && password) {
+    headers.set(
+      'Authorization',
+      `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`,
+    );
+  }
+
+  const res = await net.fetch(targetUrl, { headers });
+  if (!res.ok) {
+    return {
+      error:
+        res.status === 401 || res.status === 403
+          ? 'Recording server rejected the credentials'
+          : `Recording server returned ${res.status}`,
+      status: res.status,
+    };
+  }
+
+  const body = Buffer.from(await res.arrayBuffer());
+  if (!body.length) {
+    return { error: 'Recording is empty', status: 502 };
+  }
+
+  const entry = {
+    body,
+    type: recordingContentType(targetUrl, res.headers.get('content-type')),
+    at: Date.now(),
+  };
+  recordingCache.set(targetUrl, entry);
+  while (recordingCache.size > RECORDING_CACHE_MAX_ENTRIES) {
+    recordingCache.delete(recordingCache.keys().next().value);
+  }
+  return entry;
+}
+
+/** Serve the buffered recording, honouring the media element's Range probes. */
+function buildRecordingResponse(entry, rangeHeader) {
+  const total = entry.body.length;
+  const baseHeaders = {
+    'Content-Type': entry.type,
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'no-store',
+  };
+
+  const match = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
+  if (match && (match[1] || match[2])) {
+    const start = match[1] ? Number(match[1]) : Math.max(0, total - Number(match[2]));
+    const end = match[1] && match[2] ? Math.min(Number(match[2]), total - 1) : total - 1;
+    if (!Number.isFinite(start) || start > end || start >= total) {
+      return new Response(null, {
+        status: 416,
+        headers: { ...baseHeaders, 'Content-Range': `bytes */${total}` },
+      });
+    }
+    const chunk = entry.body.subarray(start, end + 1);
+    return new Response(chunk, {
+      status: 206,
+      headers: {
+        ...baseHeaders,
+        'Content-Length': String(chunk.length),
+        'Content-Range': `bytes ${start}-${end}/${total}`,
+      },
+    });
+  }
+
+  return new Response(entry.body, {
+    status: 200,
+    headers: { ...baseHeaders, 'Content-Length': String(total) },
+  });
+}
+
 function registerAppProtocol() {
   protocol.handle('app', (request) => {
     const { pathname } = new URL(request.url);
@@ -186,6 +312,26 @@ function registerAppProtocol() {
     }
 
     return net.fetch(pathToFileURL(fullPath).toString());
+  });
+
+  protocol.handle('astro-recording', async (request) => {
+    try {
+      const requestUrl = new URL(request.url);
+      const encodedTarget = requestUrl.pathname.replace(/^\/+/, '');
+      const targetUrl = new URL(decodeURIComponent(encodedTarget));
+      if (targetUrl.protocol !== 'https:') {
+        return new Response('Only HTTPS recordings are allowed', { status: 400 });
+      }
+
+      const loaded = await loadRecording(targetUrl.toString());
+      if (loaded.error) {
+        return new Response(loaded.error, { status: loaded.status || 502 });
+      }
+      return buildRecordingResponse(loaded, request.headers.get('range'));
+    } catch (error) {
+      reportError('recording:proxy', error);
+      return new Response('Recording could not be loaded', { status: 502 });
+    }
   });
 }
 

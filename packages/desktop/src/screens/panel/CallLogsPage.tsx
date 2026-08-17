@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { todayIST, getStoredUser } from '@/utils/dates';
 import { CommonTable } from '@/components/CommonTable';
+import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
 import { TablePanel } from '@/components/TablePanel';
 import { COMMENT_FILTER_OPTIONS } from './callLogs/constants';
 import { CallLogsToolbar } from './callLogs/CallLogsToolbar';
@@ -240,6 +241,7 @@ function CallLogsPageBody({
   const [commentDropdown, setCommentDropdown] = useState('');
   const [commentText, setCommentText] = useState('');
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
   const summaryRows = useMemo(
     () => buildCallRecordRows(summaryData),
@@ -280,6 +282,7 @@ function CallLogsPageBody({
     onViewSummary,
     onConnectDialer: connectDialer,
     onOpenComment: openComment,
+    onPlayRecording: setRecordingUrl,
   });
 
   const filtersValue = useMemo(
@@ -407,6 +410,11 @@ function CallLogsPageBody({
           />
         </CallLogsFiltersProvider>
       </TablePanel>
+
+      <RecordingPlayerDialog
+        url={recordingUrl}
+        onClose={() => setRecordingUrl(null)}
+      />
 
       <Dialog
         open={!isCaller && pauseOpen}

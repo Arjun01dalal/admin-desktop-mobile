@@ -60,6 +60,16 @@ contextBridge.exposeInMainWorld('gcalc', {
   getIpLocation: () => safeInvoke('auth:get-ip-location'),
   openLocationSettings: () => safeInvoke('gcalc:open-location-settings'),
   copyText: (text) => safeInvoke('gcalc:copy-text', String(text ?? '')),
+  recordingUrl: (url) => {
+    try {
+      const parsed = new URL(String(url || ''));
+      if (parsed.protocol === 'http:') parsed.protocol = 'https:';
+      if (parsed.protocol !== 'https:') return '';
+      return `astro-recording://media/${encodeURIComponent(parsed.toString())}`;
+    } catch {
+      return '';
+    }
+  },
 
   /** OS-encrypted session token (Electron safeStorage in main). */
   getSessionToken: () => safeInvoke('auth:get-session-token'),

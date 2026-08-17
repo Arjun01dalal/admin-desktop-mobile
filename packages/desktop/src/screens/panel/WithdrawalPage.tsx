@@ -102,6 +102,7 @@ import { BeneficiarySelect } from '@/screens/panel/withdrawal/BeneficiarySelect'
 
 const CLIENT_NAME_OPTIONS = ['', ...CLIENT_NAMES];
 const STATE_OPTIONS = ['', ...INDIA_STATES];
+const BOT_CHECK_HIDDEN_STATUSES = new Set(['Cancel', 'Rejected', 'Reverse', 'Failed']);
 
 function personCell(text: string, date?: string) {
   return (
@@ -1302,11 +1303,16 @@ export function WithdrawalPage() {
         label: 'Check By Bot',
         width: 120,
         render: (row) => {
+          // Laxmi hides bot check once a withdrawal reaches these statuses.
+          if (BOT_CHECK_HIDDEN_STATUSES.has(String(row.status || ''))) return null;
           if (!row.validationCheckedAt) return '—';
           return (
             <Stack spacing={0.5} alignItems="center">
               <Typography variant="body2" sx={{ fontSize: 11 }}>
-                {row.passedPoints ?? 0}/{row.totalPoints ?? '—'}
+                {formatDisplayDate(row.validationCheckedAt)}{' '}
+                {formatDisplayTime(row.validationCheckedAt)}
+                <br />
+                Pass Points:- {row.passedPoints ?? 0}/{row.totalPoints ?? '—'}
               </Typography>
               <Button
                 size="small"

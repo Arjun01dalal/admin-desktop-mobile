@@ -84,6 +84,8 @@ export type GCalcApi = {
   getIpLocation: () => Promise<IpLocationResult>;
   openLocationSettings: () => Promise<{ ok: boolean }>;
   copyText: (text: string) => Promise<{ ok: boolean }>;
+  /** Convert an HTTPS recording into an authenticated in-app stream URL. */
+  recordingUrl: (url: string) => string;
   /** OS-encrypted session token vault (main process safeStorage). */
   getSessionToken: () => Promise<{
     ok: boolean;

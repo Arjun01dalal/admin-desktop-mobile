@@ -12,6 +12,7 @@ export type DelayReason = {
   date?: string;
 };
 
+/** Row of `validationResults` from getAllTransaction (laxmi ValidationModal). */
 export type ValidationItem = {
   _id?: string;
   point?: string | number;

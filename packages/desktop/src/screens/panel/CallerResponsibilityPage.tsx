@@ -32,6 +32,7 @@ import {
   displayName,
   ecs,
   filterCallerRows,
+  matchesCallerHeadName,
   minutesForDate,
   pnl,
   roleFlags,
@@ -64,6 +65,8 @@ export function CallerResponsibilityPage() {
   const showTotalDeposit = canSeeTotalDeposit(user);
   const showCallerHead = !isCallerOrHead || isFullAllotment;
   const showLocation = !isCaller || isFullAllotment;
+  const showOfficeSummary = showTotalDeposit && showLocation;
+  const showAssignedCallerTotal = isCallerHead && !showOfficeSummary;
 
   const [startDate, setStartDate] = useState(
     () =>
@@ -134,9 +137,17 @@ export function CallerResponsibilityPage() {
         const byEmp = Array.isArray(data.byEmpCode)
           ? (data.byEmpCode as CallerRow[])
           : [];
-        setCallerRows(
-          filterCallerRows(byEmp, user, isCaller, showTotalDeposit),
+        const visibleRows = filterCallerRows(
+          byEmp,
+          user,
+          isCaller,
+          showTotalDeposit,
+        ).filter(
+          (row) =>
+            !isCallerHead ||
+            matchesCallerHeadName(row.callerHead, user?.name),
         );
+        setCallerRows(visibleRows);
         setLocationRows(
           Array.isArray(data.byOfficeLocation)
             ? (data.byOfficeLocation as CallerRow[])
@@ -193,6 +204,38 @@ export function CallerResponsibilityPage() {
     ],
     [isCallerOrHead, summary, payload, displayedBotCount],
   );
+
+  /** Caller-head totals from their assigned caller rows (when office summary is hidden). */
+  const assignedCallerTotals = useMemo(() => {
+    let deposit = 0;
+    let refundApproved = 0;
+    let refundPending = 0;
+    let txnCount = 0;
+    let activeCustomers = 0;
+    let refundApprovedCount = 0;
+    let refundPendingCount = 0;
+
+    for (const row of callerRows) {
+      deposit += Number(row.totalDeposit) || 0;
+      refundApproved += Number(row.withdrawalApprovedAmount) || 0;
+      refundPending += Number(row.withdrawalPendingAmount) || 0;
+      txnCount += Number(row.transactionCount) || 0;
+      activeCustomers += Number(row.activeUserCount) || 0;
+      refundApprovedCount += Number(row.withdrawalApprovedCount) || 0;
+      refundPendingCount += Number(row.withdrawalPendingCount) || 0;
+    }
+
+    return {
+      assignedCallers: callerRows.length,
+      totalDeposit: deposit,
+      withdrawalApprovedAmount: refundApproved,
+      withdrawalPendingAmount: refundPending,
+      transactionCount: txnCount,
+      activeUserCount: activeCustomers,
+      withdrawalApprovedCount: refundApprovedCount,
+      withdrawalPendingCount: refundPendingCount,
+    };
+  }, [callerRows]);
 
   const summaryColumns = useMemo<CommonTableColumn<(typeof summaryRow)[0]>[]>(
     () => {
@@ -729,7 +772,73 @@ export function CallerResponsibilityPage() {
         </Box>
       )}
 
-      {showTotalDeposit && showLocation && (
+      {showAssignedCallerTotal && (
+        <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
+          <Typography variant="h6" fontWeight={700} mb={1} sx={{ fontSize: '0.95rem' }}>
+            Assigned Caller Summary
+          </Typography>
+          <CommonTable
+            columns={[
+              {
+                id: 'assignedCallers',
+                label: "Total Assigned Caller's",
+                render: (r) => cellText(r.assignedCallers),
+              },
+              {
+                id: 'deposit',
+                label: 'Total Deposit',
+                render: (r) => roundAmt(r.totalDeposit),
+              },
+              {
+                id: 'wAppAmt',
+                label: 'Total Refund\nApproved Amount',
+                headSx: twoLineHeadSx,
+                render: (r) => roundAmt(r.withdrawalApprovedAmount),
+              },
+              {
+                id: 'pnl',
+                label: 'PNL',
+                render: (r) =>
+                  pnl(r.totalDeposit, r.withdrawalApprovedAmount),
+              },
+              {
+                id: 'wPendAmt',
+                label: 'Total Refund\nPending Amount',
+                headSx: twoLineHeadSx,
+                render: (r) => roundAmt(r.withdrawalPendingAmount),
+              },
+              {
+                id: 'txn',
+                label: 'Transaction Count',
+                render: (r) => cellText(r.transactionCount),
+              },
+              {
+                id: 'active',
+                label: 'Active Customers',
+                render: (r) => cellText(r.activeUserCount),
+              },
+              {
+                id: 'wAppCnt',
+                label: 'Refund Approved\nCount',
+                headSx: twoLineHeadSx,
+                render: (r) => cellText(r.withdrawalApprovedCount),
+              },
+              {
+                id: 'wPendCnt',
+                label: 'Refund Pending\nCount',
+                headSx: twoLineHeadSx,
+                render: (r) => cellText(r.withdrawalPendingCount),
+              },
+            ]}
+            rows={[assignedCallerTotals]}
+            getRowKey={() => 'assigned-callers'}
+            loading={loading}
+            emptyMessage="No assigned callers"
+          />
+        </Box>
+      )}
+
+      {showOfficeSummary && (
         <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
           <Typography variant="h6" fontWeight={700} mb={1} sx={{ fontSize: '0.95rem' }}>
             By Office Location
