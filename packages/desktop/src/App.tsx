@@ -186,6 +186,7 @@ const IncomingBotCallPage = lazyNamed(
   () => import('@/screens/panel/IncomingBotCallPage'),
   'IncomingBotCallPage',
 );
+const SkyTalkPage = lazyNamed(() => import('@/screens/panel/SkyTalkPage'), 'SkyTalkPage');
 const RolesResponsibilitiesPage = lazyNamed(
   () => import('@/screens/panel/RolesResponsibilitiesPage'),
   'RolesResponsibilitiesPage',
@@ -816,6 +817,7 @@ function AppInner() {
                   <Route path="/botData" element={<BotDataPage />} />
                   <Route path="/botPerformance" element={<BotPerformancePage />} />
                   <Route path="/incoming-bot-call" element={<IncomingBotCallPage />} />
+                  <Route path="/sky-talk" element={<SkyTalkPage />} />
                   <Route
                     path="/roles-responsibilities"
                     element={<RolesResponsibilitiesPage />}

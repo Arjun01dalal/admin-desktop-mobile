@@ -80,6 +80,7 @@ export const Permissions = {
   bot_data_upload: 'bot_data_upload',
   bot_performance: 'bot_performance',
   show_incoming_bot: 'show_incoming_bot',
+  view_live_chat: 'view_live_chat',
   View_Roles_and_Responsibilities: 'View_Roles_and_Responsibilities',
   Edit_Role: 'Edit_Role',
   Delete_Role: 'Delete_Role',
