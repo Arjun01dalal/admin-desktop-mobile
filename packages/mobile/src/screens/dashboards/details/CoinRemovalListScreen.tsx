@@ -1,13 +1,11 @@
 /**
  * Coin Removal List — port of desktop CoinRemovalPage + CoinRemovalDetailsPage.
- * users.coinRemovalUsers { itemsPerPage, pageNo, startDate, endDate }; tap a row to see
- * all fields, then open its transactions (users.getTransactionHistory, type 'coin').
+ * users.coinRemovalUsers; card tap → details / transactions (users.getTransactionHistory).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -38,12 +36,15 @@ type Txn = {
 };
 
 const PAGE_SIZE = 25;
-const MAIN_KEYS = new Set(['name', 'totalBalance', 'totalTransactions']);
-const TXN_MAIN_KEYS = new Set(['idx', 'balance', 'tag', 'time']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
+}
+
+function formatTs(ts?: string): string {
+  if (!ts) return '—';
+  return `${formatDisplayDate(ts)} ${formatDisplayTime(ts)}`;
 }
 
 export function CoinRemovalListScreen() {
@@ -135,61 +136,36 @@ export function CoinRemovalListScreen() {
     void loadTxns();
   }, [loadTxns]);
 
-  const columns = useMemo<DataTableColumn<Row>[]>(
-    () => [
-      { key: 'name', label: 'Name', width: 140, render: (r) => display(r.name) },
-      { key: 'id', label: 'Id', width: 150, render: (r) => display(r._id) },
-      { key: 'city', label: 'City', width: 110, render: (r) => display(r.city) },
-      { key: 'state', label: 'State', width: 110, render: (r) => display(r.state) },
-      {
-        key: 'totalBalance',
-        label: 'Total Coin Pulled',
-        width: 120,
-        align: 'center',
-        render: (r) => floorNum(r.totalBalance ?? 0).toLocaleString('en-IN'),
-      },
-      {
-        key: 'totalTransactions',
-        label: 'Total Transactions',
-        width: 130,
-        align: 'center',
-        render: (r) => String(r.totalTransactions ?? 0),
-      },
-    ],
-    [],
-  );
+  const openTransactions = useCallback((row: Row) => {
+    txnGenRef.current += 1;
+    setTxns([]);
+    setDetailUser(row);
+    setTxnPage(1);
+    setSheetRow(null);
+  }, []);
 
-  const txnColumns = useMemo<DataTableColumn<Txn>[]>(
-    () => [
-      {
-        key: 'idx',
-        label: '#',
-        width: 44,
-        render: (_t, i) => String((txnPage - 1) * PAGE_SIZE + i + 1),
-      },
-      { key: 'paymentType', label: 'Payment Type', width: 110, render: (t) => String(t.paymentType || 'coins') },
-      { key: 'userId', label: 'User Id', width: 150, render: (t) => display(t.userId) },
-      {
-        key: 'balance',
-        label: 'Balance',
-        width: 90,
-        align: 'center',
-        render: (t) => floorNum(t.balance ?? 0).toLocaleString('en-IN'),
-      },
-      { key: 'updatedBy', label: 'Updated By', width: 120, render: (t) => display(t.updatedBy?.name) },
-      { key: 'reason', label: 'Reason', width: 120, render: (t) => display(t.reason) },
-      { key: 'tag', label: 'Tag', width: 90, align: 'center', render: (t) => display(t.tag) },
-      { key: 'remark', label: 'Remark', width: 120, render: (t) => display(t.remark || t.remakr) },
-      {
-        key: 'time',
-        label: 'Time',
-        width: 150,
-        render: (t) =>
-          t.createdOn ? `${formatDisplayDate(t.createdOn)} ${formatDisplayTime(t.createdOn)}` : '—',
-      },
-    ],
-    [txnPage],
-  );
+  const userSheetFields = (r: Row): SheetField[] => [
+    { label: 'Name', value: display(r.name) },
+    { label: 'Id', value: display(r._id) },
+    { label: 'City', value: display(r.city) },
+    { label: 'State', value: display(r.state) },
+    {
+      label: 'Total Coin Pulled',
+      value: floorNum(r.totalBalance ?? 0).toLocaleString('en-IN'),
+    },
+    { label: 'Total Transactions', value: String(r.totalTransactions ?? 0) },
+  ];
+
+  const txnSheetFields = (t: Txn): SheetField[] => [
+    { label: 'Payment Type', value: String(t.paymentType || 'coins') },
+    { label: 'User Id', value: display(t.userId) },
+    { label: 'Balance', value: floorNum(t.balance ?? 0).toLocaleString('en-IN') },
+    { label: 'Updated By', value: display(t.updatedBy?.name) },
+    { label: 'Reason', value: display(t.reason) },
+    { label: 'Tag', value: display(t.tag) },
+    { label: 'Remark', value: display(t.remark || t.remakr) },
+    { label: 'Time', value: formatTs(t.createdOn) },
+  ];
 
   // ---- Transactions drill-down view ----
   if (detailUser) {
@@ -204,7 +180,7 @@ export function CoinRemovalListScreen() {
       >
         <TouchableOpacity
           onPress={() => {
-            txnGenRef.current += 1; // invalidate any in-flight request
+            txnGenRef.current += 1;
             setDetailUser(null);
             setTxns([]);
             setTxnPage(1);
@@ -224,26 +200,51 @@ export function CoinRemovalListScreen() {
           </View>
         ) : null}
 
-        <DataTable
-          columns={txnColumns.filter((c) => TXN_MAIN_KEYS.has(c.key))}
-          rows={txns}
-          keyFor={(t, i) => String(t._id || i)}
-          loading={txnLoading}
-          emptyMessage="No transactions found"
-          onRowPress={(t) => setSelectedTxn(t)}
-          hint="Tap a row to see all details"
-        />
+        {txnLoading && txns.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+        {!txnLoading && txns.length === 0 ? (
+          <Text style={styles.hint}>No transactions found</Text>
+        ) : null}
+
+        <View style={styles.list}>
+          {txns.map((t, index) => (
+            <TouchableOpacity
+              key={`row-${index}-${String(t._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSelectedTxn(t)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{(txnPage - 1) * PAGE_SIZE + index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {String(t.paymentType || 'coins')}
+                </Text>
+                <Text style={styles.cardBadge} numberOfLines={1}>
+                  {display(t.tag)}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Balance</Text>
+                <Text style={styles.cardValue}>
+                  {floorNum(t.balance ?? 0).toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Updated By</Text>
+                <Text style={styles.cardValue}>{display(t.updatedBy?.name)}</Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Time</Text>
+                <Text style={styles.cardValue}>{formatTs(t.createdOn)}</Text>
+              </View>
+              <Text style={styles.cardHint}>Tap for full details</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <RowDetailSheet
           visible={selectedTxn !== null}
           title={selectedTxn ? String(selectedTxn.paymentType || 'coins') : ''}
-          fields={
-            selectedTxn
-              ? txnColumns
-                  .filter((c) => c.key !== 'idx')
-                  .map<SheetField>((c) => ({ label: c.label, value: c.render(selectedTxn, 0) }))
-              : []
-          }
+          fields={selectedTxn ? txnSheetFields(selectedTxn) : []}
           onClose={() => setSelectedTxn(null)}
         />
 
@@ -301,35 +302,61 @@ export function CoinRemovalListScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No data available"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity
+            key={`row-${index}-${String(row._id ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSheetRow(row)}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {display(row.name)}
+              </Text>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => openTransactions(row)}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+              >
+                <Text style={styles.actionBtnText}>Transactions</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Coin Pulled</Text>
+              <Text style={styles.cardValue}>
+                {floorNum(row.totalBalance ?? 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Transactions</Text>
+              <Text style={styles.cardValue}>{String(row.totalTransactions ?? 0)}</Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>City / State</Text>
+              <Text style={styles.cardValue}>
+                {display(row.city)} · {display(row.state)}
+              </Text>
+            </View>
+            <Text style={styles.cardHint}>Tap card for full details</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.name) : ''}
-        fields={
-          sheetRow
-            ? columns.map<SheetField>((c) => ({ label: c.label, value: c.render(sheetRow, 0) }))
-            : []
-        }
+        fields={sheetRow ? userSheetFields(sheetRow) : []}
         actions={[
           {
             label: 'Open transactions',
+            tone: 'primary',
             onPress: () => {
-              if (sheetRow) {
-                txnGenRef.current += 1; // invalidate stale in-flight transactions
-                setTxns([]);
-                setDetailUser(sheetRow);
-                setTxnPage(1);
-              }
-              setSheetRow(null);
+              if (sheetRow) openTransactions(sheetRow);
             },
           },
         ]}
@@ -372,6 +399,72 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardBadge: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    maxWidth: 90,
+  },
+  actionBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    flexShrink: 0,
+  },
+  actionBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '40%' },
+  cardValue: { color: colors.foreground, fontSize: 11, flex: 1, textAlign: 'right' },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

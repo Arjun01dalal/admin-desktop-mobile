@@ -22,7 +22,7 @@ import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { CAMPAIGN_LIST } from '../../../utils/campaignList';
@@ -55,7 +55,6 @@ const TYPE_OPTIONS = [
 const PAGE_SIZES = pickPageSizes([10, 25, 50, 100, 200, 500]);
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
-const MAIN_KEYS = new Set(['sel', 'sr', 'name', 'botId', 'balance']);
 
 function formatBalance(value: unknown): string {
   const n = typeof value === 'number' ? value : Number(value);
@@ -386,11 +385,11 @@ export function BotPerformanceScreen() {
         <View style={styles.filterCard}>
           <Text style={styles.filterLabel}>Campaign</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {CAMPAIGN_LIST.map((c) => {
+            {CAMPAIGN_LIST.map((c, ci) => {
               const id = c.id.trim();
               return (
                 <TouchableOpacity
-                  key={c.id}
+                  key={`camp-${ci}`}
                   style={[styles.chip, campaignId === id && styles.chipActive]}
                   onPress={() => setCampaignId(campaignId === id ? '' : id)}
                 >
@@ -402,7 +401,7 @@ export function BotPerformanceScreen() {
             })}
           </ScrollView>
           <Text style={styles.dialerHint}>
-            Tick rows in the table (tap the ☐ cell), pick a campaign, then push.
+            Tick cards (☐), pick a campaign, then push.
           </Text>
           <TouchableOpacity
             style={[styles.searchBtn, (pushing || !selectedIds.size || !campaignId) && styles.btnDisabled]}
@@ -424,14 +423,70 @@ export function BotPerformanceScreen() {
         </View>
       ) : (
         <>
-          <DataTable
-            columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-            rows={rows}
-            keyFor={(r, i) => String(r._id || i)}
-            emptyMessage="No records found"
-            onRowPress={(row) => setSelected({ row, index: rows.indexOf(row) })}
-            hint="Tap a row to see all details"
-          />
+          {!loading && rows.length === 0 ? (
+            <Text style={styles.hint}>No records found</Text>
+          ) : null}
+          {rows.length > 0 ? (
+            <View style={styles.selectAllRow}>
+              <TouchableOpacity style={styles.selectAllBtn} onPress={toggleAll}>
+                <Text style={styles.selectAllText}>
+                  {allSelected ? '☑ Deselect all' : '☐ Select all'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.selectedCount}>{selectedIds.size} selected</Text>
+            </View>
+          ) : null}
+          <View style={styles.list}>
+            {rows.map((row, index) => {
+              const id = String(row._id);
+              const checked = selectedIds.has(id);
+              return (
+                <View key={id || String(index)} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <TouchableOpacity
+                      style={[styles.cardCheck, checked && styles.cardCheckOn]}
+                      onPress={() => toggleSelect(row)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={[styles.cardCheckText, checked && styles.cardCheckTextOn]}>
+                        {checked ? '☑' : '☐'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, minWidth: 0 }}
+                      activeOpacity={0.75}
+                      onPress={() => setSelected({ row, index })}
+                    >
+                      <View style={styles.cardHeader}>
+                        <Text style={styles.cardIndex}>#{rowOffset + index + 1}</Text>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                          {display(row.name || row.client_name)}
+                        </Text>
+                        <Text style={styles.cardSplitRight}>Bot {display(row.bot_id)}</Text>
+                      </View>
+                      <View style={styles.cardSplitRow}>
+                        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                          Balance: {formatBalance(row.balance)}
+                        </Text>
+                        <Text style={styles.cardSplitRight} numberOfLines={1}>
+                          {appCodeForName(row.clientName)}
+                        </Text>
+                      </View>
+                      <View style={styles.cardSplitRow}>
+                        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                          {display(row.city)} · {display(row.state)}
+                        </Text>
+                        <Text style={styles.cardSplitRight} numberOfLines={1}>
+                          {formatDisplayDate(row.activeUser) || '—'}
+                        </Text>
+                      </View>
+                      <Text style={styles.cardHint}>Tap card for details</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
 
           {/* Pagination */}
           <View style={styles.pagerRow}>
@@ -564,6 +619,102 @@ const styles = StyleSheet.create({
   errorText: { color: colors.destructive, fontSize: 13 },
   loadingBox: { alignItems: 'center', paddingVertical: spacing(10), gap: spacing(3) },
   loadingText: { color: colors.muted, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
+  cardCheckOn: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
+  cardCheckText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
+  cardCheckTextOn: { color: colors.primary },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    maxWidth: '40%',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing(3),
+    marginBottom: spacing(1),
+  },
+  selectAllBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    backgroundColor: colors.surface,
+  },
+  selectAllText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
+  selectedCount: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   pagerRow: {
     flexDirection: 'row',
     alignItems: 'center',

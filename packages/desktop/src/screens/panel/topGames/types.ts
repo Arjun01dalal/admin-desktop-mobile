@@ -37,8 +37,33 @@ export type DeleteTarget = {
 };
 
 export type StatusTarget = {
-  category: string;
+  /** Omitted when updating from the All filter (updates across categories). */
+  category?: string;
   gameId: string;
   status: boolean;
   name: string;
+};
+
+export type AddGameByIdPayload = {
+  gameId: string;
+  providerName: string;
+  category: string;
+  position: number;
+};
+
+export type AddGameDetailsPayload = AddGameByIdPayload & {
+  gameName: string;
+  imagePath: string;
+};
+
+export type AddGameObjectPayload = {
+  category: string;
+  position: number;
+  game: TopGameItem & Record<string, unknown>;
+};
+
+export type CatalogGame = {
+  gameId: string;
+  gameName: string;
+  providerName: string;
 };

@@ -21,17 +21,16 @@ import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
-import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import {
   DetailFilterBar,
   type SearchFieldKey,
   type SearchFieldOption,
 } from './DetailFilterBar';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type Row = {
   _id?: string;
@@ -76,7 +75,6 @@ function commentsOf(row: Row | null): CommentItem[] {
 }
 
 const PAGE_SIZE = 25;
-const MAIN_KEYS = new Set(['idx', 'name', 'balance', 'lastActivity']);
 
 const SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'name', label: 'Name' },
@@ -221,47 +219,57 @@ export function NonPerformingUserScreen() {
     }
   }, [commentDraft, commentsRow, admin]);
 
-  const columns = useMemo<DataTableColumn<Row>[]>(
-    () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
+  const openComments = useCallback((row: Row) => {
+    setSheetRow(null);
+    setCommentsRow(row);
+    setCommentDraft('');
+    setCommentMsg('');
+  }, []);
+
+  const fieldRows = useCallback(
+    (r: Row) => [
+      { label: 'Dp ID', value: display(r._id) },
+      { label: 'App Code', value: appCodeForName(String(r.clientName || '')) },
+      { label: 'Email', value: display(r.email) },
+      { label: 'Mobile', value: maskMobile(r.mobile, canShowMobile) },
+      { label: 'Balance', value: floorNum(r.balance ?? 0).toLocaleString('en-IN') },
+      { label: 'Deposit Amount', value: floorNum(r.totalAmount ?? 0).toLocaleString('en-IN') },
+      { label: 'State', value: display(r.state) },
+      { label: 'City', value: display(r.city) },
       {
-        key: 'name',
-        label: 'User Name',
-        width: 130,
-        render: (r) => display(r.name),
-        onCellPress: (r) => openUserReport(r._id, r.name),
+        label: 'App Version',
+        value: `${display(r.currentAppVersion)} / ${display(r.updatedAppVersion)}`,
       },
-      { key: 'dpId', label: 'Dp ID', width: 150, render: (r) => display(r._id) },
-      { key: 'appCode', label: 'App Code', width: 80, render: (r) => appCodeForName(String(r.clientName || '')) },
-      { key: 'email', label: 'Email', width: 160, render: (r) => display(r.email) },
-      { key: 'mobile', label: 'Mobile', width: 100, render: (r) => maskMobile(r.mobile, canShowMobile) },
-      {
-        key: 'balance',
-        label: 'Balance',
-        width: 90,
-        align: 'center',
-        render: (r) => floorNum(r.balance ?? 0).toLocaleString('en-IN'),
-      },
-      {
-        key: 'depositAmount',
-        label: 'Deposit Amount',
-        width: 110,
-        align: 'center',
-        render: (r) => floorNum(r.totalAmount ?? 0).toLocaleString('en-IN'),
-      },
-      { key: 'state', label: 'State', width: 110, render: (r) => display(r.state) },
-      { key: 'city', label: 'City', width: 110, render: (r) => display(r.city) },
-      {
-        key: 'appVersion',
-        label: 'Current / Updated App Version',
-        width: 160,
-        render: (r) => `${display(r.currentAppVersion)} / ${display(r.updatedAppVersion)}`,
-      },
-      { key: 'created', label: 'Created', width: 150, render: (r) => formatTs(r.createdOn) },
-      { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => formatTs(r.updatedOn) },
+      { label: 'Created', value: formatTs(r.createdOn) },
+      { label: 'Last Activity', value: formatTs(r.updatedOn) },
     ],
-    [page, canShowMobile, openUserReport],
+    [canShowMobile],
   );
+
+  const sheetActions = useMemo<SheetAction[]>(() => {
+    if (!sheetRow) return [];
+    const count = commentsOf(sheetRow).length;
+    const acts: SheetAction[] = [
+      {
+        label: count > 0 ? `View Comment (${count})` : 'View Comment',
+        tone: 'primary',
+        onPress: () => openComments(sheetRow),
+      },
+    ];
+    if (sheetRow._id) {
+      acts.push({
+        label: 'User Report',
+        tone: 'default',
+        onPress: () => {
+          const id = sheetRow._id;
+          const name = sheetRow.name;
+          setSheetRow(null);
+          openUserReport(id, name);
+        },
+      });
+    }
+    return acts;
+  }, [sheetRow, openComments, openUserReport]);
 
   return (
     <ScrollView
@@ -310,50 +318,81 @@ export function NonPerformingUserScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No data available"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const commentCount = commentsOf(row).length;
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>
+                  #{(page - 1) * PAGE_SIZE + index + 1}
+                </Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.name)}
+                </Text>
+                <TouchableOpacity
+                  style={styles.viewCommentBtn}
+                  onPress={() => openComments(row)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                >
+                  <Text style={styles.viewCommentBtnText}>
+                    {commentCount > 0 ? `View Comment (${commentCount})` : 'View Comment'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Balance</Text>
+                <Text style={styles.cardValue}>
+                  {floorNum(row.balance ?? 0).toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Deposit</Text>
+                <Text style={styles.cardValue}>
+                  {floorNum(row.totalAmount ?? 0).toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>App</Text>
+                <Text style={styles.cardValue}>
+                  {appCodeForName(String(row.clientName || ''))}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Mobile</Text>
+                <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Last Activity</Text>
+                <Text style={styles.cardValue}>{formatTs(row.updatedOn)}</Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for full details</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.name) : ''}
         fields={
           sheetRow
-            ? columns
-                .filter((c) => c.key !== 'idx')
-                .map<SheetField>((c) => ({ label: c.label, value: c.render(sheetRow, 0) }))
+            ? fieldRows(sheetRow).map<SheetField>((f) => ({
+                label: f.label,
+                value: f.value,
+              }))
             : []
         }
-        actions={[
-          ...(sheetRow?._id
-            ? [
-                {
-                  label: 'User Report',
-                  onPress: () => {
-                    const id = sheetRow._id;
-                    const name = sheetRow.name;
-                    setSheetRow(null);
-                    openUserReport(id, name);
-                  },
-                },
-              ]
-            : []),
-          {
-            label: `Comments (${commentsOf(sheetRow).length})`,
-            onPress: () => {
-              setCommentsRow(sheetRow);
-              setCommentDraft('');
-              setCommentMsg('');
-              setSheetRow(null);
-            },
-          },
-        ]}
+        actions={sheetActions}
         onClose={() => setSheetRow(null)}
       />
 
@@ -361,7 +400,7 @@ export function NonPerformingUserScreen() {
       <Modal
         visible={commentsRow !== null}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setCommentsRow(null)}
       >
         <KeyboardAvoidingView
@@ -470,6 +509,60 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(3), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    gap: spacing(1),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginBottom: spacing(1.5),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    paddingHorizontal: spacing(2),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  viewCommentBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1.5),
+    flexShrink: 0,
+  },
+  viewCommentBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 2,
+  },
+  cardLabel: { color: colors.muted, fontSize: 12, fontWeight: '600', width: '40%' },
+  cardValue: { color: colors.foreground, fontSize: 12, flex: 1, textAlign: 'right' },
+  cardHint: { color: colors.muted, fontSize: 11, marginTop: spacing(1.5) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -485,17 +578,30 @@ const styles = StyleSheet.create({
   },
   pagerLabel: { color: colors.muted, fontSize: 13 },
   pagerDisabled: { color: colors.muted, opacity: 0.5 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
+  backdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(10),
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  backdropTouch: { ...StyleSheet.absoluteFillObject },
   sheet: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: radius.md * 2,
-    borderTopRightRadius: radius.md * 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md * 2,
     padding: spacing(4),
-    maxHeight: '80%',
+    maxHeight: '100%',
   },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sheetTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1, marginRight: spacing(2) },
+  sheetTitle: {
+    color: colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: spacing(2),
+  },
   sheetClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing(3) },
   commentInput: {
@@ -520,7 +626,12 @@ const styles = StyleSheet.create({
   commentBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   commentMsg: { color: colors.muted, fontSize: 12, marginTop: spacing(2) },
   commentList: { marginTop: spacing(3) },
-  commentEmpty: { color: colors.muted, fontSize: 13, textAlign: 'center', paddingVertical: spacing(4) },
+  commentEmpty: {
+    color: colors.muted,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: spacing(4),
+  },
   commentCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,

@@ -7,7 +7,7 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TextInput, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { CreateUserScreen } from '../screens/CreateUserScreen';
@@ -76,6 +76,7 @@ import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerforman
 import { DepositListScreen } from '../screens/dashboards/details/DepositListScreen';
 import { WithdrawalFundScreen } from '../screens/dashboards/details/WithdrawalFundScreen';
 import { SocialMediaScreen } from '../screens/dashboards/details/SocialMediaScreen';
+import { WhatsappScreen } from '../screens/dashboards/details/WhatsappScreen';
 import { WhatsappMidScreen } from '../screens/dashboards/details/WhatsappMidScreen';
 import { AAAFraudBetReportScreen } from '../screens/dashboards/details/AAAFraudBetReportScreen';
 import { AAABlacklistedUsersScreen } from '../screens/dashboards/details/AAABlacklistedUsersScreen';
@@ -149,6 +150,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/depositList': DepositListScreen as AnyScreen,
   '/withdrawal-fund': WithdrawalFundScreen as AnyScreen,
   '/social-media': SocialMediaScreen as AnyScreen,
+  '/whatsappView': WhatsappScreen as AnyScreen,
   '/whatsapp-mid': WhatsappMidScreen as AnyScreen,
   '/aaa-fraud-bet-report': AAAFraudBetReportScreen as AnyScreen,
   '/aaa-blacklisted-users': AAABlacklistedUsersScreen as AnyScreen,
@@ -186,15 +188,28 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
           <Text style={styles.drawerTitle}>Astro</Text>
           {user?.name ? <Text style={styles.drawerSub}>{user.name}</Text> : null}
         </View>
-        <TextInput
-          style={styles.drawerSearch}
-          value={menuQuery}
-          onChangeText={setMenuQuery}
-          placeholder="🔍 Search menu…"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <View style={styles.drawerSearchWrap}>
+          <TextInput
+            style={styles.drawerSearch}
+            value={menuQuery}
+            onChangeText={setMenuQuery}
+            placeholder="🔍 Search menu…"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {Boolean(menuQuery.trim()) ? (
+            <TouchableOpacity
+              style={styles.drawerSearchClear}
+              onPress={() => setMenuQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear menu search"
+            >
+              <Text style={styles.drawerSearchClearText}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
       <DrawerContentScrollView
         {...rest}
@@ -213,6 +228,8 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
             activeTintColor={colors.primary}
             inactiveTintColor={colors.muted}
             onPress={() => rest.navigation.navigate(screenNameFor(item))}
+            style={styles.drawerItem}
+            labelStyle={styles.drawerItemLabel}
           />
         ))}
       </DrawerContentScrollView>
@@ -262,6 +279,10 @@ function ProfileHeaderButton() {
 }
 
 function PanelDrawer({ items }: { items: NavItem[] }) {
+  const { width: screenWidth } = useWindowDimensions();
+  // Default RN drawer is ~280 / 80% — keep it a bit narrower on phones.
+  const drawerWidth = Math.min(230, Math.round(screenWidth * 0.7));
+
   return (
     <Drawer.Navigator
         initialRouteName="welcome"
@@ -269,11 +290,14 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
         screenOptions={{
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
-          headerTitleStyle: { fontWeight: '600' },
+          headerTitleStyle: { fontWeight: '600', fontSize: 16 },
           headerRight: () => <ProfileHeaderButton />,
           drawerType: 'front',
           overlayColor: 'rgba(0,0,0,0.55)',
-          drawerStyle: { backgroundColor: colors.surface },
+          drawerStyle: {
+            backgroundColor: colors.surface,
+            width: drawerWidth,
+          },
           sceneStyle: { backgroundColor: colors.background },
         }}
       >
@@ -377,12 +401,17 @@ const styles = StyleSheet.create({
     paddingEnd: spacing(1),
   },
   drawerHeader: {
-    paddingHorizontal: 16,
-    paddingTop: spacing(3),
-    paddingBottom: 12,
+    paddingHorizontal: spacing(3),
+    paddingTop: spacing(2),
+    paddingBottom: spacing(2),
   },
-  drawerTitle: { color: colors.primary, fontSize: 18, fontWeight: '700' },
-  drawerSub: { color: colors.muted, fontSize: 13, marginTop: 4 },
+  drawerTitle: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+  drawerSub: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  drawerSearchWrap: {
+    marginHorizontal: spacing(2.5),
+    position: 'relative',
+    justifyContent: 'center',
+  },
   drawerSearch: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -390,9 +419,38 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     color: colors.foreground,
     paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
+    paddingRight: spacing(9),
+    paddingVertical: spacing(3),
+    fontSize: 14,
+    minHeight: 46,
+  },
+  drawerSearchClear: {
+    position: 'absolute',
+    right: spacing(2),
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawerSearchClearText: {
+    color: colors.foreground,
     fontSize: 13,
-    marginHorizontal: spacing(3),
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  drawerItem: {
+    marginVertical: 0,
+    marginHorizontal: spacing(1),
+    borderRadius: radius.sm,
+    paddingVertical: 0,
+    minHeight: 40,
+  },
+  drawerItemLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: -8,
   },
   headerIconBtn: {
     paddingHorizontal: spacing(3),

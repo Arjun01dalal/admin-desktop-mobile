@@ -16,10 +16,12 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ImageIcon from '@mui/icons-material/Image';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SaveIcon from '@mui/icons-material/Save';
 import VideoCallIcon from '@mui/icons-material/VideoCall';
@@ -29,6 +31,7 @@ import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { asList, useReportQuery } from '@/screens/panel/shared';
 import { AddGameLaunchBannerModal } from '@/screens/panel/banners/AddGameLaunchBannerModal';
+import { replaceS3WithCloudfront } from '@/utils/cdnUrl';
 import {
   BANNER_CATEGORY_OPTIONS,
   BANNER_TYPE_OPTIONS,
@@ -124,6 +127,11 @@ export function BannersPage() {
   const [togglingId, setTogglingId] = useState('');
   const [positionDrafts, setPositionDrafts] = useState<Record<string, string>>({});
   const [savingPositionId, setSavingPositionId] = useState('');
+  const [updateImageOpen, setUpdateImageOpen] = useState(false);
+  const [updateImageId, setUpdateImageId] = useState('');
+  const [updateImagePath, setUpdateImagePath] = useState('');
+  const [updateImageName, setUpdateImageName] = useState('');
+  const [updatingImage, setUpdatingImage] = useState(false);
 
   const canAdd = hasPermission(Permissions.Add_Banner);
   const canToggle = hasPermission(Permissions.Toggle_Banner);
@@ -131,7 +139,10 @@ export function BannersPage() {
 
   const buildPayload = useCallback(() => ({}), []);
   const unpack = useCallback((res: { data?: unknown }) => {
-    const list = asList<BannerRow>(res.data);
+    const list = asList<BannerRow>(res.data).map((banner) => ({
+      ...banner,
+      imagePath: replaceS3WithCloudfront(banner.imagePath),
+    }));
     const sorted = [...list].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     return { rows: sorted };
   }, []);
@@ -213,6 +224,7 @@ export function BannersPage() {
           deepLink: true,
           mobileRouter: form.mobilePage,
           mobileOptions: form.mobileOptions,
+          status: true,
         };
         if (form.type === 'bonusScreenBanners') {
           payload.decryption = {
@@ -298,8 +310,8 @@ export function BannersPage() {
     async (row: BannerRow) => {
       const raw = positionDrafts[row._id] ?? String(row.position ?? '');
       const position = Number(raw);
-      if (!position || position < 1) {
-        toast.error('Please enter a valid position');
+      if (!position || position < 1 || position > 25) {
+        toast.error('Please select a valid position (1-25)');
         return;
       }
       setSavingPositionId(row._id);
@@ -317,6 +329,53 @@ export function BannersPage() {
     },
     [positionDrafts, load],
   );
+
+  const openUpdateImage = useCallback((row: BannerRow) => {
+    setUpdateImageId(row._id);
+    setUpdateImagePath(row.imagePath || '');
+    setUpdateImageName(row.gameName || '');
+    setUpdateImageOpen(true);
+  }, []);
+
+  const closeUpdateImage = useCallback(() => {
+    if (updatingImage) return;
+    setUpdateImageOpen(false);
+    setUpdateImageId('');
+    setUpdateImagePath('');
+    setUpdateImageName('');
+  }, [updatingImage]);
+
+  const handleUpdateImage = useCallback(async () => {
+    const imagePath = updateImagePath.trim();
+    if (!updateImageId) {
+      toast.error('Banner id is missing');
+      return;
+    }
+    if (!imagePath) {
+      toast.error('Please enter image URL');
+      return;
+    }
+
+    setUpdatingImage(true);
+    try {
+      const res = await secureApi('ops.bannersUpdateImage', {
+        _id: updateImageId,
+        imagePath,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update banner image');
+        return;
+      }
+      toast.success('Banner image updated successfully');
+      setUpdateImageOpen(false);
+      setUpdateImageId('');
+      setUpdateImagePath('');
+      setUpdateImageName('');
+      void load();
+    } finally {
+      setUpdatingImage(false);
+    }
+  }, [load, updateImageId, updateImagePath]);
 
   const handleDelete = useCallback(async () => {
     setSubmitting(true);
@@ -346,12 +405,17 @@ export function BannersPage() {
         id: 'image',
         label: 'Image',
         width: 120,
-        render: (row) =>
-          row.imagePath ? (
+        render: (row) => {
+          if (!row.imagePath) return '—';
+          const isVideo =
+            row.imagePath.toLowerCase().includes('.mp4') ||
+            row.imagePath.toLowerCase().includes('video');
+          return (
             <Box
-              component="img"
+              component={isVideo ? 'video' : 'img'}
               src={row.imagePath}
-              alt={row.gameName || 'Banner'}
+              controls={isVideo || undefined}
+              alt={isVideo ? undefined : row.gameName || 'Banner'}
               sx={{
                 height: 56,
                 width: 96,
@@ -361,9 +425,8 @@ export function BannersPage() {
                 mx: 'auto',
               }}
             />
-          ) : (
-            '—'
-          ),
+          );
+        },
       },
       {
         id: 'gameName',
@@ -468,23 +531,37 @@ export function BannersPage() {
       },
     );
 
-    if (canDelete) {
-      cols.push({
-        id: 'action',
-        label: 'Action',
-        width: 80,
-        render: (row) => (
-          <IconButton
-            size="small"
-            aria-label="Delete"
-            onClick={() => openDelete(row)}
-            sx={{ color: '#f44336' }}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        ),
-      });
-    }
+    cols.push({
+      id: 'action',
+      label: 'Action',
+      width: 100,
+      render: (row) => (
+        <Stack direction="row" spacing={0.25} justifyContent="center">
+          <Tooltip title="Update image" arrow>
+            <IconButton
+              size="small"
+              aria-label="Update banner image"
+              onClick={() => openUpdateImage(row)}
+              sx={{ color: '#ff9f0a' }}
+            >
+              <ImageIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {canDelete ? (
+            <Tooltip title="Delete banner" arrow>
+              <IconButton
+                size="small"
+                aria-label="Delete"
+                onClick={() => openDelete(row)}
+                sx={{ color: '#f44336' }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : null}
+        </Stack>
+      ),
+    });
 
     return cols;
   }, [
@@ -495,6 +572,7 @@ export function BannersPage() {
     positionDrafts,
     savingPositionId,
     handleUpdatePosition,
+    openUpdateImage,
     openDelete,
   ]);
 
@@ -713,6 +791,79 @@ export function BannersPage() {
         onClose={() => setAddBannerOpen(false)}
         onSuccess={() => void load()}
       />
+
+      <Dialog
+        open={updateImageOpen}
+        onClose={closeUpdateImage}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          Update Banner Image
+          {updateImageName ? ` — ${updateImageName}` : ''}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            margin="dense"
+            label="Image URL"
+            placeholder="https://d1abp4kt5r84bg.cloudfront.net/..."
+            value={updateImagePath}
+            onChange={(event) => setUpdateImagePath(event.target.value)}
+          />
+          {updateImagePath.trim() ? (
+            <Box
+              sx={{
+                mt: 2,
+                p: 1,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 1,
+              }}
+            >
+              {updateImagePath.toLowerCase().includes('.mp4') ||
+              updateImagePath.toLowerCase().includes('video') ? (
+                <Box
+                  component="video"
+                  controls
+                  src={replaceS3WithCloudfront(updateImagePath.trim())}
+                  sx={{ width: '100%', maxHeight: 180, display: 'block' }}
+                />
+              ) : (
+                <Box
+                  component="img"
+                  src={replaceS3WithCloudfront(updateImagePath.trim())}
+                  alt="Banner preview"
+                  sx={{
+                    width: '100%',
+                    maxHeight: 180,
+                    objectFit: 'contain',
+                    borderRadius: 1,
+                    display: 'block',
+                  }}
+                />
+              )}
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button variant="outlined" onClick={closeUpdateImage} disabled={updatingImage}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleUpdateImage()}
+            disabled={updatingImage}
+            sx={orangeBtnSx}
+          >
+            {updatingImage ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              'Update Image'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={videoOpen}

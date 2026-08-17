@@ -7,11 +7,9 @@
  *  - List from withdrawals.transactions {type:'withdrawal'} with date range,
  *    status chips, search (userName/mobile/amount/transactionId/dp_id/accountNo)
  *    and pagination.
- *  - Phone: short cards via shared ResponsiveTable; tap a card → full details
- *    in the shared RowDetailSheet. Tablet: regular table.
- *
- * Skipped vs desktop (approval workflow): lock/unlock, check/cross-check,
- * status update, bulk actions, beneficiary dialogs — desktop-only for now.
+ *  - Phone: short cards via shared ResponsiveTable; Check / Cross Check on the
+ *    outer card (Laxmi table parity). Tap a card → full details + remaining
+ *    actions in RowDetailSheet. Tablet: regular table.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -213,6 +211,22 @@ function bothChecksOk(r: Rec): boolean {
   return Boolean(checkOf(r, 'checkBy')?.status && checkOf(r, 'crossCheckBy')?.status);
 }
 
+/** Desktop extractBeneficiaryAccounts parity. */
+function extractBeneficiaryAccounts(r: Rec): string[] {
+  const accounts = r.beneficiaryAccounts;
+  if (Array.isArray(accounts)) return accounts.map(String).filter(Boolean);
+  if (typeof accounts === 'string' && accounts.trim()) return [accounts.trim()];
+  return [];
+}
+
+/** Desktop: check column hidden only for Cancel/Rejected/Reverse/Failed. */
+function checksAllowedFor(r: Rec, checksDisabled: boolean): boolean {
+  return (
+    !checksDisabled &&
+    !['Cancel', 'Rejected', 'Reverse', 'Failed'].includes(String(r.status || ''))
+  );
+}
+
 function isTerminal(r: Rec): boolean {
   return TERMINAL_STATUSES.has(String(r.status || ''));
 }
@@ -382,6 +396,13 @@ export function WithdrawalScreen() {
   const [beneInitial, setBeneInitial] = useState<string[]>([]);
   const [beneInput, setBeneInput] = useState('');
   const [beneBusy, setBeneBusy] = useState(false);
+  // Per-row Add Bene (desktop AddBeneDialog — assign banks to this withdrawal user).
+  const [addBeneRow, setAddBeneRow] = useState<Rec | null>(null);
+  const [availableBanks, setAvailableBanks] = useState<string[]>([]);
+  const [addBeneExisting, setAddBeneExisting] = useState<string[]>([]);
+  const [addBeneSelected, setAddBeneSelected] = useState<string[]>([]);
+  const [addBeneSearch, setAddBeneSearch] = useState('');
+  const [addBeneBusy, setAddBeneBusy] = useState(false);
 
   // Desktop permission parity (login Responsibilities).
   const perms = useMemo(
@@ -768,22 +789,81 @@ export function WithdrawalScreen() {
 
   /* --------------------------- add bene list (banks) --------------------------- */
 
+  const loadAvailableBanks = useCallback(async (): Promise<string[]> => {
+    const res = await secureApi('withdrawals.availableBanks', {});
+    const obj = res.ok ? unpack(res.data) : {};
+    const banks = Array.isArray(obj.availableBanks)
+      ? (obj.availableBanks as string[]).filter(Boolean)
+      : [];
+    setAvailableBanks(banks);
+    return banks;
+  }, []);
+
   const openBeneModal = useCallback(async () => {
     setBeneBusy(true);
     setBeneOpen(true);
     setBeneInput('');
     try {
-      const res = await secureApi('withdrawals.availableBanks', {});
-      const obj = res.ok ? unpack(res.data) : {};
-      const banks = Array.isArray(obj.availableBanks)
-        ? (obj.availableBanks as string[]).filter(Boolean)
-        : [];
+      const banks = await loadAvailableBanks();
       setBeneBanks(banks);
       setBeneInitial(banks);
     } finally {
       setBeneBusy(false);
     }
-  }, []);
+  }, [loadAvailableBanks]);
+
+  const openAddBene = useCallback(
+    async (r: Rec) => {
+      // Close detail sheet first to avoid nested-modal touch freeze.
+      setSelected(null);
+      setAddBeneSearch('');
+      setAddBeneSelected([]);
+      setAddBeneExisting(extractBeneficiaryAccounts(r));
+      setAddBeneBusy(true);
+      setTimeout(() => setAddBeneRow(r), 350);
+      try {
+        await loadAvailableBanks();
+      } finally {
+        setAddBeneBusy(false);
+      }
+    },
+    [loadAvailableBanks],
+  );
+
+  const submitAddBene = useCallback(async () => {
+    if (!addBeneRow) return;
+    if (addBeneSelected.length === 0) {
+      notify('Select at least one bank');
+      return;
+    }
+    const userId = String(addBeneRow.dp_id ?? addBeneRow.userId ?? '');
+    const transactionId = txnIdOf(addBeneRow);
+    if (!userId || !transactionId) {
+      notify('Missing user or transaction id');
+      return;
+    }
+    setAddBeneBusy(true);
+    try {
+      const addRes = await secureApi('withdrawals.addBeneficiary', {
+        userId,
+        bankAccountName: addBeneSelected,
+      });
+      if (!addRes.ok) {
+        notify(addRes.message || 'Failed to add beneficiary');
+        return;
+      }
+      const syncRes = await secureApi('withdrawals.syncBeneficiary', { transactionId });
+      if (!syncRes.ok) {
+        notify(syncRes.message || 'Added but sync failed');
+        return;
+      }
+      setAddBeneRow(null);
+      notify('Beneficiary updated');
+      afterAction();
+    } finally {
+      setAddBeneBusy(false);
+    }
+  }, [addBeneRow, addBeneSelected, afterAction]);
 
   const saveBeneBanks = useCallback(async () => {
     const norm = (s: string) => s.trim().toLowerCase();
@@ -993,17 +1073,17 @@ export function WithdrawalScreen() {
         render: (r) => fmtAmount(r.amount ?? r.Amount),
       },
       {
+        key: 'app',
+        label: 'App',
+        width: 80,
+        render: (r) => display(appCodeForName(String(r.clientName || '')) || r.clientName),
+      },
+      {
         key: 'status',
         label: 'Status',
         width: 100,
         color: (r) => statusColor(r.status),
         render: (r) => display(r.status),
-      },
-      {
-        key: 'app',
-        label: 'App',
-        width: 80,
-        render: (r) => display(appCodeForName(String(r.clientName || '')) || r.clientName),
       },
       {
         key: 'mobile',
@@ -1166,6 +1246,13 @@ export function WithdrawalScreen() {
         },
       });
     }
+    if (perms.actions) {
+      acts.push({
+        label: 'Add Bene',
+        tone: 'primary',
+        onPress: () => void openAddBene(r),
+      });
+    }
     if (r.validationCheckedAt) {
       acts.push({
         label: `Bot Validation (${num(r.passedPoints)}/${num(r.totalPoints)})`,
@@ -1181,20 +1268,18 @@ export function WithdrawalScreen() {
     const checkSecond = checkOf(r, 'crossCheckBy');
     // Desktop: check column hidden only for Cancel/Rejected/Reverse/Failed,
     // and checks are NOT behind withdrawals_button.
-    const checksAllowed =
-      !perms.checksDisabled &&
-      !['Cancel', 'Rejected', 'Reverse', 'Failed'].includes(String(r.status || ''));
+    const checksAllowed = checksAllowedFor(r, perms.checksDisabled);
     if (!checkFirst && checksAllowed) {
       acts.push(
-        { label: 'Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'first', true) },
-        { label: 'Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'first', false) },
+        { label: 'Check ✓', tone: 'primary', onPress: () => void doCheck(r, 'first', true) },
+        { label: 'Check ✗', tone: 'warning', onPress: () => void doCheck(r, 'first', false) },
       );
     }
     // Desktop: cross-check buttons appear only after first check is OK.
     if (!checkSecond && checksAllowed && Boolean(checkFirst?.status)) {
       acts.push(
-        { label: 'Cross Check: OK', tone: 'primary', onPress: () => void doCheck(r, 'second', true) },
-        { label: 'Cross Check: Not OK', tone: 'warning', onPress: () => void doCheck(r, 'second', false) },
+        { label: 'Cross Check ✓', tone: 'primary', onPress: () => void doCheck(r, 'second', true) },
+        { label: 'Cross Check ✗', tone: 'warning', onPress: () => void doCheck(r, 'second', false) },
       );
     }
     // Lock/Unlock + status buttons live behind withdrawals_button (desktop).
@@ -1509,6 +1594,232 @@ export function WithdrawalScreen() {
             setSelected(r);
           }
         }}
+        renderCardFooter={(r) => {
+          if (bulkMode) return null;
+          const checksAllowed = checksAllowedFor(r, perms.checksDisabled);
+          const checkFirst = checkOf(r, 'checkBy');
+          const checkSecond = checkOf(r, 'crossCheckBy');
+          const busy = actionBusy;
+          const beneList = extractBeneficiaryAccounts(r);
+          const showAddBene = perms.actions;
+          const winIn = display(r.playedGames);
+          const datePart = r.createdOn ? formatDisplayDate(String(r.createdOn)) : '—';
+          const timePart = r.createdOn ? formatDisplayTime(String(r.createdOn)) : '';
+          const commission = `₹${fmtAmount(r.commissionAmount)}`;
+          const hasBot = Boolean(r.validationCheckedAt);
+          const botPassed = num(r.passedPoints);
+          const botTotal = num(r.totalPoints);
+          const botOk = botPassed >= 13;
+          return (
+            <View style={styles.checkBlock}>
+              <View style={styles.metaPanel}>
+                <View style={styles.metaCols}>
+                  <View style={[styles.metaCol, styles.metaColFirst, styles.metaColCenter]}>
+                    <View style={[styles.metaHeadRow, styles.metaHeadRowCenter]}>
+                      <MaterialCommunityIcons
+                        name="calendar-clock"
+                        size={13}
+                        color={colors.muted}
+                      />
+                      <Text style={styles.metaHead} numberOfLines={1}>
+                        Date/Time
+                      </Text>
+                    </View>
+                    <Text style={[styles.metaVal, styles.metaValCenter]} numberOfLines={1}>
+                      {datePart}
+                    </Text>
+                    {timePart ? (
+                      <Text style={[styles.metaValSub, styles.metaValCenter]} numberOfLines={1}>
+                        {timePart}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={[styles.metaCol, styles.metaColCenter]}>
+                    <View style={[styles.metaHeadRow, styles.metaHeadRowCenter]}>
+                      <MaterialCommunityIcons
+                        name="trophy-outline"
+                        size={13}
+                        color={colors.muted}
+                      />
+                      <Text style={styles.metaHead} numberOfLines={1}>
+                        Win In
+                      </Text>
+                    </View>
+                    <Text style={[styles.metaVal, styles.metaValCenter]} numberOfLines={2}>
+                      {winIn}
+                    </Text>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={[styles.metaCol, styles.metaColCenter]}>
+                    <View style={[styles.metaHeadRow, styles.metaHeadRowCenter]}>
+                      <MaterialCommunityIcons name="cash" size={13} color={colors.muted} />
+                      <Text style={styles.metaHead} numberOfLines={1}>
+                        Commission
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.metaVal, styles.metaValEmph, styles.metaValCenter]}
+                      numberOfLines={1}
+                    >
+                      {commission}
+                    </Text>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={[styles.metaCol, styles.metaColLast, styles.metaColCenter]}>
+                    <View style={[styles.metaHeadRow, styles.metaHeadRowCenter]}>
+                      <MaterialCommunityIcons name="robot-outline" size={13} color={colors.muted} />
+                      <Text style={styles.metaHead} numberOfLines={1}>
+                        Bot
+                      </Text>
+                    </View>
+                    {hasBot ? (
+                      <Text
+                        style={[
+                          styles.metaVal,
+                          styles.metaValCenter,
+                          botOk ? styles.checkOk : styles.checkNotOk,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {botPassed}/{botTotal}
+                      </Text>
+                    ) : (
+                      <Text
+                        style={[styles.metaVal, styles.metaValSub, styles.metaValCenter]}
+                        numberOfLines={1}
+                      >
+                        —
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+              {showAddBene ? (
+                <View style={styles.beneCardRow}>
+                  <View style={styles.beneCardMeta}>
+                    <Text style={styles.sectionLabel}>Beneficiary</Text>
+                    <Text style={styles.beneCardValue} numberOfLines={1}>
+                      {beneList.length > 0
+                        ? beneList.length === 1
+                          ? beneList[0]
+                          : `${beneList.length} Bene(s)`
+                        : 'No Bene'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.addBeneBtn, (busy || addBeneBusy) && styles.checkBtnDisabled]}
+                    disabled={busy || addBeneBusy}
+                    onPress={() => void openAddBene(r)}
+                  >
+                    <MaterialCommunityIcons
+                      name="account-plus-outline"
+                      size={14}
+                      color={colors.primaryForeground}
+                    />
+                    <Text style={styles.addBeneBtnText}>Add Bene</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              {checksAllowed ? (
+                <>
+                  <View style={styles.checkGroup}>
+                    <Text style={styles.sectionLabel}>Check</Text>
+                    {checkFirst ? (
+                      <View style={styles.checkDoneChip}>
+                        <Text
+                          style={[
+                            styles.checkSymbol,
+                            checkFirst.status ? styles.checkOk : styles.checkNotOk,
+                          ]}
+                        >
+                          {checkFirst.status ? '✓' : '✗'}
+                        </Text>
+                        <Text style={styles.checkDoneName} numberOfLines={1}>
+                          by {display(checkFirst.name)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.checkActions}>
+                        <TouchableOpacity
+                          style={[styles.iconBtn, styles.iconBtnOk, busy && styles.checkBtnDisabled]}
+                          disabled={busy}
+                          onPress={() => void doCheck(r, 'first', true)}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                          <MaterialCommunityIcons name="check" size={18} color={colors.success} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.iconBtn,
+                            styles.iconBtnCross,
+                            busy && styles.checkBtnDisabled,
+                          ]}
+                          disabled={busy}
+                          onPress={() => void doCheck(r, 'first', false)}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                          <MaterialCommunityIcons name="close" size={18} color={colors.destructive} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                  {checkFirst?.status ? (
+                    <View style={styles.checkGroup}>
+                      <Text style={styles.sectionLabel}>Cross Check</Text>
+                      {checkSecond ? (
+                        <View style={styles.checkDoneChip}>
+                          <Text
+                            style={[
+                              styles.checkSymbol,
+                              checkSecond.status ? styles.checkOk : styles.checkNotOk,
+                            ]}
+                          >
+                            {checkSecond.status ? '✓' : '✗'}
+                          </Text>
+                          <Text style={styles.checkDoneName} numberOfLines={1}>
+                            by {display(checkSecond.name)}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.checkActions}>
+                          <TouchableOpacity
+                            style={[
+                              styles.iconBtn,
+                              styles.iconBtnOk,
+                              busy && styles.checkBtnDisabled,
+                            ]}
+                            disabled={busy}
+                            onPress={() => void doCheck(r, 'second', true)}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          >
+                            <MaterialCommunityIcons name="check" size={18} color={colors.success} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.iconBtn,
+                              styles.iconBtnCross,
+                              busy && styles.checkBtnDisabled,
+                            ]}
+                            disabled={busy}
+                            onPress={() => void doCheck(r, 'second', false)}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          >
+                            <MaterialCommunityIcons
+                              name="close"
+                              size={18}
+                              color={colors.destructive}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  ) : null}
+                </>
+              ) : null}
+            </View>
+          );
+        }}
       />
 
       <RowDetailSheet
@@ -1640,6 +1951,116 @@ export function WithdrawalScreen() {
                   <ActivityIndicator size="small" color={colors.primaryForeground} />
                 ) : (
                   <Text style={styles.confirmBtnText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Per-row Add Bene (desktop AddBeneDialog parity) */}
+      <Modal
+        visible={addBeneRow !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !addBeneBusy && setAddBeneRow(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.addBeneCard]}>
+            <Text style={styles.modalTitle}>Select Bank Account Name</Text>
+            <Text style={styles.addBeneHint}>
+              Green = already on beneficiary list. Select one or more banks below.
+            </Text>
+            {addBeneSelected.length > 0 ? (
+              <Text style={styles.addBeneSelectedCount}>
+                {addBeneSelected.length} bank(s) selected
+              </Text>
+            ) : null}
+            <TextInput
+              style={[styles.modalInput, { minHeight: 40, marginTop: spacing(1) }]}
+              value={addBeneSearch}
+              onChangeText={setAddBeneSearch}
+              placeholder="Search bank name…"
+              placeholderTextColor={colors.muted}
+              autoCorrect={false}
+            />
+            {addBeneBusy && availableBanks.length === 0 ? (
+              <ActivityIndicator style={{ marginVertical: spacing(4) }} color={colors.primary} />
+            ) : availableBanks.length === 0 ? (
+              <Text style={styles.muted}>
+                No available banks — use Tools → Add Bene List first
+              </Text>
+            ) : (
+              <ScrollView style={styles.addBeneList} keyboardShouldPersistTaps="handled">
+                {availableBanks
+                  .filter((b) => {
+                    const q = addBeneSearch.trim().toLowerCase();
+                    return !q || b.toLowerCase().includes(q);
+                  })
+                  .map((bank) => {
+                    const already = addBeneExisting.some(
+                      (e) => e.trim().toLowerCase() === bank.trim().toLowerCase(),
+                    );
+                    const isSelected = addBeneSelected.includes(bank);
+                    return (
+                      <TouchableOpacity
+                        key={bank}
+                        style={[
+                          styles.addBeneItem,
+                          already && styles.addBeneItemDone,
+                          isSelected && !already && styles.addBeneItemSelected,
+                        ]}
+                        disabled={already || addBeneBusy}
+                        onPress={() => {
+                          setAddBeneSelected((prev) =>
+                            prev.includes(bank)
+                              ? prev.filter((x) => x !== bank)
+                              : [...prev, bank],
+                          );
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.addBeneCheck,
+                            already || isSelected ? styles.checkOk : styles.muted,
+                          ]}
+                        >
+                          {already || isSelected ? '✓' : '○'}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.addBeneItemText,
+                            already && styles.checkOk,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {bank}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.pagerBtn}
+                onPress={() => setAddBeneRow(null)}
+                disabled={addBeneBusy}
+              >
+                <Text style={styles.pagerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.confirmBtn,
+                  (addBeneBusy || addBeneSelected.length === 0) && styles.pagerBtnDisabled,
+                ]}
+                disabled={addBeneBusy || addBeneSelected.length === 0}
+                onPress={() => void submitAddBene()}
+              >
+                {addBeneBusy ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Submit</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2177,4 +2598,191 @@ const styles = StyleSheet.create({
   validationStatus: { fontSize: 12, fontWeight: '700' },
   validationReason: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   validationDetails: { color: colors.muted, fontSize: 11, marginTop: spacing(1) },
+  checkBlock: {
+    gap: spacing(2),
+    paddingTop: spacing(2),
+    marginTop: spacing(0.5),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  metaPanel: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(1),
+  },
+  metaCols: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  metaCol: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: spacing(1.5),
+    justifyContent: 'flex-start',
+  },
+  metaColFirst: {},
+  metaColLast: {},
+  metaColCenter: {
+    alignItems: 'center',
+  },
+  metaDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    alignSelf: 'stretch',
+  },
+  metaHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: spacing(1),
+    minHeight: 16,
+  },
+  metaHeadRowCenter: {
+    justifyContent: 'center',
+  },
+  metaHead: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  metaVal: {
+    color: colors.foreground,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  metaValCenter: {
+    textAlign: 'center',
+    width: '100%',
+  },
+  metaValSub: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
+    lineHeight: 14,
+  },
+  metaValEmph: {
+    color: colors.primary,
+  },
+  sectionLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    width: 78,
+  },
+  checkGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    minHeight: 36,
+  },
+  checkActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginLeft: 'auto',
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnOk: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.45)',
+  },
+  iconBtnCross: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  checkBtnDisabled: { opacity: 0.45 },
+  checkDoneChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(2),
+    minWidth: 0,
+  },
+  checkSymbol: { fontSize: 14, fontWeight: '800', width: 16, textAlign: 'center' },
+  checkDoneName: { color: colors.foreground, fontSize: 12, fontWeight: '500', flexShrink: 1 },
+  checkOk: { color: colors.success },
+  checkNotOk: { color: colors.destructive },
+  beneCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    minHeight: 36,
+  },
+  beneCardMeta: { flex: 1, minWidth: 0 },
+  beneCardValue: {
+    color: colors.foreground,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  addBeneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(2.5),
+  },
+  addBeneBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
+  addBeneCard: { maxHeight: '85%' },
+  addBeneHint: {
+    color: colors.muted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: spacing(1),
+    lineHeight: 17,
+  },
+  addBeneSelectedCount: {
+    color: '#ff9f0a',
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: spacing(1),
+  },
+  addBeneList: { maxHeight: 280, marginTop: spacing(1) },
+  addBeneItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2),
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing(1),
+    backgroundColor: colors.surfaceAlt,
+  },
+  addBeneItemDone: {
+    borderColor: 'rgba(34, 197, 94, 0.45)',
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
+  },
+  addBeneItemSelected: {
+    borderColor: 'rgba(255, 159, 10, 0.55)',
+    backgroundColor: 'rgba(255, 159, 10, 0.08)',
+  },
+  addBeneCheck: { fontSize: 14, fontWeight: '700', width: 18 },
+  addBeneItemText: { color: colors.foreground, fontSize: 13, flex: 1 },
 });

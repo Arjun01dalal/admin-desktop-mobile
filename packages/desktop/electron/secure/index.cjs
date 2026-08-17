@@ -655,6 +655,7 @@ async function execute(action, payload = {}, token = null) {
       'Content-Type': 'application/json',
       ...(safeToken ? { Authorization: `Bearer ${safeToken}` } : {}),
       ...(clientNameHeader ? { 'client-name': clientNameHeader } : {}),
+      ...(def.headers && typeof def.headers === 'object' ? def.headers : {}),
     };
 
     // Match laxminarayan Live Match calls: dates go in the query string for GET.

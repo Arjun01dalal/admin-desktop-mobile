@@ -142,20 +142,33 @@ export function DetailFilterBar(props: Props) {
             ))}
           </ScrollView>
           <View style={styles.searchRow}>
-            <TextInput
-              style={[styles.dateInput, styles.searchInput]}
-              value={searchText ?? ''}
-              onChangeText={onSearchTextChange}
-              onSubmitEditing={onSearchSubmit}
-              returnKeyType="search"
-              placeholder={`Search ${
-                searchFields.find((f) => f.key === searchField)?.label ?? 'name'
-              }…`}
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
-            />
+            <View style={styles.searchInputWrap}>
+              <TextInput
+                style={[styles.dateInput, styles.searchInput]}
+                value={searchText ?? ''}
+                onChangeText={onSearchTextChange}
+                onSubmitEditing={onSearchSubmit}
+                returnKeyType="search"
+                placeholder={`Search ${
+                  searchFields.find((f) => f.key === searchField)?.label ?? 'name'
+                }…`}
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
+              />
+              {Boolean(searchText?.trim()) ? (
+                <TouchableOpacity
+                  style={styles.clearSearchBtn}
+                  onPress={() => onSearchTextChange('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                >
+                  <Text style={styles.clearSearchText}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <TouchableOpacity
               style={[styles.applyBtn, loading && styles.btnDisabled]}
               onPress={onSearchSubmit}
@@ -174,9 +187,9 @@ export function DetailFilterBar(props: Props) {
           contentContainerStyle={styles.row}
         >
           <Chip label="All Apps" active={!appClientName} onPress={() => onAppChange('')} />
-          {CLIENT_NAMES.map((name) => (
+          {CLIENT_NAMES.map((name, i) => (
             <Chip
-              key={name}
+              key={`app-${i}-${name}`}
               label={appCodeForName(name)}
               active={appClientName === name}
               onPress={() => onAppChange(name)}
@@ -242,7 +255,32 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
   searchWrap: { gap: spacing(2) },
   searchRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
-  searchInput: { flex: 1 },
+  searchInputWrap: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  searchInput: {
+    flex: undefined,
+    width: '100%',
+    paddingRight: spacing(9),
+  },
+  clearSearchBtn: {
+    position: 'absolute',
+    right: spacing(2),
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearSearchText: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
   rowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   chip: {
     paddingHorizontal: spacing(3),

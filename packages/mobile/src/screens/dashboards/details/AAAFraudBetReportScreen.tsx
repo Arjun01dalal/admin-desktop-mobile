@@ -1,27 +1,26 @@
 /**
- * AAA Fraud Bet Report — mobile port of desktop AAAFraudBetReportPage.
+ * AAA Fraud Bet Report — mobile port of desktop AAAFraudBetReportPage / Laxmi.
+ * Date pickers (From / To), card list, images rendered with <Image>.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { DateField } from '../../../components/DateField';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 const STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected'];
-
-function toDateTimeLocal(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+const LIMIT_OPTIONS = ['10', '25', '50', '100', '200'];
 
 const PREFERRED_LIST_KEYS = [
   'reports',
@@ -36,6 +35,46 @@ const PREFERRED_LIST_KEYS = [
   'result',
   'payload',
 ];
+
+const IMAGE_URL_REGEX = /^https?:\/\/.*\.(png|jpe?g|gif|webp|svg|bmp)(\?.*)?$/i;
+const IMAGE_DATA_URI_REGEX = /^data:image\/[a-zA-Z0-9.+-]+;base64,/i;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?$/;
+
+/** Card summary keys (show first when present). */
+const CARD_PRIORITY_KEYS = [
+  'userName',
+  'user_name',
+  'name',
+  'userId',
+  'user_id',
+  'status',
+  'amount',
+  'stake',
+  'gameName',
+  'game',
+  'market',
+  'createdAt',
+  'createdOn',
+  'date',
+  'betTime',
+  'remark',
+  'comment',
+];
+
+function toYmd(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function toApiDateTime(ymd: string, endOfDay: boolean): string {
+  const clean = ymd.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+    return endOfDay ? `${clean}T23:59` : `${clean}T00:00`;
+  }
+  // Already datetime-local
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(clean)) return clean.slice(0, 16);
+  return clean;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -81,12 +120,25 @@ function formatColumnLabel(key: string): string {
     .join(' ');
 }
 
-function cellText(value: unknown): string {
+function isImageValue(col: string, value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  if (IMAGE_DATA_URI_REGEX.test(value)) return true;
+  if (/screenshot|screen_shot|image|photo|img/i.test(col)) {
+    return /^https?:\/\//i.test(value) || IMAGE_DATA_URI_REGEX.test(value);
+  }
+  return IMAGE_URL_REGEX.test(value);
+}
+
+function cellText(key: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string' && /time|date/i.test(key) && ISO_DATE_REGEX.test(value)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleString();
+  }
   if (typeof value === 'object') {
     try {
-      return JSON.stringify(value).slice(0, 120);
+      return JSON.stringify(value).slice(0, 160);
     } catch {
       return String(value);
     }
@@ -94,17 +146,48 @@ function cellText(value: unknown): string {
   return String(value);
 }
 
+function pickImageFromRow(row: Record<string, unknown>): { key: string; uri: string } | null {
+  for (const [key, value] of Object.entries(row)) {
+    if (isImageValue(key, value)) return { key, uri: value };
+  }
+  return null;
+}
+
+function cardFields(row: Record<string, unknown>): { key: string; label: string; value: string }[] {
+  const keys = Object.keys(row);
+  const ordered: string[] = [];
+  for (const pref of CARD_PRIORITY_KEYS) {
+    const match = keys.find((k) => k === pref || k.toLowerCase() === pref.toLowerCase());
+    if (match && !ordered.includes(match) && !isImageValue(match, row[match])) {
+      ordered.push(match);
+    }
+  }
+  for (const k of keys) {
+    if (ordered.length >= 6) break;
+    if (ordered.includes(k)) continue;
+    if (isImageValue(k, row[k])) continue;
+    if (k === '_id' || k === 'id') continue;
+    ordered.push(k);
+  }
+  return ordered.map((key) => ({
+    key,
+    label: formatColumnLabel(key),
+    value: cellText(key, row[key]),
+  }));
+}
+
 export function AAAFraudBetReportScreen() {
   const [startDate, setStartDate] = useState(() =>
-    toDateTimeLocal(new Date(Date.now() - 9 * 24 * 60 * 60 * 1000)),
+    toYmd(new Date(Date.now() - 9 * 24 * 60 * 60 * 1000)),
   );
-  const [endDate, setEndDate] = useState(() => toDateTimeLocal(new Date()));
+  const [endDate, setEndDate] = useState(() => toYmd(new Date()));
   const [status, setStatus] = useState('All');
   const [limit, setLimit] = useState('10');
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sheetRow, setSheetRow] = useState<Record<string, unknown> | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const genRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -113,8 +196,8 @@ export function AAAFraudBetReportScreen() {
     setError(null);
     try {
       const res = await secureApi<unknown>('aaa.fraudBetsReport', {
-        startDate,
-        endDate,
+        startDate: toApiDateTime(startDate, false),
+        endDate: toApiDateTime(endDate, true),
         status: status || 'All',
         limit: String(limit || 10),
       });
@@ -136,151 +219,319 @@ export function AAAFraudBetReportScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const columnKeys = useMemo(() => {
-    const keys = new Set<string>();
-    rows.forEach((row) => Object.keys(row || {}).forEach((k) => keys.add(k)));
-    return Array.from(keys).slice(0, 8);
-  }, [rows]);
-
-  const columns: DataTableColumn<Record<string, unknown>>[] = useMemo(
-    () =>
-      columnKeys.map((col) => ({
-        key: col,
-        label: formatColumnLabel(col),
-        width: 140,
-        render: (row) => cellText(row?.[col]),
-      })),
-    [columnKeys],
-  );
-
-  const sheetFields: SheetField[] = sheetRow
-    ? Object.keys(sheetRow).map((k) => ({
+  const sheetFields: SheetField[] = useMemo(() => {
+    if (!sheetRow) return [];
+    return Object.keys(sheetRow)
+      .filter((k) => !isImageValue(k, sheetRow[k]))
+      .map((k) => ({
         label: formatColumnLabel(k),
-        value: cellText(sheetRow[k]),
-      }))
-    : [];
+        value: cellText(k, sheetRow[k]),
+        multiline: true,
+      }));
+  }, [sheetRow]);
+
+  const sheetImage = sheetRow ? pickImageFromRow(sheetRow) : null;
 
   return (
-    <View style={styles.root}>
-      <ScrollView
-        style={styles.filters}
-        contentContainerStyle={styles.filtersContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.title}>AAA Fraud Bet Report</Text>
-        <TextInput
-          style={styles.input}
-          value={startDate}
-          onChangeText={setStartDate}
-          placeholder="Start (YYYY-MM-DDTHH:mm)"
-          placeholderTextColor={colors.muted}
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
         />
-        <TextInput
-          style={styles.input}
-          value={endDate}
-          onChangeText={setEndDate}
-          placeholder="End (YYYY-MM-DDTHH:mm)"
-          placeholderTextColor={colors.muted}
-        />
-        <ScrollView horizontal style={styles.chipRow}>
+      }
+    >
+      <Text style={styles.title}>AAA Fraud Bet Report</Text>
+      <Text style={styles.sub}>Total: {rows.length.toLocaleString('en-IN')}</Text>
+
+      <View style={styles.filterCard}>
+        <View style={styles.datesRow}>
+          <View style={styles.dateField}>
+            <Text style={styles.fieldLabel}>From Date</Text>
+            <DateField style={styles.dateInput} value={startDate} onChange={setStartDate} />
+          </View>
+          <View style={styles.dateField}>
+            <Text style={styles.fieldLabel}>To Date</Text>
+            <DateField style={styles.dateInput} value={endDate} onChange={setEndDate} />
+          </View>
+        </View>
+
+        <Text style={styles.fieldLabel}>Status</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
           {STATUS_OPTIONS.map((s) => (
             <TouchableOpacity
               key={s}
               style={[styles.chip, status === s && styles.chipActive]}
               onPress={() => setStatus(s)}
             >
-              <Text
-                style={[styles.chipText, status === s && styles.chipTextActive]}
-              >
-                {s}
-              </Text>
+              <Text style={[styles.chipText, status === s && styles.chipTextActive]}>{s}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <TextInput
-          style={styles.input}
-          value={limit}
-          onChangeText={setLimit}
-          keyboardType="numeric"
-          placeholder="Limit"
-          placeholderTextColor={colors.muted}
-        />
-        <TouchableOpacity style={styles.btn} onPress={() => void load()}>
-          <Text style={styles.btnText}>Apply</Text>
-        </TouchableOpacity>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
 
-      <ScrollView
-        horizontal
-        style={styles.tableScroll}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={() => void load()}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        <DataTable
-          columns={columns}
-          rows={rows}
-          keyFor={(row, index) => String(row._id || row.id || row.userId || index)}
-          loading={loading}
-          onRowPress={(row) => setSheetRow(row)}
-          emptyMessage="No fraud bets found."
-        />
-      </ScrollView>
+        <Text style={styles.fieldLabel}>Limit</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {LIMIT_OPTIONS.map((n) => (
+            <TouchableOpacity
+              key={n}
+              style={[styles.chip, limit === n && styles.chipActive]}
+              onPress={() => setLimit(n)}
+            >
+              <Text style={[styles.chipText, limit === n && styles.chipTextActive]}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnFlex, loading && styles.btnDisabled]}
+            disabled={loading}
+            onPress={() => void load()}
+          >
+            <Text style={styles.btnText}>{loading ? 'Loading…' : 'Apply'}</Text>
+          </TouchableOpacity>
+        </View>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+      </View>
+
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No fraud bets found for the selected filters.</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const image = pickImageFromRow(row);
+          const fields = cardFields(row);
+          const title =
+            String(
+              row.userName ||
+                row.user_name ||
+                row.name ||
+                row.userId ||
+                row.user_id ||
+                `Bet #${index + 1}`,
+            ) || `Bet #${index + 1}`;
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id || row.id || row.userId || '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {title}
+                </Text>
+                {image ? (
+                  <TouchableOpacity
+                    style={styles.viewImageBtn}
+                    activeOpacity={0.8}
+                    onPress={() => setPreviewImage(image.uri)}
+                  >
+                    <Text style={styles.viewImageBtnText}>View Image</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {fields.map((f) => (
+                <View key={f.key} style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>{f.label}</Text>
+                  <Text style={styles.cardValue} numberOfLines={3}>
+                    {f.value}
+                  </Text>
+                </View>
+              ))}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={Boolean(sheetRow)}
         title="Fraud Bet"
         fields={sheetFields}
+        actions={
+          sheetImage
+            ? [
+                {
+                  label: 'View Image',
+                  tone: 'primary',
+                  onPress: () => {
+                    const uri = sheetImage.uri;
+                    setSheetRow(null);
+                    setTimeout(() => setPreviewImage(uri), 250);
+                  },
+                },
+              ]
+            : undefined
+        }
         onClose={() => setSheetRow(null)}
       />
-    </View>
+
+      <Modal
+        visible={Boolean(previewImage)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImage(null)}
+      >
+        <View style={styles.previewBackdrop}>
+          <TouchableWithoutFeedback onPress={() => setPreviewImage(null)}>
+            <View style={styles.previewTouch} />
+          </TouchableWithoutFeedback>
+          <View style={styles.previewCard}>
+            <TouchableOpacity
+              style={styles.previewClose}
+              onPress={() => setPreviewImage(null)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.previewCloseText}>✕</Text>
+            </TouchableOpacity>
+            {previewImage ? (
+              <Image
+                source={{ uri: previewImage }}
+                style={styles.previewImage}
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  filters: { maxHeight: 280 },
-  filtersContent: { padding: spacing(4), gap: spacing(2) },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.foreground,
-    marginBottom: 4,
-  },
-  input: {
+  screen: { flex: 1, backgroundColor: 'transparent' },
+  content: { padding: spacing(4), paddingBottom: spacing(10) },
+  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1), marginBottom: spacing(3) },
+  filterCard: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: spacing(2),
-    color: colors.foreground,
-    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing(3),
+    gap: spacing(2),
+    marginBottom: spacing(3),
   },
-  chipRow: { maxHeight: 40 },
+  datesRow: { flexDirection: 'row', gap: spacing(2) },
+  dateField: { flex: 1, minWidth: 0 },
+  fieldLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: spacing(1),
+  },
+  dateInput: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    fontSize: 14,
+  },
+  chipRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', paddingVertical: 2 },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginRight: 6,
-    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    backgroundColor: colors.surfaceAlt,
   },
   chipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
+  actionRow: { flexDirection: 'row', marginTop: spacing(1) },
   btn: {
-    alignSelf: 'flex-start',
     backgroundColor: colors.primary,
+    borderRadius: radius.md,
     paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-    borderRadius: radius.sm,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
   },
-  btnText: { color: colors.primaryForeground, fontWeight: '700' },
-  error: { color: colors.destructive },
-  tableScroll: { flex: 1 },
+  btnFlex: { flex: 1 },
+  btnDisabled: { opacity: 0.6 },
+  btnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  error: { color: colors.destructive, fontSize: 12, marginTop: spacing(1) },
+  hint: { color: colors.muted, marginBottom: spacing(2) },
+  list: { gap: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    gap: spacing(1.5),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    paddingHorizontal: spacing(2),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: { color: colors.foreground, fontSize: 15, fontWeight: '700', flex: 1, minWidth: 0 },
+  viewImageBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1.5),
+    flexShrink: 0,
+  },
+  viewImageBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 2,
+  },
+  cardLabel: { color: colors.muted, fontSize: 12, fontWeight: '600', width: '38%' },
+  cardValue: { color: colors.foreground, fontSize: 12, flex: 1, textAlign: 'right' },
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    padding: spacing(4),
+  },
+  previewTouch: { ...StyleSheet.absoluteFillObject },
+  previewCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing(3),
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  previewClose: { alignSelf: 'flex-end', marginBottom: spacing(2) },
+  previewCloseText: { color: colors.foreground, fontSize: 18, fontWeight: '700' },
+  previewImage: { width: '100%', height: 360 },
 });

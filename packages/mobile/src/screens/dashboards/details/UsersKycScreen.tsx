@@ -763,7 +763,7 @@ export function UsersKycScreen() {
 
       {rows.map((r, i) => (
         <TouchableOpacity
-          key={r._id || String(i)}
+          key={`row-${i}-${String(r._id ?? '')}`}
           style={styles.card}
           activeOpacity={0.75}
           onPress={() => setSheetRow(r)}

@@ -10,9 +10,11 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-toastify';
 import { useLocationController } from '@/controllers/LocationProvider';
 import { AstroLogo } from '@/components/AstroLogo';
+import { ThemeModeMenu } from '@/components/ThemeModeMenu';
 import { persistRoleFromLogin } from '@/auth/permissions';
 import {
   getRoleOptions,
@@ -35,7 +37,23 @@ type Props = {
   initialEmail?: string;
 };
 
+function loginShellSx(isDark: boolean) {
+  return {
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    background: isDark
+      ? 'radial-gradient(circle at 50% 0%, #2b2b30 0%, #1c1c1e 55%)'
+      : 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f0f1f5 45%, #e8e9ee 100%)',
+    color: isDark ? '#fff' : '#111',
+    px: 3,
+    py: 4,
+  };
+}
+
 export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -248,23 +266,41 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
     }
   };
 
+  const fieldSx = {
+    '& .MuiInputBase-root': {
+      bgcolor: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
+      color: 'text.primary',
+    },
+    '& .MuiInputBase-input': {
+      color: 'text.primary',
+      WebkitTextFillColor: 'currentColor',
+    },
+    '& .MuiInputLabel-root': { color: 'text.secondary' },
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)',
+    },
+    '& .MuiFormHelperText-root': { color: 'text.secondary' },
+  };
+
   if (pendingUser) {
     const options = getRoleOptions(pendingUser);
     return (
       <Box
         sx={{
-          height: '100vh',
-          display: 'flex',
+          ...loginShellSx(isDark),
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'radial-gradient(circle at 50% 0%, #2b2b30 0%, #1c1c1e 55%)',
-          px: 3,
+          flexDirection: 'row',
+          position: 'relative',
         }}
       >
+        <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
+          <ThemeModeMenu />
+        </Box>
         <Stack spacing={3} sx={{ width: '100%', maxWidth: 420 }}>
           <Stack spacing={1} alignItems="center">
             <AstroLogo size={96} />
-            <Typography variant="h5" fontWeight={700}>
+            <Typography variant="h5" fontWeight={700} color="text.primary">
               Change Role
             </Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center">
@@ -278,6 +314,7 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
             value={selectedRoleId}
             onChange={(event) => setSelectedRoleId(event.target.value)}
             disabled={loading}
+            sx={fieldSx}
           >
             {options.map((role: RoleOption) => (
               <MenuItem key={role.id} value={role.id}>
@@ -300,36 +337,42 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
   }
 
   return (
-    <Box
-      sx={{
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'radial-gradient(circle at 50% 0%, #2b2b30 0%, #1c1c1e 55%)',
-        px: 3,
-        py: 4,
-      }}
-    >
-      <Button
-        onClick={onBack}
-        sx={{ alignSelf: 'flex-start', color: 'text.secondary', mb: 1 }}
+    <Box sx={loginShellSx(isDark)}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          mb: 1,
+        }}
       >
-        ← Astro Admin
-      </Button>
+        <Button onClick={onBack} sx={{ color: 'text.secondary' }}>
+          ← Astro Admin
+        </Button>
+        <ThemeModeMenu />
+      </Box>
 
       <Stack spacing={1} alignItems="center" sx={{ mb: 4 }}>
         <AstroLogo size={96} />
         <Typography
           variant="overline"
-          sx={{ letterSpacing: 3, color: '#c9a0ff', fontWeight: 700, lineHeight: 1 }}
+          sx={{
+            letterSpacing: 3,
+            color: isDark ? '#c9a0ff' : '#7b4fd4',
+            fontWeight: 700,
+            lineHeight: 1,
+          }}
         >
           ASTRO ADMIN
         </Typography>
-        <Typography variant="h5" fontWeight={700}>
-          Sign in
+        <Typography variant="h5" fontWeight={700} color="text.primary">
+          {showOtp ? 'Verify OTP' : 'Sign in'}
         </Typography>
         <Typography variant="body2" color="text.secondary" textAlign="center">
-          Enter your mobile number to receive a one-time password
+          {showOtp
+            ? `Enter the 4-digit OTP sent to ${mobile}`
+            : 'Enter your mobile number to receive a one-time password'}
         </Typography>
         {isReady && coords && (
           <Typography variant="caption" color="success.main">
@@ -356,6 +399,7 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
           helperText={mobileError}
           disabled={showOtp || loading}
           inputProps={{ inputMode: 'numeric', maxLength: 10 }}
+          sx={fieldSx}
         />
 
         {showOtp && (
@@ -372,15 +416,24 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
             disabled={loading}
             inputProps={{ inputMode: 'numeric', maxLength: 4 }}
             autoFocus
+            sx={fieldSx}
           />
         )}
 
         <FormControlLabel
+          sx={{
+            color: 'text.primary',
+            '& .MuiFormControlLabel-label': { color: 'text.primary' },
+          }}
           control={
             <Checkbox
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               disabled={loading}
+              sx={{
+                color: 'text.secondary',
+                '&.Mui-checked': { color: 'primary.main' },
+              }}
             />
           }
           label="Remember me"
@@ -396,6 +449,7 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
                 setOtp('');
                 setOtpError(undefined);
               }}
+              sx={{ color: 'text.secondary' }}
             >
               Change number
             </Button>

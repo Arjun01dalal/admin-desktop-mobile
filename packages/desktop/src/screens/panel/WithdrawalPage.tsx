@@ -17,6 +17,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -126,6 +127,7 @@ function Copyable({ value, masked }: { value?: string; masked: string }) {
 
 /** Withdrawal — CommonTable UI + old panel action contracts (check/lock/status/bulk/bene). */
 export function WithdrawalPage() {
+  const isLightMode = useTheme().palette.mode === 'light';
   const admin = getStoredUser<{
     _id?: string;
     name?: string;
@@ -1485,19 +1487,32 @@ export function WithdrawalPage() {
     setDelayReason,
   ]);
 
-  const getRowSx = useCallback((row: WithdrawalRow) => {
-    const bg = withdrawalRowBg(row);
-    if (!bg) return undefined;
-    return {
-      bgcolor: `${bg} !important`,
-      '& td': { bgcolor: `${bg} !important` },
-      '& td[data-sticky-left="true"]': {
+  const getRowSx = useCallback(
+    (row: WithdrawalRow) => {
+      const bg = withdrawalRowBg(row, isLightMode ? 'light' : 'dark');
+      if (!bg) return undefined;
+      const text = isLightMode ? '#1a1a1f' : '#e8e8ea';
+      const border = isLightMode
+        ? 'rgba(0, 0, 0, 0.10) !important'
+        : 'rgba(255, 255, 255, 0.12) !important';
+      return {
         bgcolor: `${bg} !important`,
-        backgroundColor: `${bg} !important`,
-        zIndex: '30 !important',
-      },
-    };
-  }, []);
+        '& td': {
+          bgcolor: `${bg} !important`,
+          color: `${text} !important`,
+          borderColor: border,
+        },
+        '& td[data-sticky-left="true"]': {
+          bgcolor: `${bg} !important`,
+          backgroundColor: `${bg} !important`,
+          zIndex: '30 !important',
+        },
+        '& .MuiTypography-root': { color: 'inherit !important' },
+        '& .MuiIconButton-root': { color: text },
+      };
+    },
+    [isLightMode],
+  );
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
@@ -1806,7 +1821,7 @@ export function WithdrawalPage() {
               label="Gateway"
               value={bulkManualGateway}
               onChange={(e) => setBulkManualGateway(e.target.value)}
-              sx={{ '& .MuiInputBase-root': { bgcolor: '#121218' } }}
+              sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper', color: 'text.primary' } }}
             >
               <MenuItem value="">— Choose —</MenuItem>
               {Array.from(new Set([...MANUAL_GATEWAYS, ...gateways])).map((g) => (
@@ -1821,7 +1836,7 @@ export function WithdrawalPage() {
               label="Mid"
               value={bulkManualMid}
               onChange={(e) => setBulkManualMid(e.target.value)}
-              sx={{ '& .MuiInputBase-root': { bgcolor: '#121218' } }}
+              sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper', color: 'text.primary' } }}
             >
               <MenuItem value="">— Choose —</MenuItem>
               {mids.map((m, i) => (

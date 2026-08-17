@@ -41,6 +41,8 @@ export type GameCardState = {
   onPlutusChange: (value: string) => void;
   onLudoUpdate?: () => void;
   onLudoUpdateRtp?: () => void;
+  onLudoGgrDetails?: () => void;
+  onLudoGameGgrDetails?: (gameId: string, ggr: number) => void;
 };
 
 export type ProviderNavContext = {
@@ -395,6 +397,7 @@ export function buildProviderCards(
       selectOptions: ludoOptions,
       selectStatsMap: bundle.ludoGameStatsMap,
       onSelectChange: games?.onLudoGameChange,
+      onSelectGgrPress: games?.onLudoGameGgrDetails,
       actions: [
         {
           label: 'Update',
@@ -411,7 +414,10 @@ export function buildProviderCards(
         row('Unique Player', ludo.uniquePlayers),
         row('Total Player Commission', ludo.totalPlayerCommission),
         row('RTP', Math.round(toNum(ludo.rtp))),
-        row('GGR', Math.round(toNum(ludo.ggr))),
+        {
+          ...row('GGR', Math.round(toNum(ludo.ggr))),
+          onPress: () => games?.onLudoGgrDetails?.(),
+        },
       ],
     },
     {

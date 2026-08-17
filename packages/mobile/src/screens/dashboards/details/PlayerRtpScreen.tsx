@@ -3,7 +3,7 @@
  * Type selector (Qtech / WCO / Satta Matka / Falcon / Exchange / AAA Exchange);
  * only Qtech (ops.playerRtpQtech) and AAA Exchange (ops.playerRtpExchange) have
  * wired APIs — other types show "not available yet" (same as desktop).
- * Date filter + userId/gameId search. Row tap opens a popup with all fields; for
+ * Date filter + userId/gameId search. Card tap opens a popup with all fields; for
  * Qtech the per-game breakdown is listed there (desktop opens a details route).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,12 +15,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -60,6 +58,11 @@ type ExchangeRow = {
 };
 
 type PlayerRtpRow = QtechRow | ExchangeRow;
+
+type SheetState =
+  | { kind: 'qtech'; row: QtechRow }
+  | { kind: 'exchange'; row: ExchangeRow }
+  | null;
 
 const TYPE_OPTIONS: RtpType[] = [
   'Qtech',
@@ -153,7 +156,7 @@ function winPctBadge(winPercentage: number | undefined): string | undefined {
   return undefined;
 }
 
-/** Translucent row background by win% (desktop rowBgSx parity). */
+/** Translucent card background by win% (desktop rowBgSx parity). */
 function winPctRowBg(winPercentage: number | undefined): string | undefined {
   const pct = Number(winPercentage) || 0;
   if (pct > 85) return 'rgba(220,38,38,0.18)';
@@ -175,7 +178,7 @@ export function PlayerRtpScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [sheetRow, setSheetRow] = useState<QtechRow | null>(null);
+  const [sheet, setSheet] = useState<SheetState>(null);
   const genRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -224,110 +227,44 @@ export function PlayerRtpScreen() {
     setGameId(draftGameId.trim());
   }, [draftUserId, draftGameId]);
 
-  // Fit the visible (main) columns to the phone width so there is no
-  // horizontal scroll. Widths scale with the screen size.
-  const { width: screenWidth } = useWindowDimensions();
-  const availableWidth = Math.max(280, screenWidth - spacing(4) * 2 - spacing(2));
-  const IDX_W = 34;
-  const fit = (weight: number, totalWeight: number) =>
-    Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
-  // Qtech main columns: userId(3) gameCount(1.2) totalAmount(3.1) gap totalWinPct(2.4)
-  const GAP_W = 12;
-  const qtechW = {
-    userId: fit(3, 10),
-    gameCount: fit(1.2, 10),
-    totalAmount: fit(3.1, 10) - GAP_W,
-    winPct: fit(2.4, 10),
-  };
-  // Exchange main columns: userId(3) amount(2.5) name(3) winLoss(2.5)
-  const exchW = {
-    userId: fit(3, 11),
-    amount: fit(2.5, 11),
-    name: fit(3, 11),
-    winLoss: fit(2.5, 11),
-  };
-
-  const qtechColumns = useMemo<DataTableColumn<QtechRow>[]>(
-    () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
-      { key: 'userId', label: 'User ID', width: qtechW.userId, render: (r) => display(r.userId) },
-      {
-        key: 'games',
-        label: 'Games',
-        width: 200,
-        render: (r) =>
-          [...(r.games || [])]
-            .sort((a, b) => (Number(b.winPercentage) || 0) - (Number(a.winPercentage) || 0))
-            .map((g) => g.gameId)
-            .filter(Boolean)
-            .join(', ') || '—',
-      },
-      {
-        key: 'gameCount',
-        label: 'Games',
-        width: qtechW.gameCount,
-        align: 'center',
-        render: (r) => String(r.games?.length || 0),
-      },
-      { key: 'totalAmount', label: 'Amount', width: qtechW.totalAmount, align: 'right', render: (r) => formatAmount(r.combined?.totalAmount ?? 0) },
-      // Spacer between Amount and Win % so the badge doesn't touch the numbers.
-      { key: 'gap', label: '', width: GAP_W, render: () => '' },
-      { key: 'totalBets', label: 'Total Bets', width: 100, align: 'right', render: (r) => display(r.combined?.totalBets ?? 0) },
-      { key: 'totalWins', label: 'Total Wins', width: 100, align: 'right', render: (r) => display(r.combined?.totalWins ?? 0) },
-      { key: 'winAmount', label: 'Total Wins Amount', width: 130, align: 'right', render: (r) => formatAmount(r.combined?.winAmount ?? 0) },
-      {
-        key: 'winPct',
-        label: 'Win %',
-        width: qtechW.winPct,
-        render: (r) => display(r.combined?.winPercentage ?? 0),
-        badge: (r) => winPctBadge(r.combined?.winPercentage),
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availableWidth],
-  );
-
-  const exchangeColumns = useMemo<DataTableColumn<ExchangeRow>[]>(
-    () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
-      { key: 'userId', label: 'User ID', width: exchW.userId, render: (r) => display(r.userId) },
-      { key: 'amount', label: 'Amount', width: exchW.amount, align: 'right', render: (r) => formatAmount(r.amount) },
-      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
-      { key: 'name', label: 'Name', width: exchW.name, render: (r) => display(r.name) },
-      { key: 'provider', label: 'Provider', width: 120, render: (r) => display(r.provider) },
-      { key: 'totalBets', label: 'Total Bets', width: 100, align: 'right', render: (r) => display(r.totalBets) },
-      {
-        key: 'winLoss',
-        label: 'Win Loss',
-        width: exchW.winLoss,
-        align: 'right',
-        render: (r) => formatAmount(r.winLoss ?? 0),
-        color: (r) => (Number(r.winLoss) < 0 ? colors.destructive : '#16a34a'),
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availableWidth],
-  );
-
   const isQtech = type === 'Qtech';
   const isSupported = SUPPORTED_RTP_TYPES.has(type);
 
   const sheetFields: SheetField[] = useMemo(() => {
-    if (!sheetRow) return [];
-    const games = [...(sheetRow.games || [])].sort(
+    if (!sheet) return [];
+    if (sheet.kind === 'exchange') {
+      const r = sheet.row;
+      const winLoss = Number(r.winLoss) || 0;
+      return [
+        { label: 'User ID', value: display(r.userId) },
+        { label: 'Name', value: display(r.name) },
+        { label: 'App Code', value: appCodeForName(r.clientName) },
+        { label: 'Provider', value: display(r.provider) },
+        { label: 'Amount', value: formatAmount(r.amount) },
+        { label: 'Total Bets', value: display(r.totalBets) },
+        {
+          label: 'Win Loss',
+          value: formatAmount(r.winLoss ?? 0),
+          color: winLoss < 0 ? colors.destructive : '#16a34a',
+        },
+      ];
+    }
+
+    const row = sheet.row;
+    const games = [...(row.games || [])].sort(
       (a, b) => (Number(b.winPercentage) || 0) - (Number(a.winPercentage) || 0),
     );
     const fields: SheetField[] = [
-      { label: 'User ID', value: display(sheetRow.userId) },
-      { label: 'Game Count', value: String(sheetRow.games?.length || 0) },
-      { label: 'Total Amount', value: formatAmount(sheetRow.combined?.totalAmount ?? 0) },
-      { label: 'Total Bets', value: display(sheetRow.combined?.totalBets ?? 0) },
-      { label: 'Total Wins', value: display(sheetRow.combined?.totalWins ?? 0) },
-      { label: 'Total Wins Amount', value: formatAmount(sheetRow.combined?.winAmount ?? 0) },
+      { label: 'User ID', value: display(row.userId) },
+      { label: 'Game Count', value: String(row.games?.length || 0) },
+      { label: 'Total Amount', value: formatAmount(row.combined?.totalAmount ?? 0) },
+      { label: 'Total Bets', value: display(row.combined?.totalBets ?? 0) },
+      { label: 'Total Wins', value: display(row.combined?.totalWins ?? 0) },
+      { label: 'Total Wins Amount', value: formatAmount(row.combined?.winAmount ?? 0) },
       {
         label: 'Total Win %',
-        value: display(sheetRow.combined?.winPercentage ?? 0),
-        badgeColor: winPctBadge(sheetRow.combined?.winPercentage),
+        value: display(row.combined?.winPercentage ?? 0),
+        badgeColor: winPctBadge(row.combined?.winPercentage),
       },
     ];
     games.forEach((g, i) => {
@@ -340,7 +277,10 @@ export function PlayerRtpScreen() {
       });
     });
     return fields;
-  }, [sheetRow]);
+  }, [sheet]);
+
+  const qtechRows = rows as QtechRow[];
+  const exchangeRows = rows as ExchangeRow[];
 
   return (
     <ScrollView
@@ -379,6 +319,7 @@ export function PlayerRtpScreen() {
               setDraftGameId('');
               setUserId('');
               setGameId('');
+              setSheet(null);
             }}
           >
             <Text style={[styles.chipText, type === opt && styles.chipTextActive]}>{opt}</Text>
@@ -428,43 +369,126 @@ export function PlayerRtpScreen() {
       ) : null}
 
       {!isSupported ? (
-        <View style={styles.card}>
+        <View style={styles.unavailableCard}>
           <Text style={styles.empty}>{type} RTP is not available yet</Text>
         </View>
-      ) : isQtech ? (
-        <DataTable
-          columns={qtechColumns.filter((c) =>
-            ['idx', 'userId', 'gameCount', 'totalAmount', 'gap', 'winPct'].includes(c.key),
-          )}
-          rows={rows as QtechRow[]}
-          keyFor={(r, i) => String(r.userId || i)}
-          loading={loading}
-          emptyMessage="No RTP data found"
-          onRowPress={(row) => setSheetRow(row)}
-          rowBg={(row) => winPctRowBg(row.combined?.winPercentage)}
-          hint="Tap a row to see all games"
-        />
       ) : (
-        <DataTable
-          columns={exchangeColumns.filter((c) =>
-            ['idx', 'userId', 'amount', 'name', 'winLoss'].includes(c.key),
+        <>
+          {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+          {!loading && rows.length === 0 ? (
+            <Text style={styles.hint}>No RTP data found</Text>
+          ) : null}
+
+          {isQtech ? (
+            <View style={styles.list}>
+              {qtechRows.map((row, index) => {
+                const winPct = row.combined?.winPercentage;
+                const badge = winPctBadge(winPct);
+                const bg = winPctRowBg(winPct);
+                return (
+                  <TouchableOpacity
+                    key={`row-${index}-${String(row.userId ?? '')}`}
+                    style={[styles.card, bg ? { backgroundColor: bg } : null]}
+                    activeOpacity={0.75}
+                    onPress={() => setSheet({ kind: 'qtech', row })}
+                  >
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.cardIndex}>#{index + 1}</Text>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {display(row.userId)}
+                      </Text>
+                      <Text style={[styles.winPill, badge ? { color: badge, borderColor: badge } : null]}>
+                        Win%: {display(winPct ?? 0)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft}>
+                        Amount: {formatAmount(row.combined?.totalAmount ?? 0)}
+                      </Text>
+                      <Text style={styles.cardSplitRight}>
+                        Games: {row.games?.length || 0}
+                      </Text>
+                    </View>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft}>
+                        Bets: {display(row.combined?.totalBets ?? 0)}
+                      </Text>
+                      <Text style={styles.cardSplitRight}>
+                        Wins: {display(row.combined?.totalWins ?? 0)}
+                      </Text>
+                    </View>
+                    <Text style={styles.cardHint}>Tap card for game breakdown</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {exchangeRows.map((row, index) => {
+                const winLoss = Number(row.winLoss) || 0;
+                return (
+                  <TouchableOpacity
+                    key={`row-${index}-${String(row.userId ?? '')}`}
+                    style={styles.card}
+                    activeOpacity={0.75}
+                    onPress={() => setSheet({ kind: 'exchange', row })}
+                  >
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.cardIndex}>#{index + 1}</Text>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {display(row.name) !== '—' ? display(row.name) : display(row.userId)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                        App Code: {appCodeForName(row.clientName)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.cardSplitRight,
+                          { color: winLoss < 0 ? colors.destructive : '#16a34a' },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        P/L: {formatAmount(row.winLoss ?? 0)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft}>
+                        Amount: {formatAmount(row.amount)}
+                      </Text>
+                      <Text style={styles.cardSplitRight}>
+                        Bets: {display(row.totalBets)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardRow}>
+                      <Text style={styles.cardLabel}>User ID</Text>
+                      <Text style={styles.cardValue} numberOfLines={1}>
+                        {display(row.userId)}
+                      </Text>
+                    </View>
+                    <Text style={styles.cardHint}>Tap card for details</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           )}
-          rows={rows as ExchangeRow[]}
-          keyFor={(r, i) => String(r.userId || i)}
-          loading={loading}
-          emptyMessage="No RTP data found"
-          onRowPress={(row) =>
-            setSheetRow({ userId: row.userId, games: [], combined: {} })
-          }
-          hint="Tap a row to see details"
-        />
+        </>
       )}
 
       <RowDetailSheet
-        visible={sheetRow !== null}
-        title={sheetRow ? `User ${display(sheetRow.userId)}` : ''}
+        visible={sheet !== null}
+        title={
+          sheet
+            ? sheet.kind === 'qtech'
+              ? `User ${display(sheet.row.userId)}`
+              : display(sheet.row.name) !== '—'
+                ? display(sheet.row.name)
+                : `User ${display(sheet.row.userId)}`
+            : ''
+        }
         fields={sheetFields}
-        onClose={() => setSheetRow(null)}
+        onClose={() => setSheet(null)}
       />
     </ScrollView>
   );
@@ -512,7 +536,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  card: {
+  unavailableCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -521,6 +545,87 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(6) },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  winPill: {
+    fontSize: 10,
+    fontWeight: '800',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    color: colors.foreground,
+    overflow: 'hidden',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,

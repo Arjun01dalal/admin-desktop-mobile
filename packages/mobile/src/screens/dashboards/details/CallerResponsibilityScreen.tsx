@@ -1,7 +1,7 @@
 /**
  * Caller Responsibility — port of desktop CallerResponsibilityPage with the
  * mobile screen structure: date/caller-head/location filters, Summary card,
- * By Office Location table and Caller Data table with a bottom detail sheet.
+ * By Office Location table and Caller Data cards with a bottom detail sheet.
  * (Desktop's CSV validate + drill-down subpages are not ported yet.)
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -27,6 +27,7 @@ import {
   RESP_TOTAL_DEPOSIT,
   type CallerRow,
 } from '../../../auth/callerRoles';
+import { openPanelTarget } from '../../../navigation/panelDetail';
 import { colors, radius, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -95,11 +96,11 @@ function ecs(row: CallerRow): Record<string, unknown> {
   return (row.activePlayersECS || {}) as Record<string, unknown>;
 }
 
-/** Caller table columns shown in the list; the sheet shows all of them. */
-const MAIN_KEYS = new Set(['sr', 'pseudo', 'deposit', 'pnl']);
-
+/** Full column set for the detail sheet. */
 export function CallerResponsibilityScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<{
+    navigate: (name: string, params?: Record<string, unknown>) => void;
+  }>();
   const user = getStoredUser<StoredCallerUser>();
   const { isCaller, isCallerHead, isCallerOrHead, isFullAllotment } = roleFlags(user?.Role_ID);
   const showTotalDeposit = canSeeTotalDeposit(user);
@@ -124,19 +125,35 @@ export function CallerResponsibilityScreen() {
 
   const openDepositList = useCallback(
     (row: CallerRow, type?: 'withdrawal' | 'uniquePending') => {
-      const params: Record<string, unknown> = {
+      const state: Record<string, unknown> = {
         list: row,
         empCode: row.empCode,
         startDate,
         endDate,
       };
-      if (type) params.type = type;
-      // Root-stack detail route (above the drawer) — push so Back always returns here.
-      const parent = navigation.getParent() as
-        | { push?: (name: string, params?: object) => void; navigate: (name: string, params?: object) => void }
-        | undefined;
-      const go = parent?.push ?? parent?.navigate ?? navigation.navigate.bind(navigation);
-      go('/caller-responsibility/deposit-list', params);
+      if (type) state.type = type;
+      openPanelTarget(navigation, {
+        href: '/caller-responsibility/deposit-list',
+        state,
+      });
+      setSelected(null);
+    },
+    [navigation, startDate, endDate],
+  );
+
+  const openCallerDetails = useCallback(
+    (row: CallerRow) => {
+      openPanelTarget(navigation, {
+        href: '/caller-responsibility/details',
+        state: {
+          empCode: row.empCode,
+          deposit: row.totalDeposit,
+          activePlayersECS: row.activePlayersECS,
+          list: row,
+          startDate,
+          endDate,
+        },
+      });
       setSelected(null);
     },
     [navigation, startDate, endDate],
@@ -293,11 +310,6 @@ export function CallerResponsibilityScreen() {
     setEndDate(draftEnd);
   }, [draftStart, draftEnd]);
 
-  const listColumns = useMemo(
-    () => callerColumns.filter((c) => MAIN_KEYS.has(c.key)),
-    [callerColumns],
-  );
-
   const onCallerPress = useCallback((row: CallerRow, index: number) => {
     setSelected({ row, index });
   }, []);
@@ -418,24 +430,7 @@ export function CallerResponsibilityScreen() {
       )}
 
       {!loading && (
-        <>
-          <Text style={styles.sectionTitle}>Caller Data</Text>
-          <View style={styles.callerHeadRow}>
-            {listColumns.map((c) => (
-              <Text
-                key={c.key}
-                style={[
-                  styles.callerHead,
-                  { flex: c.key === 'sr' ? 0.5 : 1 },
-                  c.align === 'right' && styles.callerRight,
-                ]}
-                numberOfLines={1}
-              >
-                {c.label}
-              </Text>
-            ))}
-          </View>
-        </>
+        <Text style={styles.sectionTitle}>Caller Data</Text>
       )}
     </View>
     ),
@@ -458,7 +453,6 @@ export function CallerResponsibilityScreen() {
       summaryItems,
       locationColumns,
       locationRows,
-      listColumns,
     ],
   );
 
@@ -477,28 +471,59 @@ export function CallerResponsibilityScreen() {
         ListEmptyComponent={
           loading ? null : <Text style={styles.emptyList}>No caller data</Text>
         }
-        renderItem={({ item, index }) => (
-          <Pressable
-            onPress={() => onCallerPress(item, index)}
-            delayPressIn={0}
-            unstable_pressDelay={0}
-            style={({ pressed }) => [styles.callerRow, pressed && styles.callerRowPressed]}
-          >
-            {listColumns.map((c) => (
-              <Text
-                key={c.key}
-                style={[
-                  styles.callerCell,
-                  { flex: c.key === 'sr' ? 0.5 : 1 },
-                  c.align === 'right' && styles.callerRight,
-                ]}
-                numberOfLines={1}
-              >
-                {c.render(item, index)}
-              </Text>
-            ))}
-          </Pressable>
-        )}
+        renderItem={({ item, index }) => {
+          const deposit = Number(item.totalDeposit);
+          const withdraw = Number(item.withdrawalApprovedAmount);
+          const pnlNum =
+            Number.isFinite(deposit) && Number.isFinite(withdraw) ? Math.round(deposit - withdraw) : null;
+          return (
+            <Pressable
+              onPress={() => onCallerPress(item, index)}
+              delayPressIn={0}
+              unstable_pressDelay={0}
+              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {String(item.subAdminName ?? 'Company')}
+                </Text>
+                {showLocation ? (
+                  <Text style={styles.cardMeta} numberOfLines={1}>
+                    {cellText(item.officeLocation)}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  Deposit: {roundAmt(item.totalDeposit)}
+                </Text>
+                <Text
+                  style={[
+                    styles.cardSplitRight,
+                    pnlNum != null && pnlNum < 0
+                      ? { color: colors.destructive }
+                      : pnlNum != null
+                        ? { color: colors.success }
+                        : null,
+                  ]}
+                  numberOfLines={1}
+                >
+                  PNL: {pnl(item.totalDeposit, item.withdrawalApprovedAmount)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  Refund: {roundAmt(item.withdrawalApprovedAmount)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  Active: {cellText(item.transactionCount)}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for details & lists</Text>
+            </Pressable>
+          );
+        }}
       />
 
       <RowDetailSheet
@@ -518,8 +543,12 @@ export function CallerResponsibilityScreen() {
           selected
             ? [
                 {
-                  label: 'View Deposit',
+                  label: 'Details',
                   tone: 'primary',
+                  onPress: () => openCallerDetails(selected.row),
+                },
+                {
+                  label: 'View Deposit',
                   onPress: () => openDepositList(selected.row),
                 },
                 {
@@ -599,33 +628,68 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.destructive, fontSize: 13 },
   emptyList: { color: colors.muted, textAlign: 'center', marginTop: spacing(4) },
-  callerHeadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing(2),
-    borderBottomWidth: 1,
-    borderBottomColor: colors.primary,
+  card: {
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing(2),
-    borderTopLeftRadius: radius.md,
-    borderTopRightRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderBottomWidth: 1,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    marginBottom: spacing(2),
+    gap: 2,
   },
-  callerHead: { color: colors.primary, fontWeight: '700', fontSize: 12, paddingHorizontal: spacing(1) },
-  callerRow: {
+  cardPressed: { backgroundColor: colors.surfaceAlt },
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing(3),
-    paddingHorizontal: spacing(2),
-    backgroundColor: colors.surface,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
   },
-  callerRowPressed: { backgroundColor: colors.surfaceAlt },
-  callerCell: { color: colors.foreground, fontSize: 13, paddingHorizontal: spacing(1) },
-  callerRight: { textAlign: 'right' },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardMeta: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    flexShrink: 0,
+    maxWidth: '36%',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

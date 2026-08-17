@@ -10,7 +10,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { orangeBtnSx } from '@/screens/panel/transactions/shared';
+import { fieldSx, orangeBtnSx } from '@/screens/panel/transactions/shared';
 import type { MidOption } from '@/screens/panel/transactions/shared';
 import { MANUAL_GATEWAYS } from './types';
 import type { WithdrawalRow } from './types';
@@ -31,7 +31,6 @@ type Props = {
   onSubmit: () => void;
 };
 
-const fieldBg = { '& .MuiInputBase-root': { bgcolor: '#121218' } };
 
 /** QR approve dialog — show UPI QR, pick gateway/mid, approve with reason "By UPI ID". */
 export function QrApproveDialog({
@@ -100,7 +99,7 @@ export function QrApproveDialog({
             label="Gateway"
             value={gateway}
             onChange={(e) => onGateway(e.target.value)}
-            sx={fieldBg}
+            sx={fieldSx}
           >
             <MenuItem value="">— Choose —</MenuItem>
             {gateways.map((g) => (
@@ -115,7 +114,7 @@ export function QrApproveDialog({
             label="Mid"
             value={mid}
             onChange={(e) => onMid(e.target.value)}
-            sx={fieldBg}
+            sx={fieldSx}
           >
             <MenuItem value="">— Choose —</MenuItem>
             {mids.map((m, i) => (

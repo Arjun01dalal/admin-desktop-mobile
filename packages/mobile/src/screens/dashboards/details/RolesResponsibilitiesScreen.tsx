@@ -432,7 +432,7 @@ export function RolesResponsibilitiesScreen() {
         const count = role.Responsibilities?.length || 0;
         return (
           <TouchableOpacity
-            key={String(role._id || i)}
+            key={`row-${i}-${String(role._id ?? '')}`}
             style={styles.roleCard}
             activeOpacity={0.7}
             onPress={() => {

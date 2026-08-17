@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   MenuItem,
   Pagination,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
@@ -29,11 +38,11 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
-import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { asList, asPaged, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import {
   orangeBtnSx,
+  chipSx,
   fieldSx,
   filterSelectSx,
   toolbarBoxSx,
@@ -91,6 +100,26 @@ type QueryState = {
 
 type SelectedOrder = { orderId: string; paymentGatewayName: string };
 
+const secondaryBtnSx = {
+  ...orangeBtnSx,
+  bgcolor: 'transparent',
+  color: '#ff9f0a',
+  borderColor: 'rgba(255,159,10,0.65)',
+  '&:hover': {
+    bgcolor: 'rgba(255,159,10,0.08)',
+    borderColor: '#ff9f0a',
+  },
+};
+
+const statusChipSx = (color: string, background: string) => ({
+  ...chipSx,
+  color,
+  bgcolor: background,
+  border: '1px solid',
+  borderColor: `${color}40`,
+  '& .MuiChip-label': { px: 1.25 },
+});
+
 const EMPTY_FILTERS: ColumnFilters = {
   userName: '',
   userMobile: '',
@@ -109,16 +138,9 @@ const EMPTY_FILTERS: ColumnFilters = {
   upiId: '',
 };
 
-const summaryTextSx = {
-  fontSize: 13,
-  fontWeight: 700,
-  color: '#ff9f0a',
-  whiteSpace: 'nowrap' as const,
-  px: 0.5,
-};
-
 export function DepositPage() {
   const navigate = useNavigate();
+  const isLightMode = useTheme().palette.mode === 'light';
   const admin = getStoredUser<{ _id?: string; name?: string }>();
   const canPencil = hasPermission('Deposit_Pensil');
   const canWhatsApp = hasPermission('whatsapp_icon');
@@ -128,7 +150,8 @@ export function DepositPage() {
   const today = todayIST();
 
   const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
+  /** Default 20 so one screen shows ~15–20 deposit rows. */
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
@@ -148,6 +171,10 @@ export function DepositPage() {
   const [midModalOpen, setMidModalOpen] = useState(false);
   const [midValue, setMidValue] = useState('');
   const [gatewayValue, setGatewayValue] = useState('');
+  /** Collapsed by default so the deposit table gets more vertical space. */
+  const [toolbarOpen, setToolbarOpen] = useState(false);
+  /** Compact rows fit ~20-25 deposits on screen without scrolling. */
+  const [compactRows, setCompactRows] = useState(true);
   const [midSaving, setMidSaving] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [editRow, setEditRow] = useState<DepositRow | null>(null);
@@ -567,26 +594,18 @@ export function DepositPage() {
 
   const depositData = summary.depositData;
   const uniquePending = summary.uniquePendingDetail;
+  const activeFilterCount = useMemo(
+    () => Object.values(query.filters).filter((value) => value.trim()).length,
+    [query.filters],
+  );
 
   const columns = useMemo<CommonTableColumn<DepositRow>[]>(() => {
     const cols: CommonTableColumn<DepositRow>[] = [
       {
         id: 'index',
         label: 'Sr No',
-        width: 72,
-        filter: (
-          <TextField
-            select
-            size="small"
-            fullWidth
-            value={requestType}
-            onChange={(e) => setRequestType(e.target.value as RequestType)}
-            sx={filterSelectSx}
-          >
-            <MenuItem value="automatic">Automatic</MenuItem>
-            <MenuItem value="scannerDeposit">Scanner data</MenuItem>
-          </TextField>
-        ),
+        width: 58,
+        stickyLeft: true,
         render: (row, index) => (
           <IndexCell
             index={index}
@@ -596,6 +615,7 @@ export function DepositPage() {
             selectable={canUpdateMid}
             selected={selectedSet.has(row.orderId || '')}
             onToggle={toggleOrder}
+            compact={compactRows}
           />
         ),
       },
@@ -603,11 +623,13 @@ export function DepositPage() {
         id: 'userName',
         label: 'User Name',
         width: 140,
+        stickyLeft: true,
         filter: searchFilter('userName', 'User name'),
         render: (row) => (
           <Typography
             sx={{
               fontSize: 12,
+              lineHeight: compactRows ? 1.3 : undefined,
               fontWeight: 600,
               cursor: row.userId ? 'pointer' : 'default',
               whiteSpace: 'normal',
@@ -627,9 +649,11 @@ export function DepositPage() {
       {
         id: 'paymentMethod',
         label: 'Payment Method',
-        width: 130,
+        width: 180,
+        stickyLeft: true,
+        cellSx: { whiteSpace: 'normal', overflow: 'visible' },
         filter: selectFilter('mid', midOptions),
-        render: (row) => <PaymentMethodCell row={row} />,
+        render: (row) => <PaymentMethodCell row={row} compact={compactRows} />,
       },
       {
         id: 'mobile',
@@ -637,7 +661,12 @@ export function DepositPage() {
         width: 150,
         filter: searchFilter('userMobile', 'Mobile'),
         render: (row) => (
-          <MobileCell row={row} canShowMobile={canShowMobile} canWhatsApp={canWhatsApp} />
+          <MobileCell
+            row={row}
+            canShowMobile={canShowMobile}
+            canWhatsApp={canWhatsApp}
+            compact={compactRows}
+          />
         ),
       },
       {
@@ -670,6 +699,7 @@ export function DepositPage() {
             row={row}
             canEdit={canEditDeposit(row, canPencil)}
             onEdit={openEdit}
+            compact={compactRows}
           />
         ),
       },
@@ -677,33 +707,41 @@ export function DepositPage() {
         id: 'lastActivity',
         label: 'Last Activity',
         width: 110,
-        render: (row) => <LastActivityCell row={row} />,
+        render: (row) => <LastActivityCell row={row} compact={compactRows} />,
       },
       {
         id: 'checkBy',
         label: 'Check By',
         width: 110,
-        render: (row) => (
-          <PersonCell
-            person={row.checkBy}
-            canCheck={canShowCheckAction(row, canPencil) && !row.checkBy}
-            checking={checkingId === `${row.orderId}-first`}
-            onCheck={() => void markChecked(row, 'first')}
-          />
-        ),
+        render: (row) =>
+          canShowCheckAction(row, canPencil) ? (
+            <PersonCell
+              person={row.checkBy}
+              canCheck={!row.checkBy}
+              checking={checkingId === `${row.orderId}-first`}
+              onCheck={() => void markChecked(row, 'first')}
+              compact={compactRows}
+            />
+          ) : (
+            '—'
+          ),
       },
       {
         id: 'crossCheckBy',
         label: 'Cross Checked By',
         width: 120,
-        render: (row) => (
-          <PersonCell
-            person={row.crossCheckBy}
-            canCheck={canShowCheckAction(row, canPencil) && !row.crossCheckBy}
-            checking={checkingId === `${row.orderId}-second`}
-            onCheck={() => void markChecked(row, 'second')}
-          />
-        ),
+        render: (row) =>
+          canShowCheckAction(row, canPencil) ? (
+            <PersonCell
+              person={row.crossCheckBy}
+              canCheck={!row.crossCheckBy}
+              checking={checkingId === `${row.orderId}-second`}
+              onCheck={() => void markChecked(row, 'second')}
+              compact={compactRows}
+            />
+          ) : (
+            '—'
+          ),
       },
       {
         id: 'userState',
@@ -734,7 +772,9 @@ export function DepositPage() {
         id: 'secondaryName',
         label: 'Secondary User Name',
         width: 200,
-        render: (row) => <SecondaryNameCell row={row} onSaved={() => void load()} />,
+        render: (row) => (
+          <SecondaryNameCell row={row} onSaved={() => void load()} compact={compactRows} />
+        ),
       },
       {
         id: 'account',
@@ -789,7 +829,7 @@ export function DepositPage() {
         label: 'User UPI ID',
         width: 200,
         cellSx: { whiteSpace: 'normal' },
-        render: (row) => <UserUpiCell row={row} />,
+        render: (row) => <UserUpiCell row={row} compact={compactRows} />,
       },
       {
         id: 'updatedBy',
@@ -812,7 +852,7 @@ export function DepositPage() {
   }, [
     page,
     itemsPerPage,
-    requestType,
+    compactRows,
     canUpdateMid,
     canShowMobile,
     canWhatsApp,
@@ -835,19 +875,6 @@ export function DepositPage() {
         id: 'index',
         label: 'Sr No',
         width: 90,
-        filter: (
-          <TextField
-            select
-            size="small"
-            fullWidth
-            value={requestType}
-            onChange={(e) => setRequestType(e.target.value as RequestType)}
-            sx={filterSelectSx}
-          >
-            <MenuItem value="automatic">Automatic</MenuItem>
-            <MenuItem value="scannerDeposit">Scanner data</MenuItem>
-          </TextField>
-        ),
         render: (_row, index) => index + 1,
       },
       {
@@ -932,173 +959,420 @@ export function DepositPage() {
         },
       },
     ],
-    [requestType, canShowMobile],
+    [canShowMobile],
   );
 
-  const getRowSx = useCallback((row: DepositRow) => {
-    const bg = depositRowBg(row.status);
-    if (!bg) return undefined;
-    return {
-      bgcolor: `${bg} !important`,
-      '& td': {
+  const getRowSx = useCallback(
+    (row: DepositRow) => {
+      const status = String(row.status || '').toLowerCase();
+      const isPending = status === 'pending' || status === 'processing';
+      const bg = depositRowBg(row.status, isLightMode ? 'light' : 'dark');
+      const text = isLightMode ? '#1a1a1f' : '#e8e8ea';
+      const border = isLightMode
+        ? 'rgba(0, 0, 0, 0.12) !important'
+        : 'rgba(52, 199, 120, 0.22) !important';
+      const pendingTighten = isPending
+        ? {
+            '& td': {
+              py: '2px !important',
+              lineHeight: 1.05,
+            },
+          }
+        : undefined;
+      if (!bg && !pendingTighten) return undefined;
+      if (!bg) return pendingTighten;
+      return {
         bgcolor: `${bg} !important`,
-        color: '#e8e8ea !important',
-        borderColor: 'rgba(132, 209, 132, 0.22) !important',
-      },
-      '& .MuiTypography-root': { color: 'inherit !important' },
-      '& .MuiIconButton-root': { color: '#e8e8ea' },
-    };
-  }, []);
+        '& td': {
+          bgcolor: `${bg} !important`,
+          color: `${text} !important`,
+          borderColor: border,
+          ...(isPending ? { py: '2px !important', lineHeight: 1.05 } : null),
+        },
+        // Sticky cells set their own !important fill — keep status tint while frozen.
+        '& td[data-sticky-left="true"]': {
+          bgcolor: `${bg} !important`,
+          backgroundColor: `${bg} !important`,
+        },
+        '& .MuiTypography-root': { color: 'inherit !important' },
+        '& .MuiIconButton-root': { color: text },
+      };
+    },
+    [isLightMode],
+  );
+
+  /**
+   * Page chrome (title + toolbar header + pagination) is fixed height, so the
+   * table takes whatever is left of the viewport.
+   */
+  const tableMaxHeight = toolbarOpen
+    ? 'calc(100vh - 250px)'
+    : compactRows
+      ? 'calc(100vh - 132px)'
+      : 'calc(100vh - 140px)';
 
   return (
-    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Typography variant="h5" fontWeight={700} mb={1.5}>
-        Deposit
-      </Typography>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        px: 1.5,
+        py: compactRows ? 0.75 : 1.25,
+      }}
+    >
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        useFlexGap
+        gap={1}
+        mb={compactRows ? 0.75 : 1.5}
+      >
+        <Typography variant={compactRows ? 'h6' : 'h5'} fontWeight={700}>
+          Deposits
+        </Typography>
+        <Stack direction="row" alignItems="center" gap={1}>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={requestType}
+            onChange={(_event, value: RequestType | null) => {
+              if (value) setRequestType(value);
+            }}
+            aria-label="Deposit data source"
+            sx={{
+              height: 36,
+              '& .MuiToggleButton-root': {
+                px: 1.5,
+                py: 0.5,
+                fontWeight: 700,
+                textTransform: 'none',
+              },
+              '& .Mui-selected': {
+                bgcolor: 'rgba(255,159,10,0.18) !important',
+                color: '#ff9f0a !important',
+              },
+            }}
+          >
+            <ToggleButton value="automatic">Automatic</ToggleButton>
+            <ToggleButton value="scannerDeposit">Scanner</ToggleButton>
+          </ToggleButtonGroup>
+          <Button
+            startIcon={
+              loading || scannerLoading || summaryLoading ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+            disabled={loading || scannerLoading || summaryLoading}
+            onClick={() => {
+              if (isScanner) void loadScannerRows();
+              else void load();
+              void loadSummary();
+            }}
+            sx={{ ...orangeBtnSx, height: 36 }}
+          >
+            Refresh
+          </Button>
+        </Stack>
+      </Stack>
 
-      <Box sx={toolbarBoxSx}>
-        <Box
+      <Box
+        sx={{
+          ...toolbarBoxSx,
+          p: 0,
+          mb: compactRows ? 0.75 : 1.5,
+          overflow: 'hidden',
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1}
           sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: 'repeat(2, minmax(0, 1fr))',
-              sm: 'repeat(3, minmax(0, 1fr))',
-              md: 'repeat(4, minmax(0, 1fr))',
-              lg: 'repeat(6, minmax(0, 1fr))',
-            },
-            gap: 1.25,
-            alignItems: 'center',
+            px: 1.5,
+            py: 0.75,
+            cursor: 'pointer',
+            userSelect: 'none',
+            borderBottom: toolbarOpen ? '1px solid' : 'none',
+            borderColor: 'divider',
+            '&:hover': { bgcolor: 'action.hover' },
           }}
+          onClick={() => setToolbarOpen((v) => !v)}
         >
-          <TextField
-            size="small"
-            type="date"
-            label="From Date"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            size="small"
-            type="date"
-            label="To Date"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            select
-            size="small"
-            label="Items Per Page"
-            value={String(itemsPerPage)}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value) || DEFAULT_ITEMS_PER_PAGE);
-              setPage(1);
-            }}
-            sx={fieldSx}
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ minWidth: 0 }}
           >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <MenuItem key={n} value={n}>
-                {n}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <Button
-            variant="contained"
-            disabled={loading || scannerLoading}
-            onClick={() => {
-              if (isScanner) void loadScannerRows();
-              else commitQuery();
-            }}
-            sx={orangeBtnSx}
-          >
-            APPLY
-          </Button>
-          <Button
-            variant="contained"
-            disabled={loading || scannerLoading}
-            onClick={() => {
-              commitQuery({ allData: true });
-              if (isScanner) void loadScannerRows();
-            }}
-            sx={orangeBtnSx}
-          >
-            ALL DATA
-          </Button>
-          <Button variant="contained" disabled={loading} onClick={clearDates} sx={orangeBtnSx}>
-            CLEAR DATES
-          </Button>
-
-          <Button variant="contained" disabled={loading} onClick={clearAllFilters} sx={orangeBtnSx}>
-            CLEAR ALL FILTERS
-          </Button>
-        </Box>
-
-        {/* Separate from equal-width grid — nowrap labels were overflowing into neighbors */}
-        <Stack
-          direction="row"
-          flexWrap="wrap"
-          useFlexGap
-          spacing={2}
-          alignItems="center"
-          sx={{ mt: 1.25 }}
-        >
-          <Typography sx={summaryTextSx}>Total User : {total}</Typography>
-          <Typography sx={summaryTextSx}>
-            Unique Pending Deposit ({uniquePending?.pendingCount ?? 0}) :{' '}
-            {uniquePending?.pendingAmount ?? 0}
-          </Typography>
-          <Typography sx={summaryTextSx}>
-            Rejected ({depositData?.depositRejectedCount ?? 0}) :{' '}
-            {depositData?.depositRejectedTotal ?? 0}
-          </Typography>
-          <Typography sx={summaryTextSx}>
-            Total Scanner Amount : {scannerTotal}
-            {summaryLoading ? ' …' : ''}
-          </Typography>
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+              Filters & Actions
+            </Typography>
+            {activeFilterCount > 0 ? (
+              <Chip
+                size="small"
+                label={`${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} active`}
+                color="primary"
+                variant="outlined"
+              />
+            ) : null}
+            {query.allData ? (
+              <Chip size="small" label="All data" color="info" variant="outlined" />
+            ) : null}
+            {selectedOrders.length > 0 ? (
+              <Chip
+                size="small"
+                label={`${selectedOrders.length} selected`}
+                color="success"
+                variant="outlined"
+              />
+            ) : null}
+            {!toolbarOpen ? (
+              <>
+                <Chip size="small" label={`Total deposits: ${total}`} sx={chipSx} />
+                <Chip
+                  size="small"
+                  label={`Unique pending (${uniquePending?.pendingCount ?? 0}): ${formatAmount(uniquePending?.pendingAmount ?? 0)}`}
+                  sx={chipSx}
+                />
+                <Chip
+                  size="small"
+                  label={`Rejected (${depositData?.depositRejectedCount ?? 0}): ${formatAmount(depositData?.depositRejectedTotal ?? 0)}`}
+                  sx={chipSx}
+                />
+                {isScanner ? (
+                  <Chip
+                    size="small"
+                    label={`Scanner: ${formatAmount(scannerTotal)}`}
+                    sx={chipSx}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </Stack>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCompactRows((v) => !v);
+              }}
+              sx={{
+                py: 0,
+                fontSize: 11,
+                textTransform: 'none',
+                fontWeight: 700,
+                color: '#b06f10',
+                borderColor: '#f1a144',
+                bgcolor: 'rgba(241,161,68,0.10)',
+                '&:hover': {
+                  borderColor: '#e09030',
+                  bgcolor: 'rgba(241,161,68,0.2)',
+                },
+              }}
+            >
+              {compactRows ? 'Compact rows' : 'Comfortable rows'}
+            </Button>
+            <IconButton
+              size="small"
+              aria-label={toolbarOpen ? 'Collapse filters' : 'Expand filters'}
+              sx={{ color: 'text.secondary' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setToolbarOpen((v) => !v);
+              }}
+            >
+              {toolbarOpen ? (
+                <ExpandLessIcon fontSize="small" />
+              ) : (
+                <ExpandMoreIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Stack>
         </Stack>
 
-        <Stack
-          direction="row"
-          flexWrap="wrap"
-          useFlexGap
-          spacing={1.25}
-          alignItems="center"
-          sx={{ mt: 1.25 }}
-        >
-          <Button
-            variant="contained"
-            onClick={() => navigate('/unique_deposit_pending')}
-            sx={orangeBtnSx}
-          >
-            UNIQUE PENDING DEPOSIT
-          </Button>
-          {canStateWise ? (
-            <Button
-              variant="contained"
-              onClick={() => navigate('/state-wise-deposit')}
-              sx={orangeBtnSx}
+        <Collapse in={toolbarOpen} timeout="auto" unmountOnExit={false}>
+          <Box sx={{ p: 1.5, pt: 1.25 }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'repeat(2, minmax(0, 1fr))',
+                  sm: 'repeat(3, minmax(0, 1fr))',
+                  md: 'repeat(4, minmax(0, 1fr))',
+                  lg: 'repeat(6, minmax(0, 1fr))',
+                },
+                gap: 1.25,
+                alignItems: 'center',
+              }}
             >
-              STATE WISE DEPOSIT
-            </Button>
-          ) : null}
-          <Button variant="contained" disabled={loading} onClick={downloadExcel} sx={orangeBtnSx}>
-            DOWNLOAD DATA
-          </Button>
-          {canUpdateMid ? (
-            <Button
-              variant="contained"
-              disabled={!selectedOrders.length}
-              onClick={() => setMidModalOpen(true)}
-              sx={orangeBtnSx}
+              <TextField
+                size="small"
+                type="date"
+                label="From Date"
+                InputLabelProps={{ shrink: true }}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="To Date"
+                InputLabelProps={{ shrink: true }}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                select
+                size="small"
+                label="Items Per Page"
+                value={String(itemsPerPage)}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value) || 20);
+                  setPage(1);
+                }}
+                sx={fieldSx}
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <MenuItem key={n} value={n}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <Button
+                variant="contained"
+                disabled={loading || scannerLoading}
+                onClick={() => {
+                  if (isScanner) void loadScannerRows();
+                  else commitQuery();
+                }}
+                sx={orangeBtnSx}
+              >
+                Apply
+              </Button>
+              <Button
+                variant="outlined"
+                disabled={loading || scannerLoading}
+                onClick={() => {
+                  commitQuery({ allData: true });
+                  if (isScanner) void loadScannerRows();
+                }}
+                sx={secondaryBtnSx}
+              >
+                All Data
+              </Button>
+              <Button
+                variant="outlined"
+                disabled={loading}
+                onClick={clearDates}
+                sx={secondaryBtnSx}
+              >
+                Clear Dates
+              </Button>
+
+              <Button
+                variant="outlined"
+                disabled={loading}
+                onClick={clearAllFilters}
+                sx={secondaryBtnSx}
+              >
+                Clear All Filters
+              </Button>
+            </Box>
+
+            {/* Separate from equal-width grid — nowrap labels were overflowing into neighbors */}
+            <Stack
+              direction="row"
+              flexWrap="wrap"
+              useFlexGap
+              spacing={2}
+              alignItems="center"
+              sx={{ mt: 1.25 }}
             >
-              UPDATE MID NAME
-            </Button>
-          ) : null}
-        </Stack>
+              <Chip size="small" label={`Total deposits: ${total}`} sx={chipSx} />
+              <Chip
+                size="small"
+                label={`Approved (${depositData?.depositApprovedCount ?? 0}): ${formatAmount(depositData?.depositApprovedTotal ?? 0)}`}
+                sx={statusChipSx('#2e7d32', 'rgba(46,125,50,0.12)')}
+              />
+              <Chip
+                size="small"
+                label={`Pending (${depositData?.depositPendingCount ?? 0}): ${formatAmount(depositData?.depositPendingTotal ?? 0)}`}
+                sx={statusChipSx('#ed8b00', 'rgba(255,159,10,0.13)')}
+              />
+              <Chip
+                size="small"
+                label={`Unique pending (${uniquePending?.pendingCount ?? 0}): ${formatAmount(uniquePending?.pendingAmount ?? 0)}`}
+                sx={statusChipSx('#9c6b00', 'rgba(255,193,7,0.13)')}
+              />
+              <Chip
+                size="small"
+                label={`Rejected (${depositData?.depositRejectedCount ?? 0}): ${formatAmount(depositData?.depositRejectedTotal ?? 0)}`}
+                sx={statusChipSx('#d32f2f', 'rgba(211,47,47,0.11)')}
+              />
+              <Chip
+                size="small"
+                label={`Scanner: ${formatAmount(scannerTotal)}${summaryLoading ? ' …' : ''}`}
+                sx={statusChipSx('#0288d1', 'rgba(2,136,209,0.11)')}
+              />
+            </Stack>
+
+            <Stack
+              direction="row"
+              flexWrap="wrap"
+              useFlexGap
+              spacing={1.25}
+              alignItems="center"
+              sx={{ mt: 1.25 }}
+            >
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/unique_deposit_pending')}
+                sx={secondaryBtnSx}
+              >
+                Unique Pending Deposit
+              </Button>
+              {canStateWise ? (
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/state-wise-deposit')}
+                  sx={secondaryBtnSx}
+                >
+                  State Wise Deposit
+                </Button>
+              ) : null}
+              <Button
+                variant="outlined"
+                disabled={loading}
+                onClick={downloadExcel}
+                sx={secondaryBtnSx}
+              >
+                Download Data
+              </Button>
+              {canUpdateMid ? (
+                <Button
+                  variant="contained"
+                  disabled={!selectedOrders.length}
+                  onClick={() => setMidModalOpen(true)}
+                  sx={orangeBtnSx}
+                >
+                  Update MID Name ({selectedOrders.length})
+                </Button>
+              ) : null}
+            </Stack>
+          </Box>
+        </Collapse>
       </Box>
 
       {isScanner ? (
@@ -1110,9 +1384,10 @@ export function DepositPage() {
           emptyMessage="No scanner data found"
           stickyHeader
           dense
+          compact={compactRows}
           virtualize={false}
           minWidth={1600}
-          maxHeight="calc(100vh - 300px)"
+          maxHeight={tableMaxHeight}
         />
       ) : (
         <CommonTable
@@ -1123,14 +1398,20 @@ export function DepositPage() {
           emptyMessage="No deposits found"
           stickyHeader
           dense
+          compact={compactRows}
           virtualize={false}
           minWidth={2800}
-          maxHeight="calc(100vh - 300px)"
+          maxHeight={tableMaxHeight}
           getRowSx={getRowSx}
         />
       )}
 
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mt={2}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        mt={compactRows ? 1 : 2}
+      >
         <Typography variant="body2" color="text.secondary">
           Total: {isScanner ? scannerRows.length : total}
         </Typography>
@@ -1140,6 +1421,7 @@ export function DepositPage() {
             page={page}
             onChange={(_e, p) => setPage(p)}
             color="primary"
+            size={compactRows ? 'small' : 'medium'}
             disabled={loading}
           />
         ) : null}

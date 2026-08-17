@@ -20,7 +20,7 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { colors, radius, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
@@ -58,7 +58,6 @@ function fmtINR(value: unknown): string {
 }
 
 /** Columns shown in the list; the bottom sheet shows all of them. */
-const MAIN_KEYS = new Set(['rank', 'name', 'city', 'deposit']);
 
 export function LeaderboardScreen() {
   const isFocused = useIsFocused();
@@ -232,14 +231,51 @@ export function LeaderboardScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={indexedRows}
-        keyFor={(r, i) => String(r._id || i)}
-        emptyMessage={loading ? 'Loading…' : 'No Data Found'}
-        onRowPress={(row) => setSelected({ row, rank: row.__rank })}
-        hint="Tap a row to see all details"
-      />
+      {loading && indexedRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && indexedRows.length === 0 ? <Text style={styles.hint}>No Data Found</Text> : null}
+      <View style={styles.list}>
+        {indexedRows.map((row, index) => {
+          const blocked = Boolean(row.block);
+          return (
+            <View key={`row-${index}-${String(row._id ?? row.__rank ?? '')}`} style={styles.card}>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => setSelected({ row, rank: row.__rank })}
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardIndex}>#{row.__rank}</Text>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {String(row.name || '—')}
+                  </Text>
+                  <Text style={[styles.statusPill, blocked ? styles.statusOff : styles.statusOn]}>
+                    {blocked ? 'Blocked' : 'Active'}
+                  </Text>
+                </View>
+                <View style={styles.cardSplitRow}>
+                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                    City: {String(row.city || '—')}
+                  </Text>
+                  <Text style={styles.cardSplitRight}>Deposit: {fmtINR(row.customerDepositAmt)}</Text>
+                </View>
+                <View style={styles.cardSplitRow}>
+                  <Text style={styles.cardSplitLeft}>Customers: {String(row.customerCount ?? 0)}</Text>
+                  <Text style={styles.cardSplitRight}>
+                    Active today: {String(row.activeUserCount ?? 0)}
+                  </Text>
+                </View>
+                <Text style={styles.cardHint}>Tap card for details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.editCityBtn}
+                onPress={() => openCityEdit(row)}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+              >
+                <Text style={styles.editCityText}>Edit city</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={selected !== null}
@@ -325,7 +361,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  cityScroll: { marginBottom: spacing(3) },
+  cityScroll: { marginTop: spacing(3), marginBottom: spacing(3) },
   cityRow: { flexDirection: 'row', gap: spacing(2) },
   cityCard: {
     minWidth: 110,
@@ -346,6 +382,85 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    maxWidth: '40%',
+  },
+  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
+  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  editCityBtn: {
+    alignSelf: 'flex-start',
+    marginTop: spacing(1),
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    backgroundColor: colors.surfaceAlt,
+  },
+  editCityText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

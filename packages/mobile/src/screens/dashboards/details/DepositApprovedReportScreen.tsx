@@ -3,7 +3,8 @@
  * (/DepositApprovedReport). Payment-type selector (Automatic / Scanner data);
  * Automatic paginates depositApproved.transactions (status Approved), Scanner
  * loads depositApproved.scannerData. Date filter, app-code chips, gateway chips
- * and a userName search. The gateway selection drives the "Total Approved Sum"
+ * and per-column search (userName, DP ID, amount, state, city, account, aadhaar,
+ * txn id, payment method). The gateway selection drives the "Total Approved Sum"
  * chip (depositApproved.approvedSum). Row tap opens the full detail sheet.
  *
  * Skipped: desktop's "Download ExcelData" (browser file download) — not ported.
@@ -23,13 +24,25 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { pickPageSizes, appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import { DetailFilterBar } from './DetailFilterBar';
+import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type RequestType = 'automaticDeposit' | 'scannerDeposit';
+
+const SEARCH_FIELDS: readonly SearchFieldOption[] = [
+  { key: 'userName', label: 'User Name' },
+  { key: 'userId', label: 'DP ID' },
+  { key: 'amount', label: 'Amount' },
+  { key: 'userState', label: 'State' },
+  { key: 'userCity', label: 'City' },
+  { key: 'accountNumber', label: 'Acc No' },
+  { key: 'aadhaarNumber', label: 'Aadhar No' },
+  { key: 'orderId', label: 'Txn ID' },
+  { key: 'paymentGatewayName', label: 'Payment Method' },
+];
 
 function csvEscape(value: unknown): string {
   const str = value === null || value === undefined ? '' : String(value);
@@ -85,8 +98,6 @@ type ScannerRow = {
 type GatewayOption = { _id: string; name?: string; mid?: string | number };
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
-const DEPOSIT_MAIN = new Set(['idx', 'userName', 'amount', 'status']);
-const SCANNER_MAIN = new Set(['idx', 'userName', 'balance', 'reason']);
 
 const TYPE_OPTIONS: { key: RequestType; label: string }[] = [
   { key: 'automaticDeposit', label: 'Automatic' },
@@ -122,8 +133,12 @@ export function DepositApprovedReportScreen() {
   const [requestType, setRequestType] = useState<RequestType>('automaticDeposit');
   const [clientName, setClientName] = useState('');
   const [gatewayId, setGatewayId] = useState('');
+  const [searchField, setSearchField] = useState<string>('userName');
   const [draftSearch, setDraftSearch] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
+  const [applied, setApplied] = useState<{ field: string; text: string }>({
+    field: 'userName',
+    text: '',
+  });
 
   const [gateways, setGateways] = useState<GatewayOption[]>([]);
   const [rows, setRows] = useState<DepositRow[]>([]);
@@ -190,10 +205,19 @@ export function DepositApprovedReportScreen() {
     setError(null);
     try {
       const filter: Record<string, unknown> = { status: 'Approved' };
-      if (appliedSearch.trim()) filter.userName = appliedSearch.trim();
+      const text = applied.text.trim();
+      if (text && applied.field) {
+        // Map search chip → API filter key (desktop column filters parity).
+        if (applied.field === 'paymentGatewayName') {
+          filter.paymentGatewayName = text;
+        } else {
+          filter[applied.field] = text;
+        }
+      }
       if (clientName) filter.clientName = clientName;
       const gateway = gateways.find((g) => g._id === gatewayId);
       if (gateway) {
+        // Gateway chip wins over typed payment-method search when both set.
         if (gateway.name) filter.paymentGatewayName = gateway.name;
         if (gateway.mid != null && gateway.mid !== '') filter.mid = gateway.mid;
       }
@@ -222,7 +246,7 @@ export function DepositApprovedReportScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [appliedSearch, clientName, gateways, gatewayId, pageSize, page, startDate, endDate]);
+  }, [applied, clientName, gateways, gatewayId, pageSize, page, startDate, endDate]);
 
   const loadScanner = useCallback(async () => {
     const gen = ++genRef.current;
@@ -318,9 +342,30 @@ export function DepositApprovedReportScreen() {
   );
 
   const search = useCallback(() => {
-    setAppliedSearch(draftSearch);
+    setApplied({ field: searchField, text: draftSearch });
     setPage(1);
-  }, [draftSearch]);
+  }, [searchField, draftSearch]);
+
+  /** Scanner list has no server-side column filters — apply local match. */
+  const visibleScannerRows = useMemo(() => {
+    const text = applied.text.trim().toLowerCase();
+    if (!text) return scannerRows;
+    return scannerRows.filter((row) => {
+      const hay = [
+        row.userName,
+        row.userId,
+        row.clientName,
+        row.state,
+        row.city,
+        row.reason,
+        row.utr,
+        row.mid,
+      ]
+        .map((v) => String(v ?? '').toLowerCase())
+        .join(' ');
+      return hay.includes(text);
+    });
+  }, [scannerRows, applied]);
 
   // Fit main columns to phone width.
   const { width: screenWidth } = useWindowDimensions();
@@ -446,7 +491,7 @@ export function DepositApprovedReportScreen() {
       <Text style={styles.title}>Deposit Approved Report</Text>
       <Text style={styles.sub}>
         {`${startDate} → ${endDate}`} · Total:{' '}
-        {(isScanner ? scannerRows.length : total).toLocaleString('en-IN')}
+        {(isScanner ? visibleScannerRows.length : total).toLocaleString('en-IN')}
       </Text>
 
       <DetailFilterBar
@@ -466,9 +511,9 @@ export function DepositApprovedReportScreen() {
           setPageSize(n);
           setPage(1);
         }}
-        searchFields={[{ key: 'userName', label: 'User Name' }]}
-        searchField="userName"
-        onSearchFieldChange={() => {}}
+        searchFields={SEARCH_FIELDS}
+        searchField={searchField}
+        onSearchFieldChange={setSearchField}
         searchText={draftSearch}
         onSearchTextChange={setDraftSearch}
         onSearchSubmit={search}
@@ -503,9 +548,9 @@ export function DepositApprovedReportScreen() {
         >
           <Text style={[styles.chipText, !gatewayId && styles.chipTextActive]}>All</Text>
         </TouchableOpacity>
-        {gateways.map((g) => (
+        {gateways.map((g, gi) => (
           <TouchableOpacity
-            key={g._id}
+            key={`gw-${gi}-${String(g._id ?? '')}`}
             style={[styles.chip, gatewayId === g._id && styles.chipActive]}
             onPress={() => {
               setGatewayId(g._id);
@@ -543,26 +588,118 @@ export function DepositApprovedReportScreen() {
       ) : null}
 
       {isScanner ? (
-        <DataTable
-          columns={scannerColumns.filter((c) => SCANNER_MAIN.has(c.key))}
-          rows={scannerRows}
-          keyFor={(r, i) => String(r._id || r.userId || i)}
-          loading={loading}
-          emptyMessage="No scanner data found"
-          onRowPress={(row) => setScannerSheet(row)}
-          hint="Tap a row to see all details"
-        />
+        <>
+          {loading && visibleScannerRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+          {!loading && visibleScannerRows.length === 0 ? (
+            <Text style={styles.hint}>No scanner data found</Text>
+          ) : null}
+          <View style={styles.list}>
+            {visibleScannerRows.map((row, index) => (
+              <TouchableOpacity
+                key={`row-${index}-${String(row._id || row.userId || '')}`}
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => setScannerSheet(row)}
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardIndex}>#{index + 1}</Text>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {display(row.userName)}
+                  </Text>
+                  {row.userId ? (
+                    <TouchableOpacity
+                      style={styles.reportBtn}
+                      onPress={() => openUserReport(row.userId, row.userName)}
+                    >
+                      <Text style={styles.reportBtnText}>User Report</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                <View style={styles.cardSplitRow}>
+                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                    App Code: {appCodeForName(row.clientName)}
+                  </Text>
+                  <Text style={styles.cardSplitRight} numberOfLines={1}>
+                    Balance: {formatIN(row.balance)}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Reason</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>{display(row.reason)}</Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>DP ID</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>{display(row.userId)}</Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Date</Text>
+                  <Text style={styles.cardValue}>
+                    {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
+                      .filter(Boolean)
+                      .join(' ') || '—'}
+                  </Text>
+                </View>
+                <Text style={styles.cardHint}>Tap card for full details</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
       ) : (
         <>
-          <DataTable
-            columns={depositColumns.filter((c) => DEPOSIT_MAIN.has(c.key))}
-            rows={rows}
-            keyFor={(r, i) => String(r._id || r.orderId || i)}
-            loading={loading}
-            emptyMessage="No approved deposits found"
-            onRowPress={(row) => setDepositSheet(row)}
-            hint="Tap a row to see all details"
-          />
+          {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+          {!loading && rows.length === 0 ? (
+            <Text style={styles.hint}>No approved deposits found</Text>
+          ) : null}
+          <View style={styles.list}>
+            {rows.map((row, index) => (
+              <TouchableOpacity
+                key={`row-${index}-${String(row._id || row.orderId || '')}`}
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => setDepositSheet(row)}
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {display(row.userName)}
+                  </Text>
+                  {row.userId ? (
+                    <TouchableOpacity
+                      style={styles.reportBtn}
+                      onPress={() => openUserReport(row.userId, row.userName)}
+                    >
+                      <Text style={styles.reportBtnText}>User Report</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Amount</Text>
+                  <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
+                </View>
+                <View style={styles.cardSplitRow}>
+                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                    App Code: {appCodeForName(row.clientName)}
+                  </Text>
+                  <Text style={[styles.cardSplitRight, styles.approvedText]} numberOfLines={1}>
+                    Status: {display(row.status)}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>DP ID</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>{display(row.userId)}</Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Date</Text>
+                  <Text style={styles.cardValue}>
+                    {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
+                      .filter(Boolean)
+                      .join(' ') || '—'}
+                  </Text>
+                </View>
+                <Text style={styles.cardHint}>Tap card for full details</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <View style={styles.pager}>
             <Text
               style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
@@ -672,6 +809,84 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  reportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+  },
+  reportBtnText: { color: colors.primaryForeground, fontSize: 10, fontWeight: '700' },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  approvedText: { color: '#16a34a' },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

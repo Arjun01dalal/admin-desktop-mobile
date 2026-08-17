@@ -2,8 +2,9 @@
  * Casino Top-up Balance — Qtech remaining balance (new API) + Qtech history.
  * Mirrors desktop CasinoTopupBalancePage.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,7 +19,6 @@ import {
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission, canAccessNavItem } from '../../../auth/permissions';
 import { NAV_ITEMS } from '../../../navigation/navItems';
@@ -364,6 +364,8 @@ export function CasinoTopupBalanceScreen() {
   const [remaining, setRemaining] = useState<QtechRemainingSummary>(emptyRemainingSummary);
   const [remainingLoading, setRemainingLoading] = useState(false);
   const [remainingTab, setRemainingTab] = useState<'provider' | 'game'>('provider');
+  const [tabLoading, setTabLoading] = useState(false);
+  const tabLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -425,6 +427,27 @@ export function CasinoTopupBalanceScreen() {
     if (canView) void refreshAll();
   }, [canView, refreshAll]);
 
+  const switchRemainingTab = useCallback((tab: 'provider' | 'game') => {
+    setRemainingTab((prev) => (prev === tab ? prev : tab));
+  }, []);
+
+  const skipTabLoaderRef = useRef(true);
+  useEffect(() => {
+    if (skipTabLoaderRef.current) {
+      skipTabLoaderRef.current = false;
+      return;
+    }
+    setTabLoading(true);
+    if (tabLoadTimerRef.current) clearTimeout(tabLoadTimerRef.current);
+    tabLoadTimerRef.current = setTimeout(() => {
+      setTabLoading(false);
+      tabLoadTimerRef.current = null;
+    }, 350);
+    return () => {
+      if (tabLoadTimerRef.current) clearTimeout(tabLoadTimerRef.current);
+    };
+  }, [remainingTab]);
+
   const openAdd = useCallback(() => {
     setAddOpen(true);
     setAmount('');
@@ -470,63 +493,6 @@ export function CasinoTopupBalanceScreen() {
       setSubmitting(false);
     }
   }, [amount, currency, dateTime, note, loadBalances, loadRemaining]);
-
-  const historyColumns = useMemo<DataTableColumn<TopupRecord>[]>(
-    () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      {
-        key: 'amount',
-        label: 'Amount',
-        width: 110,
-        align: 'right',
-        render: (r) => (r.amount != null ? Number(r.amount).toLocaleString('en-IN') : '—'),
-      },
-      { key: 'currency', label: 'Currency', width: 90, render: (r) => display(r.currency) },
-      {
-        key: 'toppedUpAtIst',
-        label: 'Topped Up At (IST)',
-        width: 170,
-        render: (r) => display(r.toppedUpAtIst || r.createdAt || r.toppedUpAt),
-      },
-      { key: 'note', label: 'Note', width: 180, render: (r) => display(r.note) },
-    ],
-    [],
-  );
-
-  const remainingColumns = useMemo<DataTableColumn<RemainingBreakdownRow>[]>(
-    () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      {
-        key: 'name',
-        label: remainingTab === 'provider' ? 'Provider' : 'Game',
-        width: 150,
-        render: (r) => remainingRowLabel(r, remainingTab),
-      },
-      { key: 'code', label: 'ID / Code', width: 120, render: (r) => remainingRowCode(r) },
-      {
-        key: 'ggrUsd',
-        label: 'GGR / Amount (USD)',
-        width: 130,
-        align: 'right',
-        render: (r) => remainingRowGgrUsd(r),
-      },
-      {
-        key: 'ggrInr',
-        label: 'GGR / Amount (INR)',
-        width: 130,
-        align: 'right',
-        render: (r) => remainingRowGgrInr(r),
-      },
-      {
-        key: 'consumed',
-        label: 'Consumed / Turnover',
-        width: 130,
-        align: 'right',
-        render: (r) => remainingRowConsumed(r),
-      },
-    ],
-    [remainingTab],
-  );
 
   const remainingRows = remainingTab === 'provider' ? remaining.byProvider : remaining.byGame;
 
@@ -630,7 +596,8 @@ export function CasinoTopupBalanceScreen() {
             <View style={styles.chipsRow}>
               <TouchableOpacity
                 style={[styles.chip, remainingTab === 'provider' && styles.chipActive]}
-                onPress={() => setRemainingTab('provider')}
+                onPress={() => switchRemainingTab('provider')}
+                disabled={tabLoading}
               >
                 <Text
                   style={[styles.chipText, remainingTab === 'provider' && styles.chipTextActive]}
@@ -640,7 +607,8 @@ export function CasinoTopupBalanceScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.chip, remainingTab === 'game' && styles.chipActive]}
-                onPress={() => setRemainingTab('game')}
+                onPress={() => switchRemainingTab('game')}
+                disabled={tabLoading}
               >
                 <Text style={[styles.chipText, remainingTab === 'game' && styles.chipTextActive]}>
                   By Game ({remaining.byGame.length})
@@ -648,14 +616,46 @@ export function CasinoTopupBalanceScreen() {
               </TouchableOpacity>
             </View>
 
-            <DataTable
-              columns={remainingColumns}
-              rows={remainingRows}
-              keyFor={(r, i) => String(r._id || r.id || r.gameId || r.provider || i)}
-              loading={remainingLoading && remainingRows.length === 0}
-              emptyMessage="No data found"
-              hint="Swipe sideways to see all columns →"
-            />
+            {tabLoading || (remainingLoading && remainingRows.length === 0) ? (
+              <View style={styles.tabLoader}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.listHint}>Loading…</Text>
+              </View>
+            ) : remainingRows.length === 0 ? (
+              <Text style={styles.listHint}>No data found</Text>
+            ) : (
+              <View style={styles.list}>
+                {remainingRows.map((row, index) => (
+                  <View
+                    key={`row-${index}-${String(row._id || row.id || row.gameId || row.provider || '')}`}
+                    style={styles.card}
+                  >
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.cardIndex}>#{index + 1}</Text>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {remainingRowLabel(row, remainingTab)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                        ID: {remainingRowCode(row)}
+                      </Text>
+                      <Text style={styles.cardSplitRight} numberOfLines={1}>
+                        Consumed: {remainingRowConsumed(row)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                        GGR USD: {remainingRowGgrUsd(row)}
+                      </Text>
+                      <Text style={styles.cardSplitRight} numberOfLines={1}>
+                        GGR INR: {remainingRowGgrInr(row)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </>
         )}
       </View>
@@ -673,14 +673,35 @@ export function CasinoTopupBalanceScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView>
-              <DataTable
-                columns={historyColumns}
-                rows={providers.qtech.records}
-                keyFor={(r, i) => String(r._id || i)}
-                loading={providers.qtech.loading && providers.qtech.records.length === 0}
-                emptyMessage="No top-up records found"
-                hint="Swipe sideways →"
-              />
+              {providers.qtech.loading && providers.qtech.records.length === 0 ? (
+                <Text style={styles.listHint}>Loading…</Text>
+              ) : null}
+              {!providers.qtech.loading && providers.qtech.records.length === 0 ? (
+                <Text style={styles.listHint}>No top-up records found</Text>
+              ) : null}
+              <View style={styles.list}>
+                {providers.qtech.records.map((row, index) => (
+                  <View key={`row-${index}-${String(row._id ?? '')}`} style={styles.card}>
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.cardIndex}>#{index + 1}</Text>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {row.amount != null ? Number(row.amount).toLocaleString('en-IN') : '—'}{' '}
+                        {display(row.currency)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                        {display(row.toppedUpAtIst || row.createdAt || row.toppedUpAt)}
+                      </Text>
+                    </View>
+                    {row.note ? (
+                      <Text style={styles.cardNote} numberOfLines={2}>
+                        {display(row.note)}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
             </ScrollView>
           </View>
         </View>
@@ -794,17 +815,91 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3.5),
   },
   addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: spacing(1.5),
+  },
   metricChip: {
-    width: '47%',
+    width: '32%',
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing(2.5),
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(1.5),
   },
-  metricLabel: { color: colors.muted, fontSize: 11 },
-  metricValue: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginTop: spacing(0.5) },
+  metricLabel: { color: colors.muted, fontSize: 9, fontWeight: '600' },
+  metricValue: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: spacing(0.5),
+  },
+  list: { gap: spacing(2), marginTop: spacing(2) },
+  listHint: { color: colors.muted, marginTop: spacing(2), marginBottom: spacing(1), fontSize: 13 },
+  tabLoader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing(8),
+    gap: spacing(2),
+  },
+  card: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardNote: { color: colors.muted, fontSize: 11, marginTop: spacing(0.5) },
   rangeText: { color: colors.muted, fontSize: 12, marginTop: spacing(2), marginBottom: spacing(1) },
   balanceBox: {
     backgroundColor: colors.surfaceAlt,

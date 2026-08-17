@@ -5,10 +5,9 @@
  *
  * Main view: date filter + All Data toggle, three tappable KPI cards
  * (bonusWallet.fundRequestSummary). Tapping a card drills into an in-screen
- * table sub-view listing that type's records
+ * card list of that type's records
  * (bonusWallet.fundApproved / fundPending / fundTransferIn), paginated with
- * name/mobile search and a compact main column subset; row tap opens the full
- * detail sheet.
+ * name/mobile search; card tap opens the full detail sheet.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -19,12 +18,11 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { pickPageSizes, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -66,7 +64,6 @@ type FundRow = {
 };
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
-const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'amount', 'status']);
 
 const ACTION_BY_TYPE: Record<NavType, string> = {
   pending: 'bonusWallet.fundPending',
@@ -101,6 +98,14 @@ function formatDateTime(value?: string | number): string {
   const d = formatDisplayDate(value);
   const t = formatDisplayTime(value);
   return [d, t].filter(Boolean).join(' ') || '—';
+}
+
+function statusColor(status?: string): string {
+  const s = String(status || '').toLowerCase();
+  if (s === 'approved' || s === 'success') return '#16a34a';
+  if (s === 'pending') return '#d97706';
+  if (s === 'rejected' || s === 'removed' || s === 'failed') return '#dc2626';
+  return colors.muted;
 }
 
 function unpackSummary(data: unknown): FundSummary {
@@ -341,26 +346,14 @@ export function BonusWalletFundRequestScreen() {
     [summary],
   );
 
-  // Fit main columns to phone width (no horizontal scroll for the subset).
-  const { width: screenWidth } = useWindowDimensions();
-  const availableWidth = Math.max(280, screenWidth - spacing(4) * 2 - spacing(2));
-  const IDX_W = 34;
-  const fit = (weight: number, totalWeight: number) =>
-    Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
-  const w = {
-    name: fit(3, 9),
-    mobile: fit(2.4, 9),
-    amount: fit(1.8, 9),
-    status: fit(1.8, 9),
-  };
-
+  // Column defs kept for RowDetailSheet field rendering (full desktop set).
   const columns = useMemo<DataTableColumn<FundRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      { key: 'name', label: 'Name', width: w.name, render: (r) => display(r.name) },
-      { key: 'mobile', label: 'Mobile', width: w.mobile, render: (r) => maskMobile(r.mobile, canShowMobile) },
+      { key: 'idx', label: '#', width: 34, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      { key: 'name', label: 'Name', width: 140, render: (r) => display(r.name) },
+      { key: 'mobile', label: 'Mobile', width: 120, render: (r) => maskMobile(r.mobile, canShowMobile) },
       { key: 'openBal', label: 'Opening Balance', width: 130, align: 'right', render: (r) => display(r.bonusWalletOpenBalance) },
-      { key: 'amount', label: 'Amount', width: w.amount, align: 'right', render: (r) => display(r.amount) },
+      { key: 'amount', label: 'Amount', width: 100, align: 'right', render: (r) => display(r.amount) },
       { key: 'closeBal', label: 'Closing Balance', width: 130, align: 'right', render: (r) => display(r.bonusWalletClosingBalance) },
       { key: 'refByName', label: 'Referred By Name', width: 150, render: (r) => display(r.referredByName) },
       { key: 'refByMobile', label: 'Referred By Mobile', width: 150, render: (r) => maskMobile(r.referredByMobile, canShowMobile) },
@@ -386,12 +379,11 @@ export function BonusWalletFundRequestScreen() {
             ? `${r.referralPercentage}%`
             : '—',
       },
-      { key: 'status', label: 'Status', width: w.status, render: (r) => display(r.status) },
+      { key: 'status', label: 'Status', width: 100, render: (r) => display(r.status) },
       { key: 'created', label: 'Created', width: 110, render: (r) => formatDateTime(r.createdOn ?? r.createdAt) },
       { key: 'updated', label: 'Updated', width: 110, render: (r) => formatDateTime(r.updatedOn ?? r.updatedAt) },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, pageSize, canShowMobile, availableWidth],
+    [page, pageSize, canShowMobile],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
@@ -476,15 +468,62 @@ export function BonusWalletFundRequestScreen() {
           </View>
         ) : null}
 
-        <DataTable
-          columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-          rows={tableRows}
-          keyFor={(r, i) => String(r._id || i)}
-          loading={tableLoading}
-          emptyMessage="No records found"
-          onRowPress={(row) => setSheetRow(row)}
-          hint="Tap a row to see all details"
-        />
+        {tableLoading && tableRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+        {!tableLoading && tableRows.length === 0 ? (
+          <Text style={styles.hint}>No records found</Text>
+        ) : null}
+
+        <View style={styles.list}>
+          {tableRows.map((row, index) => {
+            const badge = statusColor(row.status);
+            return (
+              <TouchableOpacity
+                key={`row-${index}-${String(row._id || '')}`}
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => setSheetRow(row)}
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {display(row.name)}
+                  </Text>
+                  <Text
+                    style={[styles.statusPill, { color: badge, backgroundColor: `${badge}22` }]}
+                    numberOfLines={1}
+                  >
+                    {display(row.status)}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Mobile</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {maskMobile(row.mobile, canShowMobile)}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Amount</Text>
+                  <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
+                </View>
+                <View style={styles.cardSplitRow}>
+                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                    Open: {display(row.bonusWalletOpenBalance)}
+                  </Text>
+                  <Text style={styles.cardSplitRight} numberOfLines={1}>
+                    Close: {display(row.bonusWalletClosingBalance)}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Created</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {formatDateTime(row.createdOn ?? row.createdAt)}
+                  </Text>
+                </View>
+                <Text style={styles.cardHint}>Tap card for details & actions</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         <View style={styles.pager}>
           <Text
@@ -634,6 +673,71 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, fontSize: 13, marginTop: spacing(2), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(2) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
+  cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, minWidth: 0 },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(2),
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
+    maxWidth: 110,
+    textAlign: 'center',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -1,6 +1,7 @@
 /**
  * Dashboard users list — port of desktop DashboardUsersListPage.
  * kind: 'balance' | 'bonus' | 'registered' maps to a secureApi action.
+ * Phone UI: compact cards (not a horizontal table).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -31,12 +32,18 @@ type UserRow = {
   balance?: number;
   bonusBalance?: number;
   clientName?: string;
+  city?: string;
+  state?: string;
   [key: string]: unknown;
 };
 
 const META: Record<
   Kind,
-  { title: string; action: 'users.getAllBalance' | 'users.getAllBonus' | 'users.registeredUser'; decreasing?: boolean }
+  {
+    title: string;
+    action: 'users.getAllBalance' | 'users.getAllBonus' | 'users.registeredUser';
+    decreasing?: boolean;
+  }
 > = {
   balance: { title: 'Total Users Balance', action: 'users.getAllBalance', decreasing: true },
   bonus: { title: 'Total Users Bonus Balance', action: 'users.getAllBonus' },
@@ -101,7 +108,6 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       { label: 'City', value: display(selected.city) },
       { label: 'State', value: display(selected.state) },
     );
-    // Show any remaining data the API returned so the sheet never drops fields.
     const known = new Set([
       '_id',
       'name',
@@ -181,6 +187,8 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
     void load();
   }, [load]);
 
+  const amountLabel = kind === 'bonus' ? 'Bonus' : 'Balance';
+
   const header = useMemo(
     () => (
       <View>
@@ -226,86 +234,117 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
-        <View style={[styles.row, styles.headRow]}>
-          <Text style={[styles.cell, styles.cellIndex, styles.headText]}>#</Text>
-          <Text style={[styles.cell, styles.cellName, styles.headText]}>Name</Text>
-          <Text style={[styles.cell, styles.cellMobile, styles.headText]}>Mobile</Text>
-          <Text style={[styles.cell, styles.cellApp, styles.headText]}>App</Text>
-          <Text style={[styles.cell, styles.cellNum, styles.headText]}>
-            {kind === 'bonus' ? 'Bonus' : 'Balance'}
-          </Text>
-        </View>
-        <Text style={styles.hint}>Tap a row to see all details</Text>
+        <Text style={styles.hint}>Tap a card for all details</Text>
       </View>
     ),
-    [meta.title, startDate, endDate, draftStart, draftEnd, loading, appClientName, searchField, searchDraft, pageSize, totalBalance, error, kind],
+    [
+      meta.title,
+      startDate,
+      endDate,
+      draftStart,
+      draftEnd,
+      loading,
+      appClientName,
+      searchField,
+      searchDraft,
+      pageSize,
+      totalBalance,
+      error,
+    ],
   );
 
   return (
     <>
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      data={rows}
-      showsVerticalScrollIndicator={false}
-      keyExtractor={(item, i) => item._id ?? String(i)}
-      ListHeaderComponent={header}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
-      }
-      renderItem={({ item, index }) => {
-        const value = kind === 'bonus' ? item.bonusBalance : item.balance;
-        return (
-          <TouchableOpacity style={styles.row} onPress={() => setSelected(item)}>
-            <Text style={[styles.cell, styles.cellIndex]}>{(page - 1) * pageSize + index + 1}</Text>
-            <Text style={[styles.cell, styles.cellName]} numberOfLines={1}>
-              {display(item.name)}
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        showsVerticalScrollIndicator={false}
+        keyExtractor={(item, i) => item._id ?? String(i)}
+        ListHeaderComponent={header}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => void load()}
+            tintColor={colors.primary}
+          />
+        }
+        renderItem={({ item, index }) => {
+          const value = kind === 'bonus' ? item.bonusBalance : item.balance;
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSelected(item)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(item.name)}
+                </Text>
+                <Text style={styles.cardApp} numberOfLines={1}>
+                  {appCodeForName(item.clientName)}
+                </Text>
+              </View>
+              <View style={styles.cardGrid}>
+                <View style={styles.cardCell}>
+                  <Text style={styles.cardLabel}>Mobile</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {maskMobile(item.mobile, canShowMobile)}
+                  </Text>
+                </View>
+                <View style={styles.cardCell}>
+                  <Text style={styles.cardLabel}>{amountLabel}</Text>
+                  <Text style={[styles.cardValue, styles.cardAmount]} numberOfLines={1}>
+                    ₹{floorNum(value ?? 0).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                {item.state || item.city ? (
+                  <View style={[styles.cardCell, styles.cardCellWide]}>
+                    <Text style={styles.cardLabel}>Location</Text>
+                    <Text style={styles.cardValue} numberOfLines={1}>
+                      {[item.city, item.state].filter(Boolean).join(', ') || '—'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.cardHint}>Tap for all details</Text>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={{ marginTop: spacing(6) }} color={colors.primary} />
+          ) : (
+            <Text style={styles.empty}>No users</Text>
+          )
+        }
+        ListFooterComponent={
+          <View style={styles.pager}>
+            <Text
+              style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+              onPress={() => page > 1 && setPage((p) => p - 1)}
+            >
+              ‹ Prev
             </Text>
-            <Text style={[styles.cell, styles.cellMobile]} numberOfLines={1}>
-              {maskMobile(item.mobile, canShowMobile)}
+            <Text style={styles.pagerLabel}>
+              Page {page} / {totalPages}
             </Text>
-            <Text style={[styles.cell, styles.cellApp]} numberOfLines={1}>
-              {appCodeForName(item.clientName)}
+            <Text
+              style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+              onPress={() => page < totalPages && setPage((p) => p + 1)}
+            >
+              Next ›
             </Text>
-            <Text style={[styles.cell, styles.cellNum]}>
-              {floorNum(value ?? 0).toLocaleString('en-IN')}
-            </Text>
-          </TouchableOpacity>
-        );
-      }}
-      ListEmptyComponent={
-        loading ? (
-          <ActivityIndicator style={{ marginTop: spacing(6) }} color={colors.primary} />
-        ) : (
-          <Text style={styles.empty}>No users</Text>
-        )
-      }
-      ListFooterComponent={
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-            onPress={() => page > 1 && setPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {page} / {totalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-            onPress={() => page < totalPages && setPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
-      }
-    />
-    <RowDetailSheet
-      visible={selected !== null}
-      title={selected ? display(selected.name) : ''}
-      fields={sheetFields}
-      onClose={() => setSelected(null)}
-    />
+          </View>
+        }
+      />
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? display(selected.name) : ''}
+        fields={sheetFields}
+        onClose={() => setSelected(null)}
+      />
     </>
   );
 }
@@ -325,22 +364,68 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
-  row: {
+  hint: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: spacing(2) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginTop: spacing(2),
+  },
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing(2),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    gap: spacing(2),
+    marginBottom: spacing(2),
   },
-  headRow: { marginTop: spacing(3), borderBottomColor: colors.primary },
-  headText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
-  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1) },
-  cellIndex: { width: 34 },
-  cellName: { flex: 1.4 },
-  cellMobile: { flex: 1.3 },
-  cellApp: { width: 44, textAlign: 'center' },
-  hint: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: spacing(1) },
-  cellNum: { flex: 1, textAlign: 'right', fontWeight: '700' },
+  cardIndex: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    minWidth: 28,
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  cardApp: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    maxWidth: 72,
+  },
+  cardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+  },
+  cardCell: {
+    width: '47%',
+    flexGrow: 1,
+    minWidth: '45%',
+  },
+  cardCellWide: {
+    width: '100%',
+  },
+  cardLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardAmount: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(2) },
   empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
   pager: {
     flexDirection: 'row',

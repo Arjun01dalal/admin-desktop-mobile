@@ -1,8 +1,9 @@
 import type { GameRow, TopGameItem, TopGamesDoc } from './types';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import { replaceS3WithCloudfront } from '@/utils/cdnUrl';
 
 export function getImageUrl(item: TopGameItem): string {
-  if (item?.imagePath) return item.imagePath;
+  if (item?.imagePath) return replaceS3WithCloudfront(item.imagePath);
 
   const images = item?.images || [];
   const preferred =
@@ -11,7 +12,7 @@ export function getImageUrl(item: TopGameItem): string {
     images.find((img) => img.type === 'logo-round') ||
     images[0];
 
-  return preferred?.url || '';
+  return replaceS3WithCloudfront(preferred?.url || '');
 }
 
 export function getGameName(item: TopGameItem): string {
@@ -93,5 +94,52 @@ export function buildGameRows(
       .join(' ')
       .toLowerCase()
       .includes(query),
+  );
+}
+
+export function unpackCatalogGames(raw: unknown): Array<{
+  gameId: string;
+  gameName: string;
+  providerName: string;
+}> {
+  const payload =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? ((raw as { payload?: unknown; items?: unknown }).payload ??
+        (raw as { items?: unknown }).items ??
+        raw)
+      : raw;
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as { items?: unknown })?.items)
+      ? ((payload as { items: unknown[] }).items)
+      : [];
+
+  const unique = new Map<
+    string,
+    { gameId: string; gameName: string; providerName: string }
+  >();
+  items.forEach((item) => {
+    const row = (item || {}) as Record<string, unknown>;
+    const provider =
+      (row.provider as { name?: string } | undefined) || undefined;
+    const gameId = row.gameId ?? row.Game_Code ?? row.id;
+    const gameName = row.Name ?? row.gameName ?? row.name ?? gameId;
+    const providerName =
+      row.providerName ??
+      provider?.name ??
+      row.Provider_Name ??
+      row.Provider_ID ??
+      '';
+    if (gameId == null || gameId === '') return;
+    const normalized = {
+      gameId: String(gameId),
+      gameName: String(gameName || gameId),
+      providerName: String(providerName || 'Unknown'),
+    };
+    unique.set(`${normalized.providerName}:${normalized.gameId}`, normalized);
+  });
+
+  return Array.from(unique.values()).sort((a, b) =>
+    a.gameName.localeCompare(b.gameName),
   );
 }

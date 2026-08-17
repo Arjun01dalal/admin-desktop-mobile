@@ -19,8 +19,15 @@
       "bundleIdentifier": "vip.astrotalk.panel",
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
+      "requireFullScreen": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait"
+        ],
         "NSLocationWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes."
       }
@@ -60,6 +67,12 @@
       "expo-asset",
       "expo-font",
       "expo-secure-store",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT"
+        }
+      ],
       [
         "expo-location",
         {

@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
@@ -31,8 +31,6 @@ type Row = {
   status?: boolean;
   [key: string]: unknown;
 };
-
-const MAIN_KEYS = new Set(['idx', 'name', 'upiId', 'status']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -238,15 +236,40 @@ export function UpiListsScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No UPI records found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No UPI records found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const active = Boolean(row.status);
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.name)}
+                </Text>
+                <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
+                  {active ? 'Active' : 'Inactive'}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  UPI Id: {display(row.upiId)}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for details & actions</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -266,7 +289,7 @@ export function UpiListsScreen() {
       <Modal
         visible={addOpen}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setAddOpen(false)}
       >
         <KeyboardAvoidingView
@@ -289,7 +312,11 @@ export function UpiListsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <Text style={styles.fieldLabel}>PN *</Text>
               <TextInput
                 style={styles.input}
@@ -363,15 +390,82 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
+  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  backdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing(6),
+    paddingVertical: spacing(12),
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  backdropTouch: { ...StyleSheet.absoluteFillObject },
   modalSheet: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: radius.md * 2,
-    borderTopRightRadius: radius.md * 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md * 2,
     padding: spacing(4),
-    maxHeight: '85%',
+    maxHeight: '100%',
   },
+  modalScroll: { flexGrow: 0 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   modalTitle: {
     color: colors.foreground,

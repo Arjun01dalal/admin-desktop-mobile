@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayTime } from '../../../utils/dates';
 import { roleNamesMap } from '../../../data/rolesData';
@@ -35,7 +35,6 @@ type Item = {
 
 type RoleGroup = { _id: string; items?: Item[] };
 
-const MAIN_KEYS = new Set(['name', 'city', 'loginTime']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -141,15 +140,24 @@ export function LoginReportScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id ?? i)}
-        loading={loading}
-        emptyMessage="No login records"
-        onRowPress={(row) => setSelected(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No login records</Text> : null}
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity key={`row-${index}-${String(row._id ?? '')}`} style={styles.card} activeOpacity={0.75} onPress={() => setSelected(row)}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>{display(row.name)}</Text>
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft} numberOfLines={1}>City: {display(row.address?.city)}</Text>
+              <Text style={styles.cardSplitRight}>Login: {formatDisplayTime(row.updatedOn) || '—'}</Text>
+            </View>
+            <Text style={styles.cardSplitLeft} numberOfLines={1}>State: {display(row.address?.state)}</Text>
+            <Text style={styles.cardHint}>Tap card for details</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <RowDetailSheet
         visible={selected !== null}
@@ -192,4 +200,41 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), marginBottom: spacing(1) },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', flex: 1, minWidth: 0 },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
+  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
+  cardSplitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing(2), paddingVertical: 1 },
+  cardSplitLeft: { color: colors.foreground, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'left' },
+  cardSplitRight: { color: colors.foreground, fontSize: 11, fontWeight: '700', flexShrink: 0, maxWidth: '48%', textAlign: 'right' },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

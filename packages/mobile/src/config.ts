@@ -18,3 +18,30 @@ export function getEntkValue(): string {
 export function isConfigured(): boolean {
   return Boolean(process.env.EXPO_PUBLIC_API_BASE_URL && process.env.EXPO_PUBLIC_ENTK_VALUE);
 }
+
+/**
+ * SSL pin generate endpoint (OkHttp stress-key API).
+ * Defaults to production generate URL when unset.
+ */
+export function getSslPinGenerateUrl(): string {
+  const explicit = process.env.EXPO_PUBLIC_SSL_PIN_GENERATE_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+  try {
+    const base = getApiBaseUrl();
+    if (/laxminarayan\.live/i.test(base)) return `${base}/generate`;
+  } catch {
+    /* API base may be unset during early boot diagnostics */
+  }
+  return 'https://laxminarayan.live/api/generate';
+}
+
+/**
+ * Header `stress-key` for `/api/generate`. Prefer env; fallback is the
+ * production key used by the Android panel client.
+ */
+export function getSslStressKey(): string {
+  return (
+    process.env.EXPO_PUBLIC_SSL_STRESS_KEY?.trim() ||
+    'QhhgFGu6GTB/rOMC8AvoOh9eLuHZbke180e0hp7j4zI='
+  );
+}

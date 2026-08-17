@@ -4,7 +4,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
@@ -62,6 +65,7 @@ const isWhatsappGateway = (item: GatewayRow) =>
   `${item?.name || ''}`.toLowerCase().includes('whatsapp');
 
 export function WhatsappMidScreen() {
+  const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,9 +122,31 @@ export function WhatsappMidScreen() {
   }, [load, loadGateways]);
 
   const sorted = useMemo(
-    () => [...rows].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    () =>
+      [...rows].sort((a, b) => {
+        const byName = (a.name || '').localeCompare(b.name || '');
+        if (byName !== 0) return byName;
+        return (Number(a.position) || 0) - (Number(b.position) || 0);
+      }),
     [rows],
   );
+
+  /** Laxmi WhatsappMid — rows grouped under each Name (rowSpan on web). */
+  const groupedByName = useMemo(() => {
+    const groups: { name: string; items: Row[] }[] = [];
+    const map = new Map<string, Row[]>();
+    for (const row of sorted) {
+      const key = String(row.name || '').trim() || 'Untitled';
+      const list = map.get(key);
+      if (list) list.push(row);
+      else {
+        const next = [row];
+        map.set(key, next);
+        groups.push({ name: key, items: next });
+      }
+    }
+    return groups;
+  }, [sorted]);
 
   const toggleStatus = async (row: Row, checked: boolean) => {
     const rowId = getRowId(row);
@@ -258,26 +284,48 @@ export function WhatsappMidScreen() {
       ) : null}
 
       <View style={styles.list}>
-        {sorted.map((row, i) => (
-          <TouchableOpacity
-            key={getRowId(row) || String(i)}
-            style={styles.card}
-            onPress={() => setSheetRow(row)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardTop}>
-              <Text style={styles.cardName}>{display(row.name)}</Text>
-              <Switch
-                value={Boolean(row.isCurrentlyActive)}
-                onValueChange={(v) => void toggleStatus(row, v)}
-              />
+        {groupedByName.map((group) => (
+          <View key={group.name} style={styles.group}>
+            <View style={styles.groupHeader}>
+              <View style={styles.groupAccent} />
+              <View style={styles.groupHeaderText}>
+                <Text style={styles.groupLabel}>NAME</Text>
+                <Text style={styles.groupTitle} numberOfLines={1}>
+                  {group.name}
+                </Text>
+              </View>
+              <View style={styles.groupBadge}>
+                <Text style={styles.groupCount}>
+                  {group.items.length}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.cardMeta}>MID: {display(row.mid)}</Text>
-            <Text style={styles.cardMeta}>UPI: {display(row.upiId)}</Text>
-            <Text style={styles.cardMeta}>
-              Max {display(row.maxDepositAllowed)} · Pos {display(row.position)}
-            </Text>
-          </TouchableOpacity>
+            {group.items.map((row, i) => (
+              <TouchableOpacity
+                key={getRowId(row) || `${group.name}-${i}`}
+                style={styles.card}
+                onPress={() => setSheetRow(row)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardTop}>
+                  <Text style={styles.cardName} numberOfLines={1}>
+                    MID: {display(row.mid)}
+                  </Text>
+                  <Switch
+                    value={Boolean(row.isCurrentlyActive)}
+                    onValueChange={(v) => void toggleStatus(row, v)}
+                    style={styles.cardSwitch}
+                  />
+                </View>
+                <Text style={styles.cardMeta} numberOfLines={1}>
+                  UPI: {display(row.upiId)}
+                </Text>
+                <Text style={styles.cardMeta} numberOfLines={1}>
+                  Max {display(row.maxDepositAllowed)} · Pos {display(row.position)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         ))}
       </View>
 
@@ -290,8 +338,19 @@ export function WhatsappMidScreen() {
       />
 
       <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
-        <View style={styles.backdrop}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.formSheet}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.formContent,
+                { paddingBottom: Math.max(insets.bottom, spacing(4)) + spacing(4) },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
             <Text style={styles.formTitle}>Add Whatsapp Mid</Text>
             <TextInput
               style={styles.input}
@@ -360,8 +419,9 @@ export function WhatsappMidScreen() {
                 <Text style={styles.addBtnText}>{submitting ? 'Saving…' : 'Submit'}</Text>
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
@@ -392,22 +452,75 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.destructive },
   hint: { color: colors.muted, marginBottom: spacing(2) },
-  list: { gap: spacing(2) },
+  list: { gap: spacing(5) },
+  group: { gap: spacing(1.5) },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    paddingHorizontal: spacing(3),
+    gap: spacing(2.5),
+  },
+  groupAccent: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
+  groupHeaderText: { flex: 1, minWidth: 0 },
+  groupLabel: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  groupTitle: {
+    color: colors.foreground,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  groupBadge: {
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing(2),
+  },
+  groupCount: {
+    color: colors.primaryForeground,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing(4),
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
   },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  cardName: { fontWeight: '700', color: colors.foreground, flex: 1, marginRight: 8 },
-  cardMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  cardName: {
+    fontWeight: '700',
+    color: colors.foreground,
+    flex: 1,
+    marginRight: 8,
+    fontSize: 13,
+  },
+  cardSwitch: { transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] },
+  cardMeta: { color: colors.muted, fontSize: 11, marginTop: 1, lineHeight: 14 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -417,7 +530,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
-    padding: spacing(4),
+    maxHeight: '85%',
+  },
+  formContent: {
+    paddingHorizontal: spacing(4),
+    paddingTop: spacing(4),
     gap: spacing(2),
   },
   formTitle: { fontSize: 18, fontWeight: '700', color: colors.foreground, marginBottom: 4 },

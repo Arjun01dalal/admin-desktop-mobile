@@ -230,7 +230,7 @@ export function SocialMediaScreen() {
       <View style={styles.grid}>
         {rows.map((row, i) => (
           <TouchableOpacity
-            key={String(row._id || i)}
+            key={`row-${i}-${String(row._id ?? '')}`}
             style={styles.card}
             activeOpacity={0.7}
             onPress={() => setSheetRow(row)}

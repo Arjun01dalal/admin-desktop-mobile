@@ -27,7 +27,7 @@ import {
 } from 'react-native';
 import { pickPageSizes, asPaged, CLIENT_NAMES } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate } from '../../../utils/dates';
@@ -133,24 +133,61 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   }, [searchName, searchMob]);
 
   const runMutation = useCallback(
-    async (fn: () => Promise<{ ok: boolean; message?: string }>, successMsg?: string) => {
+    async (
+      fn: () => Promise<{ ok: boolean; success?: boolean; message?: string }>,
+      successMsg?: string,
+    ) => {
       setBusy(true);
       try {
         const res = await fn();
-        if (!res.ok) {
+        if (!res.ok || res.success === false) {
           Alert.alert(res.message || 'Request failed');
           return false;
         }
-        if (successMsg) Alert.alert(successMsg);
+        Alert.alert(successMsg || res.message || 'Updated successfully');
         setSheetRow(null);
-        void load();
+        await load();
         return true;
+      } catch (err) {
+        Alert.alert(err instanceof Error ? err.message : 'Request failed');
+        return false;
       } finally {
         setBusy(false);
       }
     },
     [load],
   );
+
+  /**
+   * React Native (especially iOS) cannot reliably present a second native
+   * Modal while RowDetailSheet is still visible. Dismiss the sheet first and
+   * open the requested editor after its slide-out animation has completed.
+   */
+  const openAfterSheetClose = useCallback((open: () => void) => {
+    setSheetRow(null);
+    setTimeout(open, Platform.OS === 'ios' ? 350 : 80);
+  }, []);
+
+  const closeCoinModal = useCallback(() => {
+    if (busy) return;
+    setCoinOpen(false);
+    setCoinValue('');
+    setCoinUserId('');
+  }, [busy]);
+
+  const closeBlockModal = useCallback(() => {
+    if (busy) return;
+    setBlockOpen(false);
+    setBlockRemark('');
+    setBlockTarget(null);
+  }, [busy]);
+
+  const closeAppModal = useCallback(() => {
+    if (busy) return;
+    setAppOpen(false);
+    setAppSelected('');
+    setAppTarget(null);
+  }, [busy]);
 
   // Add / Remove coin role (single row — same endpoint desktop uses for bulk)
   const handleCoinRole = useCallback(
@@ -176,13 +213,12 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
     [runMutation],
   );
 
-  const submitCoin = useCallback(() => {
+  const submitCoin = useCallback(async () => {
     if (!coinValue.trim()) {
       Alert.alert('Please enter coin');
       return;
     }
-    setCoinOpen(false);
-    void runMutation(
+    const updated = await runMutation(
       () =>
         secureApi<unknown>('reports.addCoin', {
           _id: coinUserId,
@@ -191,40 +227,58 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
         }),
       'Coin limit is updated',
     );
+    if (updated) {
+      setCoinOpen(false);
+      setCoinValue('');
+      setCoinUserId('');
+    }
   }, [coinUserId, coinValue, runMutation, user]);
 
-  const submitBlock = useCallback(() => {
+  const submitBlock = useCallback(async () => {
     if (!blockRemark.trim()) {
       Alert.alert('Please enter remark');
       return;
     }
     const row = blockTarget;
     if (!row) return;
-    setBlockOpen(false);
-    void runMutation(() =>
-      secureApi<unknown>('ops.blockCaller', {
-        _id: row._id,
-        Role_ID: row.Role_ID,
-        status: !row.block,
-        blockReason: blockRemark.trim(),
-      }),
+    const nextBlocked = !row.block;
+    const updated = await runMutation(
+      () =>
+        secureApi<unknown>('ops.blockCaller', {
+          _id: row._id,
+          Role_ID: row.Role_ID,
+          status: nextBlocked,
+          blockReason: blockRemark.trim(),
+        }),
+      nextBlocked ? 'User blocked successfully' : 'User unblocked successfully',
     );
+    if (updated) {
+      setBlockOpen(false);
+      setBlockRemark('');
+      setBlockTarget(null);
+    }
   }, [blockTarget, blockRemark, runMutation]);
 
-  const submitApp = useCallback(() => {
+  const submitApp = useCallback(async () => {
     const row = appTarget;
     if (!row || !appSelected) {
       Alert.alert(`Please select an app to ${appMode}`);
       return;
     }
-    setAppOpen(false);
-    void runMutation(() =>
-      secureApi<unknown>('subadmin.updateAppHeads', {
-        userId: row._id,
-        app: appSelected,
-        type: appMode,
-      }),
+    const updated = await runMutation(
+      () =>
+        secureApi<unknown>('subadmin.updateAppHeads', {
+          userId: row._id,
+          app: appSelected,
+          type: appMode,
+        }),
+      appMode === 'add' ? 'App added successfully' : 'App removed successfully',
     );
+    if (updated) {
+      setAppOpen(false);
+      setAppSelected('');
+      setAppTarget(null);
+    }
   }, [appTarget, appSelected, appMode, runMutation]);
 
   const columns = useMemo<DataTableColumn<Row>[]>(
@@ -288,7 +342,7 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       onPress: () => {
         setCoinUserId(row._id);
         setCoinValue('');
-        setCoinOpen(true);
+        openAfterSheetClose(() => setCoinOpen(true));
       },
     });
     actions.push({
@@ -298,7 +352,7 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       onPress: () => {
         setBlockTarget(row);
         setBlockRemark('');
-        setBlockOpen(true);
+        openAfterSheetClose(() => setBlockOpen(true));
       },
     });
     if (canAddApps) {
@@ -310,7 +364,7 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
           setAppTarget(row);
           setAppMode('add');
           setAppSelected('');
-          setAppOpen(true);
+          openAfterSheetClose(() => setAppOpen(true));
         },
       });
     }
@@ -322,11 +376,18 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
         setAppTarget(row);
         setAppMode('remove');
         setAppSelected('');
-        setAppOpen(true);
+        openAfterSheetClose(() => setAppOpen(true));
       },
     });
     return actions;
-  }, [sheetRow, busy, canAddApps, handleCoinRole, handleRemovePermission]);
+  }, [
+    sheetRow,
+    busy,
+    canAddApps,
+    handleCoinRole,
+    handleRemovePermission,
+    openAfterSheetClose,
+  ]);
 
   const appOptions: readonly string[] =
     appMode === 'add' ? (CLIENT_NAMES as readonly string[]) : appTarget?.allotedApps || [];
@@ -405,15 +466,65 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => ['idx', 'name', 'mobile', 'coinLimit', 'status'].includes(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No sub-admins found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row for details & actions"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No sub-admins found</Text> : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const blocked = Boolean(row.block);
+          const statusColor = blocked ? '#dc2626' : '#16a34a';
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id || '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.name)}
+                </Text>
+                <Text
+                  style={[
+                    styles.statusPill,
+                    { color: statusColor, backgroundColor: `${statusColor}22` },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {blocked ? 'Blocked' : 'Active'}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Mobile</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row.mobile)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  Coins: {display(row.coinLimit)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  Role: {row.showCoins === true ? 'Added' : '—'}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Permission</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {row.showRemoveCoin === true ? 'Yes' : 'No'}
+                </Text>
+              </View>
+              {row.allotedApps && row.allotedApps.length > 0 ? (
+                <Text style={styles.cardApps} numberOfLines={2}>
+                  Apps: {row.allotedApps.join(', ')}
+                </Text>
+              ) : null}
+              <Text style={styles.cardHint}>Tap card for details & actions</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <View style={styles.pager}>
         <Text
@@ -442,9 +553,9 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       />
 
       {/* Edit Coin Limit */}
-      <Modal visible={coinOpen} transparent animationType="slide" onRequestClose={() => setCoinOpen(false)}>
+      <Modal visible={coinOpen} transparent animationType="slide" onRequestClose={closeCoinModal}>
         <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <TouchableWithoutFeedback onPress={() => setCoinOpen(false)}>
+          <TouchableWithoutFeedback onPress={closeCoinModal}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
           <View style={styles.formSheet}>
@@ -458,11 +569,19 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
               keyboardType="numeric"
             />
             <View style={styles.formActions}>
-              <TouchableOpacity style={[styles.formBtn, styles.formBtnGhost]} onPress={() => setCoinOpen(false)}>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnGhost]}
+                onPress={closeCoinModal}
+                disabled={busy}
+              >
                 <Text style={styles.formBtnGhostText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.formBtn, styles.formBtnPrimary]} onPress={submitCoin}>
-                <Text style={styles.formBtnPrimaryText}>Submit</Text>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnPrimary, busy && styles.btnDisabled]}
+                onPress={() => void submitCoin()}
+                disabled={busy}
+              >
+                <Text style={styles.formBtnPrimaryText}>{busy ? 'Saving…' : 'Submit'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -470,9 +589,9 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       </Modal>
 
       {/* Block / Un Block remark */}
-      <Modal visible={blockOpen} transparent animationType="slide" onRequestClose={() => setBlockOpen(false)}>
+      <Modal visible={blockOpen} transparent animationType="slide" onRequestClose={closeBlockModal}>
         <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <TouchableWithoutFeedback onPress={() => setBlockOpen(false)}>
+          <TouchableWithoutFeedback onPress={closeBlockModal}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
           <View style={styles.formSheet}>
@@ -487,11 +606,19 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
               placeholderTextColor={colors.muted}
             />
             <View style={styles.formActions}>
-              <TouchableOpacity style={[styles.formBtn, styles.formBtnGhost]} onPress={() => setBlockOpen(false)}>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnGhost]}
+                onPress={closeBlockModal}
+                disabled={busy}
+              >
                 <Text style={styles.formBtnGhostText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.formBtn, styles.formBtnPrimary]} onPress={submitBlock}>
-                <Text style={styles.formBtnPrimaryText}>Submit</Text>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnPrimary, busy && styles.btnDisabled]}
+                onPress={() => void submitBlock()}
+                disabled={busy}
+              >
+                <Text style={styles.formBtnPrimaryText}>{busy ? 'Saving…' : 'Submit'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -499,9 +626,9 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       </Modal>
 
       {/* Add / Remove App */}
-      <Modal visible={appOpen} transparent animationType="slide" onRequestClose={() => setAppOpen(false)}>
+      <Modal visible={appOpen} transparent animationType="slide" onRequestClose={closeAppModal}>
         <View style={styles.backdrop}>
-          <TouchableWithoutFeedback onPress={() => setAppOpen(false)}>
+          <TouchableWithoutFeedback onPress={closeAppModal}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
           <View style={styles.formSheet}>
@@ -528,19 +655,25 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
               </View>
             )}
             <View style={styles.formActions}>
-              <TouchableOpacity style={[styles.formBtn, styles.formBtnGhost]} onPress={() => setAppOpen(false)}>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnGhost]}
+                onPress={closeAppModal}
+                disabled={busy}
+              >
                 <Text style={styles.formBtnGhostText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.formBtn,
                   appMode === 'add' ? styles.formBtnPrimary : styles.formBtnDanger,
-                  !appSelected && styles.btnDisabled,
+                  (!appSelected || busy) && styles.btnDisabled,
                 ]}
-                disabled={!appSelected}
-                onPress={submitApp}
+                disabled={!appSelected || busy}
+                onPress={() => void submitApp()}
               >
-                <Text style={styles.formBtnPrimaryText}>{appMode === 'add' ? 'Submit' : 'Remove'}</Text>
+                <Text style={styles.formBtnPrimaryText}>
+                  {busy ? 'Saving…' : appMode === 'add' ? 'Submit' : 'Remove'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -593,6 +726,72 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, fontSize: 13, marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginBottom: spacing(2) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
+  cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, minWidth: 0 },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(2),
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
+    maxWidth: 100,
+    textAlign: 'center',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardApps: { color: colors.muted, fontSize: 11, marginTop: spacing(1) },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -82,14 +82,19 @@ function Root() {
 export default function AppRoot() {
   return (
     <SafeAreaProvider>
-      <SecurityGate>
-        <AuthProvider>
-          <StatusBar style={isDarkTheme() ? 'light' : 'dark'} />
-          <Root />
-          <OfflineHost />
-          <UpdateGate />
-        </AuthProvider>
-      </SecurityGate>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SecurityGate>
+          <AuthProvider>
+            <StatusBar
+              style={isDarkTheme() ? 'light' : 'dark'}
+              backgroundColor={colors.background}
+            />
+            <Root />
+            <OfflineHost />
+            <UpdateGate />
+          </AuthProvider>
+        </SecurityGate>
+      </View>
     </SafeAreaProvider>
   );
 }

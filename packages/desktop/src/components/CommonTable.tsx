@@ -166,6 +166,8 @@ export type CommonTableProps<T> = {
   paper?: boolean;
   hover?: boolean;
   dense?: boolean;
+  /** Tighter than `dense` — trims row padding so more rows fit on one screen. */
+  compact?: boolean;
   size?: 'small' | 'medium';
   onRowClick?: (row: T, index: number) => void;
   /** Optional per-row sx (e.g. status background colors). */
@@ -357,6 +359,7 @@ export function CommonTable<T>({
   paper = true,
   hover = true,
   dense = false,
+  compact = false,
   onRowClick,
   getRowSx,
   virtualize,
@@ -371,25 +374,38 @@ export function CommonTable<T>({
   const styles =
     resolvedTone === 'light' ? commonTableStylesLight : commonTableStyles;
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const cellBase: SxProps<Theme> = dense
-    ? { ...styles.cell, fontSize: 12, py: 1 }
-    : styles.cell;
-  const headBase: SxProps<Theme> = dense
-    ? { ...styles.head, fontSize: 12, py: 1 }
-    : styles.head;
-  const filterBase: SxProps<Theme> = dense
-    ? { ...styles.filter, fontSize: 11, py: 0.75 }
-    : styles.filter;
+  const cellBase: SxProps<Theme> = compact
+    ? { ...styles.cell, fontSize: 12, py: 0.15, px: 0.75, lineHeight: 1.15 }
+    : dense
+      ? { ...styles.cell, fontSize: 12, py: 1 }
+      : styles.cell;
+  const headBase: SxProps<Theme> = compact
+    ? { ...styles.head, fontSize: 12, py: 0.5, px: 0.75 }
+    : dense
+      ? { ...styles.head, fontSize: 12, py: 1 }
+      : styles.head;
+  const filterBase: SxProps<Theme> = compact
+    ? {
+        ...styles.filter,
+        fontSize: 11.5,
+        py: 0.35,
+        px: 0.5,
+        '& .MuiInputBase-root': { fontSize: 11.5 },
+        '& .MuiInputBase-input': { py: 0.35 },
+      }
+    : dense
+      ? { ...styles.filter, fontSize: 11, py: 0.75 }
+      : styles.filter;
 
   const showFilters = columns.some((col) => col.filter != null);
   const shouldVirtualize =
     virtualize === true ||
     (virtualize !== false && rows.length >= virtualizeThreshold);
-  const rowHeight = estimateRowHeight ?? (dense ? 40 : 48);
+  const rowHeight = estimateRowHeight ?? (compact ? 30 : dense ? 40 : 48);
   const isSticky = stickyHeader || shouldVirtualize;
   /** Measured header height so sticky filters sit fully below labels (no clipping). */
   const headLabelRef = useRef<HTMLTableRowElement | null>(null);
-  const [labelRowHeight, setLabelRowHeight] = useState(dense ? 40 : 48);
+  const [labelRowHeight, setLabelRowHeight] = useState(compact ? 30 : dense ? 40 : 48);
   useLayoutEffect(() => {
     const el = headLabelRef.current;
     if (!el) return;
@@ -401,7 +417,7 @@ export function CommonTable<T>({
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
     ro?.observe(el);
     return () => ro?.disconnect();
-  }, [columns, dense, showFilters, resolvedTone]);
+  }, [columns, dense, compact, showFilters, resolvedTone]);
   const filterStickyTop = showFilters ? labelRowHeight : 0;
   const stickyOffsets = useMemo(() => buildStickyOffsets(columns), [columns]);
   const stickyHeadBg = '#ff9f0a';

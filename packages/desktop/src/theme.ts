@@ -76,11 +76,56 @@ const shared: ThemeOptions = {
   },
 };
 
-function dateFieldOverrides(calendarIcon: string) {
+function formFieldOverrides(calendarIcon: string, isDark: boolean) {
+  const lightFieldRoot = isDark
+    ? {}
+    : {
+        // Several legacy pages still hardcode #121218 on individual fields.
+        // In light mode the theme must win so text never becomes black-on-black.
+        backgroundColor: '#ffffff !important',
+        color: '#111111 !important',
+      };
+
   return {
+    MuiInputBase: {
+      styleOverrides: {
+        root: lightFieldRoot,
+        input: isDark
+          ? {}
+          : {
+              color: '#111111 !important',
+              WebkitTextFillColor: '#111111 !important',
+              '&::placeholder': {
+                color: '#5c5c62 !important',
+                opacity: 0.8,
+              },
+              '&.Mui-disabled': {
+                color: '#777777 !important',
+                WebkitTextFillColor: '#777777 !important',
+              },
+            },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        select: isDark
+          ? {}
+          : {
+              color: '#111111 !important',
+              WebkitTextFillColor: '#111111 !important',
+            },
+        icon: isDark ? {} : { color: '#5c5c62 !important' },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: isDark ? {} : { color: '#5c5c62' },
+      },
+    },
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
+          ...lightFieldRoot,
           '&:has(input[type="date"]), &:has(input[type="time"]), &:has(input[type="datetime-local"])':
             {
               position: 'relative',
@@ -143,7 +188,7 @@ export function createAppTheme(mode: AppPaletteMode): Theme {
     },
     components: {
       ...shared.components,
-      ...dateFieldOverrides(isDark ? WHITE_CALENDAR_ICON : DARK_CALENDAR_ICON),
+      ...formFieldOverrides(isDark ? WHITE_CALENDAR_ICON : DARK_CALENDAR_ICON, isDark),
     },
   });
 }

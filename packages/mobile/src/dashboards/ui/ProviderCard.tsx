@@ -60,6 +60,7 @@ export function ProviderCard({
             options={card.selectOptions!}
             statsMap={card.selectStatsMap}
             onChange={(v) => card.onSelectChange?.(v)}
+            onGgrPress={card.onSelectGgrPress}
           />
         </View>
       ) : card.selectOptions &&
@@ -109,10 +110,18 @@ export function ProviderCard({
       <View style={styles.rows}>
         {card.rows.map((r, i) => {
           const ggr = isGgrLabel(r.label) && typeof r.value === 'number';
+          const RowWrapper: React.ElementType = r.onPress ? TouchableOpacity : View;
           return (
-            <View
+            <RowWrapper
               key={`${r.label}-${i}`}
               style={[styles.row, i < card.rows.length - 1 && styles.rowBorder]}
+              {...(r.onPress
+                ? {
+                    onPress: r.onPress,
+                    activeOpacity: 0.7,
+                    accessibilityRole: 'button' as const,
+                  }
+                : {})}
             >
               <Text style={styles.rowLabel}>{toDisplayText(r.label)}</Text>
               <Text
@@ -126,15 +135,15 @@ export function ProviderCard({
               >
                 {formatValue(r.value)}
               </Text>
-            </View>
+            </RowWrapper>
           );
         })}
       </View>
 
       {card.actions && card.actions.length > 0 && (
         <View style={styles.actionsRow}>
-          {card.actions.map((action) => (
-            <TouchableOpacity key={action.label} onPress={action.onClick}>
+          {card.actions.map((action, ai) => (
+            <TouchableOpacity key={`action-${ai}-${action.label}`} onPress={action.onClick}>
               <Text style={styles.actionLink}>
                 {toDisplayText(action.label)}
               </Text>

@@ -35,6 +35,8 @@ type Props<Row> = {
   onRowPress?: (row: Row, index: number) => void;
   rowBg?: (row: Row) => string | undefined;
   hint?: string;
+  /** Extra controls under each phone card (e.g. Check / Cross Check). */
+  renderCardFooter?: (row: Row, index: number) => React.ReactNode;
 };
 
 export function ResponsiveTable<Row>(props: Props<Row>) {
@@ -54,6 +56,7 @@ function CardList<Row>({
   footer,
   onRowPress,
   rowBg,
+  renderCardFooter,
 }: Props<Row>) {
   const [sheetRow, setSheetRow] = React.useState<{ row: Row; index: number } | null>(null);
 
@@ -145,13 +148,16 @@ function CardList<Row>({
           </View>
         );
         const cardStyle = [styles.card, bg ? { backgroundColor: bg } : null];
+        const cardFooter = renderCardFooter?.(row, index);
         return (
           <TouchableOpacity
             key={keyFor(row, index)}
             style={cardStyle}
             onPress={() => (onRowPress ? onRowPress(row, index) : openSheet(row, index))}
+            activeOpacity={0.85}
           >
             {body}
+            {cardFooter ? <View style={styles.cardFooter}>{cardFooter}</View> : null}
           </TouchableOpacity>
         );
       })}
@@ -210,6 +216,7 @@ const styles = StyleSheet.create({
   cardRight: { alignItems: 'flex-end', gap: 2 },
   cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   cardSub: { color: colors.muted, fontSize: 11, marginTop: 2 },
+  cardFooter: { marginTop: spacing(2) },
   rowNo: { color: colors.muted, fontSize: 11 },
   fieldGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   field: { width: '50%', paddingRight: spacing(2), marginBottom: spacing(2) },

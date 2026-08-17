@@ -122,6 +122,7 @@ type TxnRow = {
 };
 
 type DrillType = 'deposit' | 'withdrawal';
+type ApprovedDateScope = 'yes' | 'no' | null;
 
 const DEPOSIT_STATUSES = ['', 'Pending', 'Approved', 'Rejected', 'Reverse', 'on hold', 'Processing'] as const;
 const WITHDRAWAL_STATUSES = [
@@ -202,6 +203,8 @@ export function FundRequestScreen() {
 
   const [drillType, setDrillType] = useState<DrillType | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [approvedDateScope, setApprovedDateScope] = useState<ApprovedDateScope>(null);
+  const [drillLabel, setDrillLabel] = useState('');
   const [userNameFilter, setUserNameFilter] = useState('');
   const [amountFilter, setAmountFilter] = useState('');
   const [appFilter, setAppFilter] = useState('');
@@ -291,12 +294,14 @@ export function FundRequestScreen() {
       pageNo: number;
       itemsPerPage: number;
       useAll: boolean;
+      isTodaysData: ApprovedDateScope;
     }) => {
       const gen = ++drillGenRef.current;
       setTableLoading(true);
       try {
         const filter: Record<string, unknown> = {};
         if (opts.status) filter.status = opts.status;
+        if (opts.isTodaysData) filter.isTodaysData = opts.isTodaysData;
         if (opts.userName.trim()) filter.userName = opts.userName.trim();
         if (opts.amount.trim()) filter.amount = opts.amount.trim();
         if (opts.clientName) filter.clientName = opts.clientName;
@@ -338,7 +343,15 @@ export function FundRequestScreen() {
   }, []);
 
   const reloadDrill = useCallback(
-    (overrides?: Partial<{ status: string; pageNo: number; itemsPerPage: number; type: DrillType }>) => {
+    (
+      overrides?: Partial<{
+        status: string;
+        pageNo: number;
+        itemsPerPage: number;
+        type: DrillType;
+        isTodaysData: ApprovedDateScope;
+      }>,
+    ) => {
       const type = overrides?.type ?? drillType;
       if (!type) return;
       void loadTransactions({
@@ -350,19 +363,39 @@ export function FundRequestScreen() {
         pageNo: overrides?.pageNo ?? page,
         itemsPerPage: overrides?.itemsPerPage ?? pageSize,
         useAll: allData,
+        isTodaysData: overrides?.isTodaysData ?? approvedDateScope,
       });
     },
-    [drillType, statusFilter, userNameFilter, amountFilter, appFilter, page, pageSize, allData, loadTransactions],
+    [
+      drillType,
+      statusFilter,
+      approvedDateScope,
+      userNameFilter,
+      amountFilter,
+      appFilter,
+      page,
+      pageSize,
+      allData,
+      loadTransactions,
+    ],
   );
 
   const openDrill = useCallback(
-    (type: DrillType, status: string) => {
+    (
+      type: DrillType,
+      status: string,
+      opts?: { isTodaysData?: ApprovedDateScope; label?: string },
+    ) => {
+      const isTodaysData = opts?.isTodaysData ?? null;
       setDrillType(type);
       setStatusFilter(status);
+      setApprovedDateScope(isTodaysData);
+      setDrillLabel(opts?.label || status || (type === 'deposit' ? 'Deposit' : 'Refund'));
       setUserNameFilter('');
       setAmountFilter('');
       setAppFilter('');
       setPage(1);
+      setSheetRow(null);
       setDrillOpen(true);
       void loadTransactions({
         type,
@@ -373,9 +406,22 @@ export function FundRequestScreen() {
         pageNo: 1,
         itemsPerPage: pageSize,
         useAll: allData,
+        isTodaysData,
       });
     },
     [pageSize, allData, loadTransactions],
+  );
+
+  /** Status chips leave the Approved today/old scope — otherwise Pending/Reverse/Cancel keep isTodaysData. */
+  const applyStatusChip = useCallback(
+    (status: string) => {
+      setStatusFilter(status);
+      setApprovedDateScope(null);
+      setDrillLabel(status || 'All');
+      setPage(1);
+      reloadDrill({ status, pageNo: 1, isTodaysData: null });
+    },
+    [reloadDrill],
   );
 
   const goPage = useCallback(
@@ -456,22 +502,22 @@ export function FundRequestScreen() {
   };
 
   const kpiItems: KpiItem[] = [
-    { key: 'dep-approved', label: 'Deposit Approved', bucket: depositApproved, tone: 'green', show: canViewDeposit, active: drillType === 'deposit' && statusFilter === 'Approved', onPress: () => openDrill('deposit', 'Approved') },
+    { key: 'dep-approved', label: 'Deposit Approved', bucket: depositApproved, tone: 'green', show: canViewDeposit, active: drillType === 'deposit' && statusFilter === 'Approved', onPress: () => openDrill('deposit', 'Approved', { label: 'Deposit Approved' }) },
     { key: 'app-dep', label: 'App Deposit Approved', bucket: appDeposit, tone: 'green', show: canViewDeposit },
     { key: 'new-user', label: 'New User Deposit', bucket: newUserDeposit, tone: 'green', show: canViewDeposit },
     { key: 'old-user', label: 'Old User Deposit', bucket: oldUserDeposit, tone: 'green', show: canViewDeposit },
     { key: 'transfer-main', label: 'Transfer to Main Wallet', bucket: transferMainWallet, tone: 'green', show: canViewBonusWallet },
-    { key: 'w-hold', label: 'Refund on Hold', bucket: wOnHold, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'on hold', onPress: () => openDrill('withdrawal', 'on hold') },
-    { key: 'w-approved', label: 'Refund Approved', bucket: wApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved', onPress: () => openDrill('withdrawal', 'Approved') },
-    { key: 'w-today', label: "Today's Withdrawal Approved", bucket: wTodayApproved, tone: 'blue', show: canViewWithdrawal, onPress: () => openDrill('withdrawal', 'Approved') },
-    { key: 'w-old', label: 'Old Withdrawal Approved', bucket: wOldApproved, tone: 'blue', show: canViewWithdrawal, onPress: () => openDrill('withdrawal', 'Approved') },
+    { key: 'w-hold', label: 'Refund on Hold', bucket: wOnHold, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'on hold' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'on hold', { label: 'Refund on Hold' }) },
+    { key: 'w-approved', label: 'Refund Approved', bucket: wApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Approved', { label: 'Refund Approved' }) },
+    { key: 'w-today', label: "Today's Withdrawal Approved", bucket: wTodayApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === 'yes', onPress: () => openDrill('withdrawal', 'Approved', { isTodaysData: 'yes', label: "Today's Withdrawal Approved" }) },
+    { key: 'w-old', label: 'Old Withdrawal Approved', bucket: wOldApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === 'no', onPress: () => openDrill('withdrawal', 'Approved', { isTodaysData: 'no', label: 'Old Withdrawal Approved' }) },
     { key: 'unique', label: 'Unique Deposit Pending', bucket: uniquePending, tone: 'yellow', show: canViewDeposit },
-    { key: 'dep-pending', label: 'Total Deposit Pending', bucket: depositPending, tone: 'yellow', show: canViewDeposit, active: drillType === 'deposit' && statusFilter === 'Pending', onPress: () => openDrill('deposit', 'Pending') },
-    { key: 'w-pending', label: 'Withdrawal Pending', bucket: wPending, tone: 'yellow', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Pending', onPress: () => openDrill('withdrawal', 'Pending') },
+    { key: 'dep-pending', label: 'Total Deposit Pending', bucket: depositPending, tone: 'yellow', show: canViewDeposit, active: drillType === 'deposit' && statusFilter === 'Pending', onPress: () => openDrill('deposit', 'Pending', { label: 'Total Deposit Pending' }) },
+    { key: 'w-pending', label: 'Withdrawal Pending', bucket: wPending, tone: 'yellow', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Pending' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Pending', { label: 'Withdrawal Pending' }) },
     { key: 'bonus', label: 'Total Bonus Wallet', bucket: totalBonusWallet, tone: 'orange', show: canViewBonusWallet },
-    { key: 'w-reverse', label: 'Withdrawal Reverse', bucket: wReverse, tone: 'orange', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Reverse', onPress: () => openDrill('withdrawal', 'Reverse') },
-    { key: 'w-rejected', label: 'Withdrawal Rejected', bucket: wRejected, tone: 'red', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Rejected', onPress: () => openDrill('withdrawal', 'Rejected') },
-    { key: 'w-cancel', label: 'Withdrawal Cancelled', bucket: wCanceled, tone: 'red', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Cancel', onPress: () => openDrill('withdrawal', 'Cancel') },
+    { key: 'w-reverse', label: 'Withdrawal Reverse', bucket: wReverse, tone: 'orange', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Reverse' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Reverse', { label: 'Withdrawal Reverse' }) },
+    { key: 'w-rejected', label: 'Withdrawal Rejected', bucket: wRejected, tone: 'red', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Rejected' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Rejected', { label: 'Withdrawal Rejected' }) },
+    { key: 'w-cancel', label: 'Withdrawal Cancelled', bucket: wCanceled, tone: 'red', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Cancel' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Cancel', { label: 'Withdrawal Cancelled' }) },
     { key: 'casino', label: 'Total Casino Deposit', bucket: casinoDeposit, tone: 'gray', show: canViewDeposit },
     { key: 'jetfair', label: 'Total Jetfair Deposit', bucket: jetfairDeposit, tone: 'gray', show: canViewDeposit },
   ];
@@ -635,21 +681,24 @@ export function FundRequestScreen() {
             <Text style={styles.backLink}>‹ Back to Fund Requests</Text>
           </TouchableOpacity>
           <Text style={styles.sectionTitle}>
-            {drillType === 'deposit' ? 'Deposit' : 'Refund'} Transactions ({total})
+            {drillLabel || (drillType === 'deposit' ? 'Deposit' : 'Refund')} ({total})
           </Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing(2) }}>
             {statusOptions.map((s) => (
               <TouchableOpacity
                 key={s || 'all'}
-                style={[styles.chip, statusFilter === s && styles.chipActive]}
-                onPress={() => {
-                  setStatusFilter(s);
-                  setPage(1);
-                  reloadDrill({ status: s, pageNo: 1 });
-                }}
+                style={[styles.chip, statusFilter === s && approvedDateScope === null && styles.chipActive]}
+                onPress={() => applyStatusChip(s)}
               >
-                <Text style={[styles.chipText, statusFilter === s && styles.chipTextActive]}>{s || 'All'}</Text>
+                <Text
+                  style={[
+                    styles.chipText,
+                    statusFilter === s && approvedDateScope === null && styles.chipTextActive,
+                  ]}
+                >
+                  {s || 'All'}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -726,10 +775,18 @@ export function FundRequestScreen() {
           {rows.map((r, i) => {
             const st = String(r.status || '').toLowerCase();
             const stColor =
-              st === 'approved' ? '#16a34a' : st === 'pending' ? '#d97706' : st === 'rejected' || st === 'failed' ? '#dc2626' : '#2563eb';
+              st === 'approved'
+                ? '#16a34a'
+                : st === 'pending'
+                  ? '#d97706'
+                  : st === 'rejected' || st === 'failed' || st === 'cancel'
+                    ? '#dc2626'
+                    : st === 'reverse'
+                      ? '#a855f7'
+                      : '#2563eb';
             return (
               <TouchableOpacity
-                key={r._id || r.orderId || String(i)}
+                key={`row-${i}-${String(r._id || r.orderId || '')}`}
                 style={styles.card}
                 activeOpacity={0.7}
                 onPress={() => setSheetRow(r)}
@@ -759,6 +816,22 @@ export function FundRequestScreen() {
                     <Text style={styles.cardLabel}>Date</Text>
                     <Text style={styles.cardValue}>{formatDisplayDate(r.createdOn) || '—'}</Text>
                   </View>
+                  {drillType === 'withdrawal' ? (
+                    <>
+                      <View style={styles.cardCell}>
+                        <Text style={styles.cardLabel}>Bank</Text>
+                        <Text style={styles.cardValue} numberOfLines={1}>
+                          {display(r.userBankName || r.bankName)}
+                        </Text>
+                      </View>
+                      <View style={styles.cardCell}>
+                        <Text style={styles.cardLabel}>Account</Text>
+                        <Text style={styles.cardValue} numberOfLines={1}>
+                          {display(r.accountNumber || r.accountNo)}
+                        </Text>
+                      </View>
+                    </>
+                  ) : null}
                 </View>
                 {drillType === 'deposit' && st === 'pending' && canPencil ? (
                   <TouchableOpacity

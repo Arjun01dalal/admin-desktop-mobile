@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { pickPageSizes, appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getRoleId, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
@@ -48,7 +48,6 @@ type Row = {
 };
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
-const MAIN_KEYS = new Set(['idx', 'name', 'dpId', 'mobile', 'balance']);
 
 const SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'name', label: 'Name' },
@@ -208,7 +207,7 @@ export function DumpUsersScreen() {
         }`,
     });
     return cols;
-  }, [page, canShowMobile, isCaller]);
+  }, [page, pageSize, canShowMobile, isCaller]);
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!sheetRow) return [];
@@ -301,15 +300,67 @@ export function DumpUsersScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No dump users found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No dump users found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity
+            key={`row-${index}-${String(row._id ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSheetRow(row)}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {display(row.name)}
+              </Text>
+              <TouchableOpacity
+                style={styles.undumpBtn}
+                onPress={() => handleUndump(row)}
+                disabled={undumpingId === row._id}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+              >
+                <Text style={styles.undumpBtnText}>
+                  {undumpingId === row._id ? '…' : 'Un-Dump'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                App Code: {appCodeForName(row.clientName)}
+              </Text>
+              <Text style={styles.cardSplitRight} numberOfLines={1}>
+                Balance: {formatAmount(row.balance)}
+              </Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>DP ID</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>
+                {display(row._id)}
+              </Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Mobile</Text>
+              <Text style={styles.cardValue}>
+                {maskMobile(row.mobile, canShowMobile)}
+              </Text>
+            </View>
+            {!isCaller ? (
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Reason</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row.dumpReason?.reason)}
+                </Text>
+              </View>
+            ) : null}
+            <Text style={styles.cardHint}>Tap card for full details</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <View style={styles.pager}>
         <Text
@@ -416,6 +467,88 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  undumpBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    flexShrink: 0,
+  },
+  undumpBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

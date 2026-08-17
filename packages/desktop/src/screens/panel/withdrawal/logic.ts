@@ -79,24 +79,29 @@ export function pendingAgeColor(createdOn?: string): string | undefined {
   return '#ef5350';
 }
 
-export function withdrawalRowBg(row: WithdrawalRow): string | undefined {
+export function withdrawalRowBg(
+  row: WithdrawalRow,
+  mode: 'light' | 'dark' = 'dark',
+): string | undefined {
   const status = row.status || '';
-  // Opaque dark-theme tints so sticky name columns stay solid while others scroll
-  if (status === 'Approved') return '#1b3d2f';
+  const light = mode === 'light';
+  // Opaque tints so sticky name columns stay solid while others scroll.
+  // Light mode uses pale pastel fills so dark greens/reds don't flood the table.
+  if (status === 'Approved') return light ? '#e3f6ea' : '#14352a';
   if (status === 'Rejected' || status === 'Failed' || status === 'Cancel') {
-    return '#3d1b1b';
+    return light ? '#fde8e8' : '#3d1b1b';
   }
-  if (status === 'Reverse') return '#2e1b3d';
-  if (status === 'on hold') return '#3d3520';
+  if (status === 'Reverse') return light ? '#f3e8fb' : '#2e1b3d';
+  if (status === 'on hold') return light ? '#fff6e0' : '#3d3520';
   if (status === 'IN PROGRESS' || status === 'Processing') {
-    return '#1b2a3d';
+    return light ? '#e8f0fb' : '#1b2a3d';
   }
   if (
     row.validationCheckedAt &&
     Number(row.passedPoints ?? 0) >= 13 &&
     !TERMINAL_STATUSES.has(status)
   ) {
-    return '#3d2e14';
+    return light ? '#fff3e0' : '#3d2e14';
   }
   return undefined;
 }

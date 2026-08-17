@@ -2,7 +2,9 @@ import 'react-native-gesture-handler';
 import './src/lib/webShim';
 import React, { useEffect, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { hydrateStorage } from './src/lib/webShim';
+import { setupSslPinning } from './src/security/sslPins';
 import { applyStoredTheme, colors, watchSystemThemeChanges } from './src/theme';
 
 type ComponentWithDefaults = {
@@ -38,6 +40,13 @@ export default function App() {
     let alive = true;
     let stopWatch: (() => void) | undefined;
     (async () => {
+      try {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      } catch {
+        /* orientation lock best-effort on web / unsupported hosts */
+      }
+      // SSL pinning before any panel API traffic (bootstrap + /api/generate).
+      await setupSslPinning();
       try {
         await hydrateStorage();
       } catch {

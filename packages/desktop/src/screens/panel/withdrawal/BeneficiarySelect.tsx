@@ -26,7 +26,8 @@ export const BeneficiarySelect = memo(function BeneficiarySelect({
         }}
         sx={{
           fontSize: 11,
-          bgcolor: '#121218',
+          bgcolor: 'background.paper',
+          color: 'text.primary',
           '& .MuiSelect-select': {
             py: 0.85,
             px: 1,
@@ -34,8 +35,10 @@ export const BeneficiarySelect = memo(function BeneficiarySelect({
             lineHeight: 1.3,
             whiteSpace: 'normal',
             wordBreak: 'break-word',
+            color: 'text.primary',
           },
-          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#2a2a32' },
+          '& .MuiSelect-icon': { color: 'text.secondary' },
+          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
         }}
         MenuProps={{
           PaperProps: {

@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
@@ -39,8 +39,6 @@ type Row = {
 };
 
 type UpdateKind = 'name' | 'mid' | 'link';
-
-const MAIN_KEYS = new Set(['idx', 'name', 'mid', 'status']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -352,15 +350,49 @@ export function InstantDepositProvidersScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No instant deposit providers"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No instant deposit providers</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const enabled = Boolean(row.status);
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.name)}
+                </Text>
+                <Text style={[styles.statusPill, enabled ? styles.statusOn : styles.statusOff]}>
+                  {enabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  MID: {display(row.mid)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  Type: {display(row.type)}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Link</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row.link)}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for details & actions</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -442,15 +474,15 @@ export function InstantDepositProvidersScreen() {
       </Modal>
 
       {/* Add provider modal */}
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
+      <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
         <KeyboardAvoidingView
-          style={styles.backdrop}
+          style={[styles.backdrop, styles.backdropCentered]}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <TouchableWithoutFeedback onPress={() => setAddOpen(false)}>
-            <View style={styles.backdropTouch} />
+            <View style={styles.backdropTouchFill} />
           </TouchableWithoutFeedback>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, styles.modalSheetRaised]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add provider</Text>
               <TouchableOpacity
@@ -460,65 +492,71 @@ export function InstantDepositProvidersScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <TextInput
-              style={styles.modalInput}
-              value={form.name}
-              onChangeText={(v) => setForm((p) => ({ ...p, name: v }))}
-              placeholder="Gateway Name"
-              placeholderTextColor={colors.muted}
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={form.link}
-              onChangeText={(v) => setForm((p) => ({ ...p, link: v }))}
-              placeholder="Link"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={form.mid}
-              onChangeText={(v) => setForm((p) => ({ ...p, mid: v }))}
-              placeholder="Mid"
-              placeholderTextColor={colors.muted}
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={form.type}
-              onChangeText={(v) => setForm((p) => ({ ...p, type: v }))}
-              placeholder="Type"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <View style={styles.chipsRow}>
-              <Text style={styles.chipsLabel}>Open In Browser:</Text>
-              {[
-                { label: 'Yes', value: true },
-                { label: 'No', value: false },
-              ].map((o) => (
-                <TouchableOpacity
-                  key={o.label}
-                  style={[styles.chip, form.openInBrowser === o.value && styles.chipActive]}
-                  onPress={() => setForm((p) => ({ ...p, openInBrowser: o.value }))}
-                >
-                  <Text
-                    style={[styles.chipText, form.openInBrowser === o.value && styles.chipTextActive]}
-                  >
-                    {o.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {addMsg ? <Text style={styles.modalMsg}>{addMsg}</Text> : null}
-            <TouchableOpacity
-              style={[styles.saveBtn, savingAdd && styles.btnDisabled]}
-              disabled={savingAdd}
-              onPress={() => void submitCreate()}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
             >
-              <Text style={styles.saveBtnText}>{savingAdd ? 'Saving…' : 'Submit'}</Text>
-            </TouchableOpacity>
+              <TextInput
+                style={styles.modalInput}
+                value={form.name}
+                onChangeText={(v) => setForm((p) => ({ ...p, name: v }))}
+                placeholder="Gateway Name"
+                placeholderTextColor={colors.muted}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={form.link}
+                onChangeText={(v) => setForm((p) => ({ ...p, link: v }))}
+                placeholder="Link"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={form.mid}
+                onChangeText={(v) => setForm((p) => ({ ...p, mid: v }))}
+                placeholder="Mid"
+                placeholderTextColor={colors.muted}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={form.type}
+                onChangeText={(v) => setForm((p) => ({ ...p, type: v }))}
+                placeholder="Type"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={styles.chipsRow}>
+                <Text style={styles.chipsLabel}>Open In Browser:</Text>
+                {[
+                  { label: 'Yes', value: true },
+                  { label: 'No', value: false },
+                ].map((o) => (
+                  <TouchableOpacity
+                    key={o.label}
+                    style={[styles.chip, form.openInBrowser === o.value && styles.chipActive]}
+                    onPress={() => setForm((p) => ({ ...p, openInBrowser: o.value }))}
+                  >
+                    <Text
+                      style={[styles.chipText, form.openInBrowser === o.value && styles.chipTextActive]}
+                    >
+                      {o.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {addMsg ? <Text style={styles.modalMsg}>{addMsg}</Text> : null}
+              <TouchableOpacity
+                style={[styles.saveBtn, savingAdd && styles.btnDisabled]}
+                disabled={savingAdd}
+                onPress={() => void submitCreate()}
+              >
+                <Text style={styles.saveBtnText}>{savingAdd ? 'Saving…' : 'Submit'}</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -570,8 +608,90 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
+  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '28%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  backdropCentered: { justifyContent: 'center', padding: spacing(4) },
   backdropTouch: { flex: 1 },
+  backdropTouchFill: { ...StyleSheet.absoluteFillObject },
   modalSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.md * 2,
@@ -579,9 +699,16 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     gap: spacing(2),
   },
+  modalSheetRaised: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md * 2,
+    maxHeight: '80%',
+  },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1, marginRight: spacing(2) },
   modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
+  modalScrollContent: { gap: spacing(2), paddingBottom: spacing(1) },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -610,7 +737,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing(3),
     alignItems: 'center',
-    marginTop: spacing(1),
+    marginTop: spacing(2),
   },
   btnDisabled: { opacity: 0.5 },
   saveBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },

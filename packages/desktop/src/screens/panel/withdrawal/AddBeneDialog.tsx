@@ -19,7 +19,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SearchIcon from '@mui/icons-material/Search';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { orangeBtnSx } from '@/screens/panel/transactions/shared';
+import { fieldSx, orangeBtnSx } from '@/screens/panel/transactions/shared';
 
 type Props = {
   open: boolean;
@@ -185,7 +185,7 @@ export function AddBeneDialog({
           onChange={(e) => setSearch(e.target.value)}
           sx={{
             mb: 1.5,
-            '& .MuiInputBase-root': { bgcolor: '#121218' },
+            ...fieldSx,
           }}
           InputProps={{
             endAdornment: (
@@ -223,12 +223,12 @@ export function AddBeneDialog({
                         ? 'rgba(102, 187, 106, 0.5)'
                         : isSelected
                           ? 'rgba(255, 159, 10, 0.55)'
-                          : '#2a2a32',
+                          : 'divider',
                       bgcolor: already
                         ? 'rgba(102, 187, 106, 0.08)'
                         : isSelected
                           ? 'rgba(255, 159, 10, 0.08)'
-                          : '#121218',
+                          : 'background.default',
                     }}
                   >
                     <Checkbox

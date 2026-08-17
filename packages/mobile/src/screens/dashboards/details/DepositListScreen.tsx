@@ -16,23 +16,25 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { appCodeForName, pickPageSizes } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
+import { openPanelTarget } from '../../../navigation/panelDetail';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { DateField } from '../../../components/DateField';
-import { pickPageSizes } from '@astro/shared';
 
 type MidTotal = { mid?: string; amount?: number | string; count?: number | string };
 
@@ -126,6 +128,7 @@ function normalizeMids(raw: unknown): MidTotal[] {
 }
 
 export function DepositListScreen() {
+  const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   // Read once — getSessionUser returns a fresh object each call; using it in
   // hook deps would retrigger load() every render.
   const user = useMemo(() => getSessionUser(), []);
@@ -260,24 +263,31 @@ export function DepositListScreen() {
     setView('midBreakdown');
   }, []);
 
-  // ---- Fit main columns to the phone width (no horizontal scroll). ----
-  const { width: screenWidth } = useWindowDimensions();
-  const availableWidth = Math.max(280, screenWidth - spacing(4) * 2 - spacing(2));
-  const IDX_W = 30;
-  const fit = (weight: number, totalWeight: number) =>
-    Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
-  const mainW = {
-    name: fit(3, 10),
-    userId: fit(3.2, 10),
-    deposit: fit(1.9, 10),
-    withdrawal: fit(1.9, 10),
-  };
+  const openUserDetails = useCallback(
+    (row: DepositListRow) => {
+      const userId = String(row.userId || '').trim();
+      if (!userId) {
+        Alert.alert('User Details', 'User ID is not available for this row.');
+        return;
+      }
+      setSheetRow(null);
+      openPanelTarget(navigation, {
+        href: '/user-report',
+        state: {
+          userId,
+          userName: String(row.name || ''),
+        },
+      });
+    },
+    [navigation],
+  );
 
+  // ---- Detail sheet columns (full field set) ----
   const columns = useMemo<DataTableColumn<DepositListRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      { key: 'name', label: 'Name', width: mainW.name, render: (r) => display(r.name) },
-      { key: 'userId', label: 'User Id', width: mainW.userId, render: (r) => display(r.userId) },
+      { key: 'idx', label: '#', width: 34, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      { key: 'name', label: 'Name', width: 140, render: (r) => display(r.name) },
+      { key: 'userId', label: 'User Id', width: 160, render: (r) => display(r.userId) },
       {
         key: 'mobile',
         label: 'Mobile',
@@ -286,7 +296,7 @@ export function DepositListScreen() {
       },
       { key: 'city', label: 'City', width: 110, render: (r) => display(r.city) },
       { key: 'state', label: 'State', width: 120, render: (r) => display(r.state) },
-      { key: 'clientName', label: 'Client Name', width: 130, render: (r) => display(r.clientName) },
+      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
       { key: 'lastActivity', label: 'Last Activity', width: 160, render: (r) => lastActivity(r.activeUser) },
       {
         key: 'ratio',
@@ -306,7 +316,7 @@ export function DepositListScreen() {
       {
         key: 'deposit',
         label: 'Deposit',
-        width: mainW.deposit,
+        width: 100,
         align: 'right',
         render: (r) => formatAmt(r.approvedDepositAmount),
       },
@@ -320,7 +330,7 @@ export function DepositListScreen() {
       {
         key: 'withdrawal',
         label: 'Refund',
-        width: mainW.withdrawal,
+        width: 100,
         align: 'right',
         render: (r) => formatAmt(r.approvedWithdrawalAmount),
       },
@@ -332,8 +342,7 @@ export function DepositListScreen() {
         render: (r) => String(num(r.approvedWithdrawalCount)),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, pageSize, canShowMobile, availableWidth],
+    [page, pageSize, canShowMobile],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
@@ -354,7 +363,13 @@ export function DepositListScreen() {
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
-    const acts: SheetAction[] = [];
+    const acts: SheetAction[] = [
+      {
+        label: 'User Details',
+        tone: 'primary',
+        onPress: () => openUserDetails(sheetRow),
+      },
+    ];
     const dep = normalizeMids(sheetRow.approvedDepositAmountByMid);
     const wit = normalizeMids(sheetRow.approvedWithdrawalAmountByMid);
     if (dep.length) {
@@ -380,17 +395,7 @@ export function DepositListScreen() {
       });
     }
     return acts;
-  }, [sheetRow, openMidBreakdown]);
-
-  const midColumns = useMemo<DataTableColumn<MidTotal>[]>(
-    () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'mid', label: 'Mid', width: 200, color: () => colors.primary, render: (r) => display(r.mid) },
-      { key: 'amount', label: 'Amount', width: 130, align: 'right', render: (r) => formatAmt(r.amount) },
-      { key: 'count', label: 'Count', width: 100, align: 'right', render: (r) => display(r.count) },
-    ],
-    [],
-  );
+  }, [sheetRow, openMidBreakdown, openUserDetails]);
 
   // ---------- MID breakdown sub-view (desktop /depositList/user-wise) ----------
   if (view === 'midBreakdown') {
@@ -405,12 +410,23 @@ export function DepositListScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>{drillTitle}</Text>
         <Text style={styles.sub}>{drillMids.length} MIDs</Text>
-        <DataTable
-          columns={midColumns}
-          rows={drillMids}
-          keyFor={(r, i) => `${r.mid}-${i}`}
-          emptyMessage="No MID data"
-        />
+        {drillMids.length === 0 ? <Text style={styles.hint}>No MID data</Text> : null}
+        <View style={styles.list}>
+          {drillMids.map((m, index) => (
+            <View key={`${m.mid}-${index}`} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(m.mid)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>Amount: {formatAmt(m.amount)}</Text>
+                <Text style={styles.cardSplitRight}>Count: {display(m.count)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     );
   }
@@ -430,14 +446,12 @@ export function DepositListScreen() {
       <Text style={styles.title}>Deposit List</Text>
 
       <View style={styles.totalsRow}>
-        <View style={styles.kpiBox}>
-          <Text style={styles.kpiText}>Deposit Amt: {formatAmt(totals?.totalDepositAmount ?? 0)}</Text>
-        </View>
-        <View style={styles.kpiBox}>
-          <Text style={styles.kpiText}>
-            Withdrawal Amt: {formatAmt(totals?.totalWithdrawalAmount ?? 0)}
-          </Text>
-        </View>
+        <Text style={styles.kpiText} numberOfLines={1}>
+          Deposit Amt: {formatAmt(totals?.totalDepositAmount ?? 0)}
+        </Text>
+        <Text style={styles.kpiText} numberOfLines={1}>
+          Withdrawal Amt: {formatAmt(totals?.totalWithdrawalAmount ?? 0)}
+        </Text>
       </View>
 
       {/* Date range */}
@@ -451,22 +465,24 @@ export function DepositListScreen() {
             <Text style={styles.dateLabel}>To</Text>
             <DateField style={styles.dateInput} value={endDate} onChange={setEndDate} />
           </View>
+        </View>
+        <View style={styles.actionBtnsRow}>
           <TouchableOpacity
-            style={styles.applyBtn}
+            style={[styles.applyBtn, styles.actionBtnFlex]}
             onPress={applyDates}
             disabled={loading}
           >
             <Text style={styles.applyText}>Apply</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.applyBtn, styles.clearBtn]}
+            style={[styles.clearBtn, styles.actionBtnFlex]}
             onPress={clearFilters}
             disabled={loading}
           >
-            <Text style={styles.applyText}>Clear</Text>
+            <Text style={styles.clearBtnText}>Clear</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.applyBtn}
+            style={[styles.applyBtn, styles.actionBtnFlex]}
             onPress={() => void load()}
             disabled={loading}
           >
@@ -490,18 +506,31 @@ export function DepositListScreen() {
           ))}
         </ScrollView>
         <View style={styles.searchRow}>
-          <TextInput
-            style={styles.searchInput}
-            value={draftText}
-            onChangeText={setDraftText}
-            onSubmitEditing={search}
-            returnKeyType="search"
-            placeholder={currentField?.placeholder ?? 'Search'}
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
-          />
+          <View style={styles.searchInputWrap}>
+            <TextInput
+              style={styles.searchInput}
+              value={draftText}
+              onChangeText={setDraftText}
+              onSubmitEditing={search}
+              returnKeyType="search"
+              placeholder={currentField?.placeholder ?? 'Search'}
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
+            />
+            {Boolean(draftText.trim()) ? (
+              <TouchableOpacity
+                style={styles.clearSearchBtn}
+                onPress={() => setDraftText('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Text style={styles.clearSearchText}>✕</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           <TouchableOpacity
             style={[styles.searchBtn, loading && styles.btnDisabled]}
             disabled={loading}
@@ -567,17 +596,60 @@ export function DepositListScreen() {
 
       <Text style={styles.sectionLabel}>Details List</Text>
 
-      <DataTable
-        columns={columns.filter((c) =>
-          ['idx', 'name', 'userId', 'deposit', 'withdrawal'].includes(c.key),
-        )}
-        rows={rows}
-        keyFor={(r, i) => String(r.userId || i)}
-        loading={loading}
-        emptyMessage="No data"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details & MID breakdown"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data</Text> : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity
+            key={`row-${index}-${String(row.userId ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSheetRow(row)}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {display(row.name)}
+              </Text>
+              {row.userId ? (
+                <TouchableOpacity
+                  style={styles.reportBtn}
+                  onPress={() => openUserDetails(row)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                >
+                  <Text style={styles.reportBtnText}>User Report</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                App Code: {appCodeForName(row.clientName)}
+              </Text>
+              <Text style={styles.cardSplitRight} numberOfLines={1}>
+                DP: {display(row.userId)}
+              </Text>
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft}>Deposit: {formatAmt(row.approvedDepositAmount)}</Text>
+              <Text style={styles.cardSplitRight}>
+                Refund: {formatAmt(row.approvedWithdrawalAmount)}
+              </Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Mobile</Text>
+              <Text style={styles.cardValue}>{maskMobile(row.mobile, !!canShowMobile)}</Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Last Activity</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>
+                {lastActivity(row.activeUser)}
+              </Text>
+            </View>
+            <Text style={styles.cardHint}>Tap card for details & MID breakdown</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <View style={styles.pager}>
         <Text
@@ -623,20 +695,24 @@ const styles = StyleSheet.create({
   },
   totalsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing(2),
     marginTop: spacing(3),
-  },
-  kpiBox: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    flexGrow: 1,
+    paddingVertical: spacing(2.5),
   },
-  kpiText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  kpiText: {
+    color: colors.foreground,
+    fontSize: 12,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
   filterWrap: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -646,8 +722,8 @@ const styles = StyleSheet.create({
     gap: spacing(2),
     marginTop: spacing(3),
   },
-  datesRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'flex-end', flexWrap: 'wrap' },
-  dateField: { flex: 1, minWidth: 110 },
+  datesRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'flex-end' },
+  dateField: { flex: 1, minWidth: 0 },
   dateLabel: { color: colors.muted, fontSize: 11, marginBottom: spacing(1) },
   dateInput: {
     backgroundColor: colors.surfaceAlt,
@@ -659,16 +735,32 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2),
     fontSize: 14,
   },
+  actionBtnsRow: {
+    flexDirection: 'row',
+    gap: spacing(2),
+    marginTop: spacing(1),
+  },
+  actionBtnFlex: { flex: 1 },
   applyBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
+    paddingHorizontal: spacing(3),
     paddingVertical: spacing(2.5),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clearBtn: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  clearBtn: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   applyText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  clearBtnText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
   chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
   chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   chip: {
@@ -683,16 +775,38 @@ const styles = StyleSheet.create({
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
   searchRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
-  searchInput: {
+  searchInputWrap: {
     flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  searchInput: {
+    width: '100%',
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     color: colors.foreground,
     paddingHorizontal: spacing(3),
+    paddingRight: spacing(9),
     paddingVertical: spacing(2),
     fontSize: 14,
+  },
+  clearSearchBtn: {
+    position: 'absolute',
+    right: spacing(2),
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearSearchText: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   searchBtn: {
     backgroundColor: colors.primary,
@@ -720,6 +834,88 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(2), marginBottom: spacing(1) },
+  list: { gap: spacing(2), marginTop: spacing(2) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  reportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    flexShrink: 0,
+  },
+  reportBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

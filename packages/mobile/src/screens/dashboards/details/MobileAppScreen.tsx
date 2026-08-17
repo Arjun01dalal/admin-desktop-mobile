@@ -96,7 +96,6 @@ export function MobileAppScreen() {
     }
     try {
       await Clipboard.setStringAsync(toCopy);
-      Alert.alert(unlock ? 'Copied original link' : 'Copied', unlock ? realUrl : undefined);
     } catch {
       Alert.alert('Copy failed', 'Could not copy the link');
     }

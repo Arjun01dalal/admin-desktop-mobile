@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Linking,
   Modal,
   RefreshControl,
@@ -23,7 +24,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { appCodeForName, pickPageSizes } from '@astro/shared';
 import {
   CALL_STATUS_OPTIONS,
@@ -33,8 +34,9 @@ import { secureApi } from '../../../api/client';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS, RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { getStoredUser } from '../../../lib/webShim';
+import { openPanelTarget } from '../../../navigation/panelDetail';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { formatDdMmYyyy, todayIST } from '../../../utils/dates';
 import { CAMPAIGN_LIST } from '../../../utils/campaignList';
 import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
@@ -71,7 +73,6 @@ const COMMENT_OPTIONS = COMMENT_FILTER_OPTIONS.filter((c) => c !== 'All');
 const MAX_COMMENT_LENGTH = 200;
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
-const MAIN_KEYS = new Set(['sel', 'sr', 'name', 'status', 'comment']);
 
 function callLogRowId(row: CallLogRow): string {
   return String(row.call_sid || row._id || '');
@@ -258,6 +259,9 @@ function maskMobile(value: unknown, canShow: boolean): string {
 
 export function CallLogsScreen() {
   const isFocused = useIsFocused();
+  const navigation = useNavigation<{
+    navigate: (name: string, params?: Record<string, unknown>) => void;
+  }>();
   // Read the stored user once — getStoredUser returns a fresh object each call,
   // which would otherwise recreate `load` every render and refetch in a loop.
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
@@ -293,6 +297,7 @@ export function CallLogsScreen() {
   const [selected, setSelected] = useState<{ row: CallLogRow; index: number } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
 
   const [campaignId, setCampaignId] = useState('');
@@ -551,14 +556,34 @@ export function CallLogsScreen() {
   );
 
   const openRecording = useCallback((row: CallLogRow) => {
-    const url = String(row.recording_url || '');
-    if (!url) return;
-    Linking.openURL(url).catch(() => setActionMsg('Could not open recording URL'));
+    const rawUrl = String(row.recording_url || '').trim();
+    if (!rawUrl) {
+      Alert.alert('Recording', 'Recording URL is not available.');
+      return;
+    }
+    const url = rawUrl.startsWith('//')
+      ? `https:${rawUrl}`
+      : /^[a-z][a-z0-9+.-]*:\/\//i.test(rawUrl)
+        ? rawUrl
+        : `https://${rawUrl}`;
+
+    // Dismiss the native detail modal before handing off to the audio/browser app.
+    setSelected(null);
+    setTimeout(() => {
+      void Linking.openURL(url).catch(() => {
+        Alert.alert('Recording', 'Could not open the recording URL.');
+      });
+    }, 250);
   }, []);
 
   const viewSummary = useCallback(async (row: CallLogRow) => {
+    setSelected(null);
+    setSummaryData(null);
     setActionLoading(true);
     setActionMsg('');
+    // Let the row-detail native modal finish dismissing before opening another.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    setSummaryOpen(true);
     try {
       const res = await processCallSummary(String(row.call_sid || ''));
       if (!res.ok) {
@@ -566,17 +591,53 @@ export function CallLogsScreen() {
         return;
       }
       setSummaryData(res.data || null);
+    } catch {
+      setActionMsg('Could not load call summary.');
     } finally {
       setActionLoading(false);
     }
   }, []);
+
+  const openUserReport = useCallback(
+    (row: CallLogRow) => {
+      const userId = String(row.caller_user_id || '').trim();
+      if (!userId) {
+        Alert.alert('User Report', 'User ID is not available for this call.');
+        return;
+      }
+      setSelected(null);
+      openPanelTarget(navigation, {
+        href: '/user-report',
+        state: {
+          userId,
+          userName: String(row.client_name || ''),
+        },
+      });
+    },
+    [navigation],
+  );
 
   /** Action buttons for the selected row — mirrors the desktop Action column. */
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!selected) return [];
     const row = selected.row;
     const status = String(row.status || '');
-    const actions: SheetAction[] = [];
+    const actions: SheetAction[] = [
+      {
+        label: 'Details',
+        tone: 'primary',
+        onPress: () => openUserReport(row),
+      },
+    ];
+    if (!isCaller) {
+      actions.push({
+        label: 'Add Comment',
+        onPress: () => {
+          openComment(row);
+          setSelected(null);
+        },
+      });
+    }
     if (status !== 'queued' && status !== 'deleted') {
       if (status === 'in-progress') {
         actions.push({
@@ -588,7 +649,6 @@ export function CallLogsScreen() {
       } else {
         actions.push({
           label: actionLoading ? 'Calling…' : 'Bot Call',
-          tone: 'primary',
           disabled: actionLoading,
           onPress: () => void botCall(row),
         });
@@ -613,7 +673,18 @@ export function CallLogsScreen() {
       );
     }
     return actions;
-  }, [selected, actionLoading, isCaller, botCall, endCall, connectDialer, openRecording, viewSummary]);
+  }, [
+    selected,
+    actionLoading,
+    isCaller,
+    openUserReport,
+    openComment,
+    botCall,
+    endCall,
+    connectDialer,
+    openRecording,
+    viewSummary,
+  ]);
 
   const rowOffset = (page - 1) * pageSize;
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
@@ -867,11 +938,11 @@ export function CallLogsScreen() {
           <Text style={styles.filterLabel}>Campaign</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
-              {CAMPAIGN_LIST.map((c) => {
+              {CAMPAIGN_LIST.map((c, ci) => {
                 const id = c.id.trim();
                 return (
                   <TouchableOpacity
-                    key={c.id}
+                    key={`camp-${ci}`}
                     style={[styles.chip, campaignId === id && styles.chipActive]}
                     onPress={() => setCampaignId(campaignId === id ? '' : id)}
                   >
@@ -884,7 +955,7 @@ export function CallLogsScreen() {
             </View>
           </ScrollView>
           <Text style={styles.dialerHint}>
-            Tick rows in the table (tap the ☐ cell), pick a campaign, then push.
+            Tick cards (☐), pick a campaign, then push.
           </Text>
           <TouchableOpacity
             style={[styles.dialerBtn, (pushing || !selectedIds.size || !campaignId) && styles.btnDisabled]}
@@ -961,18 +1032,79 @@ export function CallLogsScreen() {
           )}
 
           <Text style={styles.sectionTitle}>Calls</Text>
-          <DataTable
-            columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-            rows={rows}
-            keyFor={(r, i) => String(r.call_sid || r._id || i)}
-            emptyMessage="No call logs"
-            onRowPress={(row) => setSelected({ row, index: rows.indexOf(row) })}
-            hint={
-              isCaller
-                ? 'Tap a row to see all details · Tick ☐ to add to dialer'
-                : 'Tap a row for details · Tick ☐ to add to dialer · Tap a Comment cell to add a comment'
-            }
-          />
+          {!loading && rows.length === 0 ? <Text style={styles.hint}>No call logs</Text> : null}
+          {rows.length > 0 ? (
+            <View style={styles.selectAllRow}>
+              <TouchableOpacity style={styles.selectAllBtn} onPress={toggleAll}>
+                <Text style={styles.selectAllText}>
+                  {allSelected ? '☑ Deselect all' : '☐ Select all'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.selectedCount}>{selectedIds.size} selected</Text>
+            </View>
+          ) : null}
+          <View style={styles.list}>
+            {rows.map((row, index) => {
+              const id = callLogRowId(row);
+              const checked = selectedIds.has(id);
+              const badge = statusColor(row);
+              return (
+                <View key={`row-${index}-${String(row.call_sid || row._id || '')}`} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <TouchableOpacity
+                      style={[styles.cardCheck, checked && styles.cardCheckOn]}
+                      onPress={() => toggleSelect(row)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={[styles.cardCheckText, checked && styles.cardCheckTextOn]}>
+                        {checked ? '☑' : '☐'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, minWidth: 0 }}
+                      activeOpacity={0.75}
+                      onPress={() => setSelected({ row, index })}
+                    >
+                      <View style={styles.cardHeader}>
+                        <Text style={styles.cardIndex}>#{rowOffset + index + 1}</Text>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                          {String(row.client_name || '—')}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.statusPill,
+                            badge
+                              ? { color: badge, backgroundColor: `${badge}22` }
+                              : { color: colors.muted, backgroundColor: 'rgba(148,163,184,0.18)' },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {formatStatusLabel(row)}
+                        </Text>
+                      </View>
+                      <View style={styles.cardSplitRow}>
+                        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                          App: {appCodeForName(row.app_name)}
+                        </Text>
+                        <Text style={styles.cardSplitRight} numberOfLines={1}>
+                          Bot {String(row.bot_id ?? '—')}
+                        </Text>
+                      </View>
+                      <View style={styles.cardSplitRow}>
+                        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                          {String(row.state || '—')}
+                        </Text>
+                        <Text style={styles.cardSplitRight} numberOfLines={1}>
+                          {String(row.comments || '—')}
+                        </Text>
+                      </View>
+                      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
 
           {/* Pagination */}
           <View style={styles.pagerRow}>
@@ -1023,12 +1155,28 @@ export function CallLogsScreen() {
       />
 
       {/* Call Record modal (View Summary) — Laxmi CallLogModal layout */}
-      <Modal visible={summaryData !== null} transparent animationType="slide">
+      <Modal
+        visible={summaryOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setSummaryOpen(false);
+          setSummaryData(null);
+          setActionMsg('');
+        }}
+      >
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, styles.summaryCard]}>
             <Text style={styles.summaryModalTitle}>Call Record</Text>
             <ScrollView style={styles.summaryScroll} showsVerticalScrollIndicator={false}>
-              {buildSummaryRows(summaryData).length === 0 ? (
+              {actionLoading ? (
+                <View style={styles.summaryLoading}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={styles.summaryLoadingText}>Loading summary…</Text>
+                </View>
+              ) : actionMsg ? (
+                <Text style={styles.summaryError}>{actionMsg}</Text>
+              ) : buildSummaryRows(summaryData).length === 0 ? (
                 <Text style={styles.summaryValue}>No summary available.</Text>
               ) : (
                 <View style={styles.summaryTable}>
@@ -1058,7 +1206,14 @@ export function CallLogsScreen() {
               )}
             </ScrollView>
             <View style={styles.filterActions}>
-              <TouchableOpacity style={styles.clearBtn} onPress={() => setSummaryData(null)}>
+              <TouchableOpacity
+                style={styles.clearBtn}
+                onPress={() => {
+                  setSummaryOpen(false);
+                  setSummaryData(null);
+                  setActionMsg('');
+                }}
+              >
                 <Text style={styles.clearBtnText}>Close</Text>
               </TouchableOpacity>
             </View>
@@ -1227,6 +1382,102 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
+  cardCheckOn: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
+  cardCheckText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
+  cardCheckTextOn: { color: colors.primary },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    maxWidth: '40%',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing(3),
+    marginBottom: spacing(1),
+  },
+  selectAllBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    backgroundColor: colors.surface,
+  },
+  selectAllText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
+  selectedCount: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   actionMsgBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1328,6 +1579,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     marginBottom: spacing(1.5),
+  },
+  summaryLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 180,
+    gap: spacing(2),
+  },
+  summaryLoadingText: { color: '#555', fontSize: 13, fontWeight: '600' },
+  summaryError: {
+    color: colors.destructive,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: spacing(6),
   },
   summaryTable: {
     borderWidth: 1,

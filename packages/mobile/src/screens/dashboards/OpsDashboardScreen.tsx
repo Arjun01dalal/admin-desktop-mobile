@@ -67,14 +67,6 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
     () => setApplied({ startDate, endDate, appClientName, filterBy }),
     [startDate, endDate, appClientName, filterBy],
   );
-  const clearAll = useCallback(() => {
-    const d = todayIST();
-    setStartDate(d);
-    setEndDate(d);
-    setAppClientName('');
-    setFilterBy('Ashwini');
-    setApplied({ startDate: d, endDate: d, appClientName: '', filterBy: 'Ashwini' });
-  }, []);
 
   const { bundle, loading, error, reload, reloadLudo, reloadActiveExchange } =
     useOpsDashboardData(mode, applied);
@@ -122,6 +114,38 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
             setLudoModalAction('rtp');
             setLudoModalOpen(true);
           },
+          onLudoGgrDetails: () => {
+            const gameOptions = bundle?.ludoGameOptions ?? [];
+            // Backend requires a concrete gameId — fall back to first game when All.
+            const gameId =
+              selectedLudoGame && selectedLudoGame !== 'All'
+                ? selectedLudoGame
+                : gameOptions[0]?.value || '';
+            const ggrValue =
+              bundle?.ludoGameStatsMap?.[gameId || selectedLudoGame]?.ggr ??
+              bundle?.ludoGameStatsMap?.All?.ggr ??
+              0;
+            openPanelTarget(navigation, {
+              href: '/ludo-user-ggr-by-round',
+              state: {
+                date: applied.startDate,
+                gameId,
+                ggr: ggrValue < 0 ? 'minus' : 'plus',
+                gameOptions,
+              },
+            });
+          },
+          onLudoGameGgrDetails: (gameId, ggrValue) => {
+            openPanelTarget(navigation, {
+              href: '/ludo-user-ggr-by-round',
+              state: {
+                date: applied.startDate,
+                gameId: gameId === 'All' ? '' : gameId,
+                ggr: ggrValue < 0 ? 'minus' : 'plus',
+                gameOptions: bundle?.ludoGameOptions ?? [],
+              },
+            });
+          },
         },
         {
           startDate: applied.startDate,
@@ -133,6 +157,7 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
       mode,
       bundle,
       loading,
+      navigation,
       selectedLudoGame,
       selectedIndianDiva,
       selectedPlutus,
@@ -185,7 +210,6 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
         onAppChange={setAppClientName}
         onFilterByChange={setFilterBy}
         onApply={apply}
-        onAllData={clearAll}
         onRefresh={() => void reload()}
       />
 

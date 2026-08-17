@@ -1,7 +1,6 @@
 /**
- * Todays Active — full-column port of desktop TodaysActivePage.
- * ops.activeCustomers with startDate/endDate route params. Shows every
- * desktop column in a sideways-scrolling table.
+ * Todays Active — port of desktop TodaysActivePage.
+ * ops.activeCustomers with startDate/endDate. Card list + detail sheet.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -9,13 +8,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { pickLastActivity } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
@@ -25,13 +24,9 @@ import {
   type SearchFieldKey,
   type SearchFieldOption,
 } from './DetailFilterBar';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
-/** Columns kept in the list; everything else shows in the bottom sheet. */
-const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance']);
-
-/** Search fields mirroring desktop TodaysActivePage per-column filters (filter keys match).
- *  Contact-identifier fields are withheld for restricted roles like the desktop column filters. */
+/** Search fields mirroring desktop TodaysActivePage per-column filters. */
 function todaysActiveSearchFields(hideContact: boolean): readonly SearchFieldOption[] {
   const fields: SearchFieldOption[] = [
     { key: 'name', label: 'Name' },
@@ -65,6 +60,10 @@ type Row = {
   balance?: number;
   activeUser?: string;
   createdOn?: string;
+  currentAppVersion?: string;
+  accountNumber?: string;
+  aadhaarNumber?: string;
+  email?: string;
   [key: string]: unknown;
 };
 
@@ -172,81 +171,67 @@ export function TodaysActiveScreen() {
     };
   }, []);
 
-  const columns = useMemo<DataTableColumn<Row>[]>(() => {
-    const cols: DataTableColumn<Row>[] = [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      {
-        key: 'name',
-        label: 'Name',
-        width: 120,
-        render: (r) => display(r.name),
-        onCellPress: (r) => openUserReport(r._id, r.name),
-      },
-      { key: 'dpId', label: 'Dp Id', width: 150, render: (r) => display(r._id) },
-    ];
-    if (!hideContact) {
-      cols.push({
-        key: 'mobile',
-        label: 'Mobile',
-        width: 100,
-        render: (r) => maskMobile(r.mobile, canShowMobile),
-      });
-    }
-    cols.push(
-      { key: 'appName', label: 'App Code', width: 70, render: (r) => appCodeForName(r.clientName) },
-      { key: 'playIn', label: 'In', width: 90, render: (r) => display(r.played) },
-    );
-    if (!hideContact) {
-      cols.push(
-        { key: 'account', label: 'Account', width: 120, render: (r) => display(r.accountNumber) },
-        { key: 'aadhar', label: 'Aadhar', width: 110, render: (r) => display(r.aadhaarNumber) },
+  const sheetFields = useCallback(
+    (r: Row): SheetField[] => {
+      const fields: SheetField[] = [
+        { label: 'Dp Id', value: display(r._id) },
+        { label: 'App Code', value: appCodeForName(r.clientName) },
+        { label: 'In', value: display(r.played) },
+      ];
+      if (!hideContact) {
+        fields.push(
+          { label: 'Mobile', value: maskMobile(r.mobile, canShowMobile) },
+          { label: 'Account', value: display(r.accountNumber) },
+          { label: 'Aadhar', value: display(r.aadhaarNumber) },
+          {
+            label: 'Email',
+            value: canShowMobile ? display(r.email) : '**********',
+          },
+        );
+      }
+      fields.push(
+        { label: 'City', value: display(r.city) },
+        { label: 'State', value: display(r.state) },
+        { label: 'Device', value: display(r.deviceType) },
         {
-          key: 'email',
-          label: 'Email',
-          width: 160,
-          render: (r) => (canShowMobile ? display(r.email) : '**********'),
+          label: 'Balance',
+          value: floorNum(r.balance ?? 0).toLocaleString('en-IN'),
+        },
+        { label: 'User App Version', value: display(r.currentAppVersion) },
+        {
+          label: 'App Version',
+          value: display(appVersions[r.clientName || '']),
+        },
+        { label: 'Last Activity', value: pickLastActivity(r) },
+        {
+          label: 'Date',
+          value: r.createdOn ? formatDisplayDate(r.createdOn) : '—',
+        },
+        {
+          label: 'Time',
+          value: r.createdOn ? formatDisplayTime(r.createdOn) : '—',
         },
       );
-    }
-    cols.push(
-      { key: 'city', label: 'City', width: 100, render: (r) => display(r.city) },
-      { key: 'state', label: 'State', width: 110, render: (r) => display(r.state) },
-      { key: 'device', label: 'Device', width: 80, render: (r) => display(r.deviceType) },
+      return fields;
+    },
+    [hideContact, canShowMobile, appVersions],
+  );
+
+  const sheetActions = useMemo<SheetAction[] | undefined>(() => {
+    if (!selected?._id) return undefined;
+    return [
       {
-        key: 'balance',
-        label: 'Balance',
-        width: 80,
-        align: 'right',
-        render: (r) => floorNum(r.balance ?? 0).toLocaleString('en-IN'),
+        label: 'User Report',
+        tone: 'primary',
+        onPress: () => {
+          const id = selected._id;
+          const name = selected.name;
+          setSelected(null);
+          openUserReport(id, name);
+        },
       },
-      {
-        key: 'playerAppVersion',
-        label: 'User App Version',
-        width: 110,
-        render: (r) => display(r.currentAppVersion),
-      },
-      {
-        key: 'appVersion',
-        label: 'App Version',
-        width: 90,
-        render: (r) => display(appVersions[r.clientName || '']),
-      },
-      { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => pickLastActivity(r) },
-      {
-        key: 'date',
-        label: 'Date',
-        width: 90,
-        render: (r) => (r.createdOn ? formatDisplayDate(r.createdOn) : '—'),
-      },
-      {
-        key: 'time',
-        label: 'Time',
-        width: 80,
-        render: (r) => (r.createdOn ? formatDisplayTime(r.createdOn) : '—'),
-      },
-    );
-    return cols;
-  }, [page, pageSize, hideContact, canShowMobile, appVersions, openUserReport]);
+    ];
+  }, [selected, openUserReport]);
 
   return (
     <ScrollView
@@ -298,46 +283,70 @@ export function TodaysActiveScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id ?? i)}
-        loading={loading}
-        emptyMessage="No active users found"
-        onRowPress={(row) => setSelected(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No active users found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity
+            key={`row-${index}-${String(row._id ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSelected(row)}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {display(row.name)}
+              </Text>
+              {row._id ? (
+                <TouchableOpacity
+                  style={styles.reportBtn}
+                  onPress={() => openUserReport(row._id, row.name)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                >
+                  <Text style={styles.reportBtnText}>User Report</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>App</Text>
+              <Text style={styles.cardValue}>{appCodeForName(row.clientName)}</Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Balance</Text>
+              <Text style={styles.cardValue}>
+                {floorNum(row.balance ?? 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+            {!hideContact ? (
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Mobile</Text>
+                <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
+              </View>
+            ) : null}
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>In</Text>
+              <Text style={styles.cardValue}>{display(row.played)}</Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Last Activity</Text>
+              <Text style={styles.cardValue}>{pickLastActivity(row)}</Text>
+            </View>
+            <Text style={styles.cardHint}>Tap card for full details</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <RowDetailSheet
         visible={selected !== null}
         title={selected ? display(selected.name) : ''}
-        fields={
-          selected
-            ? columns
-                .filter((c) => c.key !== 'idx')
-                .map<SheetField>((c) => ({
-                  label: c.label,
-                  value: c.render(selected, 0),
-                  color: c.color?.(selected),
-                }))
-            : []
-        }
+        fields={selected ? sheetFields(selected) : []}
         onClose={() => setSelected(null)}
-        actions={
-          selected?._id
-            ? [
-                {
-                  label: 'User Report',
-                  onPress: () => {
-                    const id = selected._id;
-                    const name = selected.name;
-                    setSelected(null);
-                    openUserReport(id, name);
-                  },
-                },
-              ]
-            : undefined
-        }
+        actions={sheetActions}
       />
 
       <View style={styles.pager}>
@@ -375,6 +384,61 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  reportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    flexShrink: 0,
+  },
+  reportBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: { color: colors.foreground, fontSize: 11, flex: 1, textAlign: 'right' },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

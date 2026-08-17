@@ -19,6 +19,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
+import { AddTopGamePanel } from '@/screens/panel/topGames/AddTopGamePanel';
 import {
   buildGameRows,
   formatCategoryLabel,
@@ -62,6 +63,7 @@ export function TopGamesPage() {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [statusTarget, setStatusTarget] = useState<StatusTarget | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const loadGames = useCallback(async () => {
     setLoading(true);
@@ -92,6 +94,17 @@ export function TopGamesPage() {
     [doc?.data],
   );
 
+  const existingProviders = useMemo(() => {
+    const names = new Set<string>();
+    Object.values(doc?.data || {}).forEach((list) => {
+      list.forEach((game) => {
+        const name = game.providerName || game.provider?.name;
+        if (name) names.add(name);
+      });
+    });
+    return Array.from(names);
+  }, [doc?.data]);
+
   const games = useMemo(
     () => buildGameRows(doc?.data || {}, selectedCategory, appliedSearch),
     [doc?.data, selectedCategory, appliedSearch],
@@ -117,12 +130,16 @@ export function TopGamesPage() {
   };
 
   const openStatus = (item: GameRow, status: boolean) => {
-    if (!item._categoryKey || !item.gameId) {
-      toast.error('Category and Game ID are required');
+    if (!item.gameId) {
+      toast.error('Game ID is required');
       return;
     }
     setStatusTarget({
-      category: item._categoryKey,
+      // All section → no category. Specific category filter → include it.
+      category:
+        selectedCategory !== 'All'
+          ? item._categoryKey || selectedCategory
+          : undefined,
       gameId: item.gameId,
       status,
       name: getGameName(item),
@@ -161,29 +178,50 @@ export function TopGamesPage() {
     if (!statusTarget) return;
     setActionLoading(true);
     try {
-      const res = await secureApi('topGames.updateStatus', {
-        category: statusTarget.category,
+      const payload: {
+        gameId: string;
+        status: boolean;
+        category?: string;
+      } = {
         gameId: statusTarget.gameId,
         status: statusTarget.status,
-      });
+      };
+      if (statusTarget.category) {
+        payload.category = statusTarget.category;
+      }
+
+      const res = await secureApi('topGames.updateStatus', payload);
       if (!res.ok) {
         toast.error(res.message || 'Failed to update status');
         return;
       }
       setDoc((prev) => {
-        if (!prev?.data?.[statusTarget.category]) return prev;
-        return {
-          ...prev,
-          data: {
-            ...prev.data,
-            [statusTarget.category]: prev.data[statusTarget.category].map(
-              (game) =>
-                game.gameId === statusTarget.gameId
-                  ? { ...game, status: statusTarget.status }
-                  : game,
-            ),
-          },
-        };
+        if (!prev?.data) return prev;
+
+        if (statusTarget.category && prev.data[statusTarget.category]) {
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              [statusTarget.category]: prev.data[statusTarget.category].map(
+                (game) =>
+                  game.gameId === statusTarget.gameId
+                    ? { ...game, status: statusTarget.status }
+                    : game,
+              ),
+            },
+          };
+        }
+
+        const nextData: typeof prev.data = {};
+        Object.entries(prev.data).forEach(([category, list]) => {
+          nextData[category] = list.map((game) =>
+            game.gameId === statusTarget.gameId
+              ? { ...game, status: statusTarget.status }
+              : game,
+          );
+        });
+        return { ...prev, data: nextData };
       });
       toast.success(
         `Status ${statusTarget.status ? 'activated' : 'deactivated'} successfully`,
@@ -201,13 +239,13 @@ export function TopGamesPage() {
       {
         id: '#',
         label: '#',
-        width: 48,
+        width: 56,
         render: (_row, index) => index + 1,
       },
       {
         id: 'image',
         label: 'Image',
-        width: 72,
+        width: 100,
         render: (row) => {
           const url = getImageUrl(row);
           if (!url) return '-';
@@ -217,8 +255,8 @@ export function TopGamesPage() {
               src={url}
               alt={getGameName(row)}
               sx={{
-                width: 48,
-                height: 48,
+                width: 72,
+                height: 72,
                 objectFit: 'cover',
                 borderRadius: 1,
                 display: 'block',
@@ -231,7 +269,11 @@ export function TopGamesPage() {
       {
         id: 'name',
         label: 'Name',
-        render: (row) => getGameName(row),
+        render: (row) => (
+          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+            {getGameName(row)}
+          </Typography>
+        ),
       },
       {
         id: 'gameId',
@@ -256,7 +298,7 @@ export function TopGamesPage() {
       {
         id: 'status',
         label: 'Status',
-        width: 90,
+        width: 100,
         render: (row) => (
           <Switch
             size="small"
@@ -275,7 +317,7 @@ export function TopGamesPage() {
       {
         id: 'action',
         label: 'Action',
-        width: 72,
+        width: 80,
         render: (row) => (
           <IconButton
             size="small"
@@ -305,21 +347,49 @@ export function TopGamesPage() {
         <Typography variant="h5" fontWeight={700}>
           {toDisplayText('Top Games')}
         </Typography>
-        <Button
-          startIcon={
-            loading ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : (
-              <RefreshIcon />
-            )
-          }
-          onClick={() => void loadGames()}
-          disabled={busy}
-          sx={orangeBtnSx}
-        >
-          Refresh
-        </Button>
+        <Stack direction="row" alignItems="center" gap={1}>
+          <Button
+            variant={addOpen ? 'contained' : 'outlined'}
+            onClick={() => setAddOpen((prev) => !prev)}
+            sx={
+              addOpen
+                ? orangeBtnSx
+                : {
+                    borderColor: '#ff9f0a',
+                    color: '#ff9f0a',
+                    '&:hover': {
+                      borderColor: '#e08c00',
+                      bgcolor: 'rgba(255,159,10,0.08)',
+                    },
+                  }
+            }
+          >
+            {addOpen ? 'Close Add Games' : 'Add Games'}
+          </Button>
+          <Button
+            startIcon={
+              loading ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <RefreshIcon />
+              )
+            }
+            onClick={() => void loadGames()}
+            disabled={busy}
+            sx={orangeBtnSx}
+          >
+            Refresh
+          </Button>
+        </Stack>
       </Stack>
+
+      <AddTopGamePanel
+        categories={categoryKeys}
+        existingProviders={existingProviders}
+        onAdded={loadGames}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+      />
 
       <Stack
         direction="row"
@@ -371,7 +441,9 @@ export function TopGamesPage() {
         }
         loading={busy}
         emptyMessage="No top games found"
-        minWidth={1000}
+        minWidth={1200}
+        maxHeight="calc(100vh - 280px)"
+        estimateRowHeight={84}
       />
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>

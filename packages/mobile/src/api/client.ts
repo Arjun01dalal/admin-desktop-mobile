@@ -67,6 +67,112 @@ function maybeAuthFailure(
 }
 
 
+const BANNER_VIDEO_TYPES = new Set(['tutorialVideo', 'howToDepositVideo']);
+
+/**
+ * Multipart upload for banner tutorial videos — mirrors desktop
+ * electron/secure `uploadBannerVideo`. Accepts either a file URI (preferred on
+ * RN) or a base64 string.
+ */
+async function uploadBannerVideo(
+  payload: Record<string, unknown> = {},
+  tokenOverride?: string | null,
+): Promise<ApiResult> {
+  const videoUri = typeof payload.videoUri === 'string' ? payload.videoUri.trim() : '';
+  const fileName = String(payload.fileName || '').trim();
+  const videoType = String(payload.videoType || '').trim();
+  const mimeType = String(payload.mimeType || 'video/mp4').slice(0, 80);
+
+  if (!fileName || !videoUri) {
+    return { ok: false, message: 'Please select a video file first' };
+  }
+  if (!BANNER_VIDEO_TYPES.has(videoType)) {
+    return { ok: false, message: 'Please select a valid video type' };
+  }
+  const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
+  if (!/\.(mp4|webm|mov|m4v|avi)$/i.test(safeName)) {
+    return { ok: false, message: 'Only video uploads are allowed (mp4, webm, mov, m4v, avi)' };
+  }
+
+  try {
+    const token = tokenOverride ?? appStorage.getItem('token');
+    const form = new FormData();
+    form.append('File_Name', 'tutorialVideo');
+    form.append('category', 'others');
+    form.append('deepLink', 'true');
+    form.append('gameName', 'NA');
+    form.append('iframeUrlMob', 'NA');
+    form.append('mobileOptions', '');
+    form.append('mobileRouter', '');
+    form.append('type', videoType);
+    form.append('iframeUrl', 'NA');
+
+    if (videoUri) {
+      // React Native FormData file part
+      form.append('video', {
+        uri: videoUri,
+        name: safeName,
+        type: mimeType,
+      } as unknown as Blob);
+    } else {
+      return { ok: false, message: 'Please select a video file first' };
+    }
+
+    const url = `${getApiBaseUrl()}/bannerGames/upload_video`;
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent':
+        'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 180_000);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: form,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    let json: unknown = null;
+    try {
+      json = await res.json();
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok) {
+      const message = pickMessage(json, `Request failed (${res.status})`);
+      maybeAuthFailure('ops.bannersUploadVideo', Boolean(token), res.status, message);
+      return { ok: false, message, status: res.status };
+    }
+    const data = (json && typeof json === 'object' ? json : {}) as Record<string, unknown>;
+    return {
+      ok: true,
+      success: data.success !== false,
+      message:
+        typeof data.message === 'string'
+          ? data.message
+          : 'Tutorial video uploaded successfully',
+      data: data.data ?? data,
+      status: res.status,
+    };
+  } catch (err) {
+    const message =
+      err instanceof Error && err.name === 'AbortError'
+        ? 'Request timed out'
+        : err instanceof Error
+          ? err.message
+          : 'Video upload failed';
+    return { ok: false, message };
+  }
+}
+
 export async function secureApi<T = unknown>(
   action: SecureAction,
   payload: Record<string, unknown> = {},
@@ -74,6 +180,12 @@ export async function secureApi<T = unknown>(
 ): Promise<ApiResult<T>> {
   const entry = REGISTRY[action];
   if (!entry) return { ok: false, message: `Unknown action: ${String(action)}` };
+
+  // Multipart video upload — desktop does this in Electron; mirror on mobile.
+  if (action === 'ops.bannersUploadVideo') {
+    return uploadBannerVideo(payload, tokenOverride) as Promise<ApiResult<T>>;
+  }
+
   if (entry.type === 'local' || !entry.method || !entry.path) {
     return { ok: false, message: `Action not supported on mobile: ${String(action)}` };
   }
@@ -95,6 +207,10 @@ export async function secureApi<T = unknown>(
     if (token) headers.Authorization = `Bearer ${token}`;
     if (typeof _clientName === 'string' && _clientName.trim()) {
       headers['client-name'] = _clientName.trim().toUpperCase();
+    }
+    const staticHeaders = (entry as { headers?: Record<string, string> }).headers;
+    if (staticHeaders && typeof staticHeaders === 'object') {
+      for (const [k, v] of Object.entries(staticHeaders)) headers[k] = String(v);
     }
 
     const body = entry.encryptRequest ? { token: encryptPayload(rest) } : rest;

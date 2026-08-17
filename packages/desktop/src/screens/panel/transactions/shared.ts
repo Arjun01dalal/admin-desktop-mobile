@@ -3,6 +3,7 @@
 import { ITEMS_PER_PAGE_OPTIONS } from '@astro/shared/pagination';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
+/** Flat orange CTA — matches the local `orangeBtnSx` used across other panel pages. */
 export const orangeBtnSx = {
   bgcolor: '#ff9f0a',
   color: '#1a1200',
@@ -24,14 +25,49 @@ export const actionBtnSx = {
   py: 0.25,
 };
 
+/** Theme-aware fields — dark fills in dark mode, white + dark text in light. */
 export const fieldSx = {
   width: '100%',
   minWidth: 0,
-  '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 13 },
+  '& .MuiInputBase-root': {
+    fontSize: 13,
+    bgcolor: 'background.paper',
+    color: 'text.primary',
+  },
+  '& .MuiInputBase-input': {
+    color: 'text.primary',
+    WebkitTextFillColor: 'currentColor',
+  },
+  '& .MuiInputLabel-root': {
+    color: 'text.secondary',
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: 'primary.main',
+  },
+  '& .MuiSelect-icon': {
+    color: 'text.secondary',
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'divider',
+  },
 };
 
 export const filterSelectSx = {
-  '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 12 },
+  '& .MuiInputBase-root': {
+    fontSize: 12,
+    bgcolor: 'background.paper',
+    color: 'text.primary',
+  },
+  '& .MuiInputBase-input': {
+    color: 'text.primary',
+    WebkitTextFillColor: 'currentColor',
+  },
+  '& .MuiSelect-icon': {
+    color: 'text.secondary',
+  },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'divider',
+  },
 };
 
 export const toolbarBoxSx = {
@@ -39,7 +75,8 @@ export const toolbarBoxSx = {
   p: 1.5,
   borderRadius: 1.5,
   bgcolor: 'background.paper',
-  border: '1px solid rgba(255,255,255,0.08)',
+  border: '1px solid',
+  borderColor: 'divider',
 } as const;
 
 export const toolbarGridSx = {
@@ -97,7 +134,7 @@ export const WITHDRAWAL_STATUSES = [
 /** Shared sizes + fund/deposit drill-down extras. */
 export const PAGE_SIZE_OPTIONS = [
   ...ITEMS_PER_PAGE_OPTIONS.filter((n) =>
-    ['10', '25', '50', '75', '100', '500'].includes(n),
+    ['10', '20', '25', '50', '75', '100', '500'].includes(n),
   ),
   '300',
   '1000',

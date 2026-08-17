@@ -1,22 +1,17 @@
 /**
  * Incoming Bot Call — mobile port of desktop IncomingBotCallPage.
- * incomingBot.list { since } lists calls (filtered to the allowed "to" numbers);
- * incomingBot.processCall { call_sid } returns the AI call summary/analysis.
+ * List + summary hit helper.callingbot.live directly (same as desktop Electron
+ * local handlers), because incomingBot.* are registry "local" actions.
  *
- * NOTE: on mobile both incomingBot.list and incomingBot.processCall are declared
- * as LOCAL registry actions, which secureApi does not support (it returns an
- * error). The screen is fully implemented, but until those actions are wired on
- * mobile the list load / summary fetch will surface a "not supported" error.
- *
- * Date filter + From/To/SID search. Row tap opens the detail sheet with the full
- * call fields, a "Play Recording" action (opens the recording URL in the browser)
- * and a "View Summary" action that fetches + shows the AI analysis rows.
+ * Date filter + From/To/SID search. Card tap → detail sheet; Play Recording /
+ * View Summary dismiss the sheet first (iOS cannot stack native Modals).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -27,8 +22,6 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
-import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { DateField } from '../../../components/DateField';
@@ -100,6 +93,15 @@ function formatDurationInMin(duration: string | number | undefined): string {
   return (seconds / 60).toFixed(2);
 }
 
+function statusColor(status?: string): string {
+  const s = String(status || '').toLowerCase();
+  if (s === 'completed' || s === 'answered') return '#16a34a';
+  if (s === 'busy' || s === 'no-answer' || s === 'no_answer') return '#d97706';
+  if (s === 'failed' || s === 'canceled' || s === 'cancelled') return '#dc2626';
+  if (s === 'in-progress' || s === 'ringing' || s === 'queued') return colors.primary;
+  return colors.muted;
+}
+
 function buildSummaryRows(summaryData: CallSummaryData | null) {
   const raw = summaryData?.data?.analysis ?? summaryData?.data;
   if (!raw || typeof raw !== 'object') return [];
@@ -148,9 +150,16 @@ export function IncomingBotCallScreen() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const genRef = useRef(0);
   const summaryGenRef = useRef(0);
+
+  /** Dismiss RowDetailSheet before presenting another Modal (iOS nested-modal bug). */
+  const openAfterSheetClose = useCallback((open: () => void) => {
+    setSheetRow(null);
+    setTimeout(open, Platform.OS === 'ios' ? 350 : 80);
+  }, []);
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -211,65 +220,79 @@ export function IncomingBotCallScreen() {
     });
   }, [rows, appliedFrom, appliedTo, appliedSid]);
 
-  const openSummary = useCallback(async (call: IncomingCall) => {
+  const fetchSummary = useCallback(async (call: IncomingCall) => {
     const gen = ++summaryGenRef.current;
+    const callSid = String(call.sid || '');
     setSummaryOpen(true);
     setSummaryData(null);
+    setSummaryError(null);
     setSummaryLoading(true);
     try {
-      // Same as desktop's local handler: call the helper service directly.
-      try {
-        const resp = await fetch('https://helper.callingbot.live/process-call', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ call_sid: call.sid }),
-        });
-        const data = (await resp.json()) as CallSummaryData & {
-          status?: string;
-          message?: string;
-        };
-        if (gen !== summaryGenRef.current) return;
-        if (!resp.ok || data?.status === 'failed') {
-          Alert.alert(data?.message || 'Analysis is in progress.');
-          setSummaryOpen(false);
-          return;
-        }
-        setSummaryData(data || null);
-      } catch {
-        if (gen !== summaryGenRef.current) return;
-        Alert.alert('Analysis is in progress.');
-        setSummaryOpen(false);
+      if (!/^[A-Za-z0-9_-]{8,128}$/.test(callSid)) {
+        setSummaryError('Invalid call SID');
         return;
       }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60_000);
+      let resp: Response;
+      try {
+        resp = await fetch('https://helper.callingbot.live/process-call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ call_sid: callSid }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      const data = (await resp.json().catch(() => ({}))) as CallSummaryData & {
+        status?: string;
+        message?: string;
+      };
+      if (gen !== summaryGenRef.current) return;
+      if (!resp.ok || data?.status === 'failed') {
+        setSummaryError(data?.message || 'Analysis is in progress.');
+        return;
+      }
+      setSummaryData(data || null);
+    } catch {
+      if (gen !== summaryGenRef.current) return;
+      setSummaryError('Analysis is in progress.');
     } finally {
       if (gen === summaryGenRef.current) setSummaryLoading(false);
     }
   }, []);
 
+  const openSummary = useCallback(
+    (call: IncomingCall) => {
+      openAfterSheetClose(() => {
+        void fetchSummary(call);
+      });
+    },
+    [openAfterSheetClose, fetchSummary],
+  );
+
   const closeSummary = useCallback(() => {
     summaryGenRef.current += 1; // invalidate any in-flight summary fetch
     setSummaryOpen(false);
     setSummaryLoading(false);
+    setSummaryError(null);
+    setSummaryData(null);
   }, []);
 
   const summaryRows = useMemo(() => buildSummaryRows(summaryData), [summaryData]);
 
-  const playRecording = useCallback((url?: string | null) => {
-    if (!url) {
-      Alert.alert('No recording available');
-      return;
-    }
-    void Linking.openURL(url).catch(() => Alert.alert('Unable to open recording'));
-  }, []);
-
-  const columns = useMemo<DataTableColumn<IncomingCall>[]>(
-    () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'from', label: 'From', width: 130, render: (r) => display(r.from) },
-      { key: 'status', label: 'Status', width: 110, render: (r) => display(r.status) },
-      { key: 'duration', label: 'Dur (min)', width: 90, align: 'right', render: (r) => formatDurationInMin(r.duration) },
-    ],
-    [],
+  const playRecording = useCallback(
+    (url?: string | null) => {
+      if (!url) {
+        Alert.alert('No recording available');
+        return;
+      }
+      openAfterSheetClose(() => {
+        void Linking.openURL(url).catch(() => Alert.alert('Unable to open recording'));
+      });
+    },
+    [openAfterSheetClose],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
@@ -358,15 +381,59 @@ export function IncomingBotCallScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns}
-        rows={filteredRows}
-        keyFor={(r, i) => String(r.sid || i)}
-        loading={loading}
-        emptyMessage="No incoming calls found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row for details, recording & summary"
-      />
+      <Text style={styles.sub}>
+        {sinceDate} · {filteredRows.length.toLocaleString('en-IN')} calls · Tap card for recording &
+        summary
+      </Text>
+
+      {loading && filteredRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && filteredRows.length === 0 ? (
+        <Text style={styles.hint}>No incoming calls found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {filteredRows.map((row, index) => {
+          const badge = statusColor(row.status);
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row.sid || '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.from)}
+                </Text>
+                <Text
+                  style={[styles.statusPill, { color: badge, backgroundColor: `${badge}22` }]}
+                  numberOfLines={1}
+                >
+                  {display(row.status)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  To: {display(row.to)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  {formatDurationInMin(row.duration)} min
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  {formatDateTime(row.start_time)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  {row.recording_url ? '🎙 Recording' : 'No recording'}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap for details, play & summary</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -399,12 +466,14 @@ export function IncomingBotCallScreen() {
             <ScrollView contentContainerStyle={{ paddingBottom: spacing(6) }}>
               {summaryLoading ? (
                 <Text style={styles.summaryEmpty}>Loading…</Text>
+              ) : summaryError ? (
+                <Text style={styles.summaryError}>{summaryError}</Text>
               ) : summaryData ? (
-                summaryRows.map((item) => (
-                  <View key={item.title} style={styles.summaryRow}>
+                summaryRows.map((item, si) => (
+                  <View key={`sum-${si}-${item.title}`} style={styles.summaryCard}>
                     <Text style={styles.summaryAttr}>{item.title}</Text>
                     <Text style={styles.summaryValue}>{display(item.value)}</Text>
-                    {item.reason ? (
+                    {item.reason && item.reason !== '-' ? (
                       <Text style={styles.summaryReason}>{display(item.reason)}</Text>
                     ) : null}
                   </View>
@@ -423,7 +492,8 @@ export function IncomingBotCallScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700', marginBottom: spacing(3) },
+  title: { color: colors.foreground, fontSize: 20, fontWeight: '700', marginBottom: spacing(1) },
+  sub: { color: colors.muted, fontSize: 12, marginBottom: spacing(3) },
   filterWrap: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -465,6 +535,56 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, fontSize: 13, marginBottom: spacing(2) },
+  list: { gap: spacing(2) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
+  cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, minWidth: 0 },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(2),
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
+    maxWidth: 110,
+    textAlign: 'center',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1.5) },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   backdropTouch: { flex: 1 },
   summarySheet: {
@@ -484,14 +604,24 @@ const styles = StyleSheet.create({
   },
   summaryTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700' },
   close: { color: colors.muted, fontSize: 18, fontWeight: '700' },
-  summaryRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingVertical: spacing(2.5),
+  summaryCard: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(2),
     gap: spacing(1),
   },
   summaryAttr: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   summaryValue: { color: colors.foreground, fontSize: 14 },
   summaryReason: { color: colors.muted, fontSize: 12 },
   summaryEmpty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(6) },
+  summaryError: {
+    color: colors.destructive,
+    textAlign: 'center',
+    marginVertical: spacing(6),
+    fontSize: 14,
+    paddingHorizontal: spacing(2),
+  },
 });

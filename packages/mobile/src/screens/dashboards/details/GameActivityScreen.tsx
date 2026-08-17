@@ -31,14 +31,11 @@ import {
   type SortConfig,
   type SortKey,
 } from '../../../dashboards/activityUtils';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-
-/** Columns kept in the list; everything else shows in the bottom sheet. */
-const MAIN_KEYS = new Set(['idx', 'provider', 'betAmount', 'ggr']);
 
 function fmt(n: number): string {
   return floorNum(n).toLocaleString('en-IN');
@@ -266,14 +263,41 @@ export function GameActivityScreen() {
         ))}
       </View>
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={sorted}
-        keyFor={(r, i) => String(r.providerId || providerLabel(r) || i)}
-        loading={loading}
-        onRowPress={(row) => setSelected(row)}
-        hint="Tap a row to see all details · Tap a provider name for its games"
-      />
+      {loading && sorted.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && sorted.length === 0 ? <Text style={styles.hint}>No activity found</Text> : null}
+      <View style={styles.list}>
+        {sorted.map((row, index) => {
+          const ggr = getMetric(row, 'ggr');
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row.providerId || providerLabel(row) || '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSelected(row)}
+              onLongPress={() => openProvider(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {providerLabel(row)}
+                </Text>
+                <Text style={styles.cardSplitRight}>{gameCount(row)} games</Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>Bet: {fmt(getMetric(row, 'betAmount'))}</Text>
+                <Text style={[styles.cardSplitRight, { color: ggr < 0 ? colors.destructive : colors.success }]}>
+                  GGR: {fmt(ggr)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>Win: {fmt(getMetric(row, 'winAmount'))}</Text>
+                <Text style={styles.cardSplitRight}>RTP: {String(getMetric(row, 'rtp'))}</Text>
+              </View>
+              <Text style={styles.cardHint}>Tap for details · Long-press for games</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={selected !== null}
@@ -322,6 +346,101 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
+  cardCheckOn: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
+  cardCheckText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
+  cardCheckTextOn: { color: colors.primary },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    maxWidth: '40%',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing(3),
+    marginBottom: spacing(1),
+  },
+  selectAllBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    backgroundColor: colors.surface,
+  },
+  selectAllText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
   totalsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

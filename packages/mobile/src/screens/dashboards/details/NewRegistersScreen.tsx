@@ -6,10 +6,14 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -17,7 +21,7 @@ import { useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import {
   formatAadharAddress,
   flattenUserRow,
@@ -45,9 +49,6 @@ import {
   type SearchFieldOption,
 } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
-
-/** Columns kept in the list; everything else shows in the bottom sheet. */
-const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'appName', 'balance', 'created']);
 
 /** Search fields mirroring desktop NewRegistersPage per-column filters (filter keys match).
  *  Contact-identifier fields are withheld for restricted roles like the desktop column filters. */
@@ -99,6 +100,50 @@ type Row = {
   createdAt?: string;
   [key: string]: unknown;
 };
+
+type RegistrationComment = {
+  comment?: string;
+  commented_by?: string;
+  who?: { userId?: string; userName?: string };
+  createdOn?: string;
+  createdAt?: string;
+  date?: string;
+};
+
+type RegistrationCallLog = {
+  who?: { userId?: string; userName?: string };
+  userName?: string;
+  createdOn?: string;
+  createdAt?: string;
+  date?: string;
+  status?: string;
+};
+
+function registrationComments(row: Row): RegistrationComment[] {
+  const raw =
+    row.newRegistrationComments ||
+    row.registrationComments ||
+    row.comments ||
+    [];
+  return Array.isArray(raw) ? (raw as RegistrationComment[]) : [];
+}
+
+function registrationCallLogs(row: Row): RegistrationCallLog[] {
+  const raw = row.callLogsForNewRegistration || row.callLogs || [];
+  return Array.isArray(raw) ? (raw as RegistrationCallLog[]) : [];
+}
+
+function commentAuthor(item: RegistrationComment): string {
+  return String(item.who?.userName || item.commented_by || '—');
+}
+
+function commentWhen(item: RegistrationComment | RegistrationCallLog): string {
+  const raw = item.createdOn || item.createdAt || item.date;
+  const date = formatDisplayDate(raw);
+  const time = formatDisplayTime(raw);
+  if (!date && !time) return '—';
+  return [date, time].filter(Boolean).join(' · ');
+}
 
 type Response = {
   users?: Row[];
@@ -184,6 +229,19 @@ export function NewRegistersScreen() {
   const [dialerMsg, setDialerMsg] = useState('');
   const [calling, setCalling] = useState(false);
   const [callMsg, setCallMsg] = useState('');
+
+  // Comment / View Comments / View Logs (desktop NewRegisters + Laxmi)
+  const [commentUserId, setCommentUserId] = useState('');
+  const [commentUserName, setCommentUserName] = useState('');
+  const [commentInput, setCommentInput] = useState('');
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentSaving, setCommentSaving] = useState(false);
+  const [viewComments, setViewComments] = useState<RegistrationComment[]>([]);
+  const [viewCommentsName, setViewCommentsName] = useState('');
+  const [viewCommentsOpen, setViewCommentsOpen] = useState(false);
+  const [viewLogs, setViewLogs] = useState<RegistrationCallLog[]>([]);
+  const [viewLogsName, setViewLogsName] = useState('');
+  const [viewLogsOpen, setViewLogsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -357,6 +415,77 @@ export function NewRegistersScreen() {
     }
   }, [campaignId, rows]);
 
+  /** Close row sheet first so native modals do not stack (same as Call Logs). */
+  const afterSheetClose = useCallback((fn: () => void) => {
+    setSelected(null);
+    setCallMsg('');
+    setTimeout(fn, 250);
+  }, []);
+
+  const openAddComment = useCallback(
+    (row: Row) => {
+      afterSheetClose(() => {
+        setCommentUserId(String(row._id || ''));
+        setCommentUserName(String(row.name || ''));
+        setCommentInput('');
+        setCommentOpen(true);
+      });
+    },
+    [afterSheetClose],
+  );
+
+  const openViewComments = useCallback(
+    (row: Row) => {
+      afterSheetClose(() => {
+        setViewComments(registrationComments(row));
+        setViewCommentsName(String(row.name || ''));
+        setViewCommentsOpen(true);
+      });
+    },
+    [afterSheetClose],
+  );
+
+  const openViewCallLogs = useCallback(
+    (row: Row) => {
+      afterSheetClose(() => {
+        setViewLogs(registrationCallLogs(row));
+        setViewLogsName(String(row.name || ''));
+        setViewLogsOpen(true);
+      });
+    },
+    [afterSheetClose],
+  );
+
+  const submitComment = useCallback(async () => {
+    const text = commentInput.trim();
+    if (!commentUserId || !text) {
+      Alert.alert('Comment', 'Please enter a comment');
+      return;
+    }
+    setCommentSaving(true);
+    try {
+      const res = await secureApi('users.addNewRegistrationComment', {
+        _id: commentUserId,
+        comment: text,
+        who: {
+          userId: admin?._id,
+          userName: admin?.name,
+        },
+      });
+      if (!res.ok || res.success === false) {
+        Alert.alert('Comment', res.message || 'Failed to add comment');
+        return;
+      }
+      setCommentOpen(false);
+      setCommentInput('');
+      setCommentUserId('');
+      setCommentUserName('');
+      void load();
+    } finally {
+      setCommentSaving(false);
+    }
+  }, [admin?._id, admin?.name, commentInput, commentUserId, load]);
+
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const cols: DataTableColumn<Row>[] = [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
@@ -378,6 +507,7 @@ export function NewRegistersScreen() {
           return n == null ? '—' : floorNum(n).toLocaleString('en-IN');
         },
       },
+      { key: 'spacer', label: '', width: 20, render: () => '' },
       { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => pickLastActivity(r) },
     ];
     if (!hideContact) {
@@ -566,11 +696,11 @@ export function NewRegistersScreen() {
         <View style={styles.dialerCard}>
           <Text style={styles.dialerLabel}>Campaign</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRow}>
-            {CAMPAIGN_LIST.map((c) => {
+            {CAMPAIGN_LIST.map((c, ci) => {
               const id = c.id.trim();
               return (
                 <TouchableOpacity
-                  key={c.id}
+                  key={`camp-${ci}`}
                   style={[styles.chip, campaignId === id && styles.chipActive]}
                   onPress={() => setCampaignId(campaignId === id ? '' : id)}
                 >
@@ -603,15 +733,47 @@ export function NewRegistersScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id ?? i)}
-        loading={loading}
-        emptyMessage="No users found"
-        onRowPress={(row) => setSelected(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No users found</Text> : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const bal = pickBalance(row);
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSelected(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.name)}
+                </Text>
+                <Text style={styles.cardApp}>{appCodeForName(pickAppName(row))}</Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  Balance: {bal == null ? '—' : floorNum(bal).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  {formatDisplayDate(row.createdOn || row.createdAt) || '—'}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  State: {display(row.state)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  {pickLastActivity(row)}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for details & actions</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={selected !== null}
@@ -619,7 +781,7 @@ export function NewRegistersScreen() {
         fields={
           selected
             ? columns
-                .filter((c) => c.key !== 'idx')
+                .filter((c) => c.key !== 'idx' && c.key !== 'spacer')
                 .map<SheetField>((c) => ({
                   label: c.label,
                   value: c.render(selected, 0),
@@ -628,14 +790,41 @@ export function NewRegistersScreen() {
             : []
         }
         actions={
-          selected && !hideContact && selected.mobile
+          selected
             ? ([
                 {
-                  label: calling ? 'Sending to dialer…' : callMsg ? `Call — ${callMsg}` : 'Call (send to dialer)',
+                  label: 'Comment',
                   tone: 'primary',
-                  disabled: calling,
-                  onPress: () => void singleCall(selected),
+                  onPress: () => openAddComment(selected),
                 },
+                {
+                  label: (() => {
+                    const count = registrationComments(selected).length;
+                    return count > 0 ? `View All (${count})` : 'View All';
+                  })(),
+                  onPress: () => openViewComments(selected),
+                },
+                {
+                  label: (() => {
+                    const count = registrationCallLogs(selected).length;
+                    return count > 0 ? `View Logs (${count})` : 'View Logs';
+                  })(),
+                  onPress: () => openViewCallLogs(selected),
+                },
+                ...(!hideContact && selected.mobile
+                  ? ([
+                      {
+                        label: calling
+                          ? 'Sending to dialer…'
+                          : callMsg
+                            ? `Call — ${callMsg}`
+                            : 'Call (send to dialer)',
+                        tone: 'primary' as const,
+                        disabled: calling,
+                        onPress: () => void singleCall(selected),
+                      },
+                    ] satisfies SheetAction[])
+                  : []),
               ] satisfies SheetAction[])
             : undefined
         }
@@ -644,6 +833,123 @@ export function NewRegistersScreen() {
           setCallMsg('');
         }}
       />
+
+      <Modal
+        visible={commentOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !commentSaving && setCommentOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Comment</Text>
+            {commentUserName ? (
+              <Text style={styles.modalSub}>{commentUserName}</Text>
+            ) : null}
+            <TextInput
+              style={styles.commentInput}
+              value={commentInput}
+              onChangeText={setCommentInput}
+              placeholder="Comment"
+              placeholderTextColor={colors.muted}
+              multiline
+              textAlignVertical="top"
+              editable={!commentSaving}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setCommentOpen(false)}
+                disabled={commentSaving}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, commentSaving && styles.modalSubmitDisabled]}
+                onPress={() => void submitComment()}
+                disabled={commentSaving}
+              >
+                {commentSaving ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Submit</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={viewCommentsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewCommentsOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              Comments{viewCommentsName ? ` — ${viewCommentsName}` : ''}
+            </Text>
+            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+              {viewComments.length === 0 ? (
+                <Text style={styles.modalEmpty}>No Comments</Text>
+              ) : (
+                viewComments.map((c, i) => (
+                  <View key={i} style={styles.logCard}>
+                    <Text style={styles.logBody}>{c.comment || '—'}</Text>
+                    <Text style={styles.logMeta}>
+                      {commentAuthor(c)} · {commentWhen(c)}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setViewCommentsOpen(false)}
+            >
+              <Text style={styles.modalCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={viewLogsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewLogsOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              Call Logs{viewLogsName ? ` — ${viewLogsName}` : ''}
+            </Text>
+            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+              {viewLogs.length === 0 ? (
+                <Text style={styles.modalEmpty}>No Call Logs</Text>
+              ) : (
+                viewLogs.map((log, i) => (
+                  <View key={i} style={styles.logCard}>
+                    <Text style={styles.logTitle}>
+                      {String(log.who?.userName || log.userName || '—')}
+                      {log.status ? ` · ${log.status}` : ''}
+                    </Text>
+                    <Text style={styles.logMeta}>{commentWhen(log)}</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setViewLogsOpen(false)}
+            >
+              <Text style={styles.modalCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.pager}>
         <Text
@@ -680,6 +986,69 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardApp: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   quickRow: { marginTop: spacing(3), flexGrow: 0 },
   chip: {
     backgroundColor: colors.surface,
@@ -730,4 +1099,87 @@ const styles = StyleSheet.create({
   },
   pagerDisabled: { color: colors.muted, opacity: 0.5 },
   pagerLabel: { color: colors.muted, fontSize: 13 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing(4),
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(4),
+    gap: spacing(3),
+    maxHeight: '80%',
+  },
+  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
+  modalSub: { color: colors.muted, fontSize: 12 },
+  commentInput: {
+    minHeight: 96,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    fontSize: 14,
+  },
+  modalActions: { flexDirection: 'row', gap: spacing(2) },
+  modalCancel: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: { color: colors.foreground, fontWeight: '600', fontSize: 13 },
+  modalCloseBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseBtnText: { color: colors.foreground, fontWeight: '700', fontSize: 14 },
+  modalSubmit: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubmitDisabled: { opacity: 0.6 },
+  modalSubmitText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  modalList: { flexGrow: 0, maxHeight: 360 },
+  modalEmpty: {
+    color: colors.muted,
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: spacing(6),
+  },
+  logCard: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(2),
+  },
+  logTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', marginBottom: spacing(1) },
+  logBody: {
+    color: colors.foreground,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing(1),
+  },
+  logMeta: { color: colors.muted, fontSize: 12 },
 });

@@ -9,7 +9,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { orangeBtnSx } from '@/screens/panel/transactions/shared';
+import { fieldSx, orangeBtnSx } from '@/screens/panel/transactions/shared';
 import type { MidOption } from '@/screens/panel/transactions/shared';
 import { ACTION_STATUSES, MANUAL_GATEWAYS } from './types';
 import { midLabel } from './logic';
@@ -31,7 +31,6 @@ type Props = {
   onSubmit: () => void;
 };
 
-const fieldBg = { '& .MuiInputBase-root': { bgcolor: '#121218' } };
 
 /** Approve / Reject / Reverse / Manual / On Hold dialog. */
 export function ActionDialog({
@@ -73,7 +72,7 @@ export function ActionDialog({
             label="Status"
             value={status}
             onChange={(e) => onStatus(e.target.value)}
-            sx={fieldBg}
+            sx={fieldSx}
           >
             {ACTION_STATUSES.map((s) => (
               <MenuItem key={s} value={s}>
@@ -88,7 +87,7 @@ export function ActionDialog({
             label="Remark"
             value={remark}
             onChange={(e) => onRemark(e.target.value)}
-            sx={fieldBg}
+            sx={fieldSx}
             helperText={status === 'Approved' ? 'Defaults to "Approved"' : 'Required for non-approve actions'}
           />
           {needsGatewayMid ? (
@@ -99,7 +98,7 @@ export function ActionDialog({
                 label="Gateway"
                 value={gateway}
                 onChange={(e) => onGateway(e.target.value)}
-                sx={fieldBg}
+                sx={fieldSx}
               >
                 <MenuItem value="">— Choose —</MenuItem>
                 {gatewayOptions.map((g) => (
@@ -114,7 +113,7 @@ export function ActionDialog({
                 label="Mid"
                 value={mid}
                 onChange={(e) => onMid(e.target.value)}
-                sx={fieldBg}
+                sx={fieldSx}
               >
                 <MenuItem value="">— Choose —</MenuItem>
                 {mids.map((m, i) => (

@@ -39,9 +39,9 @@ import {
 } from './dashboards/details/DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
 import { CreateUserScreen } from './CreateUserScreen';
-import { mapUsersToBotSettings } from '../utils/dialerHelpers';
+import { mapUsersToBotSettings, buildBotDialoutSetting } from '../utils/dialerHelpers';
 import { CAMPAIGN_LIST } from '../utils/campaignList';
-import { addToDialerBatch } from '../utils/externalDialer';
+import { addToDialerBatch, singleCallToDialer } from '../utils/externalDialer';
 
 /** Desktop parity: reason tag sent with add-to-bot per user type. */
 function reasonForUserType(type: UserType): string {
@@ -449,11 +449,87 @@ export function UsersScreen() {
   // Global Add-to-Bot / Add-to-Dialer (desktop UsersToolbar parity).
   const canAddToBot = !isCaller && hasPermission('add_to_bot');
   const canAddToDialer = !isCaller && hasPermission('add_to_dilaler');
+  /** Laxmi CallingBtn column — hidden only with contact_visibility_none. */
+  const showCalling = !hideContact;
   const [dialerOpen, setDialerOpen] = useState(false);
   const [botId, setBotId] = useState('');
   const [campaignId, setCampaignId] = useState('');
   const [dialerBusy, setDialerBusy] = useState(false);
   const [dialerMsg, setDialerMsg] = useState('');
+  const [callConfirmRow, setCallConfirmRow] = useState<Row | null>(null);
+  const [callBusy, setCallBusy] = useState(false);
+
+  const adminRec = useMemo(() => (admin ?? {}) as Record<string, unknown>, [admin]);
+  const extensionIds = useMemo(() => {
+    const raw = adminRec.extensionId;
+    if (Array.isArray(raw)) return raw.map(String);
+    if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
+    return [] as string[];
+  }, [adminRec.extensionId]);
+  const numericCampaignId = useMemo(
+    () => extensionIds.find((val) => /^\d+$/.test(val)) || '',
+    [extensionIds],
+  );
+  const dialerListId = numericCampaignId ? `9${numericCampaignId}` : '—';
+  const dialerListName = `${String(adminRec.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`;
+
+  const initiateBotCall = useCallback(
+    async (row: Row) => {
+      const mobile = String(row.mobile || '').trim();
+      if (!mobile) {
+        Alert.alert('No mobile number for this user');
+        return;
+      }
+      setCallBusy(true);
+      try {
+        const res = await secureApi('callLogs.addToBotDialer', {
+          userId: adminRec._id,
+          created_by: adminRec.name,
+          dialout_settings: [
+            buildBotDialoutSetting(row, botId.trim() || '1', reasonForUserType(userType)),
+          ],
+        });
+        Alert.alert(res.ok ? 'Bot Call' : 'Bot Call failed', res.message || (res.ok ? 'Call Initiated.' : 'Failed'));
+      } finally {
+        setCallBusy(false);
+      }
+    },
+    [adminRec, botId, userType],
+  );
+
+  const confirmManualCall = useCallback(async () => {
+    const row = callConfirmRow;
+    if (!row) return;
+    const mobile = String(row.mobile || '').trim();
+    if (!mobile) {
+      Alert.alert('No mobile number for this user');
+      return;
+    }
+    if (!numericCampaignId) {
+      Alert.alert('Dialer extension / campaign ID not found for this admin');
+      return;
+    }
+    setCallBusy(true);
+    try {
+      const res = await singleCallToDialer({
+        lead: {
+          _id: String(row._id || ''),
+          name: row.name,
+          mobile,
+          city: row.city,
+          state: row.state,
+          clientName: row.clientName,
+        },
+        extensionId: extensionIds,
+        adminName: typeof adminRec.name === 'string' ? adminRec.name : 'ADMIN',
+        serverId: adminRec.serverId,
+      });
+      Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
+      if (res.ok) setCallConfirmRow(null);
+    } finally {
+      setCallBusy(false);
+    }
+  }, [adminRec, callConfirmRow, extensionIds, numericCampaignId]);
 
   const handleAddToBot = useCallback(async () => {
     setDialerMsg('');
@@ -841,11 +917,11 @@ export function UsersScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.chipRow}
                   >
-                    {CAMPAIGN_LIST.map((c) => {
+                    {CAMPAIGN_LIST.map((c, ci) => {
                       const id = c.id.trim();
                       return (
                         <TouchableOpacity
-                          key={id}
+                          key={`camp-${ci}`}
                           style={[styles.chip, campaignId === id && styles.chipActive]}
                           onPress={() => setCampaignId(campaignId === id ? '' : id)}
                         >
@@ -902,7 +978,7 @@ export function UsersScreen() {
                     .join(' · ') || '—';
             return (
               <TouchableOpacity
-                key={String(r._id ?? i)}
+                key={`user-${i}-${String(r._id || '')}`}
                 style={styles.userCard}
                 onPress={() => setSelected(r)}
                 activeOpacity={0.7}
@@ -934,17 +1010,23 @@ export function UsersScreen() {
                   <View style={styles.userCardTags}>
                     {app ? (
                       <View style={styles.tagApp}>
-                        <Text style={styles.tagAppText}>{app}</Text>
+                        <Text style={styles.tagAppText} numberOfLines={1}>
+                          {app}
+                        </Text>
                       </View>
                     ) : null}
                     {display(r.empCode) !== '—' ? (
                       <View style={styles.tagApp}>
-                        <Text style={styles.tagAppText}>Emp {display(r.empCode)}</Text>
+                        <Text style={styles.tagAppText} numberOfLines={1}>
+                          Emp {display(r.empCode)}
+                        </Text>
                       </View>
                     ) : null}
                     {display(r.state) !== '—' ? (
-                      <View style={styles.tagApp}>
-                        <Text style={styles.tagAppText}>{display(r.state)}</Text>
+                      <View style={[styles.tagApp, styles.tagState]}>
+                        <Text style={styles.tagAppText} numberOfLines={1}>
+                          {display(r.state)}
+                        </Text>
                       </View>
                     ) : null}
                     <View style={[styles.tagStatus, blocked ? styles.tagBlocked : styles.tagActive]}>
@@ -953,11 +1035,33 @@ export function UsersScreen() {
                           styles.tagStatusText,
                           blocked ? styles.tagBlockedText : styles.tagActiveText,
                         ]}
+                        numberOfLines={1}
                       >
                         {blocked ? 'Blocked' : 'Active'}
                       </Text>
                     </View>
                   </View>
+                  {showCalling && String(r.mobile || '').trim() ? (
+                    <View style={styles.callBtnRow}>
+                      <TouchableOpacity
+                        style={[styles.callBtn, callBusy && styles.dialerBtnDisabled]}
+                        disabled={callBusy}
+                        onPress={() => {
+                          setSelected(null);
+                          setCallConfirmRow(r);
+                        }}
+                      >
+                        <Text style={styles.callBtnText}>Call</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.callBtn, callBusy && styles.dialerBtnDisabled]}
+                        disabled={callBusy}
+                        onPress={() => void initiateBotCall(r)}
+                      >
+                        <Text style={styles.callBtnText}>Bot Call</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
                 </View>
                 <View style={styles.userCardRight}>
                   <Text style={styles.userCardBalance}>
@@ -1018,6 +1122,30 @@ export function UsersScreen() {
                       },
                     ]
                   : []),
+                ...(showCalling && String(selected.mobile || '').trim()
+                  ? [
+                      {
+                        label: 'Call (Add to Dialer)',
+                        tone: 'primary' as const,
+                        disabled: callBusy,
+                        onPress: () => {
+                          const row = selected;
+                          setSelected(null);
+                          setCallConfirmRow(row);
+                        },
+                      },
+                      {
+                        label: 'Bot Call',
+                        tone: 'default' as const,
+                        disabled: callBusy,
+                        onPress: () => {
+                          const row = selected;
+                          setSelected(null);
+                          void initiateBotCall(row);
+                        },
+                      },
+                    ]
+                  : []),
                 ...(showBlockAction
                   ? [
                       {
@@ -1048,6 +1176,47 @@ export function UsersScreen() {
             : undefined
         }
       />
+
+      <Modal
+        visible={callConfirmRow !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !callBusy && setCallConfirmRow(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Confirm Details</Text>
+            <Text style={styles.modalSub}>
+              {display(callConfirmRow?.name)} · {display(callConfirmRow?.mobile)}
+            </Text>
+            <View style={styles.callConfirmBox}>
+              <Text style={styles.callConfirmLabel}>CAMPAIGN ID</Text>
+              <Text style={styles.callConfirmValue}>{numericCampaignId || '—'}</Text>
+              <Text style={styles.callConfirmLabel}>LIST ID</Text>
+              <Text style={styles.callConfirmValue}>{dialerListId}</Text>
+              <Text style={styles.callConfirmLabel}>LIST NAME</Text>
+              <Text style={styles.callConfirmValue}>{dialerListName}</Text>
+            </View>
+            <Text style={styles.modalSub}>Do you want to proceed with this details?</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.mBtn, styles.mBtnGhost]}
+                onPress={() => setCallConfirmRow(null)}
+                disabled={callBusy}
+              >
+                <Text style={styles.mBtnGhostText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.mBtn, styles.mBtnPrimary, (callBusy || !numericCampaignId) && styles.disabled]}
+                onPress={() => void confirmManualCall()}
+                disabled={callBusy || !numericCampaignId}
+              >
+                <Text style={styles.mBtnPrimaryText}>{callBusy ? 'Sending…' : 'Submit'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <BlockUserModal row={blockRow} onClose={() => setBlockRow(null)} onDone={() => void load()} />
       <DumpUserModal row={dumpRow} onClose={() => setDumpRow(null)} onDone={() => void load()} />
@@ -1223,6 +1392,7 @@ const styles = StyleSheet.create({
   },
   userCardMid: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   userCardName: {
@@ -1239,6 +1409,8 @@ const styles = StyleSheet.create({
   },
   userCardTags: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: spacing(1.5),
     marginTop: spacing(1),
   },
@@ -1249,17 +1421,24 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderWidth: 1,
     borderColor: colors.border,
+    maxWidth: '100%',
+    flexShrink: 1,
+  },
+  tagState: {
+    maxWidth: '72%',
   },
   tagAppText: {
     color: colors.foreground,
     fontSize: 10,
     fontWeight: '700',
+    flexShrink: 1,
   },
   tagStatus: {
     borderRadius: radius.sm,
     paddingHorizontal: spacing(1.5),
     paddingVertical: 2,
     borderWidth: 1,
+    flexShrink: 0,
   },
   tagActive: {
     backgroundColor: 'rgba(34, 197, 94, 0.12)',
@@ -1282,6 +1461,7 @@ const styles = StyleSheet.create({
   userCardRight: {
     alignItems: 'flex-end',
     gap: 2,
+    flexShrink: 0,
   },
   userCardBalance: {
     color: colors.foreground,
@@ -1312,6 +1492,44 @@ const styles = StyleSheet.create({
   },
   blockBtnUnblockText: {
     color: colors.success,
+  },
+  callBtnRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(1.5),
+    marginTop: spacing(1.5),
+  },
+  callBtn: {
+    backgroundColor: '#ff9f0a',
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: 5,
+  },
+  callBtnText: {
+    color: '#1a1200',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  callConfirmBox: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(3),
+    marginVertical: spacing(2),
+    gap: spacing(0.5),
+  },
+  callConfirmLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: spacing(1),
+  },
+  callConfirmValue: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',

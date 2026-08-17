@@ -15,7 +15,6 @@ import {
 import { secureApi } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
 import { Button, Input } from '../../components/UI';
-
 export type LudoModalAction = 'update' | 'rtp' | null;
 
 type Props = {

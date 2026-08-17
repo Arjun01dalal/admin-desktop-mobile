@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -55,8 +55,6 @@ type SummaryData = {
   creditAmount?: number;
   debitAmount?: number;
 };
-
-const MAIN_KEYS = new Set(['idx', 'name', 'totalFinalAmount', 'totalTransactionAmount']);
 
 const REQUEST_TYPES: { key: RequestType; label: string }[] = [
   { key: 'automaticDeposit', label: 'Automatic Deposit' },
@@ -385,48 +383,6 @@ export function FundsScreen() {
     [],
   );
 
-  const midColumns = useMemo<DataTableColumn<MidRow>[]>(
-    () => [
-      { key: 'idx', label: 'Sr No', width: 56, render: (_r, i) => String(i + 1) },
-      {
-        key: 'mid',
-        label: 'Mid',
-        width: 180,
-        color: () => (gatewayOnly ? colors.foreground : colors.primary),
-        render: (r) => display(r.mid),
-      },
-      {
-        key: 'finalAmount',
-        label: 'Final Amount',
-        width: 120,
-        align: 'right',
-        render: (r) => formatAmt(r.finalAmount),
-      },
-      {
-        key: 'transactionAmount',
-        label: 'Transaction Amount',
-        width: 150,
-        align: 'right',
-        render: (r) => formatAmt(r.transactionAmount),
-      },
-      {
-        key: 'coinAdd',
-        label: 'Scanner Add',
-        width: 120,
-        align: 'right',
-        render: (r) => formatAmt(r.coinAdd),
-      },
-      {
-        key: 'coinRemove',
-        label: 'Scanner Remove',
-        width: 130,
-        align: 'right',
-        render: (r) => formatAmt(r.coinRemove),
-      },
-    ],
-    [gatewayOnly],
-  );
-
   const autoColumns = useMemo<DataTableColumn<TxnRow>[]>(
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
@@ -610,10 +566,6 @@ export function FundsScreen() {
   const payinRows =
     requestType === 'scanner add' ? coins : requestType === 'scanner remove' ? debitCoins : transactions;
   const payinColumns = requestType === 'automaticDeposit' ? autoColumns : scannerColumns;
-  const payinMainKeys =
-    requestType === 'automaticDeposit'
-      ? ['idx', 'amount', 'userName', 'createdOn']
-      : ['idx', 'balance', 'reason', 'createdOn'];
 
   // ---------- MID list view ----------
   if (view === 'mids') {
@@ -652,18 +604,47 @@ export function FundsScreen() {
           {startDate} → {endDate} · {drillMids.length} MIDs
           {gatewayOnly ? ' · Gateway-only access — MID details are locked' : ''}
         </Text>
-        <DataTable
-          columns={midColumns}
-          rows={drillMids}
-          keyFor={(r, i) => `${r.mid}-${i}`}
-          emptyMessage="No MIDs"
-          onRowPress={(row) => {
-            if (gatewayOnly) return;
-            const midId = String(row.mid || '').trim();
-            if (midId) openPayin(midId);
-          }}
-          hint={gatewayOnly ? undefined : 'Tap a MID to see its transactions'}
-        />
+        {drillMids.length === 0 ? <Text style={styles.hint}>No MIDs</Text> : null}
+        <View style={styles.list}>
+          {drillMids.map((row, index) => (
+            <TouchableOpacity
+              key={`${row.mid}-${index}`}
+              style={[styles.card, gatewayOnly && styles.cardDisabled]}
+              activeOpacity={gatewayOnly ? 1 : 0.75}
+              disabled={gatewayOnly}
+              onPress={() => {
+                const midId = String(row.mid || '').trim();
+                if (midId) openPayin(midId);
+              }}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.mid)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>
+                  Final: {formatAmt(row.finalAmount)}
+                </Text>
+                <Text style={styles.cardSplitRight}>
+                  Txn: {formatAmt(row.transactionAmount)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>
+                  Scan+: {formatAmt(row.coinAdd)}
+                </Text>
+                <Text style={styles.cardSplitRight}>
+                  Scan−: {formatAmt(row.coinRemove)}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>
+                {gatewayOnly ? 'MID details locked' : 'Tap card for transactions'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
     );
   }
@@ -752,15 +733,74 @@ export function FundsScreen() {
           </View>
         ) : null}
 
-        <DataTable
-          columns={payinColumns.filter((c) => payinMainKeys.includes(c.key))}
-          rows={payinRows}
-          keyFor={(r, i) => String(r._id || r.orderId || i)}
-          loading={payinLoading}
-          emptyMessage="No transactions"
-          onRowPress={(row) => setTxnSheet(row)}
-          hint="Tap a row to see all details"
-        />
+        {payinLoading && payinRows.length === 0 ? (
+          <Text style={styles.hint}>Loading…</Text>
+        ) : null}
+        {!payinLoading && payinRows.length === 0 ? (
+          <Text style={styles.hint}>No transactions</Text>
+        ) : null}
+
+        <View style={styles.list}>
+          {payinRows.map((row, index) => {
+            const isAuto = requestType === 'automaticDeposit';
+            const title = isAuto ? display(row.userName) : display(row.userId);
+            return (
+              <TouchableOpacity
+                key={`row-${index}-${String(row._id || row.orderId || '')}`}
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => setTxnSheet(row)}
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardIndex}>#{index + 1}</Text>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {title}
+                  </Text>
+                </View>
+                {isAuto ? (
+                  <>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft}>
+                        Amount: {display(row.amount)}
+                      </Text>
+                      <Text style={styles.cardSplitRight} numberOfLines={1}>
+                        {canShowMobile
+                          ? display(row.userMobile)
+                          : row.userMobile
+                            ? '**********'
+                            : '—'}
+                      </Text>
+                    </View>
+                    <View style={styles.cardRow}>
+                      <Text style={styles.cardLabel}>Created</Text>
+                      <Text style={styles.cardValue} numberOfLines={1}>
+                        {dt(row.createdOn ?? row.createdAt)}
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.cardSplitRow}>
+                      <Text style={styles.cardSplitLeft}>
+                        Balance: {display(row.balance)}
+                      </Text>
+                      <Text style={styles.cardSplitRight} numberOfLines={1}>
+                        {display(row.reason)}
+                      </Text>
+                    </View>
+                    <View style={styles.cardRow}>
+                      <Text style={styles.cardLabel}>Created</Text>
+                      <Text style={styles.cardValue} numberOfLines={1}>
+                        {dt(row.createdOn ?? row.createdAt)}
+                      </Text>
+                    </View>
+                  </>
+                )}
+                <Text style={styles.cardHint}>Tap card for full details</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         <RowDetailSheet
           visible={txnSheet !== null}
@@ -781,8 +821,6 @@ export function FundsScreen() {
                       value: c.render(txnSheet, 0),
                       multiline: c.key === 'remark' || c.key === 'orderId',
                     })),
-                  // UTR is not a table column for every request type, but always
-                  // show it in the detail sheet when the row carries one.
                   ...(payinColumns.some((c) => c.key === 'utr')
                     ? []
                     : [{ label: 'UTR', value: display(txnSheet.utr), multiline: true }]),
@@ -856,15 +894,42 @@ export function FundsScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => `${r.name}-${i}`}
-        loading={loading}
-        emptyMessage="No data"
-        onRowPress={(row) => openMids(row)}
-        hint="Tap a row to open its MID list"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data</Text> : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const label = row.name === 'coinRemove' ? 'Other Removal' : display(row.name);
+          return (
+            <TouchableOpacity
+              key={`${row.name}-${index}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => openMids(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {label}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>
+                  Total: {formatAmt(row.totalFinalAmount)}
+                </Text>
+                <Text style={styles.cardSplitRight}>
+                  Auto: {formatAmt(row.totalTransactionAmount)}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Points Remove</Text>
+                <Text style={styles.cardValue}>{formatAmt(row.totalCoinRemove)}</Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card to open MID list</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -951,6 +1016,78 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.primaryForeground },
   downloadChip: { borderColor: colors.primary },
   downloadChipText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardDisabled: { opacity: 0.55 },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '50%',
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '40%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,

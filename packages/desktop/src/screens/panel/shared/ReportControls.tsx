@@ -6,7 +6,7 @@ import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { cn } from '@/lib/utils';
 
 const fieldCls =
-  'h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground [color-scheme:dark] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  'h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 type LabelProps = {
   label: string;

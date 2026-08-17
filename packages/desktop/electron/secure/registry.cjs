@@ -821,6 +821,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'ops.bannersUpdateImage': {
+    method: 'POST',
+    path: '/bannerGames/update-image',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'ops.bannersUpdate': {
     method: 'POST',
     path: '/bannerGames/update',
@@ -1326,7 +1332,10 @@ module.exports = {
     method: 'POST',
     path: '/vking/vking-match-date-ggr',
     encryptRequest: false,
-    decryptResponse: false,
+    // Laxmi safeDecrypts response.data.data before reading payload.
+    decryptResponse: true,
+    // The vking gateway rejects the call without this fixed second-factor header.
+    headers: { xcheck: 'Bearer 7291d69f36328f9b9650f6a019fe4dbd0ec2bbecb508' },
   },
   'dashboard.plutus': {
     method: 'POST',
@@ -1343,6 +1352,12 @@ module.exports = {
   'dashboard.ludo': {
     method: 'POST',
     path: '/Ludo/admin/house-stats',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'dashboard.ludoUserGgrByRound': {
+    method: 'POST',
+    path: '/Ludo/admin/user-ggr-by-round',
     encryptRequest: true,
     decryptResponse: true,
   },
@@ -1700,6 +1715,24 @@ module.exports = {
   'topGames.updateStatus': {
     method: 'POST',
     path: '/change-percentage/top-games/update-status',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'topGames.addGameById': {
+    method: 'POST',
+    path: '/change-percentage/top-games/add-game-by-id',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'topGames.addGameDetails': {
+    method: 'POST',
+    path: '/change-percentage/top-games/add-game-details',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'topGames.addGameObject': {
+    method: 'POST',
+    path: '/change-percentage/top-games/add-game-object',
     encryptRequest: true,
     decryptResponse: true,
   },

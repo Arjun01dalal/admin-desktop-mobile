@@ -18,7 +18,7 @@ import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { type SearchFieldOption } from './DetailFilterBar';
 import { TextInput } from 'react-native';
@@ -71,7 +71,6 @@ function unwrap(raw: unknown): { rows: PLRow[]; count: number } {
 }
 
 /** Columns shown in the list; the bottom sheet shows all of them. */
-const MAIN_KEYS = new Set(['sr', 'name', 'deposite', 'winAmount']);
 
 export function ProfitLossScreen() {
   const isFocused = useIsFocused();
@@ -218,14 +217,34 @@ export function ProfitLossScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        emptyMessage={loading ? 'Loading…' : 'No records found'}
-        onRowPress={(row) => setSelected({ row, index: rows.indexOf(row) })}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No records found</Text> : null}
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity
+            key={`row-${index}-${String(row._id ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSelected({ row, index })}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{index + 1 + rowOffset}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {String(row.name || '—')}
+              </Text>
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft}>Deposit: {fmt(row.deposite)}</Text>
+              <Text style={styles.cardSplitRight}>Win: {fmt(row.totalProfit)}</Text>
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft}>Bet: {fmt(row.betAmount)}</Text>
+              <Text style={styles.cardSplitRight}>Refund: {fmt(row.withdrawl)}</Text>
+            </View>
+            <Text style={styles.cardHint}>Tap card for details</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* Pagination */}
       <View style={styles.pagerRow}>
@@ -329,6 +348,83 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    maxWidth: '40%',
+  },
+  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
+  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  editCityBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    backgroundColor: colors.surfaceAlt,
+  },
+  editCityText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   pagerRow: {
     flexDirection: 'row',
     alignItems: 'center',

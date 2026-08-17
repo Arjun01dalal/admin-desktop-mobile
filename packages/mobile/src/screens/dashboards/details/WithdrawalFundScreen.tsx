@@ -32,11 +32,11 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-  useWindowDimensions,
 } from 'react-native';
+import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -444,100 +444,25 @@ export function WithdrawalFundScreen() {
     setView('withdrawals');
   }, []);
 
-  // ---------- Fit main columns to phone width (PlayerRtpScreen pattern) ----------
-  const { width: screenWidth } = useWindowDimensions();
-  const availableWidth = Math.max(280, screenWidth - spacing(4) * 2 - spacing(2));
-  const IDX_W = 34;
-  const fit = (weight: number, totalWeight: number) =>
-    Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
-
-  // Type list columns.
-  const typeW = { name: fit(5, 8), total: fit(3, 8) };
-  const typeColumns = useMemo<DataTableColumn<TypeGroup>[]>(
-    () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
-      {
-        key: 'type',
-        label: 'Type',
-        width: typeW.name,
-        color: () => colors.primary,
-        render: (r) => String(r.type).toUpperCase(),
-      },
-      {
-        key: 'total',
-        label: 'Total Amount',
-        width: typeW.total,
-        align: 'right',
-        render: (r) => formatAmount(typeTotal(r)),
-      },
-      { key: 'count', label: 'Providers', width: 90, align: 'center', render: (r) => String(r.providers.length) },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availableWidth],
-  );
-
-  // Provider list columns.
-  const provW = { name: fit(5, 8), total: fit(3, 8) };
-  const providerColumns = useMemo<DataTableColumn<ProviderRow>[]>(
-    () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
-      {
-        key: 'name',
-        label: 'Provider',
-        width: provW.name,
-        color: () => colors.primary,
-        render: (r) => display(r.withdrewalProviderName),
-      },
-      {
-        key: 'total',
-        label: 'Total Amount',
-        width: provW.total,
-        align: 'right',
-        render: (r) => formatAmount(r.totalAmount),
-      },
-      { key: 'count', label: 'MIDs', width: 70, align: 'center', render: (r) => String(r.mids.length) },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availableWidth],
-  );
-
-  // MID list columns (fit main subset to width).
-  const midW = { mid: fit(4, 10), total: fit(3, 10), count: fit(3, 10) };
-  const midColumns = useMemo<DataTableColumn<MidRow>[]>(
-    () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
-      { key: 'mid', label: 'MID', width: midW.mid, color: () => colors.primary, render: (r) => display(r.mid) },
-      { key: 'total', label: 'Total Amount', width: midW.total, align: 'right', render: (r) => formatAmount(r.totalAmount) },
-      {
-        key: 'count',
-        label: 'Count',
-        width: midW.count,
-        align: 'center',
-        render: (r) => String(r.withdrawals?.length || r.count || 0),
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availableWidth],
-  );
-
-  // Withdrawal-doc columns (main subset fit to width; full set in the sheet).
-  const wdW = { name: fit(4.2, 10), amount: fit(2.6, 10), mobile: fit(3.2, 10) };
+  // ---------- Withdrawal-doc columns (used for detail sheet fields) ----------
   const wdColumns = useMemo<DataTableColumn<WithdrawalDoc>[]>(
     () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String(i + 1) },
+      { key: 'idx', label: '#', width: 34, render: (_r, i) => String(i + 1) },
       {
         key: 'accountHolderName',
         label: 'Account Holder',
-        width: wdW.name,
+        width: 140,
         render: (r) => display(r.accountHolderName || r.userName || r.name),
       },
-      { key: 'amount', label: 'Amount', width: wdW.amount, align: 'right', render: (r) => formatAmount(r.amount ?? 0) },
+      { key: 'amount', label: 'Amount', width: 100, align: 'right', render: (r) => formatAmount(r.amount ?? 0) },
       {
         key: 'mobile',
         label: 'Mobile',
-        width: wdW.mobile,
+        width: 120,
         render: (r) => (canShowMobile ? display(r.mobile ?? r.userMobile) : r.mobile || r.userMobile ? '**********' : '—'),
       },
+      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
+      { key: 'status', label: 'Status', width: 100, render: (r) => display(r.status) },
       { key: 'empCode', label: 'Emp Code', width: 90, render: (r) => display(r.empCode) },
       { key: 'accountNo', label: 'Account No', width: 130, render: (r) => display(r.accountNo || r.accountNumber) },
       { key: 'bankName', label: 'Bank Name', width: 130, render: (r) => display(r.bankName || r.userBankName) },
@@ -570,8 +495,6 @@ export function WithdrawalFundScreen() {
     ],
     [canShowMobile],
   );
-
-  const wdMainKeys = ['idx', 'accountHolderName', 'amount', 'mobile'];
 
   const rowActions = useMemo<SheetAction[]>(() => {
     if (!row) return [];
@@ -615,14 +538,31 @@ export function WithdrawalFundScreen() {
         <Text style={styles.sub}>
           {startDate} → {endDate} · {drillType.providers.length} providers
         </Text>
-        <DataTable
-          columns={providerColumns}
-          rows={drillType.providers}
-          keyFor={(r, i) => `${r.withdrewalProviderName}-${i}`}
-          emptyMessage="No providers"
-          onRowPress={(r) => openProvider(r)}
-          hint="Tap a provider to see its MIDs"
-        />
+        {drillType.providers.length === 0 ? (
+          <Text style={styles.hint}>No providers</Text>
+        ) : null}
+        <View style={styles.list}>
+          {drillType.providers.map((r, index) => (
+            <TouchableOpacity
+              key={`${r.withdrewalProviderName}-${index}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => openProvider(r)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(r.withdrewalProviderName)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>Amount: {formatAmount(r.totalAmount)}</Text>
+                <Text style={styles.cardSplitRight}>MIDs: {r.mids.length}</Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card to see MIDs</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
     );
   }
@@ -650,37 +590,54 @@ export function WithdrawalFundScreen() {
           {startDate} → {endDate} · {drillProvider.mids.length} MIDs
           {midLoading ? ' · loading sheet comparison…' : ''}
         </Text>
-        <DataTable
-          columns={midColumns}
-          rows={drillProvider.mids}
-          keyFor={(r, i) => `${r.mid}-${i}`}
-          loading={midLoading}
-          emptyMessage="No MIDs"
-          onRowPress={(m) => {
-            const payload = midCache[m.mid];
-            const s = payload?.summary;
-            setBucketBackView('mids');
-            openBucket({
-              title: `${m.mid} — Refunds`,
-              rows: m.withdrawals,
-              totalAmount: m.totalAmount,
-              count: m.withdrawals?.length || m.count || 0,
-            });
-            // stash summary so it renders on the withdrawals screen
-            setMidSummary(
-              s
-                ? {
-                    mid: String(m.mid),
-                    payload: payload as MidReportPayload,
-                    matched: Number(s.bothInSheetAndDbCount ?? 0),
-                    dbNotSheet: Number(s.dbButNotInSheetCount ?? 0),
-                    sheetNotDb: Number(s.sheetButNotInDbCount ?? 0),
-                  }
-                : null,
-            );
-          }}
-          hint="Tap a MID to see its withdrawals & sheet-comparison buckets"
-        />
+        {drillProvider.mids.length === 0 && !midLoading ? (
+          <Text style={styles.hint}>No MIDs</Text>
+        ) : null}
+        <View style={styles.list}>
+          {drillProvider.mids.map((m, index) => (
+            <TouchableOpacity
+              key={`${m.mid}-${index}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => {
+                const payload = midCache[m.mid];
+                const s = payload?.summary;
+                setBucketBackView('mids');
+                openBucket({
+                  title: `${m.mid} — Refunds`,
+                  rows: m.withdrawals,
+                  totalAmount: m.totalAmount,
+                  count: m.withdrawals?.length || m.count || 0,
+                });
+                setMidSummary(
+                  s
+                    ? {
+                        mid: String(m.mid),
+                        payload: payload as MidReportPayload,
+                        matched: Number(s.bothInSheetAndDbCount ?? 0),
+                        dbNotSheet: Number(s.dbButNotInSheetCount ?? 0),
+                        sheetNotDb: Number(s.sheetButNotInDbCount ?? 0),
+                      }
+                    : null,
+                );
+              }}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(m.mid)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>Amount: {formatAmount(m.totalAmount)}</Text>
+                <Text style={styles.cardSplitRight}>
+                  Count: {m.withdrawals?.length || m.count || 0}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for withdrawals</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
     );
   }
@@ -745,14 +702,56 @@ export function WithdrawalFundScreen() {
           </View>
         ) : null}
 
-        <DataTable
-          columns={wdColumns.filter((c) => wdMainKeys.includes(c.key))}
-          rows={bucket.rows}
-          keyFor={(r, i) => String(r._id || r.transactionId || r.orderId || i)}
-          emptyMessage="No withdrawals found"
-          onRowPress={(r) => setRow(r)}
-          hint="Tap a row to see all details"
-        />
+        {bucket.rows.length === 0 ? (
+          <Text style={styles.hint}>No withdrawals found</Text>
+        ) : null}
+
+        <View style={styles.list}>
+          {bucket.rows.map((r, index) => {
+            const holder = display(r.accountHolderName || r.userName || r.name);
+            const mobile = canShowMobile
+              ? display(r.mobile ?? r.userMobile)
+              : r.mobile || r.userMobile
+                ? '**********'
+                : '—';
+            return (
+              <TouchableOpacity
+                key={`row-${index}-${String(r._id || r.transactionId || r.orderId || '')}`}
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => setRow(r)}
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardIndex}>#{index + 1}</Text>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {holder}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Amount</Text>
+                  <Text style={styles.cardValue}>{formatAmount(r.amount ?? 0)}</Text>
+                </View>
+                <View style={styles.cardSplitRow}>
+                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                    App Code: {appCodeForName(r.clientName)}
+                  </Text>
+                  <Text style={styles.cardSplitRight} numberOfLines={1}>
+                    Status: {display(r.status)}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Mobile</Text>
+                  <Text style={styles.cardValue}>{mobile}</Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Date</Text>
+                  <Text style={styles.cardValue}>{dt(r.updatedOn ?? r.createdOn)}</Text>
+                </View>
+                <Text style={styles.cardHint}>Tap card for details & actions</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         <RowDetailSheet
           visible={row !== null && !commentOpen}
@@ -833,11 +832,12 @@ export function WithdrawalFundScreen() {
       {agentWise.length > 0 ? (
         <View style={styles.agentWrap}>
           <Text style={styles.rowLabel}>Agent-wise (tap to open list)</Text>
-          <View style={styles.chipsRow}>
-            {agentWise.map((agent) => (
+          <View style={styles.agentGrid}>
+            {agentWise.map((agent, ai) => (
               <TouchableOpacity
-                key={agent.name}
-                style={[styles.chip, styles.chipAgent]}
+                key={`agent-${ai}-${agent.name || ''}`}
+                style={styles.agentCard}
+                activeOpacity={0.75}
                 onPress={() => {
                   setBucketBackView('report');
                   setMidSummary(null);
@@ -850,8 +850,12 @@ export function WithdrawalFundScreen() {
                   });
                 }}
               >
-                <Text style={styles.chipAgentText}>
-                  {agent.name} — Count({agent.approvedCount}) | Amount({formatAmount(agent.totalApprovedAmount)})
+                <Text style={styles.agentName} numberOfLines={1}>
+                  {agent.name}
+                </Text>
+                <Text style={styles.agentCount}>Count: {agent.approvedCount}</Text>
+                <Text style={styles.agentAmount} numberOfLines={1}>
+                  {formatAmount(agent.totalApprovedAmount)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -859,18 +863,36 @@ export function WithdrawalFundScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={typeColumns}
-        rows={types}
-        keyFor={(r, i) => `${r.type}-${i}`}
-        loading={loading}
-        emptyMessage="No withdrawal fund data for this date range"
-        onRowPress={(t) => {
-          setBucketBackView('mids');
-          openType(t);
-        }}
-        hint="Tap a type to drill into providers → MIDs"
-      />
+      {loading && types.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && types.length === 0 ? (
+        <Text style={styles.hint}>No withdrawal fund data for this date range</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {types.map((t, index) => (
+          <TouchableOpacity
+            key={`${t.type}-${index}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => {
+              setBucketBackView('mids');
+              openType(t);
+            }}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {String(t.type).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft}>Amount: {formatAmount(typeTotal(t))}</Text>
+              <Text style={styles.cardSplitRight}>Providers: {t.providers.length}</Text>
+            </View>
+            <Text style={styles.cardHint}>Tap card for providers → MIDs</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </ScrollView>
   );
 
@@ -941,6 +963,38 @@ const styles = StyleSheet.create({
   backLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginBottom: spacing(2) },
   agentWrap: { marginTop: spacing(3), gap: spacing(2) },
   rowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  agentGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+  },
+  agentCard: {
+    flexBasis: '30%',
+    flexGrow: 1,
+    maxWidth: '32%',
+    backgroundColor: 'rgba(66,165,245,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(66,165,245,0.35)',
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(1.5),
+    gap: 2,
+  },
+  agentName: {
+    color: '#42a5f5',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  agentCount: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  agentAmount: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -957,8 +1011,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipAgent: { backgroundColor: 'rgba(66,165,245,0.15)', borderColor: 'rgba(66,165,245,0.4)' },
-  chipAgentText: { color: '#42a5f5', fontSize: 12, fontWeight: '600' },
   chipMatched: { backgroundColor: 'rgba(22,163,74,0.15)', borderColor: 'rgba(22,163,74,0.4)' },
   chipWarn: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.4)' },
   chipDanger: { backgroundColor: 'rgba(220,38,38,0.15)', borderColor: 'rgba(220,38,38,0.4)' },
@@ -980,4 +1032,74 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

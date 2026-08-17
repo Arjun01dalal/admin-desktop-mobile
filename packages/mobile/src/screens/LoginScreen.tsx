@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { secureApi } from '../api/client';
 import { resolveLocation, useAuth } from '../auth/AuthContext';
+import { AppBackground } from '../components/AppBackground';
 import { Button, Card, ErrorBanner, Input } from '../components/UI';
 import { colors, spacing } from '../theme';
 import type { AuthUser } from '../types/auth';
@@ -130,6 +131,7 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <SafeAreaView style={styles.root}>
+      <AppBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.center}
@@ -213,7 +215,7 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
+  root: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', padding: spacing(5) },
   card: { gap: spacing(3) },
   title: { color: colors.foreground, fontSize: 24, fontWeight: '700', textAlign: 'center' },

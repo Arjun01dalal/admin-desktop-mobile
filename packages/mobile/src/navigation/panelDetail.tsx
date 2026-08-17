@@ -14,10 +14,12 @@ import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersSc
 import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
 import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/PlayerActivityDetailsScreen';
 import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameActivityDetailsScreen';
-import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstructGamesScreen';
+import { BetConstructGamesListScreen } from '../screens/dashboards/details/BetConstructGamesListScreen';
+import { LudoUserGgrScreen } from '../screens/dashboards/details/LudoUserGgrScreen';
 import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
 import { UserReportScreen } from '../screens/UserReportScreen';
 import { CallerDepositListScreen } from '../screens/dashboards/details/CallerDepositListScreen';
+import { CallerDetailsScreen } from '../screens/dashboards/details/CallerDetailsScreen';
 import { ActiveUserDataScreen } from '../screens/dashboards/details/ActiveUserDataScreen';
 import { MidGroupsScreen } from '../screens/dashboards/details/MidGroupsScreen';
 
@@ -120,8 +122,13 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
   },
   {
     path: '/betConstructGamesList',
-    title: 'BetConstruct Games',
-    Component: BetConstructGamesScreen as PanelDetailRoute['Component'],
+    title: 'BetConstruct Details',
+    Component: BetConstructGamesListScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/ludo-user-ggr-by-round',
+    title: 'Ludo User GGR By Round',
+    Component: LudoUserGgrScreen as PanelDetailRoute['Component'],
   },
   {
     path: '/leaderboardCustomerCount',
@@ -137,6 +144,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/caller-responsibility/deposit-list',
     title: 'Caller Deposit List',
     Component: CallerDepositListScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/caller-responsibility/details',
+    title: 'Caller Details',
+    Component: CallerDetailsScreen as PanelDetailRoute['Component'],
   },
   {
     path: '/funds/mid-groups',

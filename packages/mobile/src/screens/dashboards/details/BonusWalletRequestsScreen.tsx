@@ -21,7 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import { pickPageSizes, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -49,7 +49,6 @@ type ActionStatus = 'approve' | 'reject' | 'remove';
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 const STATUS_OPTIONS = ['', 'pending', 'approve', 'reject', 'remove'] as const;
-const MAIN_KEYS = new Set(['idx', 'name', 'amount', 'status']);
 
 const SEARCH_FIELDS = [
   { key: 'name', label: 'Name' },
@@ -423,15 +422,72 @@ export function BonusWalletRequestsScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No bonus wallet requests found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row for details and actions"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No bonus wallet requests found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const statusColor =
+            row.status === 'approve'
+              ? '#16a34a'
+              : row.status === 'reject' || row.status === 'remove'
+                ? colors.destructive
+                : '#d97706';
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.name)}
+                </Text>
+                {row.userId ? (
+                  <TouchableOpacity
+                    style={styles.reportBtn}
+                    onPress={() => {
+                      navigation.navigate('/user-report', {
+                        userId: String(row.userId),
+                        userName: String(row.name || ''),
+                      });
+                    }}
+                  >
+                    <Text style={styles.reportBtnText}>User Report</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft}>Amount: {formatIN(row.amount)}</Text>
+                <Text style={[styles.cardSplitRight, { color: statusColor }]} numberOfLines={1}>
+                  Status: {display(row.status)}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Transaction ID</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>{display(row._id)}</Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Mobile</Text>
+                <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Date</Text>
+                <Text style={styles.cardValue}>
+                  {[formatDisplayDate(row.updatedOn), formatDisplayTime(row.updatedOn)]
+                    .filter(Boolean)
+                    .join(' ') || '—'}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for details & actions</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <View style={styles.pager}>
         <Text
@@ -497,6 +553,83 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  reportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+  },
+  reportBtnText: { color: colors.primaryForeground, fontSize: 10, fontWeight: '700' },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
@@ -64,7 +64,6 @@ type Filters = { name: string; mobile: string };
 
 const EMPTY_FILTERS: Filters = { name: '', mobile: '' };
 const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
-const MAIN_KEYS = new Set(['idx', 'name', 'mobile', 'balance']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -180,6 +179,18 @@ export function NewDepositsScreen() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
 
+  const openUserReport = useCallback(
+    (row: Row) => {
+      if (!row._id) return;
+      setSheetRow(null);
+      navigation.navigate('/user-report', {
+        userId: String(row._id),
+        userName: String(row.name || ''),
+      });
+    },
+    [navigation],
+  );
+
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
       {
@@ -193,13 +204,6 @@ export function NewDepositsScreen() {
         label: 'Name',
         width: 140,
         render: (r) => display(r.name),
-        onCellPress: (r) => {
-          if (!r._id) return;
-          navigation.navigate('/user-report', {
-            userId: String(r._id),
-            userName: String(r.name || ''),
-          });
-        },
       },
       {
         key: 'mobile',
@@ -305,7 +309,7 @@ export function NewDepositsScreen() {
         render: (r) => formatAmount(r.bonusWalletBalance ?? 0),
       },
     ],
-    [page, pageSize, canShowMobile, navigation],
+    [page, pageSize, canShowMobile],
   );
 
   return (
@@ -371,15 +375,62 @@ export function NewDepositsScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No new deposits found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No new deposits found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity
+            key={`row-${index}-${String(row._id ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSheetRow(row)}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {display(row.name)}
+              </Text>
+              {row._id ? (
+                <TouchableOpacity
+                  style={styles.reportBtn}
+                  onPress={() => openUserReport(row)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                >
+                  <Text style={styles.reportBtnText}>User Report</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Balance</Text>
+              <Text style={styles.cardValue}>{formatAmount(row.balance ?? 0)}</Text>
+            </View>
+            <View style={styles.cardSplitRow}>
+              <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                Mobile: {maskMobile(row.mobile, canShowMobile)}
+              </Text>
+              <Text style={styles.cardSplitRight} numberOfLines={1}>
+                State: {display(row.state)}
+              </Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>City</Text>
+              <Text style={styles.cardValue}>{display(row.city)}</Text>
+            </View>
+            <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Created</Text>
+              <Text style={styles.cardValue}>
+                {row.createdOn
+                  ? `${formatDisplayDate(row.createdOn)} ${formatDisplayTime(row.createdOn)}`
+                  : '—'}
+              </Text>
+            </View>
+            <Text style={styles.cardHint}>Tap card for full details</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -392,6 +443,17 @@ export function NewDepositsScreen() {
             : []
         }
         onClose={() => setSheetRow(null)}
+        actions={
+          sheetRow?._id
+            ? [
+                {
+                  label: 'User Report',
+                  tone: 'primary',
+                  onPress: () => openUserReport(sheetRow),
+                },
+              ]
+            : undefined
+        }
       />
 
       {/* Search modal */}
@@ -518,6 +580,88 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  reportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    flexShrink: 0,
+  },
+  reportBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   backdropTouch: { flex: 1 },
   modalSheet: {

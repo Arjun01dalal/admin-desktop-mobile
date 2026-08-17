@@ -91,9 +91,9 @@ export function RowDetailSheet({
             {footer}
             {actions && actions.length > 0 ? (
               <View style={styles.actionsRow}>
-                {actions.map((a) => (
+                {actions.map((a, ai) => (
                   <TouchableOpacity
-                    key={a.label}
+                    key={`action-${ai}-${a.label}`}
                     style={[
                       styles.actionBtn,
                       a.tone === 'primary' && styles.actionBtnPrimary,
@@ -120,9 +120,9 @@ export function RowDetailSheet({
               </View>
             ) : null}
             {note ? <Text style={styles.note}>{note}</Text> : null}
-            {fields.map((f) =>
+            {fields.map((f, fi) =>
               f.multiline ? (
-                <View key={f.label} style={styles.fieldBlock}>
+                <View key={`field-${fi}-${f.label}`} style={styles.fieldBlock}>
                   <Text style={styles.label}>{toDisplayText(f.label)}</Text>
                   <Text
                     style={[styles.blockValue, f.color ? { color: f.color } : null]}
@@ -132,7 +132,7 @@ export function RowDetailSheet({
                   </Text>
                 </View>
               ) : (
-              <View key={f.label} style={styles.fieldRow}>
+              <View key={`field-${fi}-${f.label}`} style={styles.fieldRow}>
                 <Text style={styles.label}>{toDisplayText(f.label)}</Text>
                 {f.badgeColor ? (
                   <View style={[styles.valueBadge, { backgroundColor: f.badgeColor }]}>

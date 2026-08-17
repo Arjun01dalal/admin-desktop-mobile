@@ -50,13 +50,6 @@ export function RiskAnalysisScreen() {
     () => setApplied({ startDate, endDate, appClientName }),
     [startDate, endDate, appClientName],
   );
-  const clearAll = useCallback(() => {
-    const d = todayIST();
-    setStartDate(d);
-    setEndDate(d);
-    setAppClientName('');
-    setApplied({ startDate: d, endDate: d, appClientName: '' });
-  }, []);
 
   const { bundle, loading, error, reload } = useRiskDashboardData(applied);
 
@@ -193,7 +186,6 @@ export function RiskAnalysisScreen() {
         onAppChange={setAppClientName}
         onFilterByChange={setFilterBy}
         onApply={apply}
-        onAllData={clearAll}
         onRefresh={() => void reload()}
       />
 

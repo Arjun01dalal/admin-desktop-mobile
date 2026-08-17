@@ -1,6 +1,7 @@
 /**
  * Provider-wise active players — port of laxminarayan ActiveUserData /
  * desktop ActiveUserDataPage.
+ * Phone UI: compact cards (not a horizontal table).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -15,14 +16,11 @@ import {
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-import {
-  providerWiseActive,
-  toNum,
-} from '../../../dashboards/mergeMetrics';
+import { providerWiseActive, toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type UserRow = {
   _id?: string;
@@ -34,6 +32,11 @@ type UserRow = {
   kyc?: boolean;
   [key: string]: unknown;
 };
+
+function display(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value);
+}
 
 export function ActiveUserDataScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
@@ -51,6 +54,7 @@ export function ActiveUserDataScreen() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<UserRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [selected, setSelected] = useState<UserRow | null>(null);
 
   const load = useCallback(async () => {
     if (!customerKey) {
@@ -107,48 +111,17 @@ export function ActiveUserDataScreen() {
     void load();
   }, [load]);
 
-  const columns = useMemo<DataTableColumn<UserRow>[]>(
-    () => [
-      {
-        key: 'name',
-        label: 'Name',
-        width: 140,
-        render: (r) => String(r.name || '—'),
-      },
-      {
-        key: 'mobile',
-        label: 'Mobile',
-        width: 120,
-        render: (r) => String(r.mobile || '—'),
-      },
-      {
-        key: 'state',
-        label: 'State',
-        width: 110,
-        render: (r) => String(r.state || '—'),
-      },
-      {
-        key: 'city',
-        label: 'City',
-        width: 110,
-        render: (r) => String(r.city || '—'),
-      },
-      {
-        key: 'balance',
-        label: 'Balance',
-        width: 100,
-        align: 'right',
-        render: (r) => toNum(r.balance).toFixed(2),
-      },
-      {
-        key: 'kyc',
-        label: 'KYC',
-        width: 70,
-        render: (r) => (r.kyc ? 'Yes' : 'No'),
-      },
-    ],
-    [],
-  );
+  const sheetFields = useMemo<SheetField[]>(() => {
+    if (!selected) return [];
+    return [
+      { label: 'Name', value: display(selected.name) },
+      { label: 'Mobile', value: display(selected.mobile) },
+      { label: 'State', value: display(selected.state) },
+      { label: 'City', value: display(selected.city) },
+      { label: 'Balance', value: toNum(selected.balance).toFixed(2) },
+      { label: 'KYC', value: selected.kyc ? 'Yes' : 'No' },
+    ];
+  }, [selected]);
 
   return (
     <ScrollView
@@ -198,14 +171,66 @@ export function ActiveUserDataScreen() {
         <View style={styles.loadingBox}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          keyFor={(r, i) => String(r._id || i)}
-          emptyMessage="No Data Found"
-        />
-      )}
+      ) : null}
+
+      {!loading && rows.length === 0 && customerKey ? (
+        <Text style={styles.emptyTextCenter}>No Data Found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => (
+          <TouchableOpacity
+            key={`row-${index}-${String(row._id ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSelected(row)}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIndex}>#{(page - 1) * 50 + index + 1}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {display(row.name)}
+              </Text>
+              <Text style={[styles.kycPill, row.kyc ? styles.kycYes : styles.kycNo]}>
+                {row.kyc ? 'KYC' : 'No KYC'}
+              </Text>
+            </View>
+            <View style={styles.cardGrid}>
+              <View style={styles.cardCell}>
+                <Text style={styles.cardLabel}>Mobile</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row.mobile)}
+                </Text>
+              </View>
+              <View style={styles.cardCell}>
+                <Text style={styles.cardLabel}>Balance</Text>
+                <Text style={[styles.cardValue, styles.cardAmount]} numberOfLines={1}>
+                  ₹{toNum(row.balance).toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={styles.cardCell}>
+                <Text style={styles.cardLabel}>State</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row.state)}
+                </Text>
+              </View>
+              <View style={styles.cardCell}>
+                <Text style={styles.cardLabel}>City</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row.city)}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.cardHint}>Tap for all details</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={String(selected?.name || 'User Details')}
+        fields={sheetFields}
+        onClose={() => setSelected(null)}
+      />
 
       {totalPages > 1 ? (
         <View style={styles.pager}>
@@ -222,10 +247,7 @@ export function ActiveUserDataScreen() {
           <TouchableOpacity
             disabled={page >= totalPages || loading}
             onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-            style={[
-              styles.pageBtn,
-              page >= totalPages && styles.pageBtnDisabled,
-            ]}
+            style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
           >
             <Text style={styles.pageBtnText}>Next</Text>
           </TouchableOpacity>
@@ -264,6 +286,44 @@ const styles = StyleSheet.create({
     marginBottom: spacing(3),
   },
   emptyText: { color: colors.muted, fontSize: 13 },
+  emptyTextCenter: {
+    color: colors.muted,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: spacing(4),
+  },
+  list: { marginTop: spacing(2), gap: spacing(2) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginBottom: spacing(2),
+  },
+  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
+  cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1 },
+  kycPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  kycYes: { color: colors.success, backgroundColor: 'rgba(34,197,94,0.12)' },
+  kycNo: { color: colors.muted, backgroundColor: colors.surfaceAlt },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
+  cardCell: { width: '47%', flexGrow: 1, minWidth: '45%' },
+  cardLabel: { color: colors.muted, fontSize: 10, fontWeight: '600', marginBottom: 2 },
+  cardValue: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
+  cardAmount: { color: colors.primary, fontWeight: '700' },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(2) },
   pager: {
     flexDirection: 'row',
     alignItems: 'center',

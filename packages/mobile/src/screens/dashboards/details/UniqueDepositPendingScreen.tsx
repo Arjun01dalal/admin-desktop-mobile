@@ -25,14 +25,12 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { pickPageSizes, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -62,11 +60,19 @@ type UniquePendingRow = {
 };
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
-const MAIN_KEYS = new Set(['idx', 'userName', 'amount', 'status']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
+}
+
+function maskMobile(value: unknown, canShow: boolean): string {
+  if (value === null || value === undefined || value === '') return '—';
+  return canShow ? String(value) : '**********';
+}
+
+function rowMobile(row: UniquePendingRow): string {
+  return String(row.userMobile || row.mobile || '').trim();
 }
 
 function formatIN(value: unknown): string {
@@ -128,6 +134,7 @@ export function UniqueDepositPendingScreen() {
   const canChangeStatus = hasPermission('change_status');
   const canDownload = hasPermission('show_download_botton');
   const canWhatsApp = hasPermission('whatsapp_icon');
+  const canShowMobile = hasPermission('show_mobile');
 
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
@@ -430,57 +437,51 @@ export function UniqueDepositPendingScreen() {
     }
   }, [admin, downloadOtp, downloadCsv]);
 
-  // Fit main columns to phone width.
-  const { width: screenWidth } = useWindowDimensions();
-  const availableWidth = Math.max(280, screenWidth - spacing(4) * 2 - spacing(2));
-  const IDX_W = 34;
-  const fit = (weight: number, totalWeight: number) =>
-    Math.floor(((availableWidth - IDX_W) * weight) / totalWeight);
-  const w = { userName: fit(3.5, 8), amount: fit(2.2, 8), status: fit(2.3, 8) };
-
-  const columns = useMemo<DataTableColumn<UniquePendingRow>[]>(
-    () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
-      {
-        key: 'userName',
-        label: 'User Name',
-        width: w.userName,
-        render: (r) => display(r.userName),
-        onCellPress: (r) => {
-          if (!r.userId) return;
-          navigation.navigate('/user-report', {
-            userId: String(r.userId),
-            userName: String(r.userName || ''),
-          });
-        },
-      },
-      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
-      { key: 'userId', label: 'DP ID', width: 180, render: (r) => display(r.userId) },
-      { key: 'amount', label: 'Amount', width: w.amount, align: 'right', render: (r) => formatIN(r.amount) },
-      { key: 'state', label: 'State', width: 130, render: (r) => display(r.userState || r.state) },
-      { key: 'city', label: 'City', width: 120, render: (r) => display(r.userCity || r.city) },
-      { key: 'orderId', label: 'Transaction Id', width: 200, render: (r) => display(r.orderId || r.transactionId) },
-      { key: 'paymentMethod', label: 'Payment Method', width: 180, render: (r) => paymentMethod(r.paymentGatewayName, r.mid) },
-      { key: 'date', label: 'Date', width: 110, render: (r) => formatDisplayDate(r.createdOn) || '—' },
-      { key: 'time', label: 'Time', width: 100, render: (r) => formatDisplayTime(r.createdOn) || '—' },
-      { key: 'status', label: 'Status', width: w.status, render: (r) => display(r.status), badge: (r) => statusBadge(r.status) },
-      { key: 'comment', label: 'Comment', width: 200, render: (r) => display(r.uniquePendingReason?.reason) },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, pageSize, availableWidth, navigation],
+  const openUserReport = useCallback(
+    (row: UniquePendingRow) => {
+      if (!row.userId) return;
+      setSheetRow(null);
+      navigation.navigate('/user-report', {
+        userId: String(row.userId),
+        userName: String(row.userName || ''),
+      });
+    },
+    [navigation],
   );
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!sheetRow) return [];
-    return columns
-      .filter((c) => c.key !== 'idx')
-      .map<SheetField>((c) => ({
-        label: c.label,
-        value: c.render(sheetRow, 0),
-        multiline: c.key === 'orderId' || c.key === 'comment',
-        badgeColor: c.key === 'status' ? statusBadge(sheetRow.status) : undefined,
-      }));
-  }, [sheetRow, columns]);
+    return [
+      { label: 'User Name', value: display(sheetRow.userName) },
+      { label: 'Mobile No', value: maskMobile(rowMobile(sheetRow), canShowMobile) },
+      { label: 'App Code', value: appCodeForName(sheetRow.clientName) },
+      { label: 'DP ID', value: display(sheetRow.userId) },
+      { label: 'Amount', value: formatIN(sheetRow.amount) },
+      { label: 'State', value: display(sheetRow.userState || sheetRow.state) },
+      { label: 'City', value: display(sheetRow.userCity || sheetRow.city) },
+      {
+        label: 'Transaction Id',
+        value: display(sheetRow.orderId || sheetRow.transactionId),
+        multiline: true,
+      },
+      {
+        label: 'Payment Method',
+        value: paymentMethod(sheetRow.paymentGatewayName, sheetRow.mid),
+      },
+      { label: 'Date', value: formatDisplayDate(sheetRow.createdOn) || '—' },
+      { label: 'Time', value: formatDisplayTime(sheetRow.createdOn) || '—' },
+      {
+        label: 'Status',
+        value: display(sheetRow.status),
+        badgeColor: statusBadge(sheetRow.status),
+      },
+      {
+        label: 'Comment',
+        value: display(sheetRow.uniquePendingReason?.reason),
+        multiline: true,
+      },
+    ];
+  }, [sheetRow, canShowMobile]);
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
@@ -489,15 +490,7 @@ export function UniqueDepositPendingScreen() {
       acts.push({
         label: 'User Report',
         tone: 'primary',
-        onPress: () => {
-          const id = sheetRow.userId;
-          const name = sheetRow.userName;
-          setSheetRow(null);
-          navigation.navigate('/user-report', {
-            userId: String(id),
-            userName: String(name || ''),
-          });
-        },
+        onPress: () => openUserReport(sheetRow),
       });
     }
     const isPending = String(sheetRow.status || '').toLowerCase() === 'pending';
@@ -524,7 +517,17 @@ export function UniqueDepositPendingScreen() {
       acts.push({ label: 'Change Status', tone: 'warning', onPress: () => openInput('status', sheetRow) });
     }
     return acts;
-  }, [sheetRow, canWhatsApp, canChangeStatus, busy, openInput, openWhatsApp, openDialer, initiateBotCall, navigation]);
+  }, [
+    sheetRow,
+    canWhatsApp,
+    canChangeStatus,
+    busy,
+    openInput,
+    openWhatsApp,
+    openDialer,
+    initiateBotCall,
+    openUserReport,
+  ]);
 
   return (
     <ScrollView
@@ -603,15 +606,77 @@ export function UniqueDepositPendingScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || r.orderId || i)}
-        loading={loading}
-        emptyMessage="No unique pending deposits found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row for details and actions"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No unique pending deposits found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const badge = statusBadge(row.status);
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id || row.orderId || '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.userName)}
+                </Text>
+                {row.userId ? (
+                  <TouchableOpacity
+                    style={styles.reportBtn}
+                    onPress={() => openUserReport(row)}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  >
+                    <Text style={styles.reportBtnText}>User Report</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Mobile</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {maskMobile(rowMobile(row), canShowMobile)}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Amount</Text>
+                <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  App Code: {appCodeForName(row.clientName)}
+                </Text>
+                <Text
+                  style={[styles.cardSplitRight, badge ? { color: badge } : null]}
+                  numberOfLines={1}
+                >
+                  Status: {display(row.status)}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>DP ID</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row.userId)}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Date</Text>
+                <Text style={styles.cardValue}>
+                  {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
+                    .filter(Boolean)
+                    .join(' ') || '—'}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for details & actions</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <View style={styles.pager}>
         <Text
@@ -779,6 +844,82 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  reportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    flexShrink: 0,
+  },
+  reportBtnText: {
+    color: colors.primaryForeground,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
+  cardValue: { color: colors.foreground, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'right' },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     justifyContent: 'space-between',

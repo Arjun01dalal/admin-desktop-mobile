@@ -7,6 +7,42 @@ export type CampaignItem = {
 
 export const CAMPAIGN_LIST: CampaignItem[] = [
   {
+    id: "MHNON",
+    name: "Retention NORTH",
+    serverId: "49.206.26.7",
+    location: "Nagpur",
+  },
+  {
+    id: "OSSOUTH",
+    name: "KARNATAKA NON USER",
+    serverId: "49.206.26.7",
+    location: "Nagpur",
+  },
+  {
+    id: "TSAP",
+    name: "LAXMINARAYAN TELGU NON",
+    serverId: "49.206.26.7",
+    location: "Nagpur",
+  },
+  {
+    id: "KAR",
+    name: "KARNATAKA_ZONE",
+    serverId: "3.200",
+    location: "Dubai",
+  },
+   {
+    id: "NORTH01",
+    name: "NORTH_ZONE",
+    serverId: "3.200",
+    location: "Dubai",
+  },
+   {
+    id: "APTG",
+    name: "AP_TELANGANA_ZONE",
+    serverId: "3.200",
+    location: "Dubai",
+  },
+  {
     id: "A_1007",
     name: "Ankita",
     serverId: "49.206.26.7",
@@ -189,12 +225,6 @@ export const CAMPAIGN_LIST: CampaignItem[] = [
   {
     id: "Y_1040",
     name: "GEO YASH",
-    serverId: "49.206.26.7",
-    location: "Ajman",
-  },
-  {
-    id: "V_1060 ",
-    name: "Vidya DXB",
     serverId: "49.206.26.7",
     location: "Ajman",
   },

@@ -45,7 +45,7 @@ type Props = {
   onAppChange: (v: string) => void;
   onFilterByChange: (v: ProviderFilter) => void;
   onApply: () => void;
-  onAllData: () => void;
+  onAllData?: () => void;
   onRefresh?: () => void;
 };
 
@@ -132,9 +132,9 @@ export function FilterBar(props: Props) {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         <Chip label="All Apps" active={!appClientName} onPress={() => onAppChange('')} />
-        {appOptions.map((name) => (
+        {appOptions.map((name, i) => (
           <Chip
-            key={name}
+            key={`app-${i}-${name}`}
             label={appCodeForName(name)}
             active={appClientName === name}
             onPress={() => onAppChange(name)}
@@ -163,9 +163,11 @@ export function FilterBar(props: Props) {
         >
           <Text style={styles.applyText}>Apply</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.outlineBtn} onPress={onAllData} disabled={loading}>
-          <Text style={styles.outlineText}>All Data</Text>
-        </TouchableOpacity>
+        {onAllData ? (
+          <TouchableOpacity style={styles.outlineBtn} onPress={onAllData} disabled={loading}>
+            <Text style={styles.outlineText}>All Data</Text>
+          </TouchableOpacity>
+        ) : null}
         {onRefresh && (
           <TouchableOpacity style={styles.outlineBtn} onPress={onRefresh} disabled={loading}>
             <Text style={styles.outlineText}>Refresh</Text>

@@ -23,6 +23,8 @@ export type ProviderFilter =
 export type MetricRow = {
   label: string;
   value: number | string;
+  /** Optional metric-specific drilldown (for example Ludo GGR details). */
+  onPress?: () => void;
 };
 
 export type SelectOption = { value: string; label: string };
@@ -53,6 +55,8 @@ export type ProviderCardModel = {
   selectValue?: string;
   selectOptions?: SelectOption[];
   onSelectChange?: (value: string) => void;
+  /** Laxmi Ludo dropdown: open user GGR report for the tapped game row. */
+  onSelectGgrPress?: (gameId: string, ggr: number) => void;
   /**
    * When set (Lagna / Ludo card), select menu renders Game|Players|Bet|Win|RTP|GGR
    * table like laxminarayan Dashboard.

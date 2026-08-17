@@ -36,10 +36,15 @@ export function canEditDeposit(row: DepositRow, hasPencil: boolean): boolean {
   return isChecked;
 }
 
-/** Show check / cross-check only when amount ≥ 10000 (lax Deposit). */
+/** Show check / cross-check — Laxmi Deposit.tsx:
+ *  (Deposit_Pensil && amount ≥ 10000) || (!within3Days && status !== Approved)
+ *  So low-amount rows still get check options when older than 3 days and not Approved.
+ */
 export function canShowCheckAction(row: DepositRow, hasPencil: boolean): boolean {
-  if (!hasPencil) return false;
-  return Number(row.amount ?? 0) >= 10000;
+  const amount = Number(row.amount ?? 0);
+  if (hasPencil && amount >= 10000) return true;
+  const status = String(row.status || '');
+  return !isWithin3Days(row.createdOn) && status !== 'Approved';
 }
 
 export function defaultSettleReason(row: DepositRow): string {
@@ -68,13 +73,21 @@ export function isUpiGateway(gateway?: string): boolean {
   return UPI_GATEWAYS.has(String(gateway || ''));
 }
 
-export function depositRowBg(status?: string): string | undefined {
+export function depositRowBg(
+  status?: string,
+  mode: 'light' | 'dark' = 'dark',
+): string | undefined {
   const s = String(status || '').toLowerCase();
-  // Dark CommonTable-friendly tints (same idea as UPI Payments)
-  if (s === 'approved' || s === 'approved-clr' || s === 'success') return '#1b3d2f';
-  if (s === 'rejected' || s === 'failed' || s === 'cancel') return '#3d1b1b';
+  const light = mode === 'light';
+  // Light mode needs pale tints — the dark greens/reds turn rows unreadable.
+  if (s === 'approved' || s === 'approved-clr' || s === 'success') {
+    return light ? '#e3f6ea' : '#14352a';
+  }
+  if (s === 'rejected' || s === 'failed' || s === 'cancel') {
+    return light ? '#fde8e8' : '#3d1b1b';
+  }
   if (s === 'pending' || s === 'processing') return undefined;
-  return '#1a2f45';
+  return light ? '#e8f0fb' : '#1a2f45';
 }
 
 export type ScannerRow = {

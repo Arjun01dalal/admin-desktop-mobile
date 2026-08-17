@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { orangeBtnSx } from '@/screens/panel/transactions/shared';
+import { fieldSx, orangeBtnSx } from '@/screens/panel/transactions/shared';
 
 type Props = {
   open: boolean;
@@ -157,7 +157,7 @@ export function BeneListDialog({ open, initialBanks, onClose, onSuccess }: Props
             onKeyDown={(e) => {
               if (e.key === 'Enter') addBank();
             }}
-            sx={{ '& .MuiInputBase-root': { bgcolor: '#121218' } }}
+            sx={fieldSx}
           />
           <Button variant="contained" onClick={addBank} sx={orangeBtnSx}>
             Add
@@ -173,13 +173,14 @@ export function BeneListDialog({ open, initialBanks, onClose, onSuccess }: Props
               minHeight: 120,
               maxHeight: 280,
               overflow: 'auto',
-              border: '1px solid #333',
+              border: '1px solid',
+              borderColor: 'divider',
               borderRadius: 1,
               p: 1.5,
               display: 'flex',
               flexWrap: 'wrap',
               gap: 1,
-              bgcolor: '#121218',
+              bgcolor: 'background.default',
             }}
           >
             {banks.length ? (

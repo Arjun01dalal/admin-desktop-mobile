@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../../theme';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -36,8 +36,6 @@ type Row = {
   approvedTotal?: number;
   [key: string]: unknown;
 };
-
-const MAIN_KEYS = new Set(['idx', 'accountHolderName', 'BankName', 'status']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -281,15 +279,51 @@ export function UtrProviderScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
-        loading={loading}
-        emptyMessage="No UTR providers found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
-      />
+      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No UTR providers found</Text>
+      ) : null}
+
+      <View style={styles.list}>
+        {rows.map((row, index) => {
+          const enabled = Boolean(row.status);
+          return (
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSheetRow(row)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIndex}>#{index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(row.accountHolderName)}
+                </Text>
+                <Text style={[styles.statusPill, enabled ? styles.statusOn : styles.statusOff]}>
+                  {enabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  Bank: {display(row.BankName)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  A/c: {display(row.accountNumber)}
+                </Text>
+              </View>
+              <View style={styles.cardSplitRow}>
+                <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                  Approved: {formatAmount(row.approvedTotal)}
+                </Text>
+                <Text style={styles.cardSplitRight} numberOfLines={1}>
+                  Pending: {formatAmount(row.pendingTotal)}
+                </Text>
+              </View>
+              <Text style={styles.cardHint}>Tap card for details & actions</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -321,7 +355,7 @@ export function UtrProviderScreen() {
       />
 
       {/* Add UTR account modal */}
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
+      <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
         <KeyboardAvoidingView
           style={styles.backdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -339,45 +373,52 @@ export function UtrProviderScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <TextInput
-              style={styles.modalInput}
-              value={form.bankName}
-              onChangeText={(v) => setForm((p) => ({ ...p, bankName: v }))}
-              placeholder="Bank Name"
-              placeholderTextColor={colors.muted}
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={form.accountNumber}
-              onChangeText={(v) => setForm((p) => ({ ...p, accountNumber: v }))}
-              placeholder="Bank Account Number"
-              placeholderTextColor={colors.muted}
-              keyboardType="number-pad"
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={form.accountHolderName}
-              onChangeText={(v) => setForm((p) => ({ ...p, accountHolderName: v }))}
-              placeholder="Account Holder Name"
-              placeholderTextColor={colors.muted}
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={form.ifsc}
-              onChangeText={(v) => setForm((p) => ({ ...p, ifsc: v.toUpperCase() }))}
-              placeholder="IFSC"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            {addMsg ? <Text style={styles.modalMsg}>{addMsg}</Text> : null}
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && styles.btnDisabled]}
-              disabled={saving}
-              onPress={() => void submitCreate()}
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Submit'}</Text>
-            </TouchableOpacity>
+              <TextInput
+                style={styles.modalInput}
+                value={form.bankName}
+                onChangeText={(v) => setForm((p) => ({ ...p, bankName: v }))}
+                placeholder="Bank Name"
+                placeholderTextColor={colors.muted}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={form.accountNumber}
+                onChangeText={(v) => setForm((p) => ({ ...p, accountNumber: v }))}
+                placeholder="Bank Account Number"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={form.accountHolderName}
+                onChangeText={(v) => setForm((p) => ({ ...p, accountHolderName: v }))}
+                placeholder="Account Holder Name"
+                placeholderTextColor={colors.muted}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={form.ifsc}
+                onChangeText={(v) => setForm((p) => ({ ...p, ifsc: v.toUpperCase() }))}
+                placeholder="IFSC"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              {addMsg ? <Text style={styles.modalMsg}>{addMsg}</Text> : null}
+              <TouchableOpacity
+                style={[styles.saveBtn, saving && styles.btnDisabled]}
+                disabled={saving}
+                onPress={() => void submitCreate()}
+              >
+                <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Submit'}</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -411,15 +452,92 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   errorText: { color: colors.destructive, fontSize: 13 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
+  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+  list: { gap: spacing(2), marginTop: spacing(3) },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  cardIndex: {
+    color: colors.primaryForeground,
+    backgroundColor: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+  },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
+  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: 1,
+  },
+  cardSplitLeft: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'left',
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    maxWidth: '48%',
+    textAlign: 'right',
+  },
+  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  backdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing(6),
+    paddingVertical: spacing(12),
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  backdropTouch: { ...StyleSheet.absoluteFillObject },
   modalSheet: {
     backgroundColor: colors.background,
-    borderTopLeftRadius: radius.md * 2,
-    borderTopRightRadius: radius.md * 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md * 2,
     padding: spacing(4),
     gap: spacing(2),
+    maxHeight: '100%',
   },
+  modalScroll: { flexGrow: 0 },
+  modalScrollContent: { gap: spacing(2), paddingBottom: spacing(1) },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1, marginRight: spacing(2) },
   modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },

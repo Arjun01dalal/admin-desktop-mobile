@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
   Alert,
   Box,
+  Button,
   CircularProgress,
   Collapse,
   Grid,
+  InputAdornment,
   Paper,
+  Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
@@ -31,10 +36,18 @@ type FancyMarket = {
   result?: unknown;
   data: Record<string, number>;
 };
+type MarketBook = {
+  marketName?: string;
+  betSize?: unknown;
+  result?: unknown;
+  data: Record<string, number>;
+};
 type MatchRow = {
   matchName: string;
   sportName: string;
   teams: Record<string, number>;
+  marketList?: MarketBook[];
+  marketName?: string;
   fancy: FancyMarket[];
   betSize?: unknown;
   oddsTeams?: OddsCell[];
@@ -111,7 +124,94 @@ function buildRunnerUI(input: unknown): Array<{
   });
 }
 
-function formatDataForUI(data: unknown): MatchRow[] {
+function normalizeMarketName(name: unknown): string {
+  return String(name || '').toLowerCase().trim();
+}
+
+function mergeLaxmiMarketBooks(
+  markets: Array<{
+    marketName?: string;
+    betSize?: unknown;
+    result?: unknown;
+    riskData?: Array<{ runner?: string; pl?: number }>;
+  }>,
+): MarketBook[] {
+  const riskToMap = (
+    riskData: Array<{ runner?: string; pl?: number }> | undefined,
+  ): Record<string, number> => {
+    const map: Record<string, number> = {};
+    (riskData || []).forEach((risk) => {
+      const key = risk?.runner;
+      if (key == null || key === '') return;
+      // The reference keeps each API market's latest runner PL as-is.
+      map[key] = Number(risk.pl || 0);
+    });
+    return map;
+  };
+
+  const addInto = (
+    target: Record<string, number>,
+    source: Record<string, number>,
+  ) => {
+    Object.entries(source).forEach(([runner, pl]) => {
+      const existingKey = Object.keys(target).find(
+        (key) => normalizeMarketName(key) === normalizeMarketName(runner),
+      );
+      if (existingKey) {
+        target[existingKey] = Number(target[existingKey] || 0) + Number(pl || 0);
+      } else {
+        target[runner] = Number(pl || 0);
+      }
+    });
+  };
+
+  const withoutToss = markets.filter(
+    (market) => normalizeMarketName(market.marketName) !== 'toss',
+  );
+  const finalBook = withoutToss.find(
+    (market) => normalizeMarketName(market.marketName) === 'final book',
+  );
+  const matchOdds = withoutToss.filter((market) => {
+    const name = normalizeMarketName(market.marketName);
+    return name === 'match odds' || name.endsWith('match odds');
+  });
+  const others = withoutToss.filter((market) => {
+    const name = normalizeMarketName(market.marketName);
+    return (
+      name !== 'final book' &&
+      name !== 'match odds' &&
+      !name.endsWith('match odds')
+    );
+  });
+
+  const marketList: MarketBook[] = [];
+  if (finalBook || matchOdds.length) {
+    const mergedData = riskToMap(finalBook?.riskData);
+    let mergedBetSize = Number(finalBook?.betSize || 0);
+    matchOdds.forEach((market) => {
+      addInto(mergedData, riskToMap(market.riskData));
+      mergedBetSize += Number(market.betSize || 0);
+    });
+    marketList.push({
+      marketName: finalBook?.marketName || 'Final Book',
+      betSize: mergedBetSize || finalBook?.betSize || matchOdds[0]?.betSize,
+      result: finalBook?.result ?? '',
+      data: mergedData,
+    });
+  }
+
+  others.forEach((market) => {
+    marketList.push({
+      marketName: market.marketName,
+      betSize: market.betSize,
+      result: market.result,
+      data: riskToMap(market.riskData),
+    });
+  });
+  return marketList;
+}
+
+function formatDataForUI(data: unknown, variant: LiveMatchVariant): MatchRow[] {
   if (!Array.isArray(data)) return [];
   return data.map((item) => {
     const row = item as {
@@ -126,7 +226,13 @@ function formatDataForUI(data: unknown): MatchRow[] {
     };
     const matchName = String(row?.game?.gameName || '');
     const sportRaw = String(row?.game?.sportName || '').trim();
-    const sportName = sportRaw.length > 0 ? sportRaw : 'Other';
+    // Master keeps the raw sport name; Laxmi/Both coerce blanks to "Other".
+    const sportName =
+      variant === 'master'
+        ? String(row?.game?.sportName || '')
+        : sportRaw.length > 0
+          ? sportRaw
+          : 'Other';
     const result: MatchRow = {
       matchName,
       sportName,
@@ -134,8 +240,21 @@ function formatDataForUI(data: unknown): MatchRow[] {
       fancy: [],
     };
 
+    if (variant === 'laxmi') {
+      const marketBooks = (row.markets || []).filter(
+        (market) => market.marketType === 'MARKET',
+      );
+      result.marketList = mergeLaxmiMarketBooks(marketBooks);
+      const preferred = result.marketList[0];
+      if (preferred) {
+        result.teams = { ...preferred.data };
+        result.betSize = preferred.betSize;
+        result.marketName = preferred.marketName;
+      }
+    }
+
     row?.markets?.forEach((market) => {
-      if (market.marketType === 'MARKET') {
+      if (variant !== 'laxmi' && market.marketType === 'MARKET') {
         market?.riskData?.forEach((r) => {
           const team = String(r.runner || '').toLowerCase();
           result.teams[team] = (result.teams[team] || 0) + Number(r.pl || 0);
@@ -150,11 +269,13 @@ function formatDataForUI(data: unknown): MatchRow[] {
         };
         market?.riskData?.forEach((r) => {
           const key = String(r.runner || '');
-          fancyObj.data[key] = (fancyObj.data[key] || 0) + Number(r.pl || 0);
+          if (!key) return;
+          if (variant === 'laxmi') fancyObj.data[key] = Number(r.pl || 0);
+          else fancyObj.data[key] = (fancyObj.data[key] || 0) + Number(r.pl || 0);
         });
         result.fancy.push(fancyObj);
       }
-      result.betSize = market?.betSize;
+      if (variant !== 'laxmi') result.betSize = market?.betSize;
     });
 
     return result;
@@ -243,11 +364,16 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
     startDate?: string;
     endDate?: string;
   };
-  const startDate = navState.startDate || todayIST();
-  const endDate = navState.endDate || todayIST();
+  const initialStart = navState.startDate || todayIST();
+  const initialEnd = navState.endDate || todayIST();
 
   const orderRef = useRef<string[]>([]);
   const firstLoad = useRef(true);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
+  const [draftStart, setDraftStart] = useState(initialStart);
+  const [draftEnd, setDraftEnd] = useState(initialEnd);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [groupedData, setGroupedData] = useState<Array<[string, MatchRow[]]>>(
@@ -257,6 +383,36 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [streamId, setStreamId] = useState('');
   const [streamOpen, setStreamOpen] = useState(false);
+
+  const applyDates = useCallback(() => {
+    if (!draftStart || !draftEnd) {
+      toast.error('Please select both dates');
+      return;
+    }
+    if (draftStart > draftEnd) {
+      toast.error('From date cannot be after To date');
+      return;
+    }
+    firstLoad.current = true;
+    orderRef.current = [];
+    setStartDate(draftStart);
+    setEndDate(draftEnd);
+  }, [draftEnd, draftStart]);
+
+  const filteredGroupedData = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return groupedData;
+    return groupedData
+      .map(([sport, matches]) => {
+        const filtered = matches.filter((match) =>
+          String(match.matchName || '')
+            .toLowerCase()
+            .includes(query),
+        );
+        return [sport, filtered] as [string, MatchRow[]];
+      })
+      .filter(([, matches]) => matches.length > 0);
+  }, [groupedData, searchQuery]);
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -293,11 +449,42 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         return;
       }
 
-      const finalBook = formatDataForUI(unpackBookList(bookRes.data));
-      const merged = mergeFinalData(finalBook, matches);
+      const finalBook = formatDataForUI(unpackBookList(bookRes.data), variant);
+
+      // Master filters book rows to odds gameList when odds are available.
+      let bookForMerge = finalBook;
+      let oddsForMerge = matches;
+      if (variant === 'master') {
+        const normalize = (value: string) => value.toLowerCase().trim();
+        const bookMatchSet = new Set(
+          finalBook.map((item) => normalize(item.matchName)),
+        );
+        const filteredMatches = matches.filter((match) =>
+          bookMatchSet.has(normalize(String(match.eventName || ''))),
+        );
+        bookForMerge =
+          matches.length === 0
+            ? finalBook
+            : finalBook.filter((book) =>
+                filteredMatches.some(
+                  (match) =>
+                    normalize(String(match.eventName || '')) ===
+                    normalize(book.matchName),
+                ),
+              );
+        oddsForMerge = matches.length === 0 ? [] : filteredMatches;
+      }
+
+      const merged = mergeFinalData(bookForMerge, oddsForMerge);
 
       if (firstLoad.current) {
         orderRef.current = merged.map((m) => m.matchName);
+      } else if (variant === 'master') {
+        merged.forEach((match) => {
+          if (!orderRef.current.includes(match.matchName)) {
+            orderRef.current.push(match.matchName);
+          }
+        });
       }
 
       const stableSorted = [...merged].sort(
@@ -305,6 +492,12 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
           orderRef.current.indexOf(a.matchName) -
           orderRef.current.indexOf(b.matchName),
       );
+
+      if (variant === 'master') {
+        orderRef.current = orderRef.current.filter((name) =>
+          stableSorted.some((match) => match.matchName === name),
+        );
+      }
 
       setError('');
       setGroupedData(sortSports(groupBySport(stableSorted)));
@@ -328,7 +521,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       } catch {
         /* ignore poll errors */
       }
-      await delay(1000);
+      await delay(variant === 'laxmi' ? 4000 : 1000);
       if (mounted) void loop();
     };
     void loop();
@@ -345,6 +538,57 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       <Typography variant="body2" color="text.secondary" mb={2}>
         {startDate} → {endDate}
       </Typography>
+
+      <Stack
+        direction="row"
+        spacing={1.5}
+        alignItems="center"
+        flexWrap="nowrap"
+        mb={2}
+        sx={{ overflowX: 'auto', pb: 0.5 }}
+      >
+        <TextField
+          label="From Date"
+          type="date"
+          size="small"
+          value={draftStart}
+          onChange={(e) => setDraftStart(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: 160, flexShrink: 0 }}
+        />
+        <TextField
+          label="To Date"
+          type="date"
+          size="small"
+          value={draftEnd}
+          onChange={(e) => setDraftEnd(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: 160, flexShrink: 0 }}
+        />
+        <Button
+          variant="contained"
+          color="warning"
+          onClick={applyDates}
+          disabled={loading && groupedData.length === 0}
+          sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+        >
+          Apply
+        </Button>
+        <TextField
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search match name"
+          sx={{ minWidth: 220, flex: 1 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Stack>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -366,9 +610,20 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         </Paper>
       )}
 
-      {groupedData.length > 0 && (
+      {!loading &&
+        groupedData.length > 0 &&
+        filteredGroupedData.length === 0 &&
+        searchQuery.trim() && (
+          <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
+            <Typography color="text.secondary">
+              No matches found for “{searchQuery.trim()}”.
+            </Typography>
+          </Paper>
+        )}
+
+      {filteredGroupedData.length > 0 && (
         <Grid container spacing={2}>
-          {groupedData.map(([sport, matches]) => (
+          {filteredGroupedData.map(([sport, matches]) => (
             <Grid item xs={12} key={sport}>
               <Accordion defaultExpanded>
                 <AccordionSummary
@@ -470,33 +725,61 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                             })()}
                           </Box>
 
-                          {Object.keys(match.teams || {}).length > 0 && (
-                            <Box mb={2}>
-                              <Typography fontWeight="bold" mb={1}>
-                                Market
+                          {(match.marketList?.length
+                            ? match.marketList
+                            : Object.keys(match.teams || {}).length
+                              ? [
+                                  {
+                                    marketName: match.marketName || 'Market',
+                                    betSize: match.betSize,
+                                    data: match.teams,
+                                  },
+                                ]
+                              : []
+                          ).map((market, marketIndex) => (
+                            <Box
+                              key={`${market.marketName || 'market'}-${marketIndex}`}
+                              mb={2}
+                              sx={{
+                                p: match.marketList?.length ? 1 : 0,
+                                bgcolor: match.marketList?.length
+                                  ? 'action.hover'
+                                  : 'transparent',
+                                borderRadius: 1,
+                              }}
+                            >
+                              <Typography fontWeight="bold" mb={1} fontSize={13}>
+                                {`${market.marketName || 'Market'}${
+                                  market.betSize != null
+                                    ? ` (${toDisplayText('Bet Size')}:- ${market.betSize})`
+                                    : ''
+                                }`}
                               </Typography>
-                              {Object.entries(match.teams).map(([team, value]) => (
-                                <Box
-                                  key={team}
-                                  sx={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    fontSize: 15,
-                                  }}
-                                >
-                                  <span>{team}</span>
-                                  <span
-                                    style={{
-                                      color: value < 0 ? '#d32f2f' : '#2e7d32',
-                                      fontWeight: 'bold',
+                              {Object.entries(market.data || {}).map(
+                                ([team, value]) => (
+                                  <Box
+                                    key={team}
+                                    sx={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      fontSize: 15,
                                     }}
                                   >
-                                    {Number(value).toFixed(2)}
-                                  </span>
-                                </Box>
-                              ))}
+                                    <span>{team}</span>
+                                    <span
+                                      style={{
+                                        color:
+                                          Number(value) < 0 ? '#d32f2f' : '#2e7d32',
+                                        fontWeight: 'bold',
+                                      }}
+                                    >
+                                      {Number(value).toFixed(2)}
+                                    </span>
+                                  </Box>
+                                ),
+                              )}
                             </Box>
-                          )}
+                          ))}
 
                           {(() => {
                             const fancyList = match.fancy || [];

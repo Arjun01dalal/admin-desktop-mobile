@@ -21,16 +21,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import * as ImagePicker from 'expo-image-picker';
+import { openPanelTarget } from '../../../navigation/panelDetail';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { SlipOcrWebView, extractUtrFromText } from './utrOcr';
 import { DateField } from '../../../components/DateField';
+
+type CheckPerson = { name?: string; city?: string; state?: string; date?: string };
 
 type DepositRow = {
   _id: string;
@@ -60,6 +64,8 @@ type DepositRow = {
   userUpiId?: string;
   updatedBy?: { name?: string } | string;
   oldMultipleNames?: string[];
+  checkBy?: CheckPerson;
+  crossCheckBy?: CheckPerson;
 };
 
 // --- Manual settle helpers (desktop deposit/logic.ts parity) ---
@@ -72,6 +78,44 @@ const SETTLE_REASONS = [
   'deposit-sapt-rishi',
   'deposit-manual',
 ];
+
+function isWithin3Days(date?: string): boolean {
+  if (!date) return false;
+  const requestDate = new Date(date);
+  if (Number.isNaN(requestDate.getTime())) return false;
+  const diffDays = (Date.now() - requestDate.getTime()) / (1000 * 60 * 60 * 24);
+  return diffDays <= 3;
+}
+
+/** Laxmi: (Deposit_Pensil && amount ≥ 10000) || (!within3Days && status !== Approved) */
+function canShowCheckAction(row: DepositRow, hasPencil: boolean): boolean {
+  const amount = Number(row.amount ?? 0);
+  if (hasPencil && amount >= 10000) return true;
+  const status = String(row.status || '');
+  return !isWithin3Days(row.createdOn) && status !== 'Approved';
+}
+
+/** Approve/settle only after both checks when amount ≥ 10000 or deposit is older than 3 days. */
+function canEditDeposit(row: DepositRow, hasPencil: boolean): boolean {
+  if (!hasPencil) return false;
+  const status = String(row.status || '').toLowerCase();
+  if (status !== 'pending' && status !== 'processing') return false;
+
+  const isOld = !isWithin3Days(row.createdOn);
+  const isChecked = !!(row.checkBy && row.crossCheckBy);
+  const isHighAmount = Number(row.amount ?? 0) >= 10000;
+
+  if (isOld) return isChecked;
+  if (!isHighAmount) return true;
+  return isChecked;
+}
+
+function formatCheckPerson(p?: CheckPerson): string {
+  if (!p?.name) return '—';
+  const bits = [p.name, p.city, p.state].filter(Boolean);
+  const when = p.date ? `${formatDisplayDate(p.date)} ${formatDisplayTime(p.date)}`.trim() : '';
+  return when ? `${bits.join(' · ')} · ${when}` : bits.join(' · ') || '—';
+}
 
 function defaultSettleReason(row: DepositRow): string {
   const gateway = String(row.paymentGatewayName || '').replace(/\t/g, '');
@@ -128,7 +172,9 @@ function formatDateTime(value?: string | number): string {
 }
 
 export function DepositScreen() {
+  const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   const canShowMobile = hasPermission('show_mobile');
+  const canPencil = hasPermission('Deposit_Pensil');
   // Read once — getSessionUser returns a fresh object each call.
   const admin = useMemo(
     () => getSessionUser() as { _id?: string; name?: string } | null,
@@ -155,6 +201,7 @@ export function DepositScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sheetRow, setSheetRow] = useState<DepositRow | null>(null);
+  const [checkingId, setCheckingId] = useState('');
   const genRef = useRef(0);
 
   // Manual settle modal state
@@ -255,18 +302,57 @@ export function DepositScreen() {
   }, [searchField, draftSearch]);
 
   // Approve → open Manual Settle modal (desktop SettleDialog parity, simplified).
-  const openSettle = useCallback((row: DepositRow) => {
-    setSheetRow(null);
-    setSAmount(String(row.amount ?? ''));
-    setSReason(defaultSettleReason(row));
-    setSMid(row.mid != null ? String(row.mid) : '');
-    setSGateway(row.paymentGatewayName || '');
-    setSDate(todayIST());
-    setSUtr('');
-    setOcrImage(null);
-    setOcrBusy(false);
-    setSettleRow(row);
-  }, []);
+  const openSettle = useCallback(
+    (row: DepositRow) => {
+      if (!canEditDeposit(row, canPencil)) {
+        Alert.alert('Complete Check and Cross Check before Approve');
+        return;
+      }
+      setSheetRow(null);
+      setSAmount(String(row.amount ?? ''));
+      setSReason(defaultSettleReason(row));
+      setSMid(row.mid != null ? String(row.mid) : '');
+      setSGateway(row.paymentGatewayName || '');
+      setSDate(todayIST());
+      setSUtr('');
+      setOcrImage(null);
+      setOcrBusy(false);
+      setSettleRow(row);
+    },
+    [canPencil],
+  );
+
+  const markChecked = useCallback(
+    async (row: DepositRow, check: 'first' | 'second') => {
+      const orderId = String(row.orderId || '').trim();
+      if (!orderId) {
+        Alert.alert('Missing order id');
+        return;
+      }
+      setCheckingId(`${orderId}-${check}`);
+      try {
+        const res = await secureApi<unknown>('deposits.check', {
+          transactionId: orderId,
+          check,
+          updatedBy: {
+            name: admin?.name || '',
+            userId: admin?._id || '',
+            status: check === 'first' ? 'true' : 'false',
+          },
+        });
+        if (!res.ok || res.success === false) {
+          Alert.alert(res.message || 'Check failed');
+          return;
+        }
+        Alert.alert(res.message || 'Updated');
+        setSheetRow(null);
+        void load();
+      } finally {
+        setCheckingId('');
+      }
+    },
+    [admin, load],
+  );
 
   const submitSettle = useCallback((utrOverride?: string) => {
     const row = settleRow;
@@ -446,19 +532,76 @@ export function DepositScreen() {
         label: 'Updated By',
         value: display(typeof r.updatedBy === 'string' ? r.updatedBy : r.updatedBy?.name),
       },
+      { label: 'Check By', value: formatCheckPerson(r.checkBy), multiline: true },
+      { label: 'Cross Check By', value: formatCheckPerson(r.crossCheckBy), multiline: true },
     ];
   }, [sheetRow, canShowMobile]);
 
+  const openUserDetails = useCallback(
+    (row: DepositRow) => {
+      const userId = String(row.userId || '').trim();
+      if (!userId) {
+        Alert.alert('User Details', 'User ID is not available for this deposit.');
+        return;
+      }
+      setSheetRow(null);
+      openPanelTarget(navigation, {
+        href: '/user-report',
+        state: {
+          userId,
+          userName: String(row.userName || ''),
+        },
+      });
+    },
+    [navigation],
+  );
+
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
-    if (String(sheetRow.status || '').toLowerCase() !== 'pending') return [];
-    return [
+    const acts: SheetAction[] = [
       {
-        label: 'Approve (Manual Settle)',
+        label: 'User Details',
         tone: 'primary',
-        onPress: () => openSettle(sheetRow),
+        onPress: () => openUserDetails(sheetRow),
       },
-      {
+    ];
+    if (canShowCheckAction(sheetRow, canPencil)) {
+      if (!sheetRow.checkBy) {
+        acts.push({
+          label: checkingId === `${sheetRow.orderId}-first` ? 'Checking…' : 'Check',
+          tone: 'primary',
+          disabled: !!checkingId,
+          onPress: () => void markChecked(sheetRow, 'first'),
+        });
+      }
+      if (!sheetRow.crossCheckBy) {
+        acts.push({
+          label: checkingId === `${sheetRow.orderId}-second` ? 'Checking…' : 'Cross Check',
+          tone: 'default',
+          disabled: !!checkingId,
+          onPress: () => void markChecked(sheetRow, 'second'),
+        });
+      }
+    }
+    if (canEditDeposit(sheetRow, canPencil)) {
+      acts.push(
+        {
+          label: 'Approve (Manual Settle)',
+          tone: 'primary',
+          onPress: () => openSettle(sheetRow),
+        },
+        {
+          label: 'Add Secondary Name',
+          tone: 'default',
+          onPress: () => {
+            setSheetRow(null);
+            setSecName('');
+            setSecRow(sheetRow);
+          },
+        },
+      );
+    } else if (String(sheetRow.status || '').toLowerCase() === 'pending') {
+      acts.push({
         label: 'Add Secondary Name',
         tone: 'default',
         onPress: () => {
@@ -466,9 +609,10 @@ export function DepositScreen() {
           setSecName('');
           setSecRow(sheetRow);
         },
-      },
-    ];
-  }, [sheetRow, openSettle]);
+      });
+    }
+    return acts;
+  }, [sheetRow, openSettle, openUserDetails, canPencil, checkingId, markChecked]);
 
   return (
     <ScrollView
@@ -539,10 +683,11 @@ export function DepositScreen() {
 
       {rows.map((r, i) => {
         const pending = String(r.status || '').toLowerCase() === 'pending';
+        const canApprove = canEditDeposit(r, canPencil);
         const badge = statusBadge(r.status);
         return (
           <TouchableOpacity
-            key={r._id || r.orderId || String(i)}
+            key={`row-${i}-${String(r._id || r.orderId || '')}`}
             style={styles.card}
             activeOpacity={0.75}
             onPress={() => setSheetRow(r)}
@@ -576,7 +721,7 @@ export function DepositScreen() {
                 </Text>
               </View>
             </View>
-            {pending ? (
+            {canApprove ? (
               <View style={styles.cardBtnRow}>
                 <TouchableOpacity style={styles.approveBtn} onPress={() => openSettle(r)}>
                   <Text style={styles.approveBtnText}>Approve</Text>
@@ -591,6 +736,55 @@ export function DepositScreen() {
                   <Text style={styles.secondaryBtnText}>+ Secondary Name</Text>
                 </TouchableOpacity>
               </View>
+            ) : pending ? (
+              <View style={styles.cardBtnRow}>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => {
+                    setSecName('');
+                    setSecRow(r);
+                  }}
+                >
+                  <Text style={styles.secondaryBtnText}>+ Secondary Name</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            {canShowCheckAction(r, canPencil) ? (
+              <View style={styles.cardBtnRow}>
+                {r.checkBy ? (
+                  <Text style={styles.checkDone} numberOfLines={1}>
+                    ✓ {display(r.checkBy.name)}
+                  </Text>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.checkBtn, checkingId === `${r.orderId}-first` && styles.btnDisabled]}
+                    disabled={!!checkingId}
+                    onPress={() => void markChecked(r, 'first')}
+                  >
+                    <Text style={styles.checkBtnText}>
+                      {checkingId === `${r.orderId}-first` ? '…' : 'Check'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {r.crossCheckBy ? (
+                  <Text style={styles.checkDone} numberOfLines={1}>
+                    ✓✓ {display(r.crossCheckBy.name)}
+                  </Text>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.checkBtn, checkingId === `${r.orderId}-second` && styles.btnDisabled]}
+                    disabled={!!checkingId}
+                    onPress={() => void markChecked(r, 'second')}
+                  >
+                    <Text style={styles.checkBtnText}>
+                      {checkingId === `${r.orderId}-second` ? '…' : 'Cross Check'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
+            {pending && !canApprove && canShowCheckAction(r, canPencil) ? (
+              <Text style={styles.checkHint}>Approve after Check + Cross Check</Text>
             ) : null}
             <Text style={styles.cardHint}>Tap for all details</Text>
           </TouchableOpacity>
@@ -876,6 +1070,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   secondaryBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  checkBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    flex: 1,
+  },
+  checkBtnText: { color: colors.primaryForeground, fontSize: 13, fontWeight: '700' },
+  checkDone: {
+    flex: 1,
+    color: '#16a34a',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingVertical: spacing(2),
+  },
+  checkHint: {
+    color: '#d97706',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: spacing(2),
+  },
   btnDisabled: { opacity: 0.5 },
   modalBackdrop: {
     flex: 1,
