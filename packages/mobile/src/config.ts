@@ -45,3 +45,13 @@ export function getSslStressKey(): string {
     'QhhgFGu6GTB/rOMC8AvoOh9eLuHZbke180e0hp7j4zI='
   );
 }
+
+/** Optional Basic Auth username/password for protected call-recording URLs. */
+export function getRecordingAuthCredentials():
+  | { username: string; password: string }
+  | undefined {
+  const username = process.env.EXPO_PUBLIC_RECORDING_BASIC_AUTH_USERNAME?.trim();
+  const password = process.env.EXPO_PUBLIC_RECORDING_BASIC_AUTH_PASSWORD?.trim();
+  if (!username || !password) return undefined;
+  return { username, password };
+}

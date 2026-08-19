@@ -31,9 +31,7 @@
   },
   "license": "MIT",
   "optionalDependencies": {
+    "@esbuild/darwin-arm64": "^0.28.2",
     "@rollup/rollup-darwin-arm64": "^4.62.4"
-  },
-  "dependencies": {
-    "@esbuild/darwin-arm64": "^0.28.2"
   }
 }

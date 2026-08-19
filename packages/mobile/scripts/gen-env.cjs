@@ -11,6 +11,8 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 let base = '';
 let entk = '';
+let recordingUser = '';
+let recordingPass = '';
 
 function readEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -20,6 +22,8 @@ function readEnvFile(filePath) {
     const val = m[2].replace(/^['"]|['"]$/g, '').trim();
     if (m[1] === 'API_BASE_URL' || m[1] === 'EXPO_PUBLIC_API_BASE_URL') base = base || val;
     if (m[1] === 'ENTK_VALUE' || m[1] === 'EXPO_PUBLIC_ENTK_VALUE') entk = entk || val;
+    if (m[1] === 'RECORDING_BASIC_AUTH_USERNAME') recordingUser = recordingUser || val;
+    if (m[1] === 'RECORDING_BASIC_AUTH_PASSWORD') recordingPass = recordingPass || val;
   }
 }
 
@@ -34,6 +38,8 @@ if (!base || !entk) {
     const embedded = require(path.join(ROOT, 'packages/desktop/electron/env.generated.cjs'));
     base = base || embedded.API_BASE_URL;
     entk = entk || embedded.ENTK_VALUE;
+    recordingUser = recordingUser || embedded.RECORDING_BASIC_AUTH_USERNAME;
+    recordingPass = recordingPass || embedded.RECORDING_BASIC_AUTH_PASSWORD;
   } catch {
     /* not generated */
   }
@@ -48,5 +54,11 @@ if (!base || !entk) {
 }
 
 const out = path.join(ROOT, 'packages', 'mobile', '.env');
-fs.writeFileSync(out, `EXPO_PUBLIC_API_BASE_URL=${base}\nEXPO_PUBLIC_ENTK_VALUE=${entk}\n`);
+const lines = [
+  `EXPO_PUBLIC_API_BASE_URL=${base}`,
+  `EXPO_PUBLIC_ENTK_VALUE=${entk}`,
+];
+if (recordingUser) lines.push(`EXPO_PUBLIC_RECORDING_BASIC_AUTH_USERNAME=${recordingUser}`);
+if (recordingPass) lines.push(`EXPO_PUBLIC_RECORDING_BASIC_AUTH_PASSWORD=${recordingPass}`);
+fs.writeFileSync(out, `${lines.join('\n')}\n`);
 console.log('Wrote mobile/.env');
