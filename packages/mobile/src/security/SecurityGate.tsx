@@ -1,10 +1,10 @@
 /**
  * SecurityGate — wraps the whole app. Enables runtime protections and, if a
- * blocking threat is detected (root, hooking, tamper, active VPN, emulator),
+ * blocking threat is detected (root, hooking, tamper, emulator),
  * replaces the UI with a lockout screen instead of the app content.
  */
-import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../theme';
 import { useSecurity } from './useSecurity';
@@ -14,26 +14,11 @@ const LABELS: Record<string, string> = {
   hooks: 'Instrumentation / hooking framework detected',
   appIntegrity: 'App integrity check failed (tampered build)',
   simulator: 'Emulator / simulator not allowed',
-  systemVPN: 'Active VPN detected — disable it to continue',
 };
 
 export function SecurityGate({ children }: { children: React.ReactNode }) {
   const { threats, blocked, refresh } = useSecurity();
   const [checking, setChecking] = React.useState(false);
-  const vpnAlerted = useRef(false);
-
-  const vpnOnly = blocked && threats.length > 0 && threats.every((t) => t === 'systemVPN');
-
-  useEffect(() => {
-    if (vpnOnly && !vpnAlerted.current) {
-      vpnAlerted.current = true;
-      Alert.alert(
-        'VPN detected',
-        'Please turn off your VPN to continue. Once it is off, tap “Check again”.',
-      );
-    }
-    if (!blocked) vpnAlerted.current = false;
-  }, [blocked, vpnOnly]);
 
   if (!blocked) return <>{children}</>;
 
@@ -50,12 +35,10 @@ export function SecurityGate({ children }: { children: React.ReactNode }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.icon}>{vpnOnly ? '🛡️' : '🔒'}</Text>
-      <Text style={styles.title}>{vpnOnly ? 'VPN detected' : 'Access blocked'}</Text>
+      <Text style={styles.icon}>🔒</Text>
+      <Text style={styles.title}>Access blocked</Text>
       <Text style={styles.subtitle}>
-        {vpnOnly
-          ? 'Please turn off your VPN to continue. Once it is off, tap “Check again”.'
-          : 'This device does not meet the security requirements to run Astro Admin.'}
+        This device does not meet the security requirements to run Astro Admin.
       </Text>
       <View style={styles.list}>
         {(reasons.length ? reasons : ['Security policy violation']).map((r) => (

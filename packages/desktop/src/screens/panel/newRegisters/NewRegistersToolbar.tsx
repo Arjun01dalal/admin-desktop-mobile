@@ -17,7 +17,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { CAMPAIGN_LIST } from './campaignList';
+import { CAMPAIGN_LIST, type CampaignItem } from './campaignList';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import type { ActiveStatusFilter, NewRegistrationFilter } from './types';
 
@@ -41,6 +41,8 @@ type NewRegistersToolbarProps = {
   endDate: string;
   itemsPerPage: number;
   campaignName: string;
+  /** Callers get only login-assigned campaign IDs. */
+  campaigns?: CampaignItem[];
   activeStatus: ActiveStatusFilter;
   newRegistration: NewRegistrationFilter;
   otherState: boolean;
@@ -67,6 +69,7 @@ export function NewRegistersToolbar({
   endDate,
   itemsPerPage,
   campaignName,
+  campaigns = CAMPAIGN_LIST,
   activeStatus,
   newRegistration,
   otherState,
@@ -255,7 +258,7 @@ export function NewRegistersToolbar({
               <MenuItem value="">
                 <em>Select</em>
               </MenuItem>
-              {CAMPAIGN_LIST.map((c) => (
+              {campaigns.map((c) => (
                 <MenuItem key={c.id} value={c.id}>
                   {c.id}
                 </MenuItem>

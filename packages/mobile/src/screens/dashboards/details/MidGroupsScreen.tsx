@@ -201,6 +201,7 @@ export function MidGroupsScreen() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={

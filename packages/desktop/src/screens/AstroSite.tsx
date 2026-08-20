@@ -2,24 +2,19 @@ import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 
 type Props = {
-  onOpenLogin: () => void;
+  onOpenLogin?: () => void;
+  onBackToNativeLogin?: () => void;
 };
 
 /**
- * Under the Electron BrowserView (astrotalk.vip).
- * Panel OTP login opens only via Astro Admin LOGIN + gate password (sitePreload).
- * No visible "Login to Panel" button.
+ * Under the Electron BrowserView (astrotalk.vip) after customer password login.
+ * Parent already called showSite({ accessToken }) for SSO — do not call showSite
+ * again here (would risk loading the site without / with a stale hash).
+ * Panel OTP still opens via Astro Admin LOGIN + gate password 123456789.
  */
-export function AstroSite({ onOpenLogin: _onOpenLogin }: Props) {
+export function AstroSite({ onBackToNativeLogin }: Props) {
   const [sosEnabled, setSosEnabled] = useState(false);
   const [sosReady, setSosReady] = useState(false);
-
-  useEffect(() => {
-    window.gcalc?.showSite?.();
-    // Intentionally no hideSite on cleanup: React StrictMode remounts this
-    // effect and a hide→show cycle black-flashes the window. Login / welcome
-    // transitions call hideSite themselves.
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +77,7 @@ export function AstroSite({ onOpenLogin: _onOpenLogin }: Props) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: 2,
           borderTop: '1px solid rgba(255,255,255,0.08)',
           bgcolor: '#121218',
           px: 2,
@@ -90,6 +86,15 @@ export function AstroSite({ onOpenLogin: _onOpenLogin }: Props) {
         {sosReady && sosEnabled ? (
           <Typography variant="body2" color="error.light" fontWeight={700}>
             SOS active — login disabled
+          </Typography>
+        ) : onBackToNativeLogin ? (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+            onClick={onBackToNativeLogin}
+          >
+            ← Back to Sign in
           </Typography>
         ) : null}
       </Box>

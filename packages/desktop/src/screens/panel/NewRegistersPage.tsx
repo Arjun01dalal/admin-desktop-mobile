@@ -24,6 +24,7 @@ import { TablePanel } from '@/components/TablePanel';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
 import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
+import { campaignsForLoginUser } from './newRegisters/campaignList';
 import { NewRegistersToolbar } from './newRegisters/NewRegistersToolbar';
 import { NewRegistersFiltersProvider } from './newRegisters/FiltersContext';
 import {
@@ -65,6 +66,10 @@ export function NewRegistersPage() {
     accessibleStates?: string[];
   }>();
   const isCaller = isNewRegistersCaller(admin?.Role_ID);
+  const campaignOptions = useMemo(
+    () => campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
+    [admin, isCaller],
+  );
 
   const appOptions = useMemo(() => {
     const allotted = admin?.clientName || admin?.allotedApps;
@@ -77,7 +82,9 @@ export function NewRegistersPage() {
   const [endDate, setEndDate] = useState(todayIST);
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
-  const [campaignName, setCampaignName] = useState('');
+  const [campaignName, setCampaignName] = useState(() =>
+    isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
+  );
   const [activeStatus, setActiveStatus] = useState<ActiveStatusFilter>('All');
   const [newRegistration, setNewRegistration] =
     useState<NewRegistrationFilter>('True');
@@ -301,6 +308,7 @@ export function NewRegistersPage() {
             endDate={endDate}
             itemsPerPage={itemsPerPage}
             campaignName={campaignName}
+            campaigns={campaignOptions}
             activeStatus={activeStatus}
             newRegistration={newRegistration}
             otherState={otherState}

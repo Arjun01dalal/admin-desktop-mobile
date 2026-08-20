@@ -391,7 +391,9 @@ export function WithdrawalProvidersScreen() {
               <Text style={styles.modalClose}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
             {children}
             {modalMsg ? <Text style={styles.modalMsg}>{modalMsg}</Text> : null}
           </ScrollView>

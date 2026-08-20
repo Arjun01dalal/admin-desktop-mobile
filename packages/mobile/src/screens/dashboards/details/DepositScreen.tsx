@@ -40,6 +40,7 @@ type DepositRow = {
   _id: string;
   userId?: string;
   userName?: string;
+  empCode?: string;
   userMobile?: string;
   mobile?: string;
   clientName?: string;
@@ -504,6 +505,7 @@ export function DepositScreen() {
     const r = sheetRow;
     return [
       { label: 'User Name', value: display(r.userName) },
+      { label: 'Emp Code', value: display(r.empCode) },
       { label: 'Mobile', value: maskMobile(r.userMobile || r.mobile, canShowMobile) },
       { label: 'App', value: display(appCodeForName(r.clientName) || r.clientName) },
       { label: 'Amount', value: formatIN(r.amount) },
@@ -702,6 +704,12 @@ export function DepositScreen() {
             </View>
             <Text style={styles.cardAmount}>₹ {formatIN(r.amount)}</Text>
             <View style={styles.cardGrid}>
+              <View style={styles.cardCell}>
+                <Text style={styles.cardLabel}>Emp Code</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(r.empCode)}
+                </Text>
+              </View>
               <View style={styles.cardCell}>
                 <Text style={styles.cardLabel}>Payment Method</Text>
                 <Text style={styles.cardValue} numberOfLines={1}>

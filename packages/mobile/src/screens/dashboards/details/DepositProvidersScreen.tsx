@@ -655,6 +655,7 @@ export function DepositProvidersScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView
+            showsVerticalScrollIndicator={false}
             style={{ maxHeight: opts?.raise ? 480 : 420 }}
             keyboardShouldPersistTaps="handled"
           >

@@ -376,6 +376,13 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/incoming-bot-call",
     permission: Permissions.show_incoming_bot,
   },
+  // Gated by login Responsibilities → view_live_chat.
+  {
+    id: "skyTalk",
+    label: "Sky Talk",
+    path: "/sky-talk",
+    permission: Permissions.view_live_chat,
+  },
   {
     id: "rolesResponsibilities",
     label: "Roles & Responsibilities",

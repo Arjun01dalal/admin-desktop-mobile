@@ -29,7 +29,9 @@
           "UIInterfaceOrientationPortrait"
         ],
         "NSLocationWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
       }
     },
     "android": {

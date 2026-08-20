@@ -185,7 +185,9 @@ export function LudoDetailsModal({
     >
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <ScrollView contentContainerStyle={styles.sheetContent}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.sheetContent}>
             {updateOpen && (
               <>
                 <Text style={styles.title}>Update Game IDs</Text>

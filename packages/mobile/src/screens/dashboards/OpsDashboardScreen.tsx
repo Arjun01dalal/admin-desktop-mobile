@@ -184,6 +184,7 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={

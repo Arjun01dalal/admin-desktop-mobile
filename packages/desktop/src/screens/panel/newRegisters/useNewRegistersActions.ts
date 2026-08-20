@@ -166,11 +166,12 @@ export function useNewRegistersActions(
         (c) =>
           c.id.trim() === selectedCampaignId ||
           c.name.trim() === selectedCampaignId,
-      );
-      if (!campaign?.id) {
-        toast.error('Please select a valid campaign');
-        return false;
-      }
+      ) ?? {
+        id: selectedCampaignId,
+        name: selectedCampaignId,
+        serverId: String(admin?.serverId ?? ''),
+        location: '',
+      };
 
       const leads = mapUsersToDialerLeads(rows).filter((l) =>
         String(l.phone_number || '').replace(/\D/g, ''),
@@ -221,7 +222,7 @@ export function useNewRegistersActions(
         setDialerLoading(false);
       }
     },
-    [],
+    [admin?.serverId],
   );
 
   return {

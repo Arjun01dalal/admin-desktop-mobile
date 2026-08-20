@@ -3,15 +3,20 @@
  * LAZILY by App.tsx only after storage is hydrated and the stored theme has
  * been applied — screens capture `colors` in module-scope StyleSheet.create,
  * so the palette must be final before these imports run.
+ *
+ * Pre-auth default is native Splash → Astro Login (not the website WebView).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AppNavigator } from './navigation/AppNavigator';
-import { AstroSiteScreen } from './screens/AstroSiteScreen';
+import { AstroLoginScreen } from './screens/AstroLoginScreen';
+import { ForgotPasswordScreen } from './screens/ForgotPasswordScreen';
 import { LoginScreen } from './screens/LoginScreen';
+import { SplashScreen } from './screens/SplashScreen';
+import { TermsAndConditionsScreen } from './screens/TermsAndConditionsScreen';
 import { LocationRequiredGate } from './security/LocationRequiredGate';
 import { OfflineGate } from './security/OfflineGate';
 import { SecurityGate } from './security/SecurityGate';
@@ -20,8 +25,7 @@ import { useNetworkStatus } from './security/useNetworkStatus';
 import { UpdateGate } from './updates/UpdateGate';
 import { colors, isDarkTheme } from './theme';
 
-/** Desktop AppScreen parity: always open on the Astro site, never auto-enter the panel. */
-type GateScreen = 'site' | 'login' | 'panel';
+type GateScreen = 'splash' | 'astro-login' | 'login' | 'panel' | 'forgot' | 'terms';
 
 function OfflineHost() {
   const { offline, checking, refresh } = useNetworkStatus();
@@ -30,7 +34,22 @@ function OfflineHost() {
 
 function Root() {
   const { ready, token } = useAuth();
-  const [screen, setScreen] = useState<GateScreen>('site');
+  const [screen, setScreen] = useState<GateScreen>('splash');
+  const [returnTo, setReturnTo] = useState<GateScreen>('astro-login');
+
+  const openTerms = (from: GateScreen) => {
+    setReturnTo(from);
+    setScreen('terms');
+  };
+
+  const openForgot = (from: GateScreen) => {
+    setReturnTo(from);
+    setScreen('forgot');
+  };
+
+  const finishSplash = useCallback(() => {
+    setScreen(token ? 'panel' : 'astro-login');
+  }, [token]);
 
   // Continuously fetch location while authenticated (compliance/audit).
   // Hard-blocks the panel when Location is off — desktop LocationProvider parity.
@@ -38,11 +57,13 @@ function Root() {
   const { blocked, loading, error, retry, openSettings } = useLiveLocation(inPanel);
 
   useEffect(() => {
-    if (token && screen === 'login') setScreen('panel');
+    if (token && (screen === 'login' || screen === 'astro-login' || screen === 'splash')) {
+      setScreen('panel');
+    }
   }, [token, screen]);
 
   useEffect(() => {
-    if (!token && screen === 'panel') setScreen('site');
+    if (!token && screen === 'panel') setScreen('astro-login');
   }, [token, screen]);
 
   if (!ready) {
@@ -52,6 +73,7 @@ function Root() {
       </View>
     );
   }
+
   if (inPanel) {
     return (
       <>
@@ -66,15 +88,35 @@ function Root() {
       </>
     );
   }
-  if (screen === 'login') {
-    return <LoginScreen onBack={() => setScreen('site')} />;
+
+  if (screen === 'splash') {
+    return <SplashScreen onDone={finishSplash} />;
   }
+
+  if (screen === 'login') {
+    return (
+      <LoginScreen
+        onBack={() => setScreen('astro-login')}
+        onForgotPassword={() => openForgot('login')}
+        onTerms={() => openTerms('login')}
+      />
+    );
+  }
+
+  if (screen === 'forgot') {
+    return <ForgotPasswordScreen onBack={() => setScreen(returnTo)} />;
+  }
+
+  if (screen === 'terms') {
+    return <TermsAndConditionsScreen onBack={() => setScreen(returnTo)} />;
+  }
+
+  // Default pre-auth surface: native Astro login (replaces website WebView)
   return (
-    <AstroSiteScreen
-      onOpenLogin={() => {
-        if (token) setScreen('panel');
-        else setScreen('login');
-      }}
+    <AstroLoginScreen
+      onOpenPanelLogin={() => setScreen('login')}
+      onForgotPassword={() => openForgot('astro-login')}
+      onTerms={() => openTerms('astro-login')}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import {
   Box,
@@ -28,7 +28,6 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import TuneIcon from '@mui/icons-material/Tune';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -43,7 +42,9 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
-import { logSheetDownload } from '@/utils/sheetDownloadAudit';
+import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
+import { saveWorkbook } from '@/utils/downloadSheet';
+import type { SheetDownloadFilter } from '@/utils/sheetDownloadAudit';
 import { copyToClipboard } from '@/utils/clipboard';
 import { asPaged, asList, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
@@ -197,6 +198,15 @@ export function WithdrawalPage() {
   const [qrOpen, setQrOpen] = useState(false);
   const [qrRow, setQrRow] = useState<WithdrawalRow | null>(null);
   const [qrGateway, setQrGateway] = useState('');
+  const [sheetOtp, setSheetOtp] = useState<{ open: boolean; filter: SheetDownloadFilter }>({
+    open: false,
+    filter: { type: 'Withdrawal Sheet' },
+  });
+  const sheetAfterOtp = useRef<(() => void) | null>(null);
+  const requestSheetDownload = (filter: SheetDownloadFilter, run: () => void) => {
+    sheetAfterOtp.current = run;
+    setSheetOtp({ open: true, filter });
+  };
   const [qrMid, setQrMid] = useState('');
   const [qrSaving, setQrSaving] = useState(false);
 
@@ -204,6 +214,7 @@ export function WithdrawalPage() {
     const filter: Record<string, unknown> = {};
     const f = query.filters;
     if (f.userName.trim()) filter.userName = f.userName.trim();
+    if (f.empCode.trim()) filter.empCode = f.empCode.trim();
     if (f.mobile.trim()) filter.mobile = f.mobile.trim();
     if (f.amount.trim()) filter.amount = f.amount.trim();
     if (f.status) filter.status = f.status;
@@ -756,22 +767,6 @@ export function WithdrawalPage() {
   );
 
   const downloadExcel = useCallback(() => {
-    if (!rows.length) {
-      toast.warn('No data to export!');
-      return;
-    }
-    logSheetDownload(
-      {
-        mid: query.filters.mid || 'withdrawal',
-        type: 'Withdrawal Sheet',
-      },
-      {
-        lat: loc.coords?.latitude,
-        long: loc.coords?.longitude,
-        city: loc.address?.city || (loc.address as { city_district?: string } | null)?.city_district,
-        state: loc.address?.state,
-      },
-    );
     const data = rows.map((row, index) => ({
       'Sr No': index + 1,
       Date: row.createdOn ? formatDisplayDate(row.createdOn) : '',
@@ -788,35 +783,13 @@ export function WithdrawalPage() {
       userBankName: row.userBankName || '',
       ifscCode: row.ifscCode || '',
     }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Withdrawal Data');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    return saveWorkbook(data, {
+      sheetName: 'Withdrawal Data',
+      filename: `Withdrawal_Data_${Date.now()}.xlsx`,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Withdrawal_Data_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [rows, query.filters.mid, loc.coords, loc.address]);
+  }, [rows]);
 
   const downloadYesBank = useCallback(() => {
-    if (!rows.length) {
-      toast.warn('No data to export!');
-      return;
-    }
-    logSheetDownload(
-      { mid: 'yesBank', type: 'Withdrawal Sheet' },
-      {
-        lat: loc.coords?.latitude,
-        long: loc.coords?.longitude,
-        city: loc.address?.city || (loc.address as { city_district?: string } | null)?.city_district,
-        state: loc.address?.state,
-      },
-    );
     const data = rows.map((row, index) => ({
       'Sr No': index + 1,
       Name: displayUserName(row),
@@ -827,35 +800,13 @@ export function WithdrawalPage() {
       'Phone No': row.userMobile || row.mobile || '',
       Remarks: 'payment',
     }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Yes Bank');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    return saveWorkbook(data, {
+      sheetName: 'Yes Bank',
+      filename: `yes_bank_sheet_${Date.now()}.xlsx`,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `yes_bank_sheet_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [rows, loc.coords, loc.address]);
+  }, [rows]);
 
   const downloadPayOk = useCallback(() => {
-    if (!rows.length) {
-      toast.warn('No data to export!');
-      return;
-    }
-    logSheetDownload(
-      { mid: 'payok', type: 'Withdrawal Sheet' },
-      {
-        lat: loc.coords?.latitude,
-        long: loc.coords?.longitude,
-        city: loc.address?.city || (loc.address as { city_district?: string } | null)?.city_district,
-        state: loc.address?.state,
-      },
-    );
     const data = rows.map((row) => ({
       'Bank Name (IFSC)': row.ifscCode || '',
       'Bank Account': row.accountNo || '',
@@ -864,20 +815,11 @@ export function WithdrawalPage() {
       AccountName: row.userBankName || '',
       Email: '',
     }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pay OK');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    return saveWorkbook(data, {
+      sheetName: 'Pay OK',
+      filename: `pay_ok_sheet_${Date.now()}.xlsx`,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pay_ok_sheet_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [rows, loc.coords, loc.address]);
+  }, [rows]);
 
   const toCallingItem = useCallback(
     (row: WithdrawalRow): UserRow => ({
@@ -1114,6 +1056,7 @@ export function WithdrawalPage() {
                   item={toCallingItem(row)}
                   campaignName="WITHDRAWAL ALL APP"
                   reasonList="Withdrawal"
+                  hideBotCall
                 />
               ),
             } satisfies CommonTableColumn<WithdrawalRow>,
@@ -1161,6 +1104,13 @@ export function WithdrawalPage() {
           v ? appCodeForName(v) : 'All',
         ),
         render: (row) => appCodeForName(row.clientName),
+      },
+      {
+        id: 'empCode',
+        label: 'Emp Code',
+        width: 100,
+        filter: searchFilter('empCode', 'Emp code'),
+        render: (row) => display(row.empCode),
       },
       {
         id: 'amount',
@@ -1746,13 +1696,37 @@ export function WithdrawalPage() {
           </Button>
           {canDownload ? (
             <>
-              <Button variant="contained" disabled={loading} onClick={downloadExcel} sx={orangeBtnSx}>
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() =>
+                  requestSheetDownload(
+                    { mid: query.filters.mid || 'withdrawal', type: 'Withdrawal Sheet' },
+                    downloadExcel,
+                  )
+                }
+                sx={orangeBtnSx}
+              >
                 Download Data
               </Button>
-              <Button variant="contained" disabled={loading} onClick={downloadYesBank} sx={orangeBtnSx}>
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() =>
+                  requestSheetDownload({ mid: 'yesBank', type: 'Yes Bank Sheet' }, downloadYesBank)
+                }
+                sx={orangeBtnSx}
+              >
                 Yes Bank Data
               </Button>
-              <Button variant="contained" disabled={loading} onClick={downloadPayOk} sx={orangeBtnSx}>
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() =>
+                  requestSheetDownload({ mid: 'payok', type: 'Pay OK Sheet' }, downloadPayOk)
+                }
+                sx={orangeBtnSx}
+              >
                 Pay OK Data
               </Button>
             </>
@@ -2047,6 +2021,12 @@ export function WithdrawalPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <SheetDownloadOtpModal
+        open={sheetOtp.open}
+        filter={sheetOtp.filter}
+        onClose={() => setSheetOtp((s) => ({ ...s, open: false }))}
+        onVerified={() => sheetAfterOtp.current?.()}
+      />
     </Box>
   );
 }

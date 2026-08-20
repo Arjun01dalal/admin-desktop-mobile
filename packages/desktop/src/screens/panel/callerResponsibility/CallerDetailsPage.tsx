@@ -675,6 +675,17 @@ export function CallerDetailsPage() {
         render: (r) => appCodeForName(r.clientName || r.appName),
       },
       {
+        id: 'played',
+        label: 'In (E/C/S)',
+        width: 120,
+        render: (r) => {
+          const raw = r.played ?? r.playIn ?? r.play_in ?? r.playedGames;
+          if (Array.isArray(raw)) return raw.map(String).filter(Boolean).join(', ') || '-';
+          const text = String(raw ?? '').trim();
+          return text || '-';
+        },
+      },
+      {
         id: 'createdAt',
         label: 'Created At',
         width: 130,

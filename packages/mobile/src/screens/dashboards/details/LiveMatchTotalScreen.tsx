@@ -424,6 +424,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={

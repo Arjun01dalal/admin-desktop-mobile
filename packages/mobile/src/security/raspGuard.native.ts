@@ -48,7 +48,6 @@ function useActiveRaspThreats(): { threats: ThreatKind[] } {
     appIntegrity: () => raise('appIntegrity'),
     unofficialStore: () => raise('unofficialStore'),
     deviceBinding: () => raise('deviceBinding'),
-    systemVPN: () => raise('systemVPN'),
     obfuscationIssues: () => raise('obfuscationIssues'),
     devMode: () => raise('devMode'),
     adbEnabled: () => raise('adbEnabled'),

@@ -9,7 +9,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -24,6 +23,7 @@ import {
 import { colors, radius, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { RecordingPlayerModal } from '../../../components/RecordingPlayerModal';
 import { DateField } from '../../../components/DateField';
 
 type IncomingCall = {
@@ -151,6 +151,7 @@ export function IncomingBotCallScreen() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
   const genRef = useRef(0);
   const summaryGenRef = useRef(0);
@@ -288,9 +289,7 @@ export function IncomingBotCallScreen() {
         Alert.alert('No recording available');
         return;
       }
-      openAfterSheetClose(() => {
-        void Linking.openURL(url).catch(() => Alert.alert('Unable to open recording'));
-      });
+      openAfterSheetClose(() => setRecordingUrl(String(url)));
     },
     [openAfterSheetClose],
   );
@@ -463,7 +462,9 @@ export function IncomingBotCallScreen() {
                 <Text style={styles.close}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ paddingBottom: spacing(6) }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: spacing(6) }}>
               {summaryLoading ? (
                 <Text style={styles.summaryEmpty}>Loading…</Text>
               ) : summaryError ? (
@@ -485,6 +486,12 @@ export function IncomingBotCallScreen() {
           </View>
         </View>
       </Modal>
+
+      <RecordingPlayerModal
+        visible={recordingUrl !== null}
+        url={recordingUrl}
+        onClose={() => setRecordingUrl(null)}
+      />
     </ScrollView>
   );
 }

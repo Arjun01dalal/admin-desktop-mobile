@@ -17,9 +17,24 @@ const {
 const path = require('node:path');
 const fs = require('node:fs');
 const secureApi = require('./secure/index.cjs');
+const { optionalEnv } = require('./config.cjs');
 
-/** Main process is the sole get-sos-flag poller; renderer uses IPC `sos:state`. */
-const POLL_MS = 10_000;
+/**
+ * Adaptive SOS poll (was fixed 10s).
+ * - Idle: slower backup (push delivers activate/clear instantly when configured)
+ * - Active: keep ~10s so CLEAR is noticed quickly
+ * - No token: idle wait (no API call)
+ */
+function envPollMs(name, fallback) {
+  const n = Number(optionalEnv(name));
+  if (Number.isFinite(n) && n >= 5_000 && n <= 300_000) return Math.floor(n);
+  return fallback;
+}
+
+const POLL_ACTIVE_MS = envPollMs('SOS_POLL_ACTIVE_MS', 10_000);
+const POLL_IDLE_MS = envPollMs('SOS_POLL_IDLE_MS', 30_000);
+const POLL_IDLE_WITH_PUSH_MS = envPollMs('SOS_POLL_IDLE_PUSH_MS', 60_000);
+const POLL_NO_TOKEN_MS = envPollMs('SOS_POLL_NO_TOKEN_MS', 60_000);
 const NOTIFICATION_RENEW_MS = 15_000;
 const LOCAL_CONTEXT_FILE = 'sos-local-context.json';
 
@@ -144,6 +159,7 @@ function alertHtmlPath() {
  *   showAllPanelWindows?: () => void,
  *   getToken: () => string | null,
  *   getUserDataPath?: () => string,
+ *   pushEnabled?: boolean,
  * }} opts
  */
 function startSosMonitor({
@@ -152,6 +168,7 @@ function startSosMonitor({
   showAllPanelWindows,
   getToken,
   getUserDataPath,
+  pushEnabled = false,
 }) {
   let sosActive = false;
   let acknowledged = false;
@@ -159,6 +176,9 @@ function startSosMonitor({
   let osNotification = null;
   let renewTimer = null;
   let pollTimer = null;
+  let pollInFlight = false;
+  let refreshQueued = false;
+  let stopped = false;
   let ipcRegistered = false;
   let lastLoggedNoToken = 0;
   /** This machine pressed SOS — no siren/popup here until cleared. */
@@ -172,6 +192,26 @@ function startSosMonitor({
   };
   /** Logged-in user's office (for office-based suppress on peers). */
   let localOfficeLocation = '';
+
+  function nextPollDelayMs() {
+    const token = typeof getToken === 'function' ? getToken() : null;
+    if (!token) return POLL_NO_TOKEN_MS;
+    if (sosActive) return POLL_ACTIVE_MS;
+    return pushEnabled ? POLL_IDLE_WITH_PUSH_MS : POLL_IDLE_MS;
+  }
+
+  function scheduleNext(delayMs = nextPollDelayMs()) {
+    if (stopped) return;
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    const wait = Math.max(0, Number(delayMs) || 0);
+    pollTimer = setTimeout(() => {
+      pollTimer = null;
+      void runPoll();
+    }, wait);
+  }
 
   function contextPath() {
     try {
@@ -545,6 +585,26 @@ function startSosMonitor({
     }
   }
 
+  async function runPoll() {
+    if (stopped) return;
+    if (pollInFlight) {
+      refreshQueued = true;
+      return;
+    }
+    pollInFlight = true;
+    try {
+      await poll();
+    } finally {
+      pollInFlight = false;
+      if (refreshQueued) {
+        refreshQueued = false;
+        void runPoll();
+        return;
+      }
+      scheduleNext();
+    }
+  }
+
   if (!ipcRegistered) {
     ipcRegistered = true;
     ipcMain.on('sos:acknowledge', () => {
@@ -569,9 +629,12 @@ function startSosMonitor({
         meta: payload,
         skipAlert: silent || shouldSuppressAlert(payload),
       });
+      // Switch to active cadence after local activate.
+      scheduleNext(POLL_ACTIVE_MS);
     });
     ipcMain.on('sos:cleared', () => {
       onSosState(false, 'ipc');
+      scheduleNext(nextPollDelayMs());
     });
     ipcMain.on('sos:set-local-context', (_event, ctx = {}) => {
       if (ctx && typeof ctx === 'object') {
@@ -584,21 +647,29 @@ function startSosMonitor({
     });
   }
 
-  void poll();
-  pollTimer = setInterval(() => {
-    void poll();
-  }, POLL_MS);
+  void runPoll();
 
-  log('started');
+  log(
+    'started',
+    `idle=${pushEnabled ? POLL_IDLE_WITH_PUSH_MS : POLL_IDLE_MS}ms`,
+    `active=${POLL_ACTIVE_MS}ms`,
+    `push=${pushEnabled ? 'on' : 'off'}`,
+  );
 
   return {
     stop() {
-      if (pollTimer) clearInterval(pollTimer);
+      stopped = true;
+      if (pollTimer) clearTimeout(pollTimer);
       pollTimer = null;
       clearAlerting();
     },
     refresh() {
-      void poll();
+      if (stopped) return;
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+      void runPoll();
     },
     isActive() {
       return sosActive;
@@ -611,9 +682,11 @@ function startSosMonitor({
         meta: payload,
         skipAlert: shouldSuppressAlert(payload),
       });
+      scheduleNext(POLL_ACTIVE_MS);
     },
     forceClear() {
       onSosState(false, 'push');
+      scheduleNext(nextPollDelayMs());
     },
   };
 }

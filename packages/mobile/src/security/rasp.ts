@@ -2,7 +2,7 @@
  * freeRASP runtime application self-protection.
  *
  * Detects rooted/jailbroken devices, hooking frameworks (Frida/Xposed),
- * emulators, debuggers, tampered/repackaged builds, and active system VPN.
+ * emulators, debuggers, and tampered/repackaged builds.
  *
  * Native-only: on web preview the hook is a no-op so the app still renders.
  */
@@ -59,7 +59,7 @@ export const raspConfig = {
   // Prod RASP (EXPO_PUBLIC_RASP_PROD=1): full signing / store / emulator checks.
   isProd: RASP_IS_PROD,
   // Keep false for APK sideload — native kill looks like a launch crash.
-  // SecurityGate still locks the UI on root / hooks / VPN / etc.
+  // SecurityGate still locks the UI on root / hooks / etc.
   killOnBypass: false,
 };
 

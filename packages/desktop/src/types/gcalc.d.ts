@@ -1,4 +1,13 @@
-export type AppScreen = 'site' | 'login' | 'welcome';
+/** Pre-auth: splash → astro-login (+ forgot/terms). Panel: login (OTP) → welcome. */
+export type AppScreen =
+  | 'splash'
+  | 'astro-login'
+  | 'forgot'
+  | 'terms'
+  | 'login'
+  | 'welcome'
+  /** @deprecated Website BrowserView removed — treated as astro-login */
+  | 'site';
 
 export type AddressInfo = {
   state?: string;
@@ -56,11 +65,60 @@ export type GCalcApi = {
   showWelcome: () => void;
   /** @deprecated Use showSite */
   showCalculator: () => void;
-  showSite: () => void;
+  /** Opens Astro site BrowserView. With accessToken → SSO hash URL. */
+  showSite: (payload?: { accessToken?: string }) => void;
+  /** Landscape chrome without marketing site WebView. */
+  showNativeAuth?: () => void;
   hideSite: () => void;
   /** Open another hardened panel window (same security / shared session). */
   openNewWindow: () => Promise<{ ok: boolean; message?: string }>;
+
+  /** Public Astro customer auth (api.astrothirdeye.com). */
+  siteLoginViaPassword?: (payload: {
+    email: string;
+    password: string;
+    deviceId?: string;
+    os?: string;
+    modelNumber?: string;
+    longitude?: string;
+    latitude?: string;
+    fcmToken?: string;
+  }) => Promise<{ ok: boolean; message?: string; accessToken?: string; data?: unknown }>;
+  siteSendEmailOtp?: (payload: {
+    email: string;
+  }) => Promise<{ ok: boolean; message?: string; data?: unknown }>;
+  siteVerifyEmailOtp?: (payload: {
+    email: string;
+    otp: string;
+    deviceId?: string;
+  }) => Promise<{ ok: boolean; message?: string; accessToken?: string; data?: unknown }>;
+  siteResetPassword?: (payload: {
+    email: string;
+    newPassword: string;
+    accessToken: string;
+  }) => Promise<{ ok: boolean; message?: string; data?: unknown }>;
+  /** Real FCM device token from Electron main (Google FCM registration). */
+  getFcmToken?: (payload?: {
+    force?: boolean;
+  }) => Promise<{ ok: boolean; fcmToken?: string; message?: string }>;
+  fetchTermsAndConditions?: () => Promise<{
+    ok: boolean;
+    heading?: string;
+    bodyHtml?: string;
+    updatedAt?: string | null;
+    message?: string;
+  }>;
+
   onRequestLogin: (cb: (d?: { email?: string; mobile?: string }) => void) => () => void;
+  /** OS custom protocol deep link (e.g. myastroapp://login?logged_out=1). */
+  onDeepLink?: (
+    cb: (d: { screen?: string; loggedOut?: boolean; raw?: string }) => void,
+  ) => () => void;
+  getPendingDeepLink?: () => Promise<{
+    screen?: string;
+    loggedOut?: boolean;
+    raw?: string;
+  } | null>;
   /** Fired when password gate is used while SOS is active. */
   onLoginBlockedSos: (cb: () => void) => () => void;
   /** Site password gate unlocked (Astro Admin password matches). */
@@ -84,6 +142,11 @@ export type GCalcApi = {
   getIpLocation: () => Promise<IpLocationResult>;
   openLocationSettings: () => Promise<{ ok: boolean }>;
   copyText: (text: string) => Promise<{ ok: boolean }>;
+  /** Save a generated sheet (base64 xlsx) via the OS Save dialog. */
+  saveDownload?: (
+    filename: string,
+    base64: string,
+  ) => Promise<{ ok: boolean; canceled?: boolean; path?: string; message?: string }>;
   /** Convert an HTTPS recording into an authenticated in-app stream URL. */
   recordingUrl: (url: string) => string;
   /** OS-encrypted session token vault (main process safeStorage). */

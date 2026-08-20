@@ -14,8 +14,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -38,10 +38,11 @@ import { openPanelTarget } from '../../../navigation/panelDetail';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { formatDdMmYyyy, todayIST } from '../../../utils/dates';
-import { CAMPAIGN_LIST } from '../../../utils/campaignList';
+import { CAMPAIGN_LIST, campaignsForLoginUser } from '../../../utils/campaignList';
 import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { RecordingPlayerModal } from '../../../components/RecordingPlayerModal';
 
 type CallLogRow = Record<string, unknown> & {
   call_sid?: string;
@@ -176,6 +177,8 @@ function filterCallsClientSide(
   return next;
 }
 
+type ReinitStatus = 'deleted' | 'failed' | 'no-answer';
+
 type BotSummaryRow = {
   botId: number;
   state: string;
@@ -187,6 +190,24 @@ type BotSummaryRow = {
   queued: number;
   deleted: number;
 };
+
+const REINIT_CHIPS: Array<{
+  rowKey: 'noAnswer' | 'failed' | 'deleted';
+  status: ReinitStatus;
+  label: string;
+}> = [
+  { rowKey: 'noAnswer', status: 'no-answer', label: 'No-Answer' },
+  { rowKey: 'failed', status: 'failed', label: 'Failed' },
+  { rowKey: 'deleted', status: 'deleted', label: 'Deleted' },
+];
+
+function reinitTargetKey(botId: number, status: ReinitStatus): string {
+  return `${botId}:${status}`;
+}
+
+function hasValidBotPhone(value: unknown): boolean {
+  return String(value ?? '').replace(/\D/g, '').length >= 8;
+}
 
 function buildBotSummaryRows(summary: Record<string, unknown> | null): BotSummaryRow[] {
   if (!summary || typeof summary !== 'object') return [];
@@ -268,6 +289,10 @@ export function CallLogsScreen() {
   const isCaller = isCallLogsCaller(admin);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
   const assignedBots = useMemo(() => getAssignedBotIds(admin as never), [admin]);
+  const campaignOptions = useMemo(
+    () => campaignsForLoginUser(admin, { assignedOnly: isCaller }),
+    [admin, isCaller],
+  );
 
   const today = todayIST();
   const [draftStart, setDraftStart] = useState(today);
@@ -287,6 +312,7 @@ export function CallLogsScreen() {
   const [commentFilter, setCommentFilter] = useState('All');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [botStatusOpen, setBotStatusOpen] = useState(false);
+  const [reinitKeys, setReinitKeys] = useState<Set<string>>(() => new Set());
   const [applyTick, setApplyTick] = useState(0);
 
   const [rows, setRows] = useState<CallLogRow[]>([]);
@@ -296,11 +322,14 @@ export function CallLogsScreen() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: CallLogRow; index: number } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [summaryBusyId, setSummaryBusyId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState('');
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
 
-  const [campaignId, setCampaignId] = useState('');
+  const [campaignId, setCampaignId] = useState(() =>
+    isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
+  );
   const [dialerOpen, setDialerOpen] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [dialerMsg, setDialerMsg] = useState('');
@@ -311,6 +340,7 @@ export function CallLogsScreen() {
   const [commentChoice, setCommentChoice] = useState('');
   const [commentText, setCommentText] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
   const genRef = React.useRef(0);
   const filterDraftRef = React.useRef({ mobNo, dpId, sid, stateFilter, botIdFilter });
@@ -471,7 +501,8 @@ export function CallLogsScreen() {
       setDialerMsg('Select at least one row');
       return;
     }
-    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
+    const campaign = campaignOptions.find((c) => c.id.trim() === campaignId.trim())
+      ?? CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
     setPushing(true);
     try {
       const res = await addToDialerBatch({
@@ -484,7 +515,7 @@ export function CallLogsScreen() {
     } finally {
       setPushing(false);
     }
-  }, [admin, campaignId, rows, selectedIds]);
+  }, [admin, campaignId, campaignOptions, rows, selectedIds]);
 
   const connectDialer = useCallback(
     async (row: CallLogRow) => {
@@ -507,28 +538,120 @@ export function CallLogsScreen() {
     [admin],
   );
 
-  const botCall = useCallback(
-    async (row: CallLogRow) => {
+  const pushBotRows = useCallback(
+    async (target: CallLogRow[], opts?: { keepSheet?: boolean }) => {
+      const settings = target.map(mapRowToDialSetting).filter((s) => hasValidBotPhone(s.phone_number));
+      if (!settings.length) {
+        setActionMsg('No valid phone numbers to push');
+        Alert.alert('Reinit', 'No valid phone numbers to push');
+        return false;
+      }
       setActionLoading(true);
       setActionMsg('');
       try {
-        const res = await secureApi('callLogs.addToBotDialer', {
-          userId: String((admin as { _id?: string } | null)?._id || ''),
-          created_by: String((admin as { name?: string } | null)?.name || ''),
-          dialout_settings: [mapRowToDialSetting(row)],
-        });
-        if (!res.ok || res.success === false) {
-          setActionMsg(res.message || 'Bot call failed');
-          return;
+        const chunkSize = 10;
+        let pushed = 0;
+        let lastMessage = '';
+        for (let i = 0; i < settings.length; i += chunkSize) {
+          const chunk = settings.slice(i, i + chunkSize);
+          const res = await secureApi('callLogs.addToBotDialer', {
+            userId: String((admin as { _id?: string } | null)?._id || ''),
+            created_by: String((admin as { name?: string } | null)?.name || ''),
+            dialout_settings: chunk,
+          });
+          if (!res.ok || res.success === false) {
+            const msg =
+              res.message || `Failed after pushing ${pushed} of ${settings.length} leads`;
+            setActionMsg(msg);
+            Alert.alert('Reinit failed', msg);
+            return false;
+          }
+          pushed += chunk.length;
+          lastMessage = res.message || '';
         }
-        setActionMsg(res.message || 'Bot call queued');
-        setSelected(null);
+        setActionMsg(lastMessage || `Call Initiated Successfully (${pushed} leads).`);
+        if (!opts?.keepSheet) setSelected(null);
         void load();
+        return true;
       } finally {
         setActionLoading(false);
       }
     },
     [admin, load],
+  );
+
+  const reinitiateStatuses = useCallback(
+    async (targets: Array<{ botId: number; status: ReinitStatus }>) => {
+      if (!targets.length) {
+        Alert.alert('Reinit', 'Select at least one No-Answer, Failed, or Deleted status');
+        return;
+      }
+      setActionLoading(true);
+      setActionMsg('');
+      try {
+        const results = await Promise.all(
+          targets.map(async ({ botId, status }) => {
+            if (status === 'deleted') {
+              const res = await secureApi<CallLogRow[]>('callLogs.fetchDeleted', {
+                startDate,
+                endDate,
+                botId,
+              });
+              return {
+                ok: res.ok,
+                message: res.message,
+                rows: Array.isArray(res.data) ? res.data : [],
+              };
+            }
+            const res = await secureApi<{ calls?: CallLogRow[] }>('callLogs.getDialerData', {
+              userId: '',
+              filter: {
+                status,
+                startDate: formatDdMmYyyy(startDate),
+                endDate: formatDdMmYyyy(endDate),
+                botId: [botId],
+                index: 1,
+                limit: 5000,
+              },
+            });
+            const raw = Array.isArray(res.data?.calls) ? res.data.calls : [];
+            return {
+              ok: res.ok,
+              message: res.message,
+              rows: raw.filter(
+                (row) =>
+                  String(row.status || '').toLowerCase() === status &&
+                  Number(row.bot_id) === Number(botId),
+              ),
+            };
+          }),
+        );
+        const failed = results.filter((result) => !result.ok);
+        if (failed.length) {
+          Alert.alert('Reinit', failed[0]?.message || `Failed to fetch ${failed.length} selection(s)`);
+        }
+        const uniqueRows = Array.from(
+          new Map(
+            results
+              .filter((result) => result.ok)
+              .flatMap((result) => result.rows)
+              .map((row, index) => [
+                String(row.call_sid || row._id || `${row.bot_id}:${index}`),
+                row,
+              ]),
+          ).values(),
+        );
+        if (!uniqueRows.length) {
+          Alert.alert('Reinit', 'No calls found to reinitiate');
+          return;
+        }
+        await pushBotRows(uniqueRows, { keepSheet: true });
+        setReinitKeys(new Set());
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [endDate, pushBotRows, startDate],
   );
 
   const endCall = useCallback(
@@ -561,24 +684,15 @@ export function CallLogsScreen() {
       Alert.alert('Recording', 'Recording URL is not available.');
       return;
     }
-    const url = rawUrl.startsWith('//')
-      ? `https:${rawUrl}`
-      : /^[a-z][a-z0-9+.-]*:\/\//i.test(rawUrl)
-        ? rawUrl
-        : `https://${rawUrl}`;
-
-    // Dismiss the native detail modal before handing off to the audio/browser app.
     setSelected(null);
-    setTimeout(() => {
-      void Linking.openURL(url).catch(() => {
-        Alert.alert('Recording', 'Could not open the recording URL.');
-      });
-    }, 250);
+    setTimeout(() => setRecordingUrl(rawUrl), Platform.OS === 'ios' ? 350 : 80);
   }, []);
 
   const viewSummary = useCallback(async (row: CallLogRow) => {
+    const id = callLogRowId(row);
     setSelected(null);
     setSummaryData(null);
+    setSummaryBusyId(id);
     setActionLoading(true);
     setActionMsg('');
     // Let the row-detail native modal finish dismissing before opening another.
@@ -594,6 +708,7 @@ export function CallLogsScreen() {
     } catch {
       setActionMsg('Could not load call summary.');
     } finally {
+      setSummaryBusyId(null);
       setActionLoading(false);
     }
   }, []);
@@ -628,16 +743,14 @@ export function CallLogsScreen() {
         tone: 'primary',
         onPress: () => openUserReport(row),
       },
-    ];
-    if (!isCaller) {
-      actions.push({
-        label: 'Add Comment',
+      {
+        label: 'Comment',
         onPress: () => {
           openComment(row);
           setSelected(null);
         },
-      });
-    }
+      },
+    ];
     if (status !== 'queued' && status !== 'deleted') {
       if (status === 'in-progress') {
         actions.push({
@@ -646,12 +759,6 @@ export function CallLogsScreen() {
           disabled: actionLoading,
           onPress: () => void endCall(row),
         });
-      } else {
-        actions.push({
-          label: actionLoading ? 'Calling…' : 'Bot Call',
-          disabled: actionLoading,
-          onPress: () => void botCall(row),
-        });
       }
       actions.push({
         label: actionLoading ? 'Connecting…' : 'Connect Dialer',
@@ -659,11 +766,12 @@ export function CallLogsScreen() {
         onPress: () => void connectDialer(row),
       });
     }
-    if (!isCaller && status === 'completed' && row.recording_url) {
+    if (status === 'completed' && row.recording_url) {
+      const summaryLoading = summaryBusyId === callLogRowId(row);
       actions.push(
         {
-          label: actionLoading ? 'Loading…' : 'View Summary',
-          disabled: actionLoading,
+          label: summaryLoading ? 'Loading…' : 'View Summary',
+          disabled: summaryLoading,
           onPress: () => void viewSummary(row),
         },
         {
@@ -676,10 +784,9 @@ export function CallLogsScreen() {
   }, [
     selected,
     actionLoading,
-    isCaller,
+    summaryBusyId,
     openUserReport,
     openComment,
-    botCall,
     endCall,
     connectDialer,
     openRecording,
@@ -689,6 +796,35 @@ export function CallLogsScreen() {
   const rowOffset = (page - 1) * pageSize;
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
   const summaryRows = useMemo(() => buildBotSummaryRows(botSummary), [botSummary]);
+  const reinitTargets = useMemo(
+    () =>
+      summaryRows.flatMap((row) =>
+        REINIT_CHIPS.filter((chip) => Number(row[chip.rowKey]) > 0).map((chip) => ({
+          key: reinitTargetKey(row.botId, chip.status),
+          botId: row.botId,
+          status: chip.status,
+        })),
+      ),
+    [summaryRows],
+  );
+  const selectedReinit = reinitTargets.filter((t) => reinitKeys.has(t.key));
+  const allReinitSelected =
+    reinitTargets.length > 0 && selectedReinit.length === reinitTargets.length;
+
+  const toggleReinitTarget = useCallback((key: string) => {
+    setReinitKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleAllReinit = useCallback(() => {
+    setReinitKeys(
+      allReinitSelected ? new Set() : new Set(reinitTargets.map((t) => t.key)),
+    );
+  }, [allReinitSelected, reinitTargets]);
 
   const columns = useMemo<DataTableColumn<CallLogRow>[]>(() => {
     const cols: DataTableColumn<CallLogRow>[] = [
@@ -763,32 +899,32 @@ export function CallLogsScreen() {
             : '—',
       },
     );
+    cols.push(
+      {
+        key: 'comment',
+        label: 'Comment ✎',
+        width: 120,
+        render: (r) => String(r.comments || '—'),
+        onCellPress: openComment,
+      },
+      {
+        key: 'commentedBy',
+        label: 'Comment By',
+        width: 110,
+        render: (r) => String(r.commented_by || (r as { commentedBy?: unknown }).commentedBy || '—'),
+      },
+    );
     if (!isCaller) {
-      cols.push(
-        {
-          key: 'comment',
-          label: 'Comment ✎',
-          width: 120,
-          render: (r) => String(r.comments || '—'),
-          onCellPress: openComment,
+      cols.push({
+        key: 'deletedBy',
+        label: 'Deleted By',
+        width: 130,
+        render: (r) => {
+          const by = String(r.deleted_by || (r as { deletedBy?: unknown }).deletedBy || '—');
+          const at = r.deleted_at || (r as { deletedAt?: unknown }).deletedAt;
+          return at ? `${by} · ${new Date(String(at)).toLocaleString()}` : by;
         },
-        {
-          key: 'commentedBy',
-          label: 'Comment By',
-          width: 110,
-          render: (r) => String(r.commented_by || (r as { commentedBy?: unknown }).commentedBy || '—'),
-        },
-        {
-          key: 'deletedBy',
-          label: 'Deleted By',
-          width: 130,
-          render: (r) => {
-            const by = String(r.deleted_by || (r as { deletedBy?: unknown }).deletedBy || '—');
-            const at = r.deleted_at || (r as { deletedAt?: unknown }).deletedAt;
-            return at ? `${by} · ${new Date(String(at)).toLocaleString()}` : by;
-          },
-        },
-      );
+      });
     }
     return cols;
   }, [rowOffset, isCaller, canShowMobile, openComment, allSelected, selectedIds, toggleSelect, toggleAll]);
@@ -936,24 +1072,32 @@ export function CallLogsScreen() {
       {dialerOpen && (
         <View style={styles.filterCard}>
           <Text style={styles.filterLabel}>Campaign</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chipRow}>
-              {CAMPAIGN_LIST.map((c, ci) => {
-                const id = c.id.trim();
-                return (
-                  <TouchableOpacity
-                    key={`camp-${ci}`}
-                    style={[styles.chip, campaignId === id && styles.chipActive]}
-                    onPress={() => setCampaignId(campaignId === id ? '' : id)}
-                  >
-                    <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
-                      {id} · {c.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
+          {campaignOptions.length === 0 ? (
+            <Text style={styles.dialerHint}>
+              {isCaller
+                ? 'No campaign ID on this login. Ask admin to assign an extension / campaign.'
+                : 'No campaigns available.'}
+            </Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.chipRow}>
+                {campaignOptions.map((c, ci) => {
+                  const id = c.id.trim();
+                  return (
+                    <TouchableOpacity
+                      key={`camp-${ci}`}
+                      style={[styles.chip, campaignId === id && styles.chipActive]}
+                      onPress={() => setCampaignId(campaignId === id ? '' : id)}
+                    >
+                      <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
+                        {id}{c.name && c.name !== id ? ` · ${c.name}` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          )}
           <Text style={styles.dialerHint}>
             Tick cards (☐), pick a campaign, then push.
           </Text>
@@ -993,42 +1137,114 @@ export function CallLogsScreen() {
       ) : (
         <>
           {!isCaller && summaryRows.length > 0 && (
-            <>
+            <View style={styles.botStatusBlock}>
               <TouchableOpacity
-                style={styles.collapseHeader}
+                style={styles.botStatusHeader}
                 onPress={() => setBotStatusOpen((o) => !o)}
               >
                 <Text style={styles.collapseTitle}>
                   Bot Status ({summaryRows.length}) {botStatusOpen ? '▲' : '▼'}
                 </Text>
               </TouchableOpacity>
-              {botStatusOpen && (
-              <View style={styles.botGrid}>
-                {summaryRows.map((r) => (
-                  <View key={String(r.botId)} style={styles.botCard}>
-                    <View style={styles.botCardHeader}>
-                      <Text style={styles.botCardTitle}>Bot {r.botId}</Text>
-                      {r.state !== '-' ? (
-                        <Text style={styles.botCardState} numberOfLines={1}>
-                          {r.state}
+              {botStatusOpen ? (
+                <>
+                  {reinitTargets.length > 0 ? (
+                    <View style={styles.botStatusActions}>
+                      <TouchableOpacity
+                        style={styles.botStatusActionBtn}
+                        onPress={toggleAllReinit}
+                        disabled={actionLoading}
+                      >
+                        <Text style={styles.botStatusActionText}>
+                          {allReinitSelected ? '☑ Deselect all' : '☐ Select all'}
                         </Text>
-                      ) : null}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.reinitBtn,
+                          (!selectedReinit.length || actionLoading) && styles.btnDisabled,
+                        ]}
+                        disabled={!selectedReinit.length || actionLoading}
+                        onPress={() =>
+                          void reinitiateStatuses(
+                            selectedReinit.map(({ botId, status }) => ({ botId, status })),
+                          )
+                        }
+                      >
+                        <Text style={styles.reinitBtnText}>
+                          {actionLoading
+                            ? 'Reinit…'
+                            : `Reinit Selected (${selectedReinit.length})`}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={styles.botChipRow}>
-                      {botCardStats(r).map((s) => (
-                        <View key={s.label} style={styles.botChip}>
-                          <Text style={[styles.botChipValue, s.color ? { color: s.color } : null]}>
-                            {s.value}
-                          </Text>
-                          <Text style={styles.botChipLabel}>{s.label}</Text>
+                  ) : null}
+                  <View style={styles.botGrid}>
+                    {summaryRows.map((r) => (
+                      <View key={String(r.botId)} style={styles.botCard}>
+                        <View style={styles.botCardHeader}>
+                          <Text style={styles.botCardTitle}>Bot {r.botId}</Text>
+                          {r.state !== '-' ? (
+                            <Text style={styles.botCardState} numberOfLines={1}>
+                              {r.state}
+                            </Text>
+                          ) : null}
                         </View>
-                      ))}
-                    </View>
+                        <View style={styles.botChipRow}>
+                          {botCardStats(r).map((s) => {
+                            const reinitChip = REINIT_CHIPS.find((c) => c.label === s.label);
+                            const canReinit = Boolean(reinitChip) && s.value > 0;
+                            const selectionKey = reinitChip
+                              ? reinitTargetKey(r.botId, reinitChip.status)
+                              : '';
+                            const isOn = canReinit && reinitKeys.has(selectionKey);
+                            return (
+                              <View
+                                key={s.label}
+                                style={[
+                                  styles.botChip,
+                                  canReinit && styles.botChipReinit,
+                                  isOn && styles.botChipSelected,
+                                ]}
+                              >
+                                <TouchableOpacity
+                                  disabled={!canReinit || actionLoading}
+                                  onPress={() => {
+                                    if (canReinit) toggleReinitTarget(selectionKey);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.botChipValue,
+                                      s.color ? { color: s.color } : null,
+                                    ]}
+                                  >
+                                    {canReinit ? `${isOn ? '☑' : '☐'} ${s.value}` : s.value}
+                                  </Text>
+                                  <Text style={styles.botChipLabel}>{s.label}</Text>
+                                </TouchableOpacity>
+                                {canReinit ? (
+                                  <TouchableOpacity
+                                    disabled={actionLoading}
+                                    onPress={() =>
+                                      void reinitiateStatuses([
+                                        { botId: r.botId, status: reinitChip!.status },
+                                      ])
+                                    }
+                                  >
+                                    <Text style={styles.botChipReinitHint}>Reinit</Text>
+                                  </TouchableOpacity>
+                                ) : null}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
-              )}
-            </>
+                </>
+              ) : null}
+            </View>
           )}
 
           <Text style={styles.sectionTitle}>Calls</Text>
@@ -1060,8 +1276,8 @@ export function CallLogsScreen() {
                         {checked ? '☑' : '☐'}
                       </Text>
                     </TouchableOpacity>
+                    <View style={{ flex: 1, minWidth: 0 }}>
                     <TouchableOpacity
-                      style={{ flex: 1, minWidth: 0 }}
                       activeOpacity={0.75}
                       onPress={() => setSelected({ row, index })}
                     >
@@ -1098,8 +1314,31 @@ export function CallLogsScreen() {
                           {String(row.comments || '—')}
                         </Text>
                       </View>
-                      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+                      <Text style={styles.cardHint}>Tap card for more details</Text>
                     </TouchableOpacity>
+                      <View style={styles.cardActionRow}>
+                        <TouchableOpacity
+                          style={styles.cardActionBtn}
+                          onPress={() => openComment(row)}
+                        >
+                          <Text style={styles.cardActionBtnText}>Comment</Text>
+                        </TouchableOpacity>
+                        {String(row.status || '') === 'completed' && row.recording_url ? (
+                          <TouchableOpacity
+                            style={[
+                              styles.cardActionBtn,
+                              summaryBusyId === id && styles.cardActionBtnDisabled,
+                            ]}
+                            onPress={() => void viewSummary(row)}
+                            disabled={summaryBusyId === id}
+                          >
+                            <Text style={styles.cardActionBtnText}>
+                              {summaryBusyId === id ? 'Loading…' : 'View Summary'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    </View>
                   </View>
                 </View>
               );
@@ -1273,6 +1512,12 @@ export function CallLogsScreen() {
           </View>
         </View>
       </Modal>
+
+      <RecordingPlayerModal
+        visible={recordingUrl !== null}
+        url={recordingUrl}
+        onClose={() => setRecordingUrl(null)}
+      />
     </ScrollView>
   );
 }
@@ -1461,6 +1706,27 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  cardActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(1.5),
+    marginTop: spacing(1.5),
+  },
+  cardActionBtn: {
+    backgroundColor: '#ff9f0a',
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: 5,
+  },
+  cardActionBtnDisabled: {
+    opacity: 0.5,
+  },
+  cardActionBtnText: {
+    color: '#1a1200',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1498,7 +1764,39 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(10),
     gap: spacing(2),
   },
-  botGrid: { gap: spacing(2) },
+  botGrid: { gap: spacing(3), marginTop: spacing(3) },
+  botStatusBlock: { marginTop: spacing(3), marginBottom: spacing(2) },
+  botStatusHeader: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+  },
+  botStatusActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
+  botStatusActionBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    backgroundColor: colors.surface,
+  },
+  botStatusActionText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
+  reinitBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+  },
+  reinitBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
   botCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -1517,8 +1815,8 @@ const styles = StyleSheet.create({
   botChipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(2),
+    gap: spacing(2.5),
+    marginTop: spacing(3),
   },
   botChip: {
     backgroundColor: colors.surfaceAlt,
@@ -1527,9 +1825,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
     alignItems: 'center',
     minWidth: 72,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  botChipReinit: { minWidth: 84 },
+  botChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(245,179,1,0.16)',
   },
   botChipValue: { color: colors.foreground, fontSize: 15, fontWeight: '700' },
-  botChipLabel: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  botChipLabel: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'center' },
+  botChipReinitHint: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 4,
+  },
   loadingText: { color: colors.muted, fontSize: 13 },
   pagerRow: {
     flexDirection: 'row',

@@ -608,6 +608,7 @@ export function FundRequestScreen() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={{ padding: spacing(3), paddingBottom: spacing(10) }}
       keyboardShouldPersistTaps="handled"

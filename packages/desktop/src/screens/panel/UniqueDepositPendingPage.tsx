@@ -10,15 +10,17 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   MenuItem,
   Pagination,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import { toast } from 'react-toastify';
-import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -33,11 +35,12 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
-import { logSheetDownload } from '@/utils/sheetDownloadAudit';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { asPaged, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
+import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
+import { saveWorkbook } from '@/utils/downloadSheet';
 import type { UserRow } from '@/screens/panel/users/utils';
 
 type UniquePendingRow = {
@@ -151,9 +154,6 @@ export function UniqueDepositPendingPage() {
   const [statusRemark, setStatusRemark] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadOtp, setDownloadOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpBusy, setOtpBusy] = useState(false);
 
   const buildPayload = useCallback(() => {
     const filter: Record<string, unknown> = {};
@@ -331,86 +331,11 @@ export function UniqueDepositPendingPage() {
   }, [admin, statusOrderId, statusRemark, load, loadSummary]);
 
   const downloadExcel = useCallback(() => {
-    if (!rows.length) {
-      toast.warn('No data to export!');
-      return;
-    }
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Deposit Data');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    return saveWorkbook(rows as Record<string, unknown>[], {
+      sheetName: 'Deposit Data',
+      filename: `unique_pending_data_${Date.now()}.xlsx`,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `unique_pending_data_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
   }, [rows]);
-
-  const openDownloadDialog = useCallback(() => {
-    setDownloadOtp('');
-    setOtpSent(false);
-    setDownloadOpen(true);
-  }, []);
-
-  const sendDownloadOtp = useCallback(async () => {
-    const mobile = admin?.mobile;
-    if (!mobile) {
-      toast.error('Admin mobile not found');
-      return;
-    }
-    setOtpBusy(true);
-    try {
-      const res = await secureApi('users.sendBlockOtp', { mobile });
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to send OTP');
-        return;
-      }
-      setOtpSent(true);
-      toast.success('OTP sent successfully');
-    } finally {
-      setOtpBusy(false);
-    }
-  }, [admin?.mobile]);
-
-  const verifyDownloadOtp = useCallback(async () => {
-    const mobile = admin?.mobile;
-    if (!mobile) {
-      toast.error('Admin mobile not found');
-      return;
-    }
-    const otp = downloadOtp.trim();
-    if (otp.length !== 4) {
-      toast.error('OTP must be 4 digits');
-      return;
-    }
-    setOtpBusy(true);
-    try {
-      const verify = await secureApi('users.verifyBlockOtp', {
-        mobile,
-        otp: Number.parseInt(otp, 10),
-      });
-      if (!verify.ok) {
-        toast.error(verify.message || 'Invalid OTP');
-        return;
-      }
-      // Fire-and-forget audit log (lax OtpModal sendSheetData)
-      logSheetDownload({
-        mid: 'All',
-        type: 'Unique Pending Deposit',
-      });
-      toast.success('OTP Verified');
-      downloadExcel();
-      setDownloadOpen(false);
-      setDownloadOtp('');
-      setOtpSent(false);
-    } finally {
-      setOtpBusy(false);
-    }
-  }, [admin, downloadOtp, downloadExcel]);
 
   const toCallingItem = useCallback(
     (row: UniquePendingRow): UserRow => ({
@@ -539,6 +464,7 @@ export function UniqueDepositPendingPage() {
             item={toCallingItem(row)}
             campaignName="UNIQUE PENDING DEP ALL APP KA"
             reasonList="Unique Pending Deposit"
+            hideBotCall
           />
         ),
       },
@@ -673,8 +599,14 @@ export function UniqueDepositPendingPage() {
               </Typography>
             );
           }
+          const busy = submittingCommentId === row._id;
           return (
-            <Stack spacing={0.75} sx={{ minWidth: 160 }}>
+            <Stack
+              direction="row"
+              spacing={0.75}
+              alignItems="flex-end"
+              sx={{ minWidth: 180, py: 0.5 }}
+            >
               <TextField
                 size="small"
                 multiline
@@ -684,17 +616,38 @@ export function UniqueDepositPendingPage() {
                 onChange={(e) =>
                   setComments((prev) => ({ ...prev, [row._id]: e.target.value }))
                 }
-                sx={{ '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 12 } }}
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 12 },
+                }}
               />
-              <Button
-                size="small"
-                variant="contained"
-                disabled={submittingCommentId === row._id}
-                onClick={() => void submitComment(row)}
-                sx={actionBtnSx}
-              >
-                {submittingCommentId === row._id ? '…' : 'Submit'}
-              </Button>
+              <Tooltip title={busy ? 'Submitting…' : 'Submit comment'}>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={busy}
+                    onClick={() => void submitComment(row)}
+                    aria-label="Submit comment"
+                    sx={{
+                      bgcolor: '#f1a144',
+                      color: '#111',
+                      width: 32,
+                      height: 32,
+                      borderRadius: 1.5,
+                      mb: 0.25,
+                      '&:hover': { bgcolor: '#e09030' },
+                      '&.Mui-disabled': { bgcolor: '#f7d2a8', color: '#666' },
+                    }}
+                  >
+                    {busy ? (
+                      <CircularProgress size={14} sx={{ color: '#111' }} />
+                    ) : (
+                      <SendOutlinedIcon sx={{ fontSize: 16 }} />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Stack>
           );
         },
@@ -834,7 +787,7 @@ export function UniqueDepositPendingPage() {
               <Button
                 variant="contained"
                 disabled={loading}
-                onClick={openDownloadDialog}
+                onClick={() => setDownloadOpen(true)}
                 sx={orangeBtnSx}
               >
                 Download Data
@@ -921,72 +874,12 @@ export function UniqueDepositPendingPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog
+      <SheetDownloadOtpModal
         open={downloadOpen}
-        onClose={() => !otpBusy && setDownloadOpen(false)}
-        fullWidth
-        maxWidth="xs"
-        PaperProps={{ sx: { bgcolor: 'background.paper' } }}
-      >
-        <DialogTitle>Verify OTP to Download</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            OTP will be sent to your registered mobile
-            {admin?.mobile ? ` (${admin.mobile})` : ''}.
-          </Typography>
-          {otpSent ? (
-            <TextField
-              autoFocus
-              fullWidth
-              label="Enter 4-digit OTP"
-              value={downloadOtp}
-              onChange={(e) =>
-                setDownloadOtp(e.target.value.replace(/\D/g, '').slice(0, 4))
-              }
-              inputProps={{ inputMode: 'numeric', maxLength: 4 }}
-              sx={{ mt: 0.5, '& .MuiInputBase-root': { bgcolor: '#121218' } }}
-            />
-          ) : null}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button
-            onClick={() => setDownloadOpen(false)}
-            disabled={otpBusy}
-            sx={{ textTransform: 'none' }}
-          >
-            Cancel
-          </Button>
-          {!otpSent ? (
-            <Button
-              variant="contained"
-              disabled={otpBusy}
-              onClick={() => void sendDownloadOtp()}
-              sx={orangeBtnSx}
-            >
-              {otpBusy ? '…' : 'Send OTP'}
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="outlined"
-                disabled={otpBusy}
-                onClick={() => void sendDownloadOtp()}
-                sx={{ textTransform: 'none' }}
-              >
-                Resend
-              </Button>
-              <Button
-                variant="contained"
-                disabled={otpBusy || downloadOtp.length !== 4}
-                onClick={() => void verifyDownloadOtp()}
-                sx={orangeBtnSx}
-              >
-                {otpBusy ? '…' : 'Verify & Download'}
-              </Button>
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
+        filter={{ mid: 'All', type: 'Unique Pending Deposit' }}
+        onClose={() => setDownloadOpen(false)}
+        onVerified={downloadExcel}
+      />
     </Box>
   );
 }

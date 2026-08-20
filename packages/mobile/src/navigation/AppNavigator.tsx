@@ -82,12 +82,14 @@ import { AAAFraudBetReportScreen } from '../screens/dashboards/details/AAAFraudB
 import { AAABlacklistedUsersScreen } from '../screens/dashboards/details/AAABlacklistedUsersScreen';
 import { MobileAppScreen } from '../screens/dashboards/details/MobileAppScreen';
 import { IncomingBotCallScreen } from '../screens/dashboards/details/IncomingBotCallScreen';
+import { SkyTalkScreen } from '../screens/dashboards/details/SkyTalkScreen';
 import { RolesResponsibilitiesScreen } from '../screens/dashboards/details/RolesResponsibilitiesScreen';
 import { BonusWalletFundRequestScreen } from '../screens/dashboards/details/BonusWalletFundRequestScreen';
 import { BonusWalletRequestsScreen } from '../screens/dashboards/details/BonusWalletRequestsScreen';
 import { DepositApprovedReportScreen } from '../screens/dashboards/details/DepositApprovedReportScreen';
 import { UniqueDepositPendingScreen } from '../screens/dashboards/details/UniqueDepositPendingScreen';
 import { colors, radius, spacing, isDarkTheme } from '../theme';
+import { getAppVersion } from '../utils/appVersion';
 
 const Drawer = createDrawerNavigator();
 const RootStack = createNativeStackNavigator();
@@ -156,6 +158,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/aaa-blacklisted-users': AAABlacklistedUsersScreen as AnyScreen,
   '/mobile-app': MobileAppScreen as AnyScreen,
   '/incoming-bot-call': IncomingBotCallScreen as AnyScreen,
+  '/sky-talk': SkyTalkScreen as AnyScreen,
   '/roles-responsibilities': RolesResponsibilitiesScreen as AnyScreen,
   '/fund-request-bonus-wallet': BonusWalletFundRequestScreen as AnyScreen,
   '/bonus-wallet': BonusWalletRequestsScreen as AnyScreen,
@@ -233,6 +236,9 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
           />
         ))}
       </DrawerContentScrollView>
+      <View style={styles.drawerFooter}>
+        <Text style={styles.drawerVersion}>v{getAppVersion()}</Text>
+      </View>
     </SafeAreaView>
   );
 }
@@ -461,5 +467,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginVertical: spacing(3),
+  },
+  drawerFooter: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+  },
+  drawerVersion: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

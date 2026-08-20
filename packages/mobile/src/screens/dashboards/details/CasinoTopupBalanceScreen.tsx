@@ -498,7 +498,9 @@ export function CasinoTopupBalanceScreen() {
 
   if (!canView) {
     return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={styles.screen} contentContainerStyle={styles.content}>
         <Text style={styles.title}>{toDisplayText('Casino Top-up Balance')}</Text>
         <View style={styles.mutedBox}>
           <Text style={styles.mutedText}>You do not have permission to view this page.</Text>
@@ -672,7 +674,8 @@ export function CasinoTopupBalanceScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView>
+            <ScrollView
+              showsVerticalScrollIndicator={false}>
               {providers.qtech.loading && providers.qtech.records.length === 0 ? (
                 <Text style={styles.listHint}>Loading…</Text>
               ) : null}
@@ -722,7 +725,9 @@ export function CasinoTopupBalanceScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled">
               <Text style={styles.fieldLabel}>Amount *</Text>
               <TextInput
                 style={styles.input}

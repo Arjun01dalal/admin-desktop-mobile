@@ -27,16 +27,15 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { pickPageSizes, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import { buildBotDialoutSetting } from '../../../utils/dialerHelpers';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
+import { shareCsvFile } from '../../../utils/shareCsv';
 
 type UniquePendingRow = {
   _id: string;
@@ -170,9 +169,6 @@ export function UniqueDepositPendingScreen() {
 
   // OTP download modal.
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadOtp, setDownloadOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpBusy, setOtpBusy] = useState(false);
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -306,45 +302,6 @@ export function UniqueDepositPendingScreen() {
     );
   }, []);
 
-  /** Bot Call — SubAdmin/add-to-dialer (desktop CallingBtn initiateBotCall parity). */
-  const initiateBotCall = useCallback(
-    (row: UniquePendingRow) => {
-      const mobile = String(row.userMobile || row.mobile || '');
-      if (!mobile) {
-        Alert.alert('No mobile number for this user');
-        return;
-      }
-      void (async () => {
-        setBusy(true);
-        try {
-          const res = await secureApi<unknown>('callLogs.addToBotDialer', {
-            userId: admin?._id,
-            created_by: admin?.name,
-            dialout_settings: [
-              buildBotDialoutSetting(
-                {
-                  ...row,
-                  _id: row._id || row.userId,
-                  name: row.userName,
-                },
-                1,
-                'Unique Pending Deposit',
-              ),
-            ],
-          });
-          if (!res.ok || res.success === false) {
-            Alert.alert(res.message || 'Bot call failed');
-            return;
-          }
-          Alert.alert(res.message || 'Call Initiated.');
-        } finally {
-          setBusy(false);
-        }
-      })();
-    },
-    [admin],
-  );
-
   const openWhatsApp = useCallback((row: UniquePendingRow) => {
     const rawMobile = row.userMobile || row.mobile;
     if (!rawMobile) {
@@ -363,79 +320,14 @@ export function UniqueDepositPendingScreen() {
 
   const downloadCsv = useCallback(async () => {
     if (!rows.length) {
-      setError('No data to export');
-      return;
+      Alert.alert('No data to export');
+      return false;
     }
-    try {
-      const csv = toCsv(rows as unknown as Record<string, unknown>[]);
-      const fileUri = `${FileSystem.cacheDirectory}unique_pending_${Date.now()}.csv`;
-      await FileSystem.writeAsStringAsync(fileUri, csv);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'text/csv',
-          dialogTitle: 'Unique Pending Deposit',
-        });
-      } else {
-        setError('Sharing is not available on this device');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to export sheet');
-    }
+    return shareCsvFile(
+      `unique_pending_${Date.now()}.csv`,
+      toCsv(rows as unknown as Record<string, unknown>[]),
+    );
   }, [rows]);
-
-  const sendDownloadOtp = useCallback(async () => {
-    const mobile = admin?.mobile;
-    if (!mobile) {
-      Alert.alert('Admin mobile not found');
-      return;
-    }
-    setOtpBusy(true);
-    try {
-      const res = await secureApi<unknown>('users.sendBlockOtp', { mobile });
-      if (!res.ok) {
-        Alert.alert(res.message || 'Failed to send OTP');
-        return;
-      }
-      setOtpSent(true);
-    } finally {
-      setOtpBusy(false);
-    }
-  }, [admin?.mobile]);
-
-  const verifyDownloadOtp = useCallback(async () => {
-    const mobile = admin?.mobile;
-    if (!mobile) {
-      Alert.alert('Admin mobile not found');
-      return;
-    }
-    const otp = downloadOtp.trim();
-    if (otp.length !== 4) {
-      Alert.alert('OTP must be 4 digits');
-      return;
-    }
-    setOtpBusy(true);
-    try {
-      const verify = await secureApi<unknown>('users.verifyBlockOtp', {
-        mobile,
-        otp: Number.parseInt(otp, 10),
-      });
-      if (!verify.ok) {
-        Alert.alert(verify.message || 'Invalid OTP');
-        return;
-      }
-      // Fire-and-forget audit log (desktop parity).
-      void secureApi<unknown>('reports.sheetDownloadAuditCreate', {
-        downloadedBy: { name: admin?.name || '', userId: admin?._id || '' },
-        filter: { mid: 'All', type: 'Unique Pending Deposit' },
-      });
-      setDownloadOpen(false);
-      setDownloadOtp('');
-      setOtpSent(false);
-      await downloadCsv();
-    } finally {
-      setOtpBusy(false);
-    }
-  }, [admin, downloadOtp, downloadCsv]);
 
   const openUserReport = useCallback(
     (row: UniquePendingRow) => {
@@ -507,12 +399,6 @@ export function UniqueDepositPendingScreen() {
       disabled: !hasMobile || busy,
       onPress: () => openDialer(sheetRow),
     });
-    acts.push({
-      label: busy ? 'Calling…' : 'Bot Call',
-      tone: 'primary',
-      disabled: !hasMobile || busy,
-      onPress: () => initiateBotCall(sheetRow),
-    });
     if (canChangeStatus) {
       acts.push({ label: 'Change Status', tone: 'warning', onPress: () => openInput('status', sheetRow) });
     }
@@ -525,7 +411,6 @@ export function UniqueDepositPendingScreen() {
     openInput,
     openWhatsApp,
     openDialer,
-    initiateBotCall,
     openUserReport,
   ]);
 
@@ -589,11 +474,7 @@ export function UniqueDepositPendingScreen() {
         {canDownload ? (
           <TouchableOpacity
             style={styles.downloadChip}
-            onPress={() => {
-              setDownloadOtp('');
-              setOtpSent(false);
-              setDownloadOpen(true);
-            }}
+            onPress={() => setDownloadOpen(true)}
           >
             <Text style={styles.downloadChipText}>⬇ Download Data</Text>
           </TouchableOpacity>
@@ -750,67 +631,12 @@ export function UniqueDepositPendingScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* OTP download modal */}
-      <Modal
+      <SheetDownloadOtpModal
         visible={downloadOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDownloadOpen(false)}
-      >
-        <KeyboardAvoidingView
-          style={styles.backdrop}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableWithoutFeedback onPress={() => setDownloadOpen(false)}>
-            <View style={styles.backdropTouch} />
-          </TouchableWithoutFeedback>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle} numberOfLines={1}>
-                Verify OTP to Download
-              </Text>
-              <TouchableOpacity
-                onPress={() => setDownloadOpen(false)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Text style={styles.modalClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.fieldLabel}>
-              OTP will be sent to your registered mobile
-              {admin?.mobile ? ` (${admin.mobile})` : ''}.
-            </Text>
-            {otpSent ? (
-              <>
-                <TextInput
-                  style={styles.modalInput}
-                  value={downloadOtp}
-                  onChangeText={(v) => setDownloadOtp(v.replace(/\D/g, '').slice(0, 4))}
-                  placeholder="Enter 4-digit OTP"
-                  placeholderTextColor={colors.muted}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                />
-                <TouchableOpacity
-                  style={[styles.submitBtn, otpBusy && styles.btnDisabled]}
-                  disabled={otpBusy}
-                  onPress={() => void verifyDownloadOtp()}
-                >
-                  <Text style={styles.submitBtnText}>{otpBusy ? 'Verifying…' : 'Verify & Download'}</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <TouchableOpacity
-                style={[styles.submitBtn, otpBusy && styles.btnDisabled]}
-                disabled={otpBusy}
-                onPress={() => void sendDownloadOtp()}
-              >
-                <Text style={styles.submitBtnText}>{otpBusy ? 'Sending…' : 'Send OTP'}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        filter={{ mid: 'All', type: 'Unique Pending Deposit' }}
+        onClose={() => setDownloadOpen(false)}
+        onVerified={() => downloadCsv()}
+      />
     </ScrollView>
   );
 }

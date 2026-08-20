@@ -3,6 +3,7 @@
  * Edit permission rules in packages/shared/src/permissions.ts (shared with desktop).
  */
 import { appStorage, getStoredUser } from '../lib/webShim';
+import { persistUser } from '../lib/secureStorage';
 import type { AuthUser } from '../types/auth';
 import {
   Permissions,
@@ -68,7 +69,9 @@ export function updateStoredResponsibilities(next: string[]): void {
   const user = getSessionUser();
   if (!user) return;
   const updated = { ...user, Responsibilities: next };
-  appStorage.setItem('user', JSON.stringify(updated));
+  const userJson = JSON.stringify(updated);
+  appStorage.setItem('user', userJson);
+  void persistUser(userJson);
 }
 
 export function getResponsibilities(

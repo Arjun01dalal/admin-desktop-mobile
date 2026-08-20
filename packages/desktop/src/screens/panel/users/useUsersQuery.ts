@@ -22,6 +22,7 @@ import {
   filterSearchByEmpCode,
   hasOtherUserSearch,
   resolveSearchEmpCode,
+  trimCode,
   unpackByType,
   type UserFilters,
   type UserRow,
@@ -123,6 +124,12 @@ export function useUsersQuery({
       begin();
       setLoading(true);
       try {
+        if (isCaller && userType !== 'Sub_Admin' && !trimCode(loginEmpCode)) {
+          toast.error('No empCode on this login. Ask admin to assign empCode.');
+          setRows([]);
+          setTotal(0);
+          return;
+        }
         const isNonPerfActive = userType === 'Non_Performing_Active_User';
         const applyEmpRules =
           userType === 'User' ||
@@ -138,18 +145,22 @@ export function useUsersQuery({
         > = { ok: true };
 
         if (applyEmpRules) {
-          const resolved = resolveSearchEmpCode(
-            applied.empCode,
-            loginEmpCode,
-            otherSearch,
-          );
-          if (!resolved.ok) {
-            toast.error(resolved.message);
-            setRows([]);
-            setTotal(0);
-            return;
+          if (isCaller) {
+            empResolved = { ok: true, apiEmpCode: loginEmpCode };
+          } else {
+            const resolved = resolveSearchEmpCode(
+              applied.empCode,
+              loginEmpCode,
+              otherSearch,
+            );
+            if (!resolved.ok) {
+              toast.error(resolved.message);
+              setRows([]);
+              setTotal(0);
+              return;
+            }
+            empResolved = resolved;
           }
-          empResolved = resolved;
         }
 
         const filter = buildUserFilter(
@@ -193,13 +204,17 @@ export function useUsersQuery({
 
         const trimmedEmp = String(applied.empCode || '').trim();
         if (applyEmpRules && loginEmpCode) {
-          if (empResolved.allowOwnAndDefault || empResolved.matchDefault) {
+          if (isCaller || empResolved.apiEmpCode) {
+            list = list.filter((row) =>
+              empCodesEqual(row.empCode, empResolved.apiEmpCode || loginEmpCode),
+            );
+          } else if (empResolved.allowOwnAndDefault || empResolved.matchDefault) {
             list = filterSearchByEmpCode(list, loginEmpCode, empResolved);
-          } else if (empResolved.apiEmpCode) {
-            list = filterListByLoginEmpCode(list, empResolved.apiEmpCode);
           } else {
             list = filterListByLoginEmpCode(list, loginEmpCode);
           }
+        } else if (isCaller && userType !== 'Sub_Admin') {
+          list = list.filter((row) => empCodesEqual(row.empCode, loginEmpCode));
         } else if (isNonPerfActive && !loginEmpCode && trimmedEmp) {
           // Admin without login empCode: API may ignore filter — match client-side
           list = list.filter((row) =>
@@ -234,6 +249,7 @@ export function useUsersQuery({
       isCurrent,
       itemsPerPage,
       loginEmpCode,
+      isCaller,
       next,
       page,
       playedIn,

@@ -12,7 +12,6 @@ import {
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { toast } from 'react-toastify';
-import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -20,6 +19,8 @@ import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { display, maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
+import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
+import { saveWorkbook } from '@/utils/downloadSheet';
 import {
   computeFundsDateSplitStats,
   getCreatedOn,
@@ -110,6 +111,7 @@ export function FundsPayinPage() {
 
   const [loading, setLoading] = useState(false);
   const [requestType, setRequestType] = useState<RequestType>('automaticDeposit');
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [transactions, setTransactions] = useState<TxnRow[]>([]);
   const [coins, setCoins] = useState<TxnRow[]>([]);
@@ -265,14 +267,10 @@ export function FundsPayinPage() {
       }));
     }
 
-    if (!rows.length) {
-      toast.info('No data to export');
-      return;
-    }
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    XLSX.writeFile(workbook, `${sheetName.toLowerCase()}_${Date.now()}.xlsx`);
+    return saveWorkbook(rows, {
+      sheetName,
+      filename: `${sheetName.toLowerCase()}_${Date.now()}.xlsx`,
+    });
   };
 
   const indexCol = useMemo<CommonTableColumn<TxnRow>>(
@@ -431,7 +429,7 @@ export function FundsPayinPage() {
         </Paper>
         <Button
           startIcon={<DownloadIcon />}
-          onClick={downloadExcel}
+          onClick={() => setDownloadOpen(true)}
           sx={orangeBtnSx}
         >
           Download Excel
@@ -463,6 +461,20 @@ export function FundsPayinPage() {
         maxHeight="100%"
       />
       </TablePanel>
+      <SheetDownloadOtpModal
+        open={downloadOpen}
+        filter={{
+          mid: mid || 'All',
+          type:
+            requestType === 'automaticDeposit'
+              ? 'Funds Automatic'
+              : requestType === 'scanner add'
+                ? 'Funds Scanner Add'
+                : 'Funds Scanner Remove',
+        }}
+        onClose={() => setDownloadOpen(false)}
+        onVerified={downloadExcel}
+      />
     </Box>
   );
 }

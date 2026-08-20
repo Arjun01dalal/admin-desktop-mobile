@@ -234,6 +234,7 @@ export function AAAFraudBetReportScreen() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"

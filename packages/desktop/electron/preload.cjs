@@ -22,10 +22,23 @@ contextBridge.exposeInMainWorld('gcalc', {
   showWelcome: () => ipcRenderer.send('gcalc:show-welcome'),
   /** @deprecated Use showSite — kept for compatibility */
   showCalculator: () => ipcRenderer.send('gcalc:show-site'),
-  showSite: () => ipcRenderer.send('gcalc:show-site'),
+  /** Optional accessToken → one-shot SSO hash (customer login only, not gate password). */
+  showSite: (payload) => ipcRenderer.send('gcalc:show-site', payload || {}),
+  /** Landscape shell without marketing BrowserView (native Astro login). */
+  showNativeAuth: () => ipcRenderer.send('gcalc:show-native-auth'),
   hideSite: () => ipcRenderer.send('gcalc:hide-site'),
 
   openNewWindow: () => safeInvoke('app:open-new-window'),
+
+  /** Public Astro site auth (api.astrothirdeye.com). */
+  siteLoginViaPassword: (payload) => safeInvoke('siteAuth:loginViaPassword', payload),
+  siteSendEmailOtp: (payload) => safeInvoke('siteAuth:sendEmailOtp', payload),
+  siteVerifyEmailOtp: (payload) => safeInvoke('siteAuth:verifyEmailOtp', payload),
+  siteResetPassword: (payload) => safeInvoke('siteAuth:resetPassword', payload),
+  /** Real FCM registration token (Electron main → Google FCM). */
+  getFcmToken: (payload) => safeInvoke('siteAuth:getFcmToken', payload || {}),
+  /** Astro site Terms & Conditions (static page type 6100). */
+  fetchTermsAndConditions: () => safeInvoke('siteAuth:fetchTerms'),
 
   onRequestLogin: (cb) => {
     if (typeof cb !== 'function') return () => {};
@@ -35,6 +48,17 @@ contextBridge.exposeInMainWorld('gcalc', {
       ipcRenderer.removeListener('astro:request-login', handler);
     };
   },
+
+  /** OS / site logout deep link: myastroapp://login?logged_out=1 */
+  onDeepLink: (cb) => {
+    if (typeof cb !== 'function') return () => {};
+    const handler = (_e, d) => cb(d && typeof d === 'object' ? d : {});
+    ipcRenderer.on('gcalc:deep-link', handler);
+    return () => {
+      ipcRenderer.removeListener('gcalc:deep-link', handler);
+    };
+  },
+  getPendingDeepLink: () => safeInvoke('gcalc:get-pending-deep-link'),
 
   onLoginBlockedSos: (cb) => {
     if (typeof cb !== 'function') return () => {};
@@ -60,6 +84,11 @@ contextBridge.exposeInMainWorld('gcalc', {
   getIpLocation: () => safeInvoke('auth:get-ip-location'),
   openLocationSettings: () => safeInvoke('gcalc:open-location-settings'),
   copyText: (text) => safeInvoke('gcalc:copy-text', String(text ?? '')),
+  saveDownload: (filename, base64) =>
+    safeInvoke('file:save-download', {
+      filename: String(filename || 'download.xlsx'),
+      base64: String(base64 || ''),
+    }),
   recordingUrl: (url) => {
     try {
       const parsed = new URL(String(url || ''));

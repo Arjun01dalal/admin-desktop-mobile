@@ -1,46 +1,50 @@
-# Astro Admin Panel
+# Astro Platform (monorepo)
 
-Electron desktop app (React + Vite + MUI) that opens as a calculator.
-Entering **`9100` + `=`** opens the secure admin **Login** screen.
-After a successful OTP login, the **Welcome** screen opens fullscreen.
+npm workspaces monorepo for Astro clients.
 
-## Run
+```text
+packages/
+  desktop/   @astro/desktop  — Electron CS Panel (full app)
+  mobile/    @astro/mobile   — mobile scaffold (Expo/RN later)
+  shared/    @astro/shared   — safe shared types/constants
+docs/                      — PM / engineering docs
+```
+
+## Setup
 
 ```bash
 npm install
 
-# Hot reload (Vite + Electron) — use this while coding
-npm run dev
-
-# Build then open Electron from dist/
-npm start
-```
-
-## Secrets (important)
-
-API URL and encryption key live **only** in the Electron main process via `.env`:
-
-```bash
-cp .env.example .env
+# Desktop secrets (required for panel)
+cp packages/desktop/.env.example packages/desktop/.env
 # edit API_BASE_URL and ENTK_VALUE
 ```
 
-- `.env` is gitignored — never commit it.
-- Installers no longer ship the plaintext `.env`; `npm run dist:*` embeds the values via `scripts/generate-embedded-env.cjs` (XOR-encrypted with a per-build key, split into shuffled fragments — nothing greppable in the shipped files). This is strong obfuscation, not true secrecy — enforce real security server-side.
-- DevTools are disabled in packaged builds.
-- The renderer never sees these values; auth calls go through IPC (`auth:send-otp`, `auth:verify-otp`, `auth:get-address`).
-
-## App flow
-
-1. Calculator (cover)
-2. Type `9100` → `=` → Login (mobile OTP + location)
-3. Successful verify → Welcome (fullscreen)
-
-## Build installers
+## Commands (from repo root)
 
 ```bash
-npm run dist:mac
-npm run dist:win
+npm run desktop:dev          # Vite + Electron hot reload
+npm run desktop:dist:mac     # mac installer
+npm run desktop:dist:win     # Windows installer
+npm run sos-push             # optional SOS relay
+npm run mobile:start         # mobile scaffold placeholder
 ```
 
-Output goes to `release/`.
+You can also run inside a package:
+
+```bash
+npm run dev -w @astro/desktop
+```
+
+## Package rules
+
+| Package | Owns | Must not contain |
+|---------|------|------------------|
+| `@astro/desktop` | Electron main, preload, panel UI, SOS, cert pin | Mobile UI |
+| `@astro/mobile` | Future RN/Expo app | Electron IPC / ENTK |
+| `@astro/shared` | Types, client name codes | Secrets, Electron APIs |
+
+## Docs
+
+- [PM overview](docs/PM-Astro-CS-Panel-Overview.md)
+- [Desktop README](packages/desktop/README.md)

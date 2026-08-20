@@ -4,6 +4,7 @@ import {
   Box,
   CircularProgress,
   MenuItem,
+  Pagination,
   Stack,
   TextField,
   Typography,
@@ -18,8 +19,15 @@ import {
   formatDisplayTime,
 } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import { fieldSx } from '@/screens/panel/transactions/shared';
 
-type ProviderKey = 'SattaMatka' | 'Falcon' | 'Jetfair' | 'WCO' | 'AAAExchange';
+type ProviderKey =
+  | 'SattaMatka'
+  | 'Falcon'
+  | 'Jetfair'
+  | 'WCO'
+  | 'AAAExchange'
+  | 'PlutusGaming';
 
 type ExposureNavState = {
   userId?: string;
@@ -41,9 +49,14 @@ const PROVIDERS: { value: string; key: ProviderKey }[] = [
   { value: 'Jetfair', key: 'Jetfair' },
   { value: 'WCO', key: 'WCO' },
   { value: 'AAA Exchange', key: 'AAAExchange' },
+  { value: 'Plutus Gaming', key: 'PlutusGaming' },
 ];
 
-type ColDef = { label: string; key: string; kind?: 'date' | 'layBack' | 'amount' };
+type ColDef = {
+  label: string;
+  key: string;
+  kind?: 'date' | 'layBack' | 'amount' | 'srNo';
+};
 
 const TABLE_COLS: Record<ProviderKey, ColDef[]> = {
   SattaMatka: [
@@ -114,6 +127,11 @@ const TABLE_COLS: Record<ProviderKey, ColDef[]> = {
     { label: 'Status', key: 'status' },
     { label: 'Updated On', key: 'updatedOn', kind: 'date' },
   ],
+  /** Fallback only — Plutus columns are built dynamically from row keys. */
+  PlutusGaming: [
+    { label: 'Created On', key: 'createdOn', kind: 'date' },
+    { label: 'Updated On', key: 'updatedOn', kind: 'date' },
+  ],
 };
 
 type Row = Record<string, unknown>;
@@ -149,12 +167,13 @@ function unpackExposureLists(data: unknown): {
 
 function unpackPendingList(data: unknown): Row[] {
   let cur: unknown = data;
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 6; i += 1) {
     if (Array.isArray(cur)) return cur as Row[];
     if (!cur || typeof cur !== 'object') break;
     const o = cur as Record<string, unknown>;
     if (Array.isArray(o.items)) return o.items as Row[];
-    if (o.payload != null) {
+    if (Array.isArray(o.payload)) return o.payload as Row[];
+    if (o.payload != null && typeof o.payload === 'object') {
       cur = o.payload;
       continue;
     }
@@ -167,8 +186,37 @@ function unpackPendingList(data: unknown): Row[] {
   return [];
 }
 
-function cellValue(row: Row, col: ColDef): string {
-  const raw = row[col.key];
+function resolveNested(row: Row, key: string): unknown {
+  const direct = key.split('.').reduce<unknown>((acc, part) => {
+    if (acc && typeof acc === 'object' && !Array.isArray(acc)) {
+      return (acc as Record<string, unknown>)[part];
+    }
+    return undefined;
+  }, row);
+  if (direct !== undefined) return direct;
+  const raw = row.rawPayload;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return key.split('.').reduce<unknown>((acc, part) => {
+      if (acc && typeof acc === 'object' && !Array.isArray(acc)) {
+        return (acc as Record<string, unknown>)[part];
+      }
+      return undefined;
+    }, raw);
+  }
+  return undefined;
+}
+
+function isPlainNumeric(value: unknown): boolean {
+  if (value === null || value === undefined || value === '') return false;
+  if (typeof value === 'object') return false;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'string') return /^-?\d+(\.\d+)?$/.test(value.trim());
+  return false;
+}
+
+function cellValue(row: Row, col: ColDef, opts?: { srNo?: number }): string {
+  if (col.kind === 'srNo') return String(opts?.srNo ?? '-');
+  const raw = resolveNested(row, col.key);
   if (col.kind === 'date') {
     const d = formatDisplayDate(raw);
     const t = formatDisplayTime(raw);
@@ -176,8 +224,33 @@ function cellValue(row: Row, col: ColDef): string {
   }
   if (col.kind === 'layBack') return raw ? 'Back' : 'Lay';
   if (col.kind === 'amount') return String(formatAmount(Number(raw) || 0));
+  if (typeof raw === 'boolean') return String(raw);
+  if (isPlainNumeric(raw) && col.kind !== 'date') {
+    return String(Math.round(Number(raw)));
+  }
+  if (raw != null && typeof raw === 'object') {
+    const serialized = JSON.stringify(raw);
+    return serialized.length > 220 ? `${serialized.slice(0, 220)}...` : serialized;
+  }
   if (raw == null || raw === '') return '-';
   return String(raw);
+}
+
+function buildPlutusColumns(rows: Row[]): ColDef[] {
+  if (!rows.length) return TABLE_COLS.PlutusGaming;
+  const keys = Object.keys(rows[0]).filter(
+    (k) => k !== 'txnState' && k !== 'age' && k !== 'rawPayload',
+  );
+  return [
+    { label: 'Sr. No', key: '__srNo', kind: 'srNo' },
+    ...keys.map((k) => ({
+      label: k,
+      key: k,
+      kind: (['createdOn', 'updatedOn'].includes(k) ? 'date' : undefined) as
+        | ColDef['kind']
+        | undefined,
+    })),
+  ];
 }
 
 /** Laxmi UserExposure — opened when User Exposure Total Sum > 0. */
@@ -194,7 +267,10 @@ export function UserExposurePage() {
     Jetfair: [],
     WCO: [],
     AAAExchange: [],
+    PlutusGaming: [],
   });
+  const [plutusPage, setPlutusPage] = useState(1);
+  const [plutusItemsPerPage, setPlutusItemsPerPage] = useState(20);
 
   const loadLists = useCallback(async () => {
     if (!userId) return;
@@ -227,10 +303,34 @@ export function UserExposurePage() {
 
   const onProviderChange = async (next: string) => {
     setProvider(next);
-    if (next !== 'WCO' && next !== 'AAA Exchange') return;
+    setPlutusPage(1);
+    if (next !== 'WCO' && next !== 'AAA Exchange' && next !== 'Plutus Gaming') {
+      return;
+    }
 
     setLoading(true);
     try {
+      if (next === 'Plutus Gaming') {
+        if (!userId) {
+          toast.error('User id missing for Plutus Gaming request');
+          return;
+        }
+        const res = await secureApi('userReport.plutusPendingBets', {
+          userId,
+          itemsPerPage: 100,
+          pageNo: 1,
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to load Plutus Gaming');
+          return;
+        }
+        setDataMap((prev) => ({
+          ...prev,
+          PlutusGaming: unpackPendingList(res.data),
+        }));
+        return;
+      }
+
       const action =
         next === 'WCO'
           ? 'userReport.wcoPendingBet'
@@ -252,17 +352,32 @@ export function UserExposurePage() {
 
   const providerKey =
     PROVIDERS.find((p) => p.value === provider)?.key || 'SattaMatka';
-  const rows = dataMap[providerKey] || [];
-  const colDefs = TABLE_COLS[providerKey];
+  const isPlutus = provider === 'Plutus Gaming';
+  const allRows = dataMap[providerKey] || [];
+  const totalPages = isPlutus
+    ? Math.max(1, Math.ceil(allRows.length / plutusItemsPerPage))
+    : 1;
+  const rows = isPlutus
+    ? allRows.slice(
+        (plutusPage - 1) * plutusItemsPerPage,
+        plutusPage * plutusItemsPerPage,
+      )
+    : allRows;
+  const colDefs = isPlutus ? buildPlutusColumns(allRows) : TABLE_COLS[providerKey];
 
   const columns = useMemo<CommonTableColumn<Row>[]>(
     () =>
       colDefs.map((col) => ({
         id: col.key,
         label: col.label,
-        render: (r) => cellValue(r, col),
+        render: (r, index) =>
+          cellValue(r, col, {
+            srNo: isPlutus
+              ? (plutusPage - 1) * plutusItemsPerPage + index + 1
+              : undefined,
+          }),
       })),
-    [colDefs],
+    [colDefs, isPlutus, plutusItemsPerPage, plutusPage],
   );
 
   return (
@@ -272,17 +387,22 @@ export function UserExposurePage() {
         alignItems="center"
         spacing={1.5}
         mb={1.5}
-        flexWrap="wrap"
+        mt={0.5}
+        flexWrap="nowrap"
         useFlexGap
+        sx={{ overflowX: 'auto', pt: 0.75 }}
       >
-        <Typography fontWeight={700}>{toDisplayText('User Exposure')}</Typography>
+        <Typography fontWeight={700} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+          {toDisplayText('User Exposure')}
+        </Typography>
         <TextField
           select
           size="small"
           label="Provider"
           value={provider}
           onChange={(e) => void onProviderChange(e.target.value)}
-          sx={{ minWidth: 180, bgcolor: '#fff' }}
+          InputLabelProps={{ shrink: true }}
+          sx={{ ...fieldSx, width: 200, minWidth: 200, flex: '0 0 auto' }}
         >
           {PROVIDERS.map((p) => (
             <MenuItem key={p.value} value={p.value}>
@@ -290,6 +410,26 @@ export function UserExposurePage() {
             </MenuItem>
           ))}
         </TextField>
+        {isPlutus ? (
+          <TextField
+            select
+            size="small"
+            label="Items / page"
+            value={String(plutusItemsPerPage)}
+            onChange={(e) => {
+              setPlutusItemsPerPage(Number(e.target.value) || 20);
+              setPlutusPage(1);
+            }}
+            InputLabelProps={{ shrink: true }}
+            sx={{ ...fieldSx, width: 140, minWidth: 140, flex: '0 0 auto' }}
+          >
+            {[10, 20, 50, 100].map((n) => (
+              <MenuItem key={n} value={String(n)}>
+                {n}
+              </MenuItem>
+            ))}
+          </TextField>
+        ) : null}
       </Stack>
 
       {loading && rows.length === 0 ? (
@@ -306,10 +446,20 @@ export function UserExposurePage() {
             }
             loading={loading}
             emptyMessage="No data found"
-            minWidth={1200}
+            minWidth={isPlutus ? 900 : 1200}
             dense
             maxHeight="100%"
           />
+          {isPlutus && totalPages > 1 ? (
+            <Stack alignItems="center" py={1.5}>
+              <Pagination
+                count={totalPages}
+                page={plutusPage}
+                onChange={(_e, p) => setPlutusPage(p)}
+                color="secondary"
+              />
+            </Stack>
+          ) : null}
         </TablePanel>
       )}
     </Box>

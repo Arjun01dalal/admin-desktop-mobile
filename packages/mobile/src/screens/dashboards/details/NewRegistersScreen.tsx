@@ -38,7 +38,7 @@ import {
 } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
-import { CAMPAIGN_LIST } from '../../../utils/campaignList';
+import { CAMPAIGN_LIST, campaignsForLoginUser } from '../../../utils/campaignList';
 import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
@@ -170,7 +170,8 @@ export function NewRegistersScreen() {
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
-  const hideContact = hasPermission('contact_visibility_none') || isNewRegistersCaller();
+  const isCaller = isNewRegistersCaller();
+  const hideContact = hasPermission('contact_visibility_none') || isCaller;
 
   const [draftStart, setDraftStart] = useState(initialStart);
   const [draftEnd, setDraftEnd] = useState(initialEnd);
@@ -221,9 +222,15 @@ export function NewRegistersScreen() {
 
   // Stored admin — read once (fresh object each call would retrigger load).
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
+  const campaignOptions = useMemo(
+    () => campaignsForLoginUser(admin, { assignedOnly: isCaller }),
+    [admin, isCaller],
+  );
 
   // Add to Dialer — like the web panel, sends ALL currently loaded rows.
-  const [campaignId, setCampaignId] = useState('');
+  const [campaignId, setCampaignId] = useState(() =>
+    isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
+  );
   const [dialerOpen, setDialerOpen] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [dialerMsg, setDialerMsg] = useState('');
@@ -394,12 +401,13 @@ export function NewRegistersScreen() {
       setDialerMsg('No users to send');
       return;
     }
-    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
+    const campaign = campaignOptions.find((c) => c.id.trim() === campaignId.trim())
+      ?? CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
     setPushing(true);
     try {
       const res = await addToDialerBatch({
         campaignId,
-        serverId: campaign?.serverId,
+        serverId: campaign?.serverId ?? (admin as { serverId?: string } | null)?.serverId,
         leads: rows.map((r) => ({
           _id: String(r._id || ''),
           name: r.name,
@@ -413,7 +421,7 @@ export function NewRegistersScreen() {
     } finally {
       setPushing(false);
     }
-  }, [campaignId, rows]);
+  }, [admin, campaignId, campaignOptions, rows]);
 
   /** Close row sheet first so native modals do not stack (same as Call Logs). */
   const afterSheetClose = useCallback((fn: () => void) => {
@@ -695,22 +703,30 @@ export function NewRegistersScreen() {
       {dialerOpen && (
         <View style={styles.dialerCard}>
           <Text style={styles.dialerLabel}>Campaign</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRow}>
-            {CAMPAIGN_LIST.map((c, ci) => {
-              const id = c.id.trim();
-              return (
-                <TouchableOpacity
-                  key={`camp-${ci}`}
-                  style={[styles.chip, campaignId === id && styles.chipActive]}
-                  onPress={() => setCampaignId(campaignId === id ? '' : id)}
-                >
-                  <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
-                    {id} · {c.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {campaignOptions.length === 0 ? (
+            <Text style={styles.dialerHint}>
+              {isCaller
+                ? 'No campaign ID on this login. Ask admin to assign an extension / campaign.'
+                : 'No campaigns available.'}
+            </Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRow}>
+              {campaignOptions.map((c, ci) => {
+                const id = c.id.trim();
+                return (
+                  <TouchableOpacity
+                    key={`camp-${ci}`}
+                    style={[styles.chip, campaignId === id && styles.chipActive]}
+                    onPress={() => setCampaignId(campaignId === id ? '' : id)}
+                  >
+                    <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
+                      {id}{c.name && c.name !== id ? ` · ${c.name}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
           <Text style={styles.dialerHint}>
             Sends all {rows.length} users shown below to the selected campaign.
           </Text>

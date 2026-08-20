@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -11,8 +11,12 @@ import {
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { secureApi } from '@/api/secureClient';
-import { formatAmount, formatLocalDate } from '@/utils/dates';
+import { formatAmount, formatLocalDate, getStoredUser } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import {
+  roleFlags,
+  type StoredCallerUser,
+} from '@/screens/panel/callerResponsibility/utils';
 import { WalletLedgerTable } from './WalletLedgerTable';
 import type { EncryptedUser } from './types';
 
@@ -138,6 +142,11 @@ function pickLastActivity(encrypted?: EncryptedUser | null): unknown {
 /** Wallet History tab — layout mirrors admin-panel WalletHistory.css */
 export function WalletHistoryView({ userId, encrypted }: Props) {
   const navigate = useNavigate();
+  const { isCaller } = useMemo(() => {
+    const user = getStoredUser<StoredCallerUser>();
+    return roleFlags(user?.Role_ID);
+  }, []);
+
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [depositTotal, setDepositTotal] = useState(0);
@@ -152,43 +161,49 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
   const loadSummary = useCallback(async () => {
     setLoading(true);
     try {
-      const [walletRes, bonusRes, availedRes, exposureRes] = await Promise.all([
-        secureApi('userReport.walletHistory', {
-          itemsPerPage: 1,
-          pageNo: 1,
-          filter: { userId },
-        }),
+      const requests: Array<Promise<{ ok: boolean; data?: unknown }>> = [
         secureApi('userReport.bonusTotalEarning', {
           userId,
           itemsPerPage: 10,
           pageNo: 1,
         }),
-        secureApi('userReport.bonusApprovedTotal', { userId }),
         secureApi('userReport.userExposure', { _id: userId }),
-      ]);
-
-      if (walletRes.ok) {
-        const nested = unpackWalletSummary(walletRes.data);
-        setDepositTotal(Number(nested.totalDeposit) || 0);
-        setWithdrawalTotal(Number(nested.totalWithdrawal) || 0);
-        setBalanceTotal(Math.floor(Number(nested.balance) || 0));
-        setBonusBalance(Number(nested.bonusWalletBalance) || 0);
-        setPendingWithdrawal(Number(nested.pendingWithdrawal) || 0);
+      ];
+      if (!isCaller) {
+        requests.unshift(
+          secureApi('userReport.walletHistory', {
+            itemsPerPage: 1,
+            pageNo: 1,
+            filter: { userId },
+          }),
+          secureApi('userReport.bonusApprovedTotal', { userId }),
+        );
       }
 
-      if (bonusRes.ok) {
-        setBonusData(asBonusEarning(bonusRes.data));
-      }
-      if (availedRes.ok) {
-        setAvailedBonus(asAvailedBonus(availedRes.data));
-      }
-      if (exposureRes.ok) {
-        setUserExposure(asExposureTotal(exposureRes.data));
+      const results = await Promise.all(requests);
+
+      if (isCaller) {
+        const [bonusRes, exposureRes] = results;
+        if (bonusRes.ok) setBonusData(asBonusEarning(bonusRes.data));
+        if (exposureRes.ok) setUserExposure(asExposureTotal(exposureRes.data));
+      } else {
+        const [walletRes, availedRes, bonusRes, exposureRes] = results;
+        if (walletRes.ok) {
+          const nested = unpackWalletSummary(walletRes.data);
+          setDepositTotal(Number(nested.totalDeposit) || 0);
+          setWithdrawalTotal(Number(nested.totalWithdrawal) || 0);
+          setBalanceTotal(Math.floor(Number(nested.balance) || 0));
+          setBonusBalance(Number(nested.bonusWalletBalance) || 0);
+          setPendingWithdrawal(Number(nested.pendingWithdrawal) || 0);
+        }
+        if (availedRes.ok) setAvailedBonus(asAvailedBonus(availedRes.data));
+        if (bonusRes.ok) setBonusData(asBonusEarning(bonusRes.data));
+        if (exposureRes.ok) setUserExposure(asExposureTotal(exposureRes.data));
       }
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, isCaller]);
 
   useEffect(() => {
     void loadSummary();
@@ -217,6 +232,106 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
   const availedAmount = Number(availedBonus?.totalAmount) || 0;
   const availedCount = Number(availedBonus?.count) || 0;
 
+  const callerStats = (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))',
+        gap: 0.5,
+      }}
+    >
+      <CompactStat
+        label={`Bonus Earning (${ownEarningCount})`}
+        value={formatAmount(ownEarning)}
+        strong
+        clickable={ownEarning > 0}
+        onClick={() => openBonusEarning('bonus')}
+      />
+      <CompactStat
+        label="User Exposure"
+        value={formatAmount(userExposure)}
+        strong
+        clickable={userExposure > 0}
+        onClick={openUserExposure}
+      />
+    </Box>
+  );
+
+  const fullStats = (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))',
+        gap: 0.5,
+      }}
+    >
+      <CompactStat label="Deposit" value={formatAmount(depositTotal)} />
+      <CompactStat label="Withdraw" value={formatAmount(withdrawalTotal)} />
+      <CompactStat label="Balance" value={formatAmount(balanceTotal)} />
+      <CompactStat label="Bonus Wallet" value={formatAmount(bonusBalance)} />
+      <CompactStat
+        label="Pending Withdrawal"
+        value={formatAmount(pendingWithdrawal)}
+      />
+      <CompactStat
+        label="Created"
+        value={formatReportDate(encrypted?.createdAt)}
+      />
+      <CompactStat
+        label="Last Activity"
+        value={formatReportDate(pickLastActivity(encrypted))}
+      />
+      <CompactStat
+        label={profit < 0 ? 'Loss' : 'Profit'}
+        value={formatAmount(profit)}
+        tone={profit < 0 ? 'error' : 'success'}
+        strong
+      />
+      <CompactStat
+        label={toDisplayText(
+          profitAfter < 0
+            ? 'Loss After Withdrawal'
+            : 'Profit After Withdrawal',
+        )}
+        value={formatAmount(profitAfter)}
+        tone={profitAfter < 0 ? 'error' : 'success'}
+        strong
+      />
+      <CompactStat
+        label={`Bonus Earning (${ownEarningCount})`}
+        value={formatAmount(ownEarning)}
+        strong
+        clickable={ownEarning > 0}
+        onClick={() => openBonusEarning('bonus')}
+      />
+      <CompactStat
+        label={
+          availedAmount > 0
+            ? `Availed Bonus (${availedCount})`
+            : 'Bonus Earning (0)'
+        }
+        value={formatAmount(availedAmount)}
+        strong
+        clickable={availedAmount > 0}
+        onClick={() => openBonusEarning('availedBonus', availedBonus)}
+      />
+      <CompactStat
+        label={`${toDisplayText('Bonus Referral Earning')} (${referralCount})`}
+        value={formatAmount(referralEarning)}
+        strong
+        clickable={referralEarning > 0}
+        onClick={() => openBonusEarning()}
+      />
+      <CompactStat
+        label="User Exposure"
+        value={formatAmount(userExposure)}
+        strong
+        clickable={userExposure > 0}
+        onClick={openUserExposure}
+      />
+    </Box>
+  );
+
   const summaryBody = (
     <Box
       sx={{
@@ -231,35 +346,37 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
         width: '100%',
       }}
     >
-      <Box
-        sx={{
-          flex: { md: '1 1 56%' },
-          width: { xs: '100%', md: '56%' },
-          minWidth: 0,
-          bgcolor: '#FF9A43',
-          px: 1,
-          py: 0.75,
-          display: 'flex',
-          justifyContent: 'space-between',
-          color: '#000',
-          border: '1px solid #e7812d',
-          borderRadius: 1.5,
-        }}
-      >
-        <BazarCol header="Bazar" rows={[...BAZAR_ROWS]} footer="Grand Total" />
-        <BazarCol
-          header={toDisplayText('(Win - Loss)')}
-          rows={['0 - 0', '0 - 0', '0 - 0', '0 - 0']}
-          footer="-"
-        />
-        <BazarCol header="Total" rows={[':0', ':0', ':0', ':0']} footer=":0" />
-      </Box>
+      {!isCaller ? (
+        <Box
+          sx={{
+            flex: { md: '1 1 56%' },
+            width: { xs: '100%', md: '56%' },
+            minWidth: 0,
+            bgcolor: '#FF9A43',
+            px: 1,
+            py: 0.75,
+            display: 'flex',
+            justifyContent: 'space-between',
+            color: '#000',
+            border: '1px solid #e7812d',
+            borderRadius: 1.5,
+          }}
+        >
+          <BazarCol header="Bazar" rows={[...BAZAR_ROWS]} footer="Grand Total" />
+          <BazarCol
+            header={toDisplayText('(Win - Loss)')}
+            rows={['0 - 0', '0 - 0', '0 - 0', '0 - 0']}
+            footer="-"
+          />
+          <BazarCol header="Total" rows={[':0', ':0', ':0', ':0']} footer=":0" />
+        </Box>
+      ) : null}
 
       <Box
         sx={{
-          flex: { md: '1 1 44%' },
-          width: { xs: '100%', md: '44%' },
-          minWidth: { md: 320 },
+          flex: isCaller ? '1 1 100%' : { md: '1 1 44%' },
+          width: isCaller ? '100%' : { xs: '100%', md: '44%' },
+          minWidth: isCaller ? 0 : { md: 320 },
           bgcolor: '#fff',
           px: 1,
           py: 0.75,
@@ -273,79 +390,10 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
           <Stack alignItems="center" py={2}>
             <CircularProgress size={24} />
           </Stack>
+        ) : isCaller ? (
+          callerStats
         ) : (
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))',
-              gap: 0.5,
-            }}
-          >
-            <CompactStat label="Deposit" value={formatAmount(depositTotal)} />
-            <CompactStat label="Withdraw" value={formatAmount(withdrawalTotal)} />
-            <CompactStat label="Balance" value={formatAmount(balanceTotal)} />
-            <CompactStat label="Bonus Wallet" value={formatAmount(bonusBalance)} />
-            <CompactStat
-              label="Pending Withdrawal"
-              value={formatAmount(pendingWithdrawal)}
-            />
-            <CompactStat
-              label="Created"
-              value={formatReportDate(encrypted?.createdAt)}
-            />
-            <CompactStat
-              label="Last Activity"
-              value={formatReportDate(pickLastActivity(encrypted))}
-            />
-            <CompactStat
-              label={profit < 0 ? 'Loss' : 'Profit'}
-              value={formatAmount(profit)}
-              tone={profit < 0 ? 'error' : 'success'}
-              strong
-            />
-            <CompactStat
-              label={toDisplayText(
-                profitAfter < 0
-                  ? 'Loss After Withdrawal'
-                  : 'Profit After Withdrawal',
-              )}
-              value={formatAmount(profitAfter)}
-              tone={profitAfter < 0 ? 'error' : 'success'}
-              strong
-            />
-            <CompactStat
-              label={`Bonus Earning (${ownEarningCount})`}
-              value={formatAmount(ownEarning)}
-              strong
-              clickable={ownEarning > 0}
-              onClick={() => openBonusEarning('bonus')}
-            />
-            <CompactStat
-              label={
-                availedAmount > 0
-                  ? `Availed Bonus (${availedCount})`
-                  : 'Bonus Earning (0)'
-              }
-              value={formatAmount(availedAmount)}
-              strong
-              clickable={availedAmount > 0}
-              onClick={() => openBonusEarning('availedBonus', availedBonus)}
-            />
-            <CompactStat
-              label={`${toDisplayText('Bonus Referral Earning')} (${referralCount})`}
-              value={formatAmount(referralEarning)}
-              strong
-              clickable={referralEarning > 0}
-              onClick={() => openBonusEarning()}
-            />
-            <CompactStat
-              label="User Exposure"
-              value={formatAmount(userExposure)}
-              strong
-              clickable={userExposure > 0}
-              onClick={openUserExposure}
-            />
-          </Box>
+          fullStats
         )}
       </Box>
     </Box>
@@ -407,9 +455,11 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
                   </Typography>
                   {!loading && (
                     <Typography sx={{ fontSize: 11, color: '#667085' }}>
-                      · Deposit ₹{formatAmount(depositTotal)} · Balance ₹
-                      {formatAmount(balanceTotal)} ·{' '}
-                      {profit < 0 ? 'Loss' : 'Profit'} ₹{formatAmount(profit)}
+                      {isCaller
+                        ? `· Bonus Earning ₹${formatAmount(ownEarning)} · Exposure ₹${formatAmount(userExposure)}`
+                        : `· Deposit ₹${formatAmount(depositTotal)} · Balance ₹${formatAmount(balanceTotal)} · ${
+                            profit < 0 ? 'Loss' : 'Profit'
+                          } ₹${formatAmount(profit)}`}
                     </Typography>
                   )}
                 </Box>

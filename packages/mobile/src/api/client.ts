@@ -66,7 +66,6 @@ function maybeAuthFailure(
   authFailureHandler?.(message || 'Session expired. Please login again.');
 }
 
-
 const BANNER_VIDEO_TYPES = new Set(['tutorialVideo', 'howToDepositVideo']);
 
 /**

@@ -346,6 +346,7 @@ export function PercentageScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView
+              showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing(4) }}
               keyboardShouldPersistTaps="handled"
             >

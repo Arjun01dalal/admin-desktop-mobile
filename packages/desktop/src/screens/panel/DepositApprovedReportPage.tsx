@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
-import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
@@ -28,7 +27,8 @@ import {
   todayIST,
 } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
-import { logSheetDownload } from '@/utils/sheetDownloadAudit';
+import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
+import { saveWorkbook } from '@/utils/downloadSheet';
 import { asList, asPaged, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 
@@ -162,6 +162,7 @@ export function DepositApprovedReportPage() {
     filters: EMPTY_FILTERS,
   });
   const [approvedSum, setApprovedSum] = useState(0);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [sumLoading, setSumLoading] = useState(false);
   const [gateways, setGateways] = useState<GatewayOption[]>([]);
   const [requestType, setRequestType] = useState<RequestType>('automaticDeposit');
@@ -341,31 +342,11 @@ export function DepositApprovedReportPage() {
 
   const downloadExcel = useCallback(() => {
     const source = isScanner ? scannerRows : rows;
-    if (!source.length) {
-      toast.warn('No data to export!');
-      return;
-    }
-    logSheetDownload({
-      mid:
-        selectedGateway?.mid != null && selectedGateway.mid !== ''
-          ? String(selectedGateway.mid)
-          : 'All',
-      type: isScanner ? 'Scanner Deposit Approved Report' : 'Deposit Approved Report',
+    return saveWorkbook(source as Record<string, unknown>[], {
+      sheetName: 'Deposit Data',
+      filename: `deposit_data_${Date.now()}.xlsx`,
     });
-    const worksheet = XLSX.utils.json_to_sheet(source);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Deposit Data');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `deposit_data_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [isScanner, scannerRows, rows, selectedGateway?.mid]);
+  }, [isScanner, scannerRows, rows]);
 
   const refreshAll = useCallback(() => {
     if (isScanner) void loadScannerData();
@@ -901,7 +882,7 @@ export function DepositApprovedReportPage() {
             <Button
               variant="contained"
               disabled={loading || scannerLoading}
-              onClick={downloadExcel}
+              onClick={() => setDownloadOpen(true)}
               sx={orangeBtnSx}
             >
               Download ExcelData
@@ -972,6 +953,18 @@ export function DepositApprovedReportPage() {
           />
         )}
       </TablePanel>
+      <SheetDownloadOtpModal
+        open={downloadOpen}
+        filter={{
+          mid:
+            selectedGateway?.mid != null && selectedGateway.mid !== ''
+              ? String(selectedGateway.mid)
+              : 'All',
+          type: isScanner ? 'Scanner Deposit Approved Report' : 'Deposit Approved Report',
+        }}
+        onClose={() => setDownloadOpen(false)}
+        onVerified={downloadExcel}
+      />
     </Box>
   );
 }

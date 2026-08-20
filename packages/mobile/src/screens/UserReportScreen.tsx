@@ -5,6 +5,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,14 +15,22 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { getSessionUser } from '../auth/permissions';
+import { getSessionUser, isCallerRole } from '../auth/permissions';
 import { colors, radius, spacing } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import { type DataTableColumn } from '../dashboards/ui/DataTable';
 import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
 import { secureApi } from '../api/client';
-import { formatDisplayDate } from '../utils/dates';
+import { formatDisplayDate, formatDisplayTime } from '../utils/dates';
 import { DateField } from '../components/DateField';
+import {
+  CollapsibleSection,
+  filledFilters,
+  HistoryFilterBar,
+  type HistoryFilterField,
+  useHistoryFilters,
+} from './userReport/HistoryFilterBar';
+import { TabSelect } from './userReport/TabSelect';
 
 type Rec = Record<string, unknown>;
 
@@ -58,15 +67,16 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+function stamp(raw: unknown): string {
+  if (raw == null || raw === '') return '—';
+  const d = formatDisplayDate(raw);
+  const t = formatDisplayTime(raw);
+  if (!d) return display(raw);
+  return t ? `${d} , ${t}` : d;
+}
+
 function when(r: Rec): string {
-  const raw = (r.createdOn ?? r.createdAt ?? r.updatedOn) as string | undefined;
-  if (!raw) return '—';
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return String(raw);
-  return `${formatDisplayDate(raw)} ${d.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })}`;
+  return stamp(r.createdOn ?? r.createdAt ?? r.updatedOn);
 }
 
 /** Desktop USER_REPORT_TABS parity. */
@@ -103,9 +113,15 @@ type Summary = {
   pendingWithdrawal: number;
   exposure: number;
   referralEarning: number;
+  referralCount: number;
   ownEarning: number;
+  ownEarningCount: number;
   approvedBonus: number;
+  approvedBonusCount: number;
+  approvedBonusItems: Rec[];
 };
+
+type BonusKind = 'bonus' | 'referral' | 'availedBonus';
 
 function useWalletSummary(userId: string) {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -136,8 +152,12 @@ function useWalletSummary(userId: string) {
         pendingWithdrawal: num(w.pendingWithdrawal),
         exposure: exp,
         referralEarning: num(b.userReferral),
+        referralCount: num(b.userReferralCount),
         ownEarning: num(b.userOwnEarning),
+        ownEarningCount: num(b.userOwnEarningCount),
         approvedBonus: num(a.totalAmount),
+        approvedBonusCount: num(a.count),
+        approvedBonusItems: Array.isArray(a.items) ? (a.items as Rec[]) : [],
       });
     })();
     return () => {
@@ -150,55 +170,160 @@ function useWalletSummary(userId: string) {
 /* --------------------------------- screen --------------------------------- */
 
 export function UserReportScreen() {
+  const navigation = useNavigation<{
+    navigate: (name: string, params?: object) => void;
+  }>();
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const userId = String(params.userId ?? '');
   const userName = String(params.userName ?? '');
+  const played = String(params.played ?? '').trim();
   const { width } = useWindowDimensions();
   const compact = width < 380;
 
   const [tab, setTab] = useState<Tab>('Wallet History');
+  const [amountsOpen, setAmountsOpen] = useState(false);
   const summary = useWalletSummary(userId);
+  const isCaller = isCallerRole();
 
-  const summaryCards: [string, number][] = summary
-    ? [
-        ['Balance', summary.balance],
-        ['Total Deposit', summary.totalDeposit],
-        ['Total Refund', summary.totalWithdrawal],
-        ['Bonus Wallet', summary.bonusWalletBalance],
-        ['Pending Refund', summary.pendingWithdrawal],
-        ['Exposure', summary.exposure],
-        ['Referral Earning', summary.referralEarning],
-        ['Own Earning', summary.ownEarning],
-        ['Approved Bonus', summary.approvedBonus],
-      ]
+  const openBonus = useCallback(
+    (kind: BonusKind) => {
+      navigation.navigate('/bonus-wallet-referral-earning', {
+        userId,
+        userName,
+        Type: kind,
+        items: kind === 'availedBonus' ? summary?.approvedBonusItems ?? [] : undefined,
+      });
+    },
+    [navigation, summary?.approvedBonusItems, userId, userName],
+  );
+
+  const openExposure = useCallback(() => {
+    navigation.navigate('/user_exposure', { userId, userName });
+  }, [navigation, userId, userName]);
+
+  const profit = summary ? summary.totalDeposit - summary.totalWithdrawal : 0;
+  const profitAfter = summary
+    ? summary.totalDeposit - summary.totalWithdrawal - summary.balance - summary.pendingWithdrawal
+    : 0;
+
+  const summaryCards: Array<{
+    label: string;
+    value: number;
+    tone?: 'success' | 'error';
+    onPress?: () => void;
+  }> = summary
+    ? isCaller
+      ? [
+          {
+            label: 'User Exposure',
+            value: summary.exposure,
+            onPress: summary.exposure > 0 ? openExposure : undefined,
+          },
+          {
+            label: `Bonus Earning (${summary.ownEarningCount})`,
+            value: summary.ownEarning,
+            onPress: summary.ownEarning > 0 ? () => openBonus('bonus') : undefined,
+          },
+        ]
+      : [
+          { label: 'Balance', value: summary.balance },
+          { label: 'Total Deposit', value: summary.totalDeposit },
+          { label: 'Total Refund', value: summary.totalWithdrawal },
+          {
+            label: profit < 0 ? 'Loss' : 'Profit',
+            value: Math.abs(profit),
+            tone: profit < 0 ? 'error' : 'success',
+          },
+          {
+            label: profitAfter < 0 ? 'Loss After Withdrawal' : 'Profit After Withdrawal',
+            value: Math.abs(profitAfter),
+            tone: profitAfter < 0 ? 'error' : 'success',
+          },
+          { label: 'Bonus Wallet', value: summary.bonusWalletBalance, onPress: () => openBonus('bonus') },
+          { label: 'Pending Refund', value: summary.pendingWithdrawal },
+          {
+            label: 'User Exposure',
+            value: summary.exposure,
+            onPress: summary.exposure > 0 ? openExposure : undefined,
+          },
+          {
+            label: `Bonus Referral Earning (${summary.referralCount})`,
+            value: summary.referralEarning,
+            onPress: summary.referralEarning > 0 ? () => openBonus('referral') : undefined,
+          },
+          {
+            label: `Bonus Earning (${summary.ownEarningCount})`,
+            value: summary.ownEarning,
+            onPress: summary.ownEarning > 0 ? () => openBonus('bonus') : undefined,
+          },
+          {
+            label: `Availed Bonus (${summary.approvedBonusCount})`,
+            value: summary.approvedBonus,
+            onPress: summary.approvedBonus > 0 ? () => openBonus('availedBonus') : undefined,
+          },
+        ]
     : [];
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{userName || 'User Report'}</Text>
-      <Text style={styles.sub}>ID: {userId}</Text>
-
-      <View style={styles.summaryGrid}>
-        {summaryCards.map(([label, value]) => (
-          <View key={label} style={[styles.summaryCard, compact && styles.summaryCardCompact]}>
-            <Text style={styles.summaryLabel}>{label}</Text>
-            <Text style={styles.summaryValue}>₹{floorNum(value).toLocaleString('en-IN')}</Text>
-          </View>
-        ))}
-        {!summary ? <Text style={styles.muted}>Loading summary…</Text> : null}
+    <ScrollView
+      style={styles.wrap}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.headerRow}>
+        <View style={styles.headerName}>
+          <Text style={styles.title} numberOfLines={1}>
+            {userName || 'User Report'}
+          </Text>
+          <Text style={styles.sub} numberOfLines={2}>
+            ID: {userId}
+            {played && played !== '—' ? ` · In: ${played}` : ''}
+          </Text>
+        </View>
+        <TabSelect value={tab} options={TABS} onChange={setTab} />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-        {TABS.map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.chip, tab === t && styles.chipActive]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[styles.chipText, tab === t && styles.chipTextActive]}>{t}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <TouchableOpacity
+        style={styles.collapseHeader}
+        onPress={() => setAmountsOpen((o) => !o)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.collapseTitle}>Amounts</Text>
+        <Text style={styles.collapseChevron}>{amountsOpen ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {amountsOpen ? (
+        <View style={styles.summaryGrid}>
+          {summaryCards.map(({ label, value, tone, onPress }) => (
+            <TouchableOpacity
+              key={label}
+              activeOpacity={onPress ? 0.85 : 1}
+              disabled={!onPress}
+              onPress={onPress}
+              style={[
+                styles.summaryCard,
+                compact && styles.summaryCardCompact,
+                onPress && styles.summaryCardClickable,
+                tone === 'success' && styles.summaryCardSuccess,
+                tone === 'error' && styles.summaryCardError,
+              ]}
+            >
+              <Text style={styles.summaryLabel}>{label}</Text>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  tone === 'success' && styles.summaryValueSuccess,
+                  tone === 'error' && styles.summaryValueError,
+                  onPress && styles.summaryValueClickable,
+                ]}
+              >
+                ₹{floorNum(value).toLocaleString('en-IN')}
+              </Text>
+              {onPress ? <Text style={styles.summaryHint}>Tap to view</Text> : null}
+            </TouchableOpacity>
+          ))}
+          {!summary ? <Text style={styles.muted}>Loading summary…</Text> : null}
+        </View>
+      ) : null}
 
       <TabBody tab={tab} userId={userId} />
     </ScrollView>
@@ -359,11 +484,12 @@ const BAR_COLORS = ['#4fc3f7', '#ffb74d', '#81c784', '#e57373', '#ba68c8', '#f06
 
 /** Bet Amount Overview bars (desktop chart, RN Views version). */
 function BetAmountChart({ data }: { data: { name: string; amount: number }[] }) {
-  if (!data.length) return null;
+  if (!data.length) {
+    return <Text style={styles.muted}>No graph data</Text>;
+  }
   const max = Math.max(...data.map((d) => d.amount), 1);
   return (
     <View style={styles.chartCard}>
-      <Text style={styles.chartTitle}>Bet Amount Overview</Text>
       {data.map((d, i) => (
         <View key={d.name} style={styles.chartRow}>
           <Text style={styles.chartLabel} numberOfLines={1}>
@@ -473,36 +599,41 @@ function WalletTab({ userId }: { userId: string }) {
 
   return (
     <View>
-      <BetAmountChart data={chartData} />
-      <View style={styles.filterRow}>
-        <View style={styles.dateWrap}>
-          <DateField value={startDate} onChange={(v) => { setStartDate(v); setPage(1); }} placeholder="From" />
+      <CollapsibleSection title="Bet Amount Overview">
+        <BetAmountChart data={chartData} />
+      </CollapsibleSection>
+      <CollapsibleSection title="Search Filters">
+        <View style={styles.filterRow}>
+          <View style={styles.dateWrap}>
+            <DateField value={startDate} onChange={(v) => { setStartDate(v); setPage(1); }} placeholder="From" />
+          </View>
+          <View style={styles.dateWrap}>
+            <DateField value={endDate} onChange={(v) => { setEndDate(v); setPage(1); }} placeholder="To" />
+          </View>
         </View>
-        <View style={styles.dateWrap}>
-          <DateField value={endDate} onChange={(v) => { setEndDate(v); setPage(1); }} placeholder="To" />
+        <View style={styles.chipRowPlain}>
+          {(
+            [
+              ['', 'All'],
+              ['CR', 'Credited'],
+              ['DR', 'Debited'],
+            ] as const
+          ).map(([v, label]) => (
+            <TouchableOpacity
+              key={label}
+              style={[styles.chip, txType === v && styles.chipActive]}
+              onPress={() => {
+                setTxType(v);
+                setPage(1);
+              }}
+            >
+              <Text style={[styles.chipText, txType === v && styles.chipTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </View>
-      <View style={styles.chipRowPlain}>
-        {(
-          [
-            ['', 'All'],
-            ['CR', 'Credited'],
-            ['DR', 'Debited'],
-          ] as const
-        ).map(([v, label]) => (
-          <TouchableOpacity
-            key={label}
-            style={[styles.chip, txType === v && styles.chipActive]}
-            onPress={() => {
-              setTxType(v);
-              setPage(1);
-            }}
-          >
-            <Text style={[styles.chipText, txType === v && styles.chipTextActive]}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      </CollapsibleSection>
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -518,31 +649,57 @@ function WalletTab({ userId }: { userId: string }) {
 
 const GAME_STATUS: Record<string, string> = { P: 'Pending', W: 'Win', L: 'Loss' };
 
+const MATKA_STATUS_OPTIONS = [
+  { id: '', label: 'All' },
+  { id: 'P', label: 'Pending' },
+  { id: 'W', label: 'Win' },
+  { id: 'L', label: 'Loss' },
+];
+
+const GAME_FILTER_FIELDS: HistoryFilterField[] = [
+  { type: 'text', key: 'transaction_id', placeholder: 'Search transaction id' },
+  { type: 'text', key: 'bazar_name', placeholder: 'Search bazar name' },
+  { type: 'text', key: 'game_name', placeholder: 'Search game name' },
+  { type: 'text', key: 'game', placeholder: 'Search game' },
+  { type: 'date', key: 'result_date', placeholder: 'Game date' },
+  { type: 'text', key: 'point', placeholder: 'Search point', keyboard: 'number-pad' },
+  { type: 'status', key: 'status', options: MATKA_STATUS_OPTIONS },
+  { type: 'text', key: 'winning_point', placeholder: 'Search winning point', keyboard: 'number-pad' },
+  { type: 'text', key: 'commission', placeholder: 'Search commission', keyboard: 'number-pad' },
+];
+
+const EMPTY_GAME_FILTERS = {
+  transaction_id: '',
+  bazar_name: '',
+  game_name: '',
+  game: '',
+  result_date: '',
+  point: '',
+  status: '',
+  winning_point: '',
+  commission: '',
+};
+
 function GameTab({ userId }: { userId: string }) {
   const [rows, setRows] = useState<Rec[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<'' | 'P' | 'W' | 'L'>('');
-  const [resultDate, setResultDate] = useState('');
+  const { draft, applied, page, setPage, onChange, onSearch } = useHistoryFilters(EMPTY_GAME_FILTERS);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const filter: Rec = { customer_id: userId };
-      if (status) filter.status = status;
-      if (resultDate) filter.result_date = resultDate;
       const res = await secureApi('userReport.gameHistory', {
         itemsPerPage: 20,
         pageNo: page,
-        filter,
+        filter: { customer_id: userId, ...filledFilters(applied) },
       });
       setRows(res.ok ? listOf(res.data, 'items') : []);
       setTotalPages(res.ok ? pagesOf(res.data) : 1);
     } finally {
       setLoading(false);
     }
-  }, [userId, page, status, resultDate]);
+  }, [userId, page, applied]);
 
   useEffect(() => {
     void load();
@@ -578,33 +735,14 @@ function GameTab({ userId }: { userId: string }) {
 
   return (
     <View>
-      <View style={styles.filterRow}>
-        <View style={styles.dateWrap}>
-          <DateField value={resultDate} onChange={(v) => { setResultDate(v); setPage(1); }} placeholder="Result date" />
-        </View>
-      </View>
-      <View style={styles.chipRowPlain}>
-        {(
-          [
-            ['', 'All'],
-            ['P', 'Pending'],
-            ['W', 'Win'],
-            ['L', 'Loss'],
-          ] as const
-        ).map(([v, label]) => (
-          <TouchableOpacity
-            key={label}
-            style={[styles.chip, status === v && styles.chipActive]}
-            onPress={() => {
-              setStatus(v);
-              setPage(1);
-            }}
-          >
-            <Text style={[styles.chipText, status === v && styles.chipTextActive]}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <HistoryFilterBar
+        fields={GAME_FILTER_FIELDS}
+        values={draft}
+        onChange={onChange}
+        onSearch={onSearch}
+      />
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -620,22 +758,37 @@ function GameTab({ userId }: { userId: string }) {
 
 type FundType = 'deposit' | 'withdrawal' | 'coin';
 
+const FUND_FILTER_FIELDS: HistoryFilterField[] = [
+  { type: 'text', key: 'paymentType', placeholder: 'Payment type' },
+  { type: 'text', key: 'amount', placeholder: 'Search amount', keyboard: 'number-pad' },
+  { type: 'text', key: 'orderId', placeholder: 'Order id' },
+  { type: 'text', key: 'orderKeyId', placeholder: 'Order key id' },
+  { type: 'text', key: 'paymentGatewayName', placeholder: 'Gateway' },
+  { type: 'text', key: 'mid', placeholder: 'Mid' },
+];
+
+const EMPTY_FUND_FILTERS = {
+  paymentType: '',
+  amount: '',
+  orderId: '',
+  orderKeyId: '',
+  paymentGatewayName: '',
+  mid: '',
+};
+
 function FundTab({ userId }: { userId: string }) {
   const [type, setType] = useState<FundType>('deposit');
   const [rows, setRows] = useState<Rec[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [amount, setAmount] = useState('');
+  const { draft, applied, page, setPage, onChange, onSearch } = useHistoryFilters(EMPTY_FUND_FILTERS);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const payload: Rec = { itemsPerPage: 20, pageNo: page, type };
       if (type === 'deposit') {
-        const f: Rec = { userId };
-        if (amount.trim()) f.amount = amount.trim();
-        payload.filterDeposit = f;
+        payload.filterDeposit = { userId, ...filledFilters(applied) };
       } else if (type === 'withdrawal') {
         payload.filterWithdrawal = { dp_id: userId };
       } else {
@@ -647,7 +800,7 @@ function FundTab({ userId }: { userId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [userId, page, type, amount]);
+  }, [userId, page, type, applied]);
 
   useEffect(() => {
     void load();
@@ -674,7 +827,8 @@ function FundTab({ userId }: { userId: string }) {
         { key: 'bank', label: 'Bank', width: 110, render: (r) => display(r.bankName) },
         { key: 'provider', label: 'Provider', width: 120, render: (r) => display(r.withdrewalProviderName) },
         { key: 'commission', label: 'Commission', width: 90, render: (r) => floorNum(num(r.CommissionAmount ?? r.commission)).toLocaleString('en-IN') },
-        { key: 'created', label: 'Date/Time', width: 140, render: (r) => when(r) },
+        { key: 'createdAt', label: 'Created At', width: 150, render: (r) => stamp(r.createdOn ?? r.createdAt) },
+        { key: 'updatedAt', label: 'Updated At', width: 150, render: (r) => stamp(r.updatedOn ?? r.updatedAt) },
       ];
     }
     if (type === 'coin') {
@@ -686,7 +840,8 @@ function FundTab({ userId }: { userId: string }) {
         { key: 'reason', label: 'Reason', width: 130, render: (r) => display(r.reason) },
         { key: 'tag', label: 'Tag', width: 90, render: (r) => display(r.tag) },
         { key: 'remark', label: 'Remark', width: 140, render: (r) => display(r.remark) },
-        { key: 'created', label: 'Date/Time', width: 140, render: (r) => when(r) },
+        { key: 'createdAt', label: 'Created At', width: 150, render: (r) => stamp(r.createdOn ?? r.createdAt) },
+        { key: 'updatedAt', label: 'Updated At', width: 150, render: (r) => stamp(r.updatedOn ?? r.updatedAt) },
       ];
     }
     return [
@@ -705,7 +860,8 @@ function FundTab({ userId }: { userId: string }) {
       { key: 'lat', label: 'Latitude', width: 90, render: (r) => display(r.latitude) },
       { key: 'lng', label: 'Longitude', width: 90, render: (r) => display(r.longitude) },
       { key: 'updatedBy', label: 'Updated By', width: 120, render: updatedByName },
-      { key: 'created', label: 'Date/Time', width: 140, render: (r) => when(r) },
+      { key: 'createdAt', label: 'Created At', width: 150, render: (r) => stamp(r.createdOn ?? r.createdAt) },
+      { key: 'updatedAt', label: 'Updated At', width: 150, render: (r) => stamp(r.updatedOn ?? r.updatedAt) },
     ];
   }, [type]);
 
@@ -732,19 +888,15 @@ function FundTab({ userId }: { userId: string }) {
         ))}
       </View>
       {type === 'deposit' ? (
-        <View style={styles.filterRow}>
-          <TextInput
-            style={styles.input}
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="Search amount"
-            placeholderTextColor={colors.muted}
-            keyboardType="number-pad"
-            onSubmitEditing={() => setPage(1)}
-          />
-        </View>
+        <HistoryFilterBar
+          fields={FUND_FILTER_FIELDS}
+          values={draft}
+          onChange={onChange}
+          onSearch={onSearch}
+        />
       ) : null}
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -767,29 +919,55 @@ const MATKA_ACTION: Record<MatkaVariant, string> = {
   crazy: 'userReport.crazyWheelHistory',
 };
 
+const MATKA_FILTER_FIELDS: HistoryFilterField[] = [
+  { type: 'text', key: 'transaction_id', placeholder: 'Search transaction id' },
+  { type: 'text', key: 'bazar_name', placeholder: 'Search bazar name' },
+  { type: 'text', key: 'game_name', placeholder: 'Search game name' },
+  { type: 'text', key: 'game', placeholder: 'Search game' },
+  { type: 'date', key: 'result_date', placeholder: 'Game date' },
+  { type: 'text', key: 'point', placeholder: 'Search point', keyboard: 'number-pad' },
+  { type: 'status', key: 'status', options: MATKA_STATUS_OPTIONS },
+  { type: 'text', key: 'winning_point', placeholder: 'Search winning point', keyboard: 'number-pad' },
+  { type: 'text', key: 'commission', placeholder: 'Search commission', keyboard: 'number-pad' },
+];
+
+const CRAZY_FILTER_FIELDS: HistoryFilterField[] = [
+  { type: 'text', key: 'transaction_id', placeholder: 'Search transaction id' },
+  { type: 'text', key: 'bazar_name', placeholder: 'Search bazar name' },
+  { type: 'text', key: 'round_id', placeholder: 'Search round id' },
+  { type: 'text', key: 'game', placeholder: 'Search game' },
+  { type: 'date', key: 'result_date', placeholder: 'Game date' },
+  { type: 'text', key: 'point', placeholder: 'Search point', keyboard: 'number-pad' },
+  { type: 'status', key: 'status', options: MATKA_STATUS_OPTIONS },
+  { type: 'text', key: 'winning_point', placeholder: 'Search winning point', keyboard: 'number-pad' },
+  { type: 'text', key: 'commission', placeholder: 'Search commission', keyboard: 'number-pad' },
+];
+
+const EMPTY_MATKA_FILTERS = {
+  ...EMPTY_GAME_FILTERS,
+  round_id: '',
+};
+
 function MatkaTab({ userId, variant }: { userId: string; variant: MatkaVariant }) {
   const [rows, setRows] = useState<Rec[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [resultDate, setResultDate] = useState('');
+  const { draft, applied, page, setPage, onChange, onSearch } = useHistoryFilters(EMPTY_MATKA_FILTERS);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const filter: Rec = { customer_id: userId };
-      if (resultDate) filter.result_date = resultDate;
       const res = await secureApi(MATKA_ACTION[variant] as Parameters<typeof secureApi>[0], {
         itemsPerPage: 20,
         pageNo: page,
-        filter,
+        filter: { customer_id: userId, ...filledFilters(applied) },
       });
       setRows(res.ok ? listOf(res.data, 'items') : []);
       setTotalPages(res.ok ? pagesOf(res.data) : 1);
     } finally {
       setLoading(false);
     }
-  }, [userId, variant, page, resultDate]);
+  }, [userId, variant, page, applied]);
 
   useEffect(() => {
     void load();
@@ -833,12 +1011,14 @@ function MatkaTab({ userId, variant }: { userId: string; variant: MatkaVariant }
 
   return (
     <View>
-      <View style={styles.filterRow}>
-        <View style={styles.dateWrap}>
-          <DateField value={resultDate} onChange={(v) => { setResultDate(v); setPage(1); }} placeholder="Result date" />
-        </View>
-      </View>
+      <HistoryFilterBar
+        fields={variant === 'crazy' ? CRAZY_FILTER_FIELDS : MATKA_FILTER_FIELDS}
+        values={draft}
+        onChange={onChange}
+        onSearch={onSearch}
+      />
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -852,29 +1032,53 @@ function MatkaTab({ userId, variant }: { userId: string; variant: MatkaVariant }
 
 /* -------------------------------- qtech tab -------------------------------- */
 
+const QTECH_STATUS_OPTIONS = [
+  { id: '', label: 'All' },
+  { id: 'W', label: 'Win' },
+  { id: 'L', label: 'Loss' },
+  { id: 'R', label: 'Rollback' },
+];
+
+const QTECH_FILTER_FIELDS: HistoryFilterField[] = [
+  { type: 'text', key: 'transactionId', placeholder: 'Search transaction id' },
+  { type: 'text', key: 'roundId', placeholder: 'Search round id' },
+  { type: 'text', key: 'gameId', placeholder: 'Search game id' },
+  { type: 'text', key: 'category', placeholder: 'Search category' },
+  { type: 'text', key: 'amount', placeholder: 'Search amount', keyboard: 'number-pad' },
+  { type: 'text', key: 'winning', placeholder: 'Search winning', keyboard: 'number-pad' },
+  { type: 'status', key: 'status', options: QTECH_STATUS_OPTIONS },
+];
+
+const EMPTY_QTECH_FILTERS = {
+  transactionId: '',
+  roundId: '',
+  gameId: '',
+  category: '',
+  amount: '',
+  winning: '',
+  status: '',
+};
+
 function QtechTab({ userId }: { userId: string }) {
   const [rows, setRows] = useState<Rec[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<'' | 'W' | 'L' | 'R'>('');
+  const { draft, applied, page, setPage, onChange, onSearch } = useHistoryFilters(EMPTY_QTECH_FILTERS);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const filter: Rec = { userId };
-      if (status) filter.status = status;
       const res = await secureApi('userReport.qtechHistory', {
         itemsPerPage: 20,
         pageNo: page,
-        filter,
+        filter: { userId, ...filledFilters(applied) },
       });
       setRows(res.ok ? listOf(res.data, 'items') : []);
       setTotalPages(res.ok ? pagesOf(res.data) : 1);
     } finally {
       setLoading(false);
     }
-  }, [userId, page, status]);
+  }, [userId, page, applied]);
 
   useEffect(() => {
     void load();
@@ -910,28 +1114,14 @@ function QtechTab({ userId }: { userId: string }) {
 
   return (
     <View>
-      <View style={styles.chipRowPlain}>
-        {(
-          [
-            ['', 'All'],
-            ['W', 'Win'],
-            ['L', 'Loss'],
-            ['R', 'Rollback'],
-          ] as const
-        ).map(([v, label]) => (
-          <TouchableOpacity
-            key={label}
-            style={[styles.chip, status === v && styles.chipActive]}
-            onPress={() => {
-              setStatus(v);
-              setPage(1);
-            }}
-          >
-            <Text style={[styles.chipText, status === v && styles.chipTextActive]}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <HistoryFilterBar
+        fields={QTECH_FILTER_FIELDS}
+        values={draft}
+        onChange={onChange}
+        onSearch={onSearch}
+      />
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -945,27 +1135,72 @@ function QtechTab({ userId }: { userId: string }) {
 
 /* ------------------------------ exchange tab ------------------------------ */
 
+const EXCHANGE_FILTER_FIELDS: HistoryFilterField[] = [
+  { type: 'text', key: 'transactionId', placeholder: 'Search transaction id' },
+  { type: 'text', key: 'transactionCode', placeholder: 'Search transaction code' },
+  { type: 'text', key: 'transactionType', placeholder: 'Search transaction type' },
+  { type: 'text', key: 'marketId', placeholder: 'Search market id' },
+  { type: 'text', key: 'marketName', placeholder: 'Search market name' },
+  { type: 'text', key: 'runnerName', placeholder: 'Search runner name' },
+  { type: 'text', key: 'rate', placeholder: 'Search rate', keyboard: 'number-pad' },
+  { type: 'text', key: 'stake', placeholder: 'Search stake', keyboard: 'number-pad' },
+  { type: 'text', key: 'betType', placeholder: 'Search bet type' },
+  { type: 'text', key: 'betStatus', placeholder: 'Search bet status' },
+];
+
+const EMPTY_EXCHANGE_FILTERS = {
+  transactionId: '',
+  transactionCode: '',
+  transactionType: '',
+  marketId: '',
+  marketName: '',
+  runnerName: '',
+  rate: '',
+  stake: '',
+  betType: '',
+  betStatus: '',
+};
+
+function mapExchangeFilters(variant: 'jetfair' | 'falcon', applied: Record<string, string>): Rec {
+  const src = filledFilters(applied);
+  if (variant !== 'falcon') return src;
+  const mapped: Rec = {};
+  const alias: Record<string, string> = {
+    transactionId: 'TransactionID',
+    transactionType: 'TransactionType',
+    marketId: 'MarketID',
+    marketName: 'Marketname',
+    runnerName: 'Runnername',
+    rate: 'Rate',
+    stake: 'Stake',
+    betType: 'BetType',
+  };
+  for (const [k, v] of Object.entries(src)) {
+    mapped[alias[k] ?? k] = v;
+  }
+  return mapped;
+}
+
 function ExchangeTab({ userId, variant }: { userId: string; variant: 'jetfair' | 'falcon' }) {
   const [rows, setRows] = useState<Rec[]>([]);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const { draft, applied, page, setPage, onChange, onSearch } = useHistoryFilters(EMPTY_EXCHANGE_FILTERS);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const filter: Rec =
-        variant === 'jetfair' ? { clientUsername: userId } : { userId };
+      const base: Rec = variant === 'jetfair' ? { clientUsername: userId } : { userId };
       const res = await secureApi(
         variant === 'jetfair' ? 'userReport.jetfairHistory' : 'userReport.falconHistory',
-        { itemsPerPage: 20, pageNo: page, filter },
+        { itemsPerPage: 20, pageNo: page, filter: { ...base, ...mapExchangeFilters(variant, applied) } },
       );
       setRows(res.ok ? listOf(res.data, 'items') : []);
       setTotalPages(res.ok ? pagesOf(res.data) : 1);
     } finally {
       setLoading(false);
     }
-  }, [userId, variant, page]);
+  }, [userId, variant, page, applied]);
 
   useEffect(() => {
     void load();
@@ -1008,7 +1243,14 @@ function ExchangeTab({ userId, variant }: { userId: string; variant: 'jetfair' |
 
   return (
     <View>
+      <HistoryFilterBar
+        fields={EXCHANGE_FILTER_FIELDS}
+        values={draft}
+        onChange={onChange}
+        onSearch={onSearch}
+      />
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -1253,49 +1495,51 @@ function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
 
   return (
     <View>
-      {kind === 'qtech' || kind === 'missing' ? (
-        <View style={styles.filterRow}>
-          <View style={styles.dateWrap}>
-            <DateField value={startDate} onChange={setStartDate} placeholder="From" />
-          </View>
-          <View style={styles.dateWrap}>
-            <DateField value={endDate} onChange={setEndDate} placeholder="To" />
-          </View>
-        </View>
-      ) : null}
-      {kind === 'sm' ? (
-        <View>
+      <CollapsibleSection title="Search Filters">
+        {kind === 'qtech' || kind === 'missing' ? (
           <View style={styles.filterRow}>
             <View style={styles.dateWrap}>
-              <DateField value={startDate} onChange={setStartDate} placeholder="Result date" />
+              <DateField value={startDate} onChange={setStartDate} placeholder="From" />
+            </View>
+            <View style={styles.dateWrap}>
+              <DateField value={endDate} onChange={setEndDate} placeholder="To" />
             </View>
           </View>
-          <View style={styles.chipRowPlain}>
-            {SM_MARKET_CODES.map((code) => (
-              <TouchableOpacity
-                key={code}
-                style={[styles.chip, marketCode === code && styles.chipActive]}
-                onPress={() => setMarketCode(code)}
-              >
-                <Text style={[styles.chipText, marketCode === code && styles.chipTextActive]}>
-                  {code}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        ) : null}
+        {kind === 'sm' ? (
+          <View>
+            <View style={styles.filterRow}>
+              <View style={styles.dateWrap}>
+                <DateField value={startDate} onChange={setStartDate} placeholder="Result date" />
+              </View>
+            </View>
+            <View style={styles.chipRowPlain}>
+              {SM_MARKET_CODES.map((code) => (
+                <TouchableOpacity
+                  key={code}
+                  style={[styles.chip, marketCode === code && styles.chipActive]}
+                  onPress={() => setMarketCode(code)}
+                >
+                  <Text style={[styles.chipText, marketCode === code && styles.chipTextActive]}>
+                    {code}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
-      ) : null}
-      {kind === 'jetfair' ? (
-        <View style={styles.filterRow}>
-          <TextInput
-            style={styles.input}
-            value={marketId}
-            onChangeText={setMarketId}
-            placeholder="Market ID"
-            placeholderTextColor={colors.muted}
-          />
-        </View>
-      ) : null}
+        ) : null}
+        {kind === 'jetfair' ? (
+          <View style={styles.filterRow}>
+            <TextInput
+              style={styles.input}
+              value={marketId}
+              onChangeText={setMarketId}
+              placeholder="Market ID"
+              placeholderTextColor={colors.muted}
+            />
+          </View>
+        ) : null}
+      </CollapsibleSection>
       <TouchableOpacity
         style={[styles.submitBtn, loading && styles.pagerBtnDisabled]}
         onPress={() => void load()}
@@ -1326,6 +1570,7 @@ function ProviderTab({ userId, kind }: { userId: string; kind: ProviderKind }) {
         {kind === 'missing' ? 'Total Missing Bets' : 'Total Number of bets'}: {betCount}
       </Text>
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}
@@ -1376,15 +1621,18 @@ function QtechBetDetailsTab({ userId }: { userId: string }) {
 
   return (
     <View>
-      <View style={styles.filterRow}>
-        <View style={styles.dateWrap}>
-          <DateField value={startDate} onChange={setStartDate} placeholder="From" />
+      <CollapsibleSection title="Search Filters">
+        <View style={styles.filterRow}>
+          <View style={styles.dateWrap}>
+            <DateField value={startDate} onChange={setStartDate} placeholder="From" />
+          </View>
+          <View style={styles.dateWrap}>
+            <DateField value={endDate} onChange={setEndDate} placeholder="To" />
+          </View>
         </View>
-        <View style={styles.dateWrap}>
-          <DateField value={endDate} onChange={setEndDate} placeholder="To" />
-        </View>
-      </View>
+      </CollapsibleSection>
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r.gameId ?? i)}
@@ -1485,9 +1733,30 @@ function PlayerRtpLink({ userId }: { userId: string }) {
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   content: { padding: spacing(3), paddingBottom: spacing(8) },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginBottom: spacing(2),
+  },
+  headerName: { flex: 1, minWidth: 0 },
   title: { color: colors.foreground, fontSize: 18, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 11, marginBottom: spacing(2) },
+  sub: { color: colors.muted, fontSize: 11, marginTop: 2 },
   muted: { color: colors.muted, fontSize: 12 },
+  collapseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    marginBottom: spacing(2),
+  },
+  collapseTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  collapseChevron: { color: colors.muted, fontSize: 12 },
   summaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1505,8 +1774,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   summaryCardCompact: { minWidth: '46%' },
+  summaryCardClickable: { borderColor: colors.primary },
+  summaryCardSuccess: { backgroundColor: `${colors.success}10`, borderColor: `${colors.success}55` },
+  summaryCardError: { backgroundColor: `${colors.destructive}10`, borderColor: `${colors.destructive}55` },
   summaryLabel: { color: colors.muted, fontSize: 10, marginBottom: 2 },
   summaryValue: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  summaryValueSuccess: { color: colors.success },
+  summaryValueError: { color: colors.destructive },
+  summaryValueClickable: { textDecorationLine: 'underline' },
+  summaryHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   chipRow: { gap: spacing(2), paddingBottom: spacing(2) },
   chipRowPlain: {
     flexDirection: 'row',
@@ -1584,9 +1860,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing(3),
-    marginBottom: spacing(3),
   },
-  chartTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', marginBottom: spacing(2) },
   chartRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing(1.5) },
   chartLabel: { color: colors.muted, fontSize: 11, width: 92 },
   chartTrack: {

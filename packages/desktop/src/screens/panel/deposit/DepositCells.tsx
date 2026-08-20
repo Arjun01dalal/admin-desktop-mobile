@@ -33,6 +33,7 @@ export type DepositRow = {
   _id: string;
   userId?: string;
   userName?: string;
+  empCode?: string;
   userMobile?: string;
   mobile?: string;
   clientName?: string;

@@ -176,7 +176,9 @@ export function CreateUserScreen() {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.modeRow}>
           {(['user', 'admin'] as const).map((m) => (
             <TouchableOpacity
@@ -266,6 +268,7 @@ export function CreateUserScreen() {
               autoCorrect={false}
             />
             <FlatList
+              showsVerticalScrollIndicator={false}
               data={pickerOptions}
               keyExtractor={(o) => o.value}
               style={styles.pickerList}

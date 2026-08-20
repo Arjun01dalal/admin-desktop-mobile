@@ -1,7 +1,7 @@
 {
   "name": "@astro/desktop",
   "version": "1.0.8",
-  "description": "Astro CS Panel \u2014 Electron desktop app with secure admin login.",
+  "description": "Astro CS Panel — Electron desktop app with secure admin login.",
   "main": "electron/main.cjs",
   "author": "Your Name",
   "license": "MIT",
@@ -81,6 +81,14 @@
         "NSLocationUsageDescription": "Location is required to verify admin login."
       }
     },
+    "protocols": [
+      {
+        "name": "My Astro App",
+        "schemes": [
+          "myastroapp"
+        ]
+      }
+    ],
     "publish": [
       {
         "provider": "github",
@@ -106,6 +114,7 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
     "electron-updater": "^6.3.9",
+    "fcm-push-receiver": "^2.2.3",
     "geoip-lite": "^1.4.10",
     "lucide-react": "^1.27.0",
     "qrcode.react": "^4.2.0",

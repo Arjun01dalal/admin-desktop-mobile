@@ -51,7 +51,6 @@ export type UseCallLogsColumnsParams = {
   page: number;
   itemsPerPage: number;
   onEndCall: (row: CallLogRow) => void;
-  onBotCall: (rows: CallLogRow[]) => void;
   onViewSummary: (row: CallLogRow) => void;
   onConnectDialer: (row: CallLogRow) => void;
   onOpenComment: (row: CallLogRow) => void;
@@ -62,7 +61,6 @@ export function useCallLogsColumns({
   page,
   itemsPerPage,
   onEndCall,
-  onBotCall,
   onViewSummary,
   onConnectDialer,
   onOpenComment,
@@ -176,7 +174,7 @@ export function useCallLogsColumns({
                   {duration}
                 </Typography>
               ) : null}
-              {!isCaller && row.recording_url ? (
+              {row.recording_url ? (
                 <Button
                   size="small"
                   variant="contained"
@@ -281,8 +279,7 @@ export function useCallLogsColumns({
           );
         }
 
-        const showViewSummary =
-          !isCaller && status === 'completed' && Boolean(row.recording_url);
+        const showViewSummary = status === 'completed' && Boolean(row.recording_url);
 
         return (
           <Stack
@@ -304,17 +301,7 @@ export function useCallLogsColumns({
               >
                 View Summary
               </Button>
-            ) : (
-              <Button
-                size="small"
-                variant="outlined"
-                color="warning"
-                sx={actionBtnSx}
-                onClick={() => void onBotCall([row])}
-              >
-                Call
-              </Button>
-            )}
+            ) : null}
             <Button
               size="small"
               variant="contained"
@@ -396,7 +383,6 @@ export function useCallLogsColumns({
     hideBotIdFilter,
     isCaller,
     onEndCall,
-    onBotCall,
     onViewSummary,
     onConnectDialer,
     onOpenComment,

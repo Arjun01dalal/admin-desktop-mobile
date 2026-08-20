@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { CAMPAIGN_LIST } from '../newRegisters/campaignList';
+import { CAMPAIGN_LIST, campaignsForLoginUser, type CampaignItem } from '../newRegisters/campaignList';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 
 type CallLogsToolbarProps = {
@@ -30,13 +30,14 @@ type CallLogsToolbarProps = {
   fileRef: Ref<HTMLInputElement>;
   /** Hide upload / pause (callers). */
   isCaller?: boolean;
+  /** Campaign chips/options. Callers get only login-assigned IDs. */
+  campaigns?: CampaignItem[];
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onCampaignChange: (value: string) => void;
   onItemsPerPageChange: (value: number) => void;
   onApply: () => void;
   onRefresh: () => void;
-  onBotCall: () => void;
   onDialerCall: () => void;
   onUpload: (file?: File | null) => void;
   onPauseOpen: () => void;
@@ -53,13 +54,13 @@ export function CallLogsToolbar({
   actionLoading,
   fileRef,
   isCaller = false,
+  campaigns = CAMPAIGN_LIST,
   onStartDateChange,
   onEndDateChange,
   onCampaignChange,
   onItemsPerPageChange,
   onApply,
   onRefresh,
-  onBotCall,
   onDialerCall,
   onUpload,
   onPauseOpen,
@@ -229,15 +230,6 @@ export function CallLogsToolbar({
             <Button
               variant="contained"
               color="warning"
-              onClick={onBotCall}
-              disabled={loading || actionLoading}
-              sx={{ flexShrink: 0, fontWeight: 700 }}
-            >
-              Bot Call
-            </Button>
-            <Button
-              variant="contained"
-              color="warning"
               onClick={onDialerCall}
               disabled={loading || actionLoading}
               sx={{ flexShrink: 0, fontWeight: 700 }}
@@ -255,7 +247,7 @@ export function CallLogsToolbar({
               <MenuItem value="">
                 <em>Select campaign</em>
               </MenuItem>
-              {CAMPAIGN_LIST.map((c) => (
+              {campaigns.map((c) => (
                 <MenuItem key={c.id} value={c.id}>
                   {c.id}
                 </MenuItem>

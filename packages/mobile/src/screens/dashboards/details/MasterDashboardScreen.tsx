@@ -173,6 +173,7 @@ export function MasterDashboardScreen() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={

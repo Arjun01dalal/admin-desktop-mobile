@@ -26,6 +26,7 @@ export type WithdrawalRow = {
   _id: string;
   userId?: string;
   userName?: string;
+  empCode?: string;
   accountHolderName?: string;
   mobile?: string;
   userMobile?: string;
@@ -65,6 +66,7 @@ export type WithdrawalRow = {
 
 export type ColumnFilters = {
   userName: string;
+  empCode: string;
   amount: string;
   status: string;
   clientName: string;
@@ -88,6 +90,7 @@ export type QueryState = {
 
 export const EMPTY_FILTERS: ColumnFilters = {
   userName: '',
+  empCode: '',
   amount: '',
   status: '',
   clientName: '',

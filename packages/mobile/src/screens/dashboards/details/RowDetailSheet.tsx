@@ -104,6 +104,7 @@ export function RowDetailSheet({
                     onPress={a.onPress}
                     disabled={a.disabled}
                     delayPressIn={0}
+                    activeOpacity={0.75}
                   >
                     <Text
                       style={[

@@ -348,6 +348,7 @@ export function WhatsappScreen() {
         ) : null}
 
         <ScrollView
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.chatList}
           refreshControl={
             <RefreshControl
@@ -427,6 +428,7 @@ export function WhatsappScreen() {
       </View>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         ref={messagesRef}
         style={styles.messages}
         contentContainerStyle={styles.messagesContent}

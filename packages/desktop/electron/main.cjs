@@ -1,19 +1,44 @@
-const { app, BrowserWindow, BrowserView, ipcMain, session, protocol, net, shell, screen, clipboard, dialog, Tray, Menu, nativeImage, Notification } = require('electron');
+const { app, BrowserWindow, session, protocol, screen, Tray, Menu, nativeImage, Notification } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { pathToFileURL } = require('node:url');
-const { autoUpdater } = require('electron-updater');
-const { useViteDevServer, getGhUpdateToken, optionalEnv } = require('./config.cjs');
+const { useViteDevServer } = require('./config.cjs');
 const { enforceSessionHttpsOnly, isBlockedCleartext } = require('./httpsOnly.cjs');
 const { installMainErrorMonitor, report: reportError } = require('./errorMonitor.cjs');
 const tokenVault = require('./tokenVault.cjs');
-const auth = require('./auth.cjs');
-const secureApi = require('./secure/index.cjs');
 const { startSosMonitor } = require('./sosMonitor.cjs');
 const { startPushClient } = require('./pushService.cjs');
 const panelWindows = require('./panelWindows.cjs');
+const deepLink = require('./deepLink.cjs');
+
+const ctx = require('./ctx.cjs');
+require('./recordingProtocol.cjs');
+require('./siteBrowserView.cjs');
+require('./autoUpdateSetup.cjs');
+require('./ipcRegistry.cjs');
+
 
 installMainErrorMonitor();
+
+// Single-instance + deep links (myastroapp://login) — before ready.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    const url = deepLink.findDeepLinkInArgv(commandLine);
+    if (url) {
+      handleDeepLink(url);
+      return;
+    }
+    showMainWindow();
+  });
+}
+
+// macOS: cold / warm open via custom protocol.
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
 
 
 // Optional: improves Chromium network geolocation on some platforms.
@@ -50,16 +75,7 @@ protocol.registerSchemesAsPrivileged([
 const PORTRAIT_WIDTH = 390;
 const PORTRAIT_HEIGHT = 720;
 
-const ASTRO_SITE_URL = 'https://astrotalk.vip/';
-/** Bottom strip of the main window for the panel Login button (under BrowserView). */
-const SITE_LOGIN_BAR_HEIGHT = 56;
-
 const DIST_DIR = path.join(__dirname, '..', 'dist');
-
-const RECORDING_CACHE_MAX_ENTRIES = 4;
-const RECORDING_CACHE_TTL_MS = 5 * 60 * 1000;
-/** url -> { body: Buffer, type: string, at: number } */
-const recordingCache = new Map();
 
 let tray = null;
 /** When true, window close actually quits (tray Quit / before-quit). */
@@ -103,6 +119,44 @@ function focusWindow(win) {
   } catch {
     // ignore
   }
+}
+
+/**
+ * Logout / login deep link from Astro site or OS:
+ * myastroapp://login?logged_out=1
+ */
+function prepareNativeAuthShell() {
+  for (const rec of panelWindows.listPanels()) {
+    try {
+      ctx.applyNativeAuthSize(rec);
+    } catch {
+      ctx.hideSiteView(rec);
+    }
+  }
+}
+
+function handleDeepLink(url) {
+  const payload = deepLink.parseDeepLink(url);
+  if (!payload) return false;
+
+  // Keep pending until renderer consumes via getPendingDeepLink (cold start).
+  deepLink.setPending(payload);
+
+  if (!app.isReady()) {
+    return true;
+  }
+
+  showMainWindow();
+  prepareNativeAuthShell();
+  panelWindows.broadcastToPanels('gcalc:deep-link', payload);
+  return true;
+}
+
+function consumePendingDeepLink() {
+  const payload = deepLink.takePending();
+  if (!payload) return null;
+  prepareNativeAuthShell();
+  return payload;
 }
 
 function showMainWindow() {
@@ -183,156 +237,6 @@ function createTray() {
   if (process.platform === 'win32') {
     tray.on('click', () => showMainWindow());
   }
-}
-
-const RECORDING_AUDIO_TYPES = {
-  '.mp3': 'audio/mpeg',
-  '.wav': 'audio/wav',
-  '.ogg': 'audio/ogg',
-  '.opus': 'audio/ogg',
-  '.oga': 'audio/ogg',
-  '.m4a': 'audio/mp4',
-  '.mp4': 'audio/mp4',
-  '.aac': 'audio/aac',
-  '.webm': 'audio/webm',
-  '.flac': 'audio/flac',
-};
-
-function recordingContentType(targetUrl, upstreamType) {
-  const upstream = String(upstreamType || '').split(';')[0].trim().toLowerCase();
-  if (upstream.startsWith('audio/') || upstream.startsWith('video/')) return upstream;
-  try {
-    const ext = path.extname(new URL(targetUrl).pathname).toLowerCase();
-    if (RECORDING_AUDIO_TYPES[ext]) return RECORDING_AUDIO_TYPES[ext];
-  } catch {
-    // fall through to default
-  }
-  return 'audio/mpeg';
-}
-
-/**
- * Recordings must be fully buffered before they reach the media element:
- * the upstream server streams without Content-Length, and Chromium reports
- * duration 00:00 for media whose total size it cannot determine.
- */
-async function loadRecording(targetUrl) {
-  const cached = recordingCache.get(targetUrl);
-  if (cached && Date.now() - cached.at < RECORDING_CACHE_TTL_MS) {
-    return cached;
-  }
-  recordingCache.delete(targetUrl);
-
-  const headers = new Headers({ Accept: 'audio/*,*/*;q=0.8' });
-  const username = optionalEnv('RECORDING_BASIC_AUTH_USERNAME');
-  const password = optionalEnv('RECORDING_BASIC_AUTH_PASSWORD');
-  if (username && password) {
-    headers.set(
-      'Authorization',
-      `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`,
-    );
-  }
-
-  const res = await net.fetch(targetUrl, { headers });
-  if (!res.ok) {
-    return {
-      error:
-        res.status === 401 || res.status === 403
-          ? 'Recording server rejected the credentials'
-          : `Recording server returned ${res.status}`,
-      status: res.status,
-    };
-  }
-
-  const body = Buffer.from(await res.arrayBuffer());
-  if (!body.length) {
-    return { error: 'Recording is empty', status: 502 };
-  }
-
-  const entry = {
-    body,
-    type: recordingContentType(targetUrl, res.headers.get('content-type')),
-    at: Date.now(),
-  };
-  recordingCache.set(targetUrl, entry);
-  while (recordingCache.size > RECORDING_CACHE_MAX_ENTRIES) {
-    recordingCache.delete(recordingCache.keys().next().value);
-  }
-  return entry;
-}
-
-/** Serve the buffered recording, honouring the media element's Range probes. */
-function buildRecordingResponse(entry, rangeHeader) {
-  const total = entry.body.length;
-  const baseHeaders = {
-    'Content-Type': entry.type,
-    'Accept-Ranges': 'bytes',
-    'Cache-Control': 'no-store',
-  };
-
-  const match = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
-  if (match && (match[1] || match[2])) {
-    const start = match[1] ? Number(match[1]) : Math.max(0, total - Number(match[2]));
-    const end = match[1] && match[2] ? Math.min(Number(match[2]), total - 1) : total - 1;
-    if (!Number.isFinite(start) || start > end || start >= total) {
-      return new Response(null, {
-        status: 416,
-        headers: { ...baseHeaders, 'Content-Range': `bytes */${total}` },
-      });
-    }
-    const chunk = entry.body.subarray(start, end + 1);
-    return new Response(chunk, {
-      status: 206,
-      headers: {
-        ...baseHeaders,
-        'Content-Length': String(chunk.length),
-        'Content-Range': `bytes ${start}-${end}/${total}`,
-      },
-    });
-  }
-
-  return new Response(entry.body, {
-    status: 200,
-    headers: { ...baseHeaders, 'Content-Length': String(total) },
-  });
-}
-
-function registerAppProtocol() {
-  protocol.handle('app', (request) => {
-    const { pathname } = new URL(request.url);
-    let rel = decodeURIComponent(pathname);
-    if (!rel || rel === '/') rel = '/index.html';
-
-    const fullPath = path.normalize(path.join(DIST_DIR, rel));
-    if (!fullPath.startsWith(DIST_DIR)) {
-      return new Response('Forbidden', { status: 403 });
-    }
-
-    if (!fs.existsSync(fullPath)) {
-      return new Response('Not found', { status: 404 });
-    }
-
-    return net.fetch(pathToFileURL(fullPath).toString());
-  });
-
-  protocol.handle('astro-recording', async (request) => {
-    try {
-      const requestUrl = new URL(request.url);
-      const encodedTarget = requestUrl.pathname.replace(/^\/+/, '');
-      const targetUrl = new URL(decodeURIComponent(encodedTarget));
-      if (targetUrl.protocol !== 'https:') {
-        return new Response('Only HTTPS recordings are allowed', { status: 400 });
-      }
-
-      const loaded = await loadRecording(targetUrl.toString());
-      if (loaded.error) {
-        return new Response(loaded.error, { status: loaded.status || 502 });
-      }
-      return buildRecordingResponse(loaded, request.headers.get('range'));
-    } catch (error) {
-      reportError('recording:proxy', error);
-      return new Response('Recording could not be loaded', { status: 502 });
-    }
-  });
 }
 
 function enableGeolocationPermissions() {
@@ -483,6 +387,11 @@ function hardenWebContents(wc) {
 
   // Block cleartext HTTP navigations (Vite localhost still allowed in dev).
   wc.on('will-navigate', (event, url) => {
+    if (deepLink.parseDeepLink(url)) {
+      event.preventDefault();
+      handleDeepLink(url);
+      return;
+    }
     if (isBlockedCleartext(url, { allowLocalHttp: true })) {
       console.warn('[https-only] blocked navigation:', url);
       event.preventDefault();
@@ -490,6 +399,10 @@ function hardenWebContents(wc) {
   });
 
   wc.setWindowOpenHandler(({ url }) => {
+    if (deepLink.parseDeepLink(url)) {
+      handleDeepLink(url);
+      return { action: 'deny' };
+    }
     if (isBlockedCleartext(url, { allowLocalHttp: true })) {
       console.warn('[https-only] blocked window.open:', url);
       return { action: 'deny' };
@@ -569,7 +482,7 @@ function createWindow(opts = {}) {
   });
 
   win.on('resize', () => {
-    layoutSiteView(rec);
+    ctx.layoutSiteView(rec);
   });
 
   // Last panel window: close (X) hides to tray so SOS keeps monitoring.
@@ -584,7 +497,7 @@ function createWindow(opts = {}) {
   });
 
   win.on('closed', () => {
-    destroySiteView(rec);
+    ctx.destroySiteView(rec);
     panelWindows.unregisterPanel(win);
   });
 
@@ -617,12 +530,6 @@ function applyPortraitSize(rec) {
   win.setSize(PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
   win.center();
   win.setResizable(false);
-}
-
-function applyLoginSize(rec) {
-  if (!rec) return;
-  hideSiteView(rec);
-  applyPortraitSize(rec);
 }
 
 /**
@@ -663,225 +570,6 @@ function applyBrowserSize(rec, opts = {}) {
   }
 }
 
-function applyWelcomeSize(rec) {
-  if (!rec) return;
-  hideSiteView(rec);
-  applyBrowserSize(rec);
-}
-
-function applySiteSize(rec) {
-  if (!rec) return;
-  applyBrowserSize(rec);
-  showSiteView(rec);
-}
-
-function layoutSiteView(rec) {
-  const win = rec?.win;
-  const siteView = rec?.siteView;
-  if (!win || !siteView || win.isDestroyed()) return;
-  const [width, height] = win.getContentSize();
-  const bar = SITE_LOGIN_BAR_HEIGHT;
-  siteView.setBounds({
-    x: 0,
-    y: 0,
-    width,
-    height: Math.max(0, height - bar),
-  });
-  siteView.setAutoResize({ width: true, height: false });
-}
-
-function destroySiteView(rec) {
-  if (!rec) return;
-  const win = rec.win;
-  const siteView = rec.siteView;
-  if (!siteView) {
-    rec.siteView = null;
-    return;
-  }
-  try {
-    if (win && !win.isDestroyed()) win.removeBrowserView(siteView);
-  } catch {
-    // ignore
-  }
-  try {
-    if (!siteView.webContents.isDestroyed()) {
-      siteView.webContents.destroy();
-    }
-  } catch {
-    // ignore
-  }
-  rec.siteView = null;
-}
-
-/** Last email/mobile typed on the Astro marketing site (for prefill). */
-let cachedSiteIdentity = { email: '', mobile: '' };
-
-function siteIdentityPath() {
-  return path.join(app.getPath('userData'), 'astro-site-identity.json');
-}
-
-function loadPersistedSiteIdentity() {
-  try {
-    const raw = fs.readFileSync(siteIdentityPath(), 'utf8');
-    const parsed = JSON.parse(raw);
-    cachedSiteIdentity = normalizeSiteIdentity(parsed);
-  } catch {
-    // first run / corrupt — keep empty
-  }
-}
-
-function persistSiteIdentityToDisk() {
-  if (!cachedSiteIdentity.email && !cachedSiteIdentity.mobile) return;
-  try {
-    fs.writeFileSync(
-      siteIdentityPath(),
-      JSON.stringify(cachedSiteIdentity),
-      'utf8',
-    );
-  } catch {
-    // ignore disk errors
-  }
-}
-
-function normalizeSiteIdentity(payload) {
-  const src = payload && typeof payload === 'object' ? payload : {};
-  const email = String(src.email || '').trim().slice(0, 200);
-  let mobile = String(src.mobile || '').replace(/\D/g, '');
-  if (mobile.length > 10) mobile = mobile.slice(-10);
-  if (mobile && !/^[6-9]\d{9}$/.test(mobile)) mobile = '';
-  // Email box often holds a 10-digit mobile on this site.
-  if (!mobile && email) {
-    const digits = email.replace(/\D/g, '');
-    if (/^[6-9]\d{9}$/.test(digits.slice(-10))) mobile = digits.slice(-10);
-  }
-  return { email, mobile };
-}
-
-function rememberSiteIdentity(payload) {
-  const next = normalizeSiteIdentity(payload);
-  if (!next.email && !next.mobile) return cachedSiteIdentity;
-  cachedSiteIdentity = {
-    email: next.email || cachedSiteIdentity.email || '',
-    mobile: next.mobile || cachedSiteIdentity.mobile || '',
-  };
-  persistSiteIdentityToDisk();
-  return cachedSiteIdentity;
-}
-
-function prefillSiteView(rec) {
-  if (!rec?.siteView || rec.siteView.webContents.isDestroyed()) return;
-  if (!cachedSiteIdentity.email && !cachedSiteIdentity.mobile) return;
-  try {
-    rec.siteView.webContents.send('astro:prefill-site', cachedSiteIdentity);
-  } catch {
-    // ignore
-  }
-}
-
-/** When true, site BrowserView must stay hidden so update dialogs are visible. */
-let blockSiteForUpdate = false;
-
-function hideSiteView(rec) {
-  if (!rec?.win || !rec.siteView) return;
-  try {
-    rec.win.removeBrowserView(rec.siteView);
-  } catch {
-    // ignore
-  }
-}
-
-function hideAllSiteViews() {
-  for (const rec of panelWindows.listPanels()) {
-    hideSiteView(rec);
-  }
-}
-
-function showSiteView(rec) {
-  const win = rec?.win;
-  if (!win || win.isDestroyed()) return;
-  // BrowserView sits above the React UI and also above modal dialogs attached
-  // to the window — never re-show it while an update prompt is active.
-  if (blockSiteForUpdate) return;
-
-  const attachWhenReady = (view) => {
-    if (!view || view.webContents.isDestroyed() || win.isDestroyed()) return;
-    if (blockSiteForUpdate) return;
-    // Avoid detach/reattach churn (StrictMode remount / duplicate showSite).
-    try {
-      const current = win.getBrowserView();
-      if (current === view) {
-        layoutSiteView(rec);
-        return;
-      }
-    } catch {
-      // ignore
-    }
-    win.setBrowserView(view);
-    layoutSiteView(rec);
-    prefillSiteView(rec);
-  };
-
-  if (!rec.siteView || rec.siteView.webContents.isDestroyed()) {
-    rec.siteView = new BrowserView({
-      webPreferences: {
-        preload: path.join(__dirname, 'sitePreload.cjs'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        // Preload must reliably access ipcRenderer for panel gate.
-        sandbox: false,
-        webSecurity: true,
-        devTools: allowDevTools(),
-      },
-    });
-
-    hardenWebContents(rec.siteView.webContents);
-    rec.siteView.webContents.setWindowOpenHandler(() => {
-      // No popups — panel login is gated by site password in sitePreload.
-      return { action: 'deny' };
-    });
-
-    // SPA navigations: ensure preload listeners stay (preload reloads with page).
-    rec.siteView.webContents.on('dom-ready', () => {
-      console.log('[site] dom-ready — panel gate preload active');
-      // Attach only after first paint so users don't see an empty black BrowserView.
-      attachWhenReady(rec.siteView);
-      prefillSiteView(rec);
-    });
-
-    // Prefill after first paint as well (some SPAs mount inputs late).
-    rec.siteView.webContents.on('did-finish-load', () => {
-      attachWhenReady(rec.siteView);
-      prefillSiteView(rec);
-      setTimeout(() => prefillSiteView(rec), 400);
-      setTimeout(() => prefillSiteView(rec), 1200);
-      setTimeout(() => prefillSiteView(rec), 2500);
-    });
-
-    rec.siteView.webContents.on('will-navigate', (event, url) => {
-      try {
-        if (isBlockedCleartext(url, { allowLocalHttp: false })) {
-          event.preventDefault();
-          return;
-        }
-        const target = new URL(url);
-        const home = new URL(ASTRO_SITE_URL);
-        // Keep browsing on the marketing site; off-origin stays blocked.
-        if (target.origin !== home.origin) {
-          event.preventDefault();
-        }
-      } catch {
-        event.preventDefault();
-      }
-    });
-
-    rec.siteView.webContents.loadURL(ASTRO_SITE_URL);
-    // Keep React "Loading Astro Admin…" visible until dom-ready / finish-load.
-    return;
-  }
-
-  attachWhenReady(rec.siteView);
-}
-
 function sendToRenderer(channel, payload) {
   panelWindows.broadcastToPanels(channel, payload);
 }
@@ -891,456 +579,6 @@ function resolvePanelFromEvent(event) {
     panelWindows.getPanelByWebContents(event?.sender) ||
     panelWindows.getPanelBySiteContents(event?.sender)
   );
-}
-
-/** Last update event — replayed when renderer mounts (avoids missed IPC under site view). */
-let lastUpdateEvent = null;
-
-function prepareUpdateUi() {
-  blockSiteForUpdate = true;
-  try {
-    hideAllSiteViews();
-  } catch {
-    // ignore
-  }
-  focusWindow(panelWindows.getPrimaryWindow());
-}
-
-function publishUpdate(channel, payload) {
-  lastUpdateEvent = { channel, payload, at: Date.now() };
-  prepareUpdateUi();
-  sendToRenderer(channel, payload);
-}
-
-/**
- * Use an app-modal dialog (no parent window). Parenting to `win` while a
- * BrowserView is/was attached often puts the box behind the site on Windows.
- */
-async function showUpdateDialog(options) {
-  prepareUpdateUi();
-  return dialog.showMessageBox(options);
-}
-
-function setupAutoUpdate() {
-  if (!app.isPackaged) {
-    console.log('autoUpdater: skipped (dev / unpackaged)');
-    return;
-  }
-
-  // Prefer baked app-update.yml (always present in NSIS/dmg). package.json
-  // `build` is stripped from the packaged asar, so do not require it.
-  // Only call setFeedURL when a private-repo token is available.
-  const updateToken =
-    process.env.GH_TOKEN ||
-    process.env.GITHUB_TOKEN ||
-    getGhUpdateToken() ||
-    '';
-  if (updateToken) {
-    try {
-      const ymlPath = path.join(process.resourcesPath, 'app-update.yml');
-      const yml = fs.existsSync(ymlPath)
-        ? fs.readFileSync(ymlPath, 'utf8')
-        : '';
-      const owner = (yml.match(/^owner:\s*(.+)$/m) || [])[1]?.trim();
-      const repo = (yml.match(/^repo:\s*(.+)$/m) || [])[1]?.trim();
-      if (owner && repo) {
-        autoUpdater.setFeedURL({
-          provider: 'github',
-          owner,
-          repo,
-          private: true,
-          token: updateToken,
-        });
-      }
-    } catch (err) {
-      console.warn('autoUpdater setFeedURL skipped:', err?.message || err);
-    }
-  }
-
-  autoUpdater.logger = {
-    info: (...a) => console.log('[autoUpdater]', ...a),
-    warn: (...a) => console.warn('[autoUpdater]', ...a),
-    error: (...a) => console.error('[autoUpdater]', ...a),
-    debug: (...a) => console.log('[autoUpdater:debug]', ...a),
-  };
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.allowPrerelease = false;
-  autoUpdater.allowDowngrade = false;
-
-  let availableDialogShown = false;
-  let readyDialogShown = false;
-  let errorDialogShown = false;
-
-  autoUpdater.on('checking-for-update', () => {
-    console.log(
-      'autoUpdater: checking for update… current=',
-      app.getVersion(),
-      'platform=',
-      process.platform,
-    );
-  });
-  autoUpdater.on('update-not-available', (info) => {
-    console.log('autoUpdater: up to date', info?.version || app.getVersion());
-  });
-  autoUpdater.on('update-available', (info) => {
-    console.log('autoUpdater: update available', info.version);
-    publishUpdate('update:available', { version: info.version });
-    // Show immediately — do not wait for the ~100MB+ download to finish.
-    if (!availableDialogShown) {
-      availableDialogShown = true;
-      void showUpdateDialog({
-        type: 'info',
-        title: 'Update Available',
-        message: `Version ${info.version} is available.`,
-        detail:
-          'Downloading in the background. You will be asked to restart when it is ready (~1–3 minutes on typical connections).',
-        buttons: ['OK'],
-        noLink: true,
-      }).catch((err) =>
-        console.warn('autoUpdater available dialog failed:', err?.message || err),
-      );
-    }
-  });
-  autoUpdater.on('download-progress', (p) => {
-    publishUpdate('update:progress', { percent: Math.round(p.percent) });
-  });
-  autoUpdater.on('update-downloaded', async (info) => {
-    console.log('autoUpdater: downloaded', info.version);
-    publishUpdate('update:ready', { version: info.version });
-    if (readyDialogShown) return;
-    readyDialogShown = true;
-    try {
-      const result = await showUpdateDialog({
-        type: 'info',
-        title: 'Update Ready',
-        message: `Version ${info.version} is ready to install.`,
-        detail: 'Restart now to update, or choose Later.',
-        buttons: ['Restart & Update', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-        noLink: true,
-      });
-      if (result.response === 0) {
-        autoUpdater.quitAndInstall(false, true);
-      } else {
-        // User deferred install — allow site view again; React toast still available.
-        blockSiteForUpdate = false;
-      }
-    } catch (err) {
-      console.warn('autoUpdater ready dialog failed:', err?.message || err);
-      blockSiteForUpdate = false;
-    }
-  });
-  autoUpdater.on('error', (err) => {
-    const message = err?.message || String(err);
-    console.warn('autoUpdater error:', message);
-    const hint = /404|Not Found|Cannot find channel|latest-mac/i.test(message)
-      ? ' Update feed not reachable for this platform. Windows needs latest.yml; Mac needs latest-mac.yml + .zip on the public GitHub release.'
-      : '';
-    const full = message + hint;
-    publishUpdate('update:error', { message: full });
-    if (!errorDialogShown) {
-      errorDialogShown = true;
-      void showUpdateDialog({
-        type: 'error',
-        title: 'Update Check Failed',
-        message: full,
-        buttons: ['OK'],
-        noLink: true,
-      })
-        .catch(() => {})
-        .finally(() => {
-          blockSiteForUpdate = false;
-        });
-    }
-  });
-
-  let lastCheckAt = 0;
-  const MIN_CHECK_GAP_MS = 10 * 60 * 1000; // don't hammer GitHub
-
-  const runCheck = (force = false) => {
-    // Don't re-check while a ready dialog is already up / install pending.
-    if (readyDialogShown) return;
-    const now = Date.now();
-    if (!force && now - lastCheckAt < MIN_CHECK_GAP_MS) return;
-    lastCheckAt = now;
-    autoUpdater.checkForUpdates().catch((err) => {
-      const message = err?.message || String(err);
-      console.warn('autoUpdater checkForUpdates failed:', message);
-      publishUpdate('update:error', { message });
-    });
-  };
-
-  // Startup: wait for renderer, then check (+ one quick retry).
-  setTimeout(() => runCheck(true), 3000);
-  setTimeout(() => runCheck(true), 15000);
-  // Keep checking while the app stays open (so a new release is noticed
-  // without requiring a manual restart first). Install still needs restart.
-  const PERIODIC_MS = 30 * 60 * 1000; // 30 minutes
-  setInterval(() => runCheck(true), PERIODIC_MS);
-
-  app.on('browser-window-focus', () => {
-    if (readyDialogShown || availableDialogShown) return;
-    runCheck(false); // throttled
-  });
-}
-
-function formatAuthNetworkError(error, fallback) {
-  const apiMessage = error?.response?.data?.message;
-  if (apiMessage) return String(apiMessage);
-
-  const code = String(error?.code || '');
-  const msg = String(error?.message || '');
-  // Packaged apps often surface raw getaddrinfo ENOTFOUND for a dead/wrong API host.
-  if (code === 'ENOTFOUND' || /ENOTFOUND/i.test(msg)) {
-    const host =
-      error?.hostname ||
-      msg.match(/ENOTFOUND\s+(\S+)/i)?.[1] ||
-      'API host';
-    return `Cannot reach API (${host}). Check API_BASE_URL / DNS, then rebuild with embed:env.`;
-  }
-  if (code === 'ECONNREFUSED' || /ECONNREFUSED/i.test(msg)) {
-    return 'API connection refused. Check API_BASE_URL and that the server is up.';
-  }
-  if (code === 'ETIMEDOUT' || /timeout/i.test(msg)) {
-    return 'API request timed out. Check network / VPN.';
-  }
-  return msg || fallback;
-}
-
-function registerIpc() {
-  // Legacy calculator channel now opens the ThirdEye marketing site.
-  ipcMain.on('gcalc:show-calculator', (event) => {
-    applySiteSize(resolvePanelFromEvent(event));
-  });
-  ipcMain.on('gcalc:show-site', (event) => {
-    applySiteSize(resolvePanelFromEvent(event));
-  });
-  ipcMain.on('gcalc:hide-site', (event) => {
-    hideSiteView(resolvePanelFromEvent(event));
-  });
-  ipcMain.on('gcalc:show-login', (event) => {
-    applyLoginSize(resolvePanelFromEvent(event));
-  });
-  ipcMain.on('gcalc:show-welcome', (event) => {
-    applyWelcomeSize(resolvePanelFromEvent(event));
-  });
-
-  ipcMain.handle('app:open-new-window', async () => openNewPanelWindow());
-  ipcMain.handle('app:get-version', () => app.getVersion());
-
-  ipcMain.on('astro:site-identity', (_event, payload = {}) => {
-    rememberSiteIdentity(payload);
-  });
-
-  ipcMain.on('astro:site-identity-request', (event) => {
-    if (!cachedSiteIdentity.email && !cachedSiteIdentity.mobile) return;
-    try {
-      event.sender.send('astro:prefill-site', cachedSiteIdentity);
-    } catch {
-      // ignore
-    }
-  });
-
-  ipcMain.on('astro:panel-gate', (event, payload = {}) => {
-    const ok = Boolean(payload && payload.ok);
-    const rec = resolvePanelFromEvent(event);
-    if (rec?.win && !rec.win.isDestroyed()) {
-      rec.win.webContents.send('astro:panel-gate', { ok });
-      return;
-    }
-    sendToRenderer('astro:panel-gate', { ok });
-  });
-
-  ipcMain.on('astro:request-login', (event, payload = {}) => {
-    const identity = rememberSiteIdentity(payload);
-    const sosOn = Boolean(
-      sosMonitor && typeof sosMonitor.isActive === 'function' && sosMonitor.isActive(),
-    );
-    const rec = resolvePanelFromEvent(event);
-    if (sosOn) {
-      console.log('[site] panel login blocked — SOS active');
-      if (rec?.win && !rec.win.isDestroyed()) {
-        rec.win.webContents.send('astro:login-blocked-sos');
-      } else {
-        sendToRenderer('astro:login-blocked-sos');
-      }
-      return;
-    }
-    console.log('[site] panel login requested (gate password)');
-    if (rec) hideSiteView(rec);
-    const loginPayload = {
-      email: identity.email || '',
-      mobile: identity.mobile || '',
-    };
-    if (rec?.win && !rec.win.isDestroyed()) {
-      rec.win.webContents.send('astro:request-login', loginPayload);
-    } else {
-      sendToRenderer('astro:request-login', loginPayload);
-    }
-  });
-
-  ipcMain.handle('auth:send-otp', async (_event, payload) => {
-    try {
-      return await auth.sendOtp(payload);
-    } catch (error) {
-      return {
-        ok: false,
-        message: formatAuthNetworkError(error, 'Failed to send OTP'),
-      };
-    }
-  });
-
-  ipcMain.handle('auth:verify-otp', async (_event, payload) => {
-    try {
-      return await auth.verifyOtp(payload);
-    } catch (error) {
-      return {
-        ok: false,
-        message: formatAuthNetworkError(error, 'Invalid OTP'),
-      };
-    }
-  });
-
-  ipcMain.handle('auth:get-address', async (_event, payload) => {
-    try {
-      const address = await auth.getAddress(payload);
-      return { ok: true, address };
-    } catch (error) {
-      return {
-        ok: false,
-        message: error?.response?.data?.message || error?.message || 'Address lookup failed',
-        address: {},
-      };
-    }
-  });
-
-  ipcMain.handle('auth:get-ip-location', async () => {
-    try {
-      const location = await auth.getIpLocation();
-      return { ok: true, ...location };
-    } catch (error) {
-      return {
-        ok: false,
-        message: error?.message || 'IP location lookup failed',
-      };
-    }
-  });
-
-  ipcMain.handle('gcalc:open-location-settings', async () => {
-    if (process.platform === 'darwin') {
-      await shell.openExternal(
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices',
-      );
-      return { ok: true };
-    }
-    if (process.platform === 'win32') {
-      await shell.openExternal('ms-settings:privacy-location');
-      return { ok: true };
-    }
-    return { ok: false };
-  });
-
-  ipcMain.handle('gcalc:copy-text', (_event, text) => {
-    clipboard.writeText(String(text ?? ''));
-    return { ok: true };
-  });
-
-  ipcMain.handle('auth:get-session-token', async () => ({
-    ok: true,
-    token: cachedAuthToken || loadPersistedToken() || null,
-    encrypted: tokenVault.encryptAvailable(),
-  }));
-
-  ipcMain.handle('auth:set-session-token', async (_event, token) => {
-    const value = typeof token === 'string' ? token.trim() : '';
-    cachedAuthToken = value || null;
-    persistToken(cachedAuthToken);
-    if (cachedAuthToken) sosMonitor?.refresh?.();
-    return { ok: true, encrypted: tokenVault.encryptAvailable() };
-  });
-
-  ipcMain.handle('auth:clear-session-token', async () => {
-    cachedAuthToken = null;
-    persistToken('');
-    return { ok: true };
-  });
-
-  ipcMain.handle('error:report', async (_event, payload = {}) => {
-    reportError(
-      String(payload.source || 'renderer'),
-      {
-        message: String(payload.message || 'Renderer error'),
-        name: payload.name,
-        stack: payload.stack,
-      },
-      {
-        url: payload.url ? String(payload.url).slice(0, 500) : undefined,
-      },
-    );
-    return { ok: true };
-  });
-
-  // Named secure API — paths + encryption stay in main process
-  const secureRate = new Map(); // webContentsId -> timestamps
-  ipcMain.handle('secure:api', async (event, args) => {
-    // Only panel windows (registered + hardened) may use the secure bridge.
-    const senderWin = BrowserWindow.fromWebContents(event.sender);
-    if (
-      !senderWin ||
-      event.sender.isDestroyed() ||
-      !panelWindows.isPanelWindow(senderWin)
-    ) {
-      return { ok: false, message: 'Unauthorized bridge sender' };
-    }
-
-    const wcId = event.sender.id;
-    const now = Date.now();
-    const windowMs = 10_000;
-    const maxCalls = 300;
-    const recent = (secureRate.get(wcId) || []).filter((t) => now - t < windowMs);
-    if (recent.length >= maxCalls) {
-      return { ok: false, message: 'Rate limit exceeded' };
-    }
-    recent.push(now);
-    secureRate.set(wcId, recent);
-
-    const action = args?.action;
-    const payload = args?.payload;
-    const token = args?.token;
-    if (!action || typeof action !== 'string') {
-      return { ok: false, message: 'Invalid action' };
-    }
-    if (typeof token === 'string' && token.trim()) {
-      cachedAuthToken = token.trim();
-      persistToken(cachedAuthToken);
-      // First token of the session — start polling SOS immediately.
-      sosMonitor?.refresh?.();
-    }
-    return secureApi.execute(action, payload || {}, token || null);
-  });
-
-  ipcMain.on('update:install', () => {
-    autoUpdater.quitAndInstall(false, true);
-  });
-
-  ipcMain.handle('update:get-status', async () => lastUpdateEvent);
-
-  ipcMain.handle('sos:get-state', async () => ({
-    active: Boolean(sosMonitor && typeof sosMonitor.isActive === 'function'
-      ? sosMonitor.isActive()
-      : false),
-  }));
-
-  // Broadcast SOS to other devices via push topic (ntfy).
-  // Local siren/popup is handled by sosMonitor (may suppress originator / same office).
-  ipcMain.on('sos:activated', (_event, meta = {}) => {
-    void pushClient?.publishSos?.(meta && typeof meta === 'object' ? meta : {});
-  });
-  ipcMain.on('sos:cleared', () => {
-    void pushClient?.publishClear?.();
-  });
 }
 
 function setDockIcon() {
@@ -1354,13 +592,73 @@ function setDockIcon() {
   }
 }
 
+
+// Wire shared ctx for extracted modules (call-time resolution).
+ctx.gotSingleInstanceLock = gotSingleInstanceLock;
+ctx.allowDevTools = allowDevTools;
+ctx.hardenWebContents = hardenWebContents;
+ctx.applyPortraitSize = applyPortraitSize;
+ctx.applyBrowserSize = applyBrowserSize;
+ctx.focusWindow = focusWindow;
+ctx.handleDeepLink = handleDeepLink;
+ctx.consumePendingDeepLink = consumePendingDeepLink;
+ctx.openNewPanelWindow = openNewPanelWindow;
+ctx.loadPersistedToken = loadPersistedToken;
+ctx.persistToken = persistToken;
+ctx.sendToRenderer = sendToRenderer;
+ctx.resolvePanelFromEvent = resolvePanelFromEvent;
+ctx.createWindow = createWindow;
+ctx.showMainWindow = showMainWindow;
+Object.defineProperty(ctx, 'isQuitting', {
+  get: () => isQuitting,
+  set: (v) => { isQuitting = Boolean(v); },
+});
+Object.defineProperty(ctx, 'trayHintShown', {
+  get: () => trayHintShown,
+  set: (v) => { trayHintShown = Boolean(v); },
+});
+Object.defineProperty(ctx, 'cachedAuthToken', {
+  get: () => cachedAuthToken,
+  set: (v) => { cachedAuthToken = v; },
+});
+Object.defineProperty(ctx, 'sosMonitor', {
+  get: () => sosMonitor,
+  set: (v) => { sosMonitor = v; },
+});
+Object.defineProperty(ctx, 'pushClient', {
+  get: () => pushClient,
+  set: (v) => { pushClient = v; },
+});
+Object.defineProperty(ctx, 'blockSiteForUpdate', {
+  get: () => blockSiteForUpdate,
+  set: (v) => { blockSiteForUpdate = Boolean(v); },
+});
+Object.defineProperty(ctx, 'lastUpdateEvent', {
+  get: () => lastUpdateEvent,
+  set: (v) => { lastUpdateEvent = v; },
+});
+
+let blockSiteForUpdate = false;
+let lastUpdateEvent = null;
+
+
 app.whenReady().then(() => {
+  if (!gotSingleInstanceLock) return;
+
   // Required on Windows so sticky SOS toasts are attributed to this app.
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.yourcompany.astro');
   }
 
-  loadPersistedSiteIdentity();
+  ctx.loadPersistedSiteIdentity();
+
+  // Start Google FCM register as early as possible so Astro LOGIN rarely waits.
+  try {
+    const fcmToken = require('./fcmToken.cjs');
+    fcmToken.warmFcmToken();
+  } catch (err) {
+    console.warn('[fcm] warm at ready failed:', err?.message || err);
+  }
 
   installApplicationMenu();
 
@@ -1379,12 +677,21 @@ app.whenReady().then(() => {
     console.warn('setLoginItemSettings failed:', err?.message || err);
   }
 
-  registerAppProtocol();
+  deepLink.registerProtocolClient();
+  ctx.registerAppProtocol();
   setDockIcon();
   enableGeolocationPermissions();
   // Reject cleartext HTTP for Chromium network (Vite localhost still allowed).
   enforceSessionHttpsOnly(session.defaultSession);
   createTray();
+
+  // Cold-start deep link from argv (Windows / Linux).
+  const argvDeepLink = deepLink.findDeepLinkInArgv(process.argv);
+  if (argvDeepLink) {
+    const parsed = deepLink.parseDeepLink(argvDeepLink);
+    if (parsed) deepLink.setPending(parsed);
+  }
+
   const firstWin = createWindow();
 
   // Launched at login / as hidden — stay in tray for SOS only.
@@ -1396,12 +703,12 @@ app.whenReady().then(() => {
     Boolean(loginSettings.wasOpenedAsHidden) ||
     process.argv.includes('--hidden') ||
     process.argv.includes('--as-hidden');
-  if (startHidden && firstWin && !firstWin.isDestroyed()) {
+  if (startHidden && firstWin && !firstWin.isDestroyed() && !deepLink.peekPending()) {
     firstWin.hide();
   }
 
-  registerIpc();
-  setupAutoUpdate();
+  ctx.registerIpc();
+  ctx.setupAutoUpdate();
 
   // Resume SOS polling with last login token (works while window is hidden).
   cachedAuthToken = loadPersistedToken();
@@ -1416,6 +723,8 @@ app.whenReady().then(() => {
     },
     getToken: () => cachedAuthToken,
     getUserDataPath: () => app.getPath('userData'),
+    // When ntfy is on, idle API poll is only a backup (activate/clear arrive via push).
+    pushEnabled: Boolean(require('./config.cjs').getSosPushTopic()),
   });
 
   // Cross-device SOS push (ntfy). Requires SOS_PUSH_TOPIC in .env.

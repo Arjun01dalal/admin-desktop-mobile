@@ -41,6 +41,10 @@ import { useRevealCodes } from '@/context/useRevealCodes';
 import { useTheme } from '@mui/material/styles';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import {
+  prefetchPanelRoute,
+  prefetchPanelRoutesIdle,
+} from '@/app/routePrefetch';
+import {
   buildSosEnablePayload,
   canAccessNavItem,
   canShowSos,
@@ -236,6 +240,11 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
       navigate('/welcome', { replace: true });
     }
   }, [location.pathname, allowedPaths, navigate]);
+
+  // Warm top sidebar chunks while idle (does not block first paint).
+  useEffect(() => {
+    prefetchPanelRoutesIdle(filteredNavItems.map((item) => item.path));
+  }, [filteredNavItems]);
 
   const confirmSos = async () => {
     if (sosLoading) return;
@@ -512,6 +521,8 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
               key={item.id}
               component={NavLink}
               to={item.path}
+              onMouseEnter={() => prefetchPanelRoute(item.path)}
+              onFocus={() => prefetchPanelRoute(item.path)}
               sx={{
                 mx: 1,
                 mb: 0.5,

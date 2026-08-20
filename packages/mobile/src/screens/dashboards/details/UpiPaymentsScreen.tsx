@@ -669,7 +669,9 @@ export function UpiPaymentsScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
               <Text style={styles.modalLabel}>Status</Text>
               <View style={styles.chipsWrap}>
                 {['Approved', 'Failed', 'Hold'].map((s) => (

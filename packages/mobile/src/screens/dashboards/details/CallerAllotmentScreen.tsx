@@ -306,6 +306,7 @@ export function CallerAllotmentScreen() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={

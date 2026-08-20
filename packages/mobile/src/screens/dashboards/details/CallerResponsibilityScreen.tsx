@@ -92,6 +92,24 @@ function displayName(value: unknown, empty = '-'): string {
   return s;
 }
 
+function formatCallerHeads(value: unknown, empty = '-'): string {
+  const parts = Array.isArray(value)
+    ? value
+    : value == null || value === ''
+      ? []
+      : String(value).split(/[,|]/);
+  const names = parts
+    .map((entry) => {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        const rec = entry as Record<string, unknown>;
+        return String(rec.name ?? rec.realName ?? '').trim();
+      }
+      return String(entry ?? '').trim();
+    })
+    .filter((s) => s && s !== 'not_assigned' && s !== 'not assigned');
+  return names.length ? names.join(', ') : empty;
+}
+
 function ecs(row: CallerRow): Record<string, unknown> {
   return (row.activePlayersECS || {}) as Record<string, unknown>;
 }
@@ -286,22 +304,21 @@ export function CallerResponsibilityScreen() {
       { key: 'wAppCnt', label: 'Refund Approved Count', width: 130, align: 'right', render: (r) => cellText(r.withdrawalApprovedCount) },
       { key: 'wPendCnt', label: 'Refund Pending Count', width: 130, align: 'right', render: (r) => cellText(r.withdrawalPendingCount) },
       { key: 'activeCust', label: 'Active Customers', width: 110, align: 'right', render: (r) => cellText(r.transactionCount) },
+      { key: 'ex', label: 'E', width: 60, align: 'right', render: (r) => cellText(r.activeUserCount) },
+      { key: 'casino', label: 'C', width: 60, align: 'right', render: (r) => cellText(ecs(r).E) },
+      { key: 'matka', label: 'S', width: 60, align: 'right', render: (r) => cellText(ecs(r).C) },
     );
-    if (!isCaller) {
-      cols.push(
-        { key: 'ex', label: 'E', width: 60, align: 'right', render: (r) => cellText(r.activeUserCount) },
-        { key: 'casino', label: 'C', width: 60, align: 'right', render: (r) => cellText(ecs(r).E) },
-        { key: 'matka', label: 'S', width: 60, align: 'right', render: (r) => cellText(ecs(r).C) },
-      );
-    }
     cols.push({ key: 'daily', label: 'Daily Deposit', width: 100, align: 'right', render: (r) => roundAmt(ecs(r).S) });
     if (!isCaller) {
       cols.push({ key: 'status', label: 'Status', width: 100, render: (r) => cellText(r.time) });
     }
     cols.push({ key: 'emp', label: 'Emp Code', width: 100, render: (r) => cellText(r.empCode) });
-    if (!isCaller) {
-      cols.push({ key: 'head', label: 'Caller Head', width: 130, render: (r) => displayName(r.callerHead) });
-    }
+    cols.push({
+      key: 'head',
+      label: 'Caller Head',
+      width: 130,
+      render: (r) => formatCallerHeads(r.callerHead),
+    });
     return cols;
   }, [isCaller, showLocation]);
 
@@ -319,17 +336,21 @@ export function CallerResponsibilityScreen() {
     <View>
       <Text style={styles.title}>Caller Responsibility</Text>
       <Text style={styles.sub}>
-        {startDate} → {endDate} · Tap a caller row for details & view lists
+        {isCaller
+          ? 'Tap a caller row for details & view lists'
+          : `${startDate} → ${endDate} · Tap a caller row for details & view lists`}
       </Text>
 
-      <DetailFilterBar
-        startDate={draftStart}
-        endDate={draftEnd}
-        loading={loading}
-        onStartDateChange={setDraftStart}
-        onEndDateChange={setDraftEnd}
-        onApply={applyAll}
-      />
+      {!isCaller ? (
+        <DetailFilterBar
+          startDate={draftStart}
+          endDate={draftEnd}
+          loading={loading}
+          onStartDateChange={setDraftStart}
+          onEndDateChange={setDraftEnd}
+          onApply={applyAll}
+        />
+      ) : null}
 
       {!isCaller && (
         <>
@@ -459,6 +480,7 @@ export function CallerResponsibilityScreen() {
   return (
     <>
       <FlatList
+        showsVerticalScrollIndicator={false}
         style={styles.screen}
         contentContainerStyle={styles.content}
         data={loading ? [] : callerRows}
@@ -520,6 +542,9 @@ export function CallerResponsibilityScreen() {
                   Active: {cellText(item.transactionCount)}
                 </Text>
               </View>
+              <Text style={styles.cardHeadLine} numberOfLines={2}>
+                Head: {formatCallerHeads(item.callerHead)}
+              </Text>
               <Text style={styles.cardHint}>Tap card for details & lists</Text>
             </Pressable>
           );
@@ -668,6 +693,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flexShrink: 0,
     maxWidth: '36%',
+  },
+  cardHeadLine: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: spacing(1),
   },
   cardSplitRow: {
     flexDirection: 'row',

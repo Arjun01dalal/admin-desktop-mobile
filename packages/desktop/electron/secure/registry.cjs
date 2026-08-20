@@ -1526,6 +1526,43 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  /** Laxmi UserExposure → Plutus Gaming pending bets (plain body). */
+  'userReport.plutusPendingBets': {
+    method: 'POST',
+    path: '/Ludo/user/pending-bets',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'userReport.updateBetsAdmin': {
+    method: 'POST',
+    path: '/User/update-bets-admin',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.updateBetsFalcon': {
+    method: 'POST',
+    path: '/User/update-bets-falcon',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.updateBetsJetfair': {
+    method: 'POST',
+    path: '/User/update-bets-jetfair',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.updateWcoWinning': {
+    method: 'POST',
+    path: '/User/update-wcoWinning',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'userReport.updateExchangePendingBet': {
+    method: 'POST',
+    path: '/User/find-exchange-pending-bet-and-update',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'userReport.gameHistory': {
     method: 'POST',
     path: '/User/get-game-history',

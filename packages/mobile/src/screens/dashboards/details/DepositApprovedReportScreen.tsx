@@ -11,6 +11,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -20,8 +21,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { pickPageSizes, appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -29,6 +28,8 @@ import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
+import { shareCsvFile } from '../../../utils/shareCsv';
 
 type RequestType = 'automaticDeposit' | 'scannerDeposit';
 
@@ -150,6 +151,7 @@ export function DepositApprovedReportScreen() {
   const [error, setError] = useState<string | null>(null);
   const [depositSheet, setDepositSheet] = useState<DepositRow | null>(null);
   const [scannerSheet, setScannerSheet] = useState<ScannerRow | null>(null);
+  const [downloadOpen, setDownloadOpen] = useState(false);
 
   const genRef = useRef(0);
   const sumGenRef = useRef(0);
@@ -159,24 +161,13 @@ export function DepositApprovedReportScreen() {
   const downloadExcel = useCallback(async () => {
     const source = isScanner ? scannerRows : rows;
     if (!source.length) {
-      setError('No data to export');
-      return;
+      Alert.alert('No data to export');
+      return false;
     }
-    try {
-      const csv = toCsv(source as unknown as Record<string, unknown>[]);
-      const fileUri = `${FileSystem.cacheDirectory}deposit_data_${Date.now()}.csv`;
-      await FileSystem.writeAsStringAsync(fileUri, csv);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'text/csv',
-          dialogTitle: 'Deposit Data',
-        });
-      } else {
-        setError('Sharing is not available on this device');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to export sheet');
-    }
+    return shareCsvFile(
+      `deposit_data_${Date.now()}.csv`,
+      toCsv(source as unknown as Record<string, unknown>[]),
+    );
   }, [isScanner, scannerRows, rows]);
   const selectedGateway = useMemo(
     () => gateways.find((g) => g._id === gatewayId) || null,
@@ -575,7 +566,7 @@ export function DepositApprovedReportScreen() {
         <TouchableOpacity
           style={[styles.downloadBtn, loading && styles.downloadBtnDisabled]}
           disabled={loading}
-          onPress={() => void downloadExcel()}
+          onPress={() => setDownloadOpen(true)}
         >
           <Text style={styles.downloadBtnText}>Download Excel Data</Text>
         </TouchableOpacity>
@@ -761,6 +752,18 @@ export function DepositApprovedReportScreen() {
               ]
             : undefined
         }
+      />
+      <SheetDownloadOtpModal
+        visible={downloadOpen}
+        filter={{
+          mid:
+            selectedGateway?.mid != null && selectedGateway.mid !== ''
+              ? String(selectedGateway.mid)
+              : 'All',
+          type: isScanner ? 'Scanner Deposit Approved Report' : 'Deposit Approved Report',
+        }}
+        onClose={() => setDownloadOpen(false)}
+        onVerified={() => downloadExcel()}
       />
     </ScrollView>
   );

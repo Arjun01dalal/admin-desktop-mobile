@@ -7,15 +7,19 @@ import {
 import {
   Box,
   Button,
+  CircularProgress,
   IconButton,
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import BlockIcon from '@mui/icons-material/Block';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import { type CommonTableColumn } from '@/components/CommonTable';
 import {
@@ -73,6 +77,41 @@ import {
   type UserFilters,
   type UserRow,
 } from './utils';
+
+/** Icon CTAs for Sub_Admin Location / Action columns. */
+const subAdminIconBtnSx = {
+  bgcolor: '#f1a144',
+  color: '#111',
+  width: 32,
+  height: 32,
+  borderRadius: 1.5,
+  '&:hover': { bgcolor: '#e09030' },
+  '&.Mui-disabled': { bgcolor: '#f7d2a8', color: '#666' },
+};
+
+const subAdminSelectSx = {
+  width: '100%',
+  minWidth: 120,
+  '& .MuiInputBase-root': {
+    fontSize: 12,
+    bgcolor: 'background.paper',
+    color: 'text.primary',
+    borderRadius: 1.5,
+    minHeight: 32,
+  },
+  '& .MuiInputBase-input': {
+    color: 'text.primary',
+    WebkitTextFillColor: 'currentColor',
+    py: 0.75,
+  },
+  '& .MuiSelect-icon': { color: 'text.secondary' },
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: 'divider',
+  },
+  '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+    borderColor: '#f1a144',
+  },
+};
 
 export type UseUsersColumnsParams = {
   userType: UserType;
@@ -209,15 +248,11 @@ if (userType === 'Sub_Admin') {
           sx={{ width: '100%' }}
         >
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            {showMobileColumn ? (
-              <CallingBtn item={r} reasonList="User List" botId={botId || '1'} />
-            ) : canShowMobile ? (
-              String(r.mobile || '-')
-            ) : r.mobile ? (
-              '**********'
-            ) : (
-              '-'
-            )}
+            {canShowMobile
+              ? String(r.mobile || '-')
+              : r.mobile
+                ? '**********'
+                : '-'}
           </Box>
           <IconButton
             size="small"
@@ -294,58 +329,71 @@ if (userType === 'Sub_Admin') {
     {
       id: 'location',
       label: 'Location',
-      width: 180,
+      width: 168,
       filter: null,
       render: (r) => {
         const current =
           locationDraft[r._id] ??
           String(r.officeLocation || r.location || '');
+        const busy = locationBusyId === r._id;
         return (
-          <Stack spacing={0.75} sx={{ py: 0.5, minWidth: 150 }}>
-            <Typography variant="caption" color="text.secondary">
-              Location :- {String(r.officeLocation || '-')}
-            </Typography>
-            <TextField
-              select
-              size="small"
-              fullWidth={false}
-              value={current}
-              onChange={(e) =>
-                setLocationDraft((prev) => ({
-                  ...prev,
-                  [r._id]: e.target.value,
-                }))
-              }
+          <Stack
+            spacing={0.75}
+            alignItems="stretch"
+            sx={{ py: 0.75, width: 148, mx: 'auto' }}
+          >
+            <Typography
+              variant="caption"
               sx={{
-                width: 150,
-                '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 12 },
-              }}
-            >
-              <MenuItem value="" disabled>
-                Select location
-              </MenuItem>
-              {SUBADMIN_LOCATIONS.map((loc) => (
-                <MenuItem key={loc} value={loc}>
-                  {loc}
-                </MenuItem>
-              ))}
-            </TextField>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={locationBusyId === r._id}
-              onClick={() => void updateSubAdminLocation(r)}
-              sx={{
-                bgcolor: '#ff9f0a',
-                color: '#1a1200',
-                fontWeight: 700,
-                textTransform: 'none',
+                color: 'text.secondary',
                 fontSize: 11,
-                '&:hover': { bgcolor: '#e08c00' },
+                fontWeight: 600,
+                lineHeight: 1.3,
+                textAlign: 'left',
               }}
             >
-              {locationBusyId === r._id ? '…' : 'Update Location'}
-            </Button>
+              {String(r.officeLocation || '—')}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <TextField
+                select
+                size="small"
+                value={current}
+                onChange={(e) =>
+                  setLocationDraft((prev) => ({
+                    ...prev,
+                    [r._id]: e.target.value,
+                  }))
+                }
+                sx={{ ...subAdminSelectSx, flex: 1, minWidth: 0 }}
+              >
+                <MenuItem value="" disabled>
+                  Select location
+                </MenuItem>
+                {SUBADMIN_LOCATIONS.map((loc) => (
+                  <MenuItem key={loc} value={loc}>
+                    {loc}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Tooltip title={busy ? 'Updating…' : 'Update Location'}>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={busy}
+                    onClick={() => void updateSubAdminLocation(r)}
+                    sx={subAdminIconBtnSx}
+                    aria-label="Update Location"
+                  >
+                    {busy ? (
+                      <CircularProgress size={14} sx={{ color: '#111' }} />
+                    ) : (
+                      <SaveOutlinedIcon sx={{ fontSize: 16 }} />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Stack>
           </Stack>
         );
       },
@@ -353,43 +401,48 @@ if (userType === 'Sub_Admin') {
     {
       id: 'action',
       label: 'Action',
-      width: 150,
+      width: 96,
       filter: null,
-      render: (r) => (
-        <Stack spacing={0.75} sx={{ py: 0.5 }}>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={blockCallerBusy}
-            onClick={() => void startBlockCaller(r)}
-            sx={{
-              bgcolor: '#ff9f0a',
-              color: '#1a1200',
-              fontWeight: 700,
-              textTransform: 'none',
-              fontSize: 11,
-              '&:hover': { bgcolor: '#e08c00' },
-            }}
+      render: (r) => {
+        const blocked = r.block === true;
+        return (
+          <Stack
+            direction="row"
+            spacing={0.75}
+            alignItems="center"
+            justifyContent="center"
+            sx={{ py: 0.75 }}
           >
-            {r.block === true ? 'Un Block Caller' : 'Block Caller'}
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => openRealName(r)}
-            sx={{
-              bgcolor: '#ff9f0a',
-              color: '#1a1200',
-              fontWeight: 700,
-              textTransform: 'none',
-              fontSize: 11,
-              '&:hover': { bgcolor: '#e08c00' },
-            }}
-          >
-            Add Real Name
-          </Button>
-        </Stack>
-      ),
+            <Tooltip title={blocked ? 'Unblock Caller' : 'Block Caller'}>
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={blockCallerBusy}
+                  onClick={() => void startBlockCaller(r)}
+                  sx={subAdminIconBtnSx}
+                  aria-label={blocked ? 'Unblock Caller' : 'Block Caller'}
+                >
+                  {blocked ? (
+                    <LockOpenIcon sx={{ fontSize: 16 }} />
+                  ) : (
+                    <BlockIcon sx={{ fontSize: 16 }} />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Add Real Name">
+              <IconButton
+                size="small"
+                onClick={() => openRealName(r)}
+                sx={subAdminIconBtnSx}
+                aria-label="Add Real Name"
+              >
+                <BadgeOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        );
+      },
     },
     {
       id: 'lastActivity',
@@ -451,6 +504,7 @@ if (userType === 'Non_Performing_Active_User') {
           item={r}
           botId={botId}
           reasonList={reasonForUserType(userType)}
+          hideBotCall
         />
       ),
     });
@@ -471,7 +525,7 @@ if (userType === 'Non_Performing_Active_User') {
     {
       id: 'empCode',
       label: 'Emp Code',
-      filter: canShowMobile ? (
+      filter: !isCaller && canShowMobile ? (
         <FilterInput
           value={draft.empCode}
           onChange={setDraftField('empCode')}
@@ -588,6 +642,7 @@ if (userType === 'LAXMI_999_Users') {
           item={r}
           botId={botId}
           reasonList={reasonForUserType(userType)}
+          hideBotCall
         />
       ),
     });
@@ -870,6 +925,7 @@ if (userType === 'In_Active_Deposit') {
           item={r}
           botId={botId}
           reasonList={reasonForUserType(userType)}
+          hideBotCall
         />
       ),
     });
@@ -1243,7 +1299,7 @@ cols.push(
     width: EMP_COL.width,
     headSx: EMP_COL.sx,
     cellSx: EMP_COL.sx,
-    filter: canShowMobile ? (
+    filter: !isCaller && canShowMobile ? (
       <FilterInput
         value={draft.empCode}
         onChange={setDraftField('empCode')}
@@ -1293,6 +1349,7 @@ if (showMobileColumn) {
         item={r}
         botId={botId}
         reasonList={reasonForUserType(userType)}
+        hideBotCall
       />
     ),
   });

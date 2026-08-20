@@ -146,7 +146,7 @@ export function LudoGameStatsPicker({
             <ScrollView
               style={styles.tableScroll}
               nestedScrollEnabled
-              showsVerticalScrollIndicator
+              showsVerticalScrollIndicator={false}
             >
               <View style={styles.bodyRow}>
                 {/* Frozen game-name column */}

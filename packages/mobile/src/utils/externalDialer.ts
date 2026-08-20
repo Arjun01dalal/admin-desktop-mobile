@@ -126,6 +126,8 @@ export async function addToDialerBatch(args: {
   campaignId: string;
   serverId?: string;
   leads: DialerLeadSource[];
+  listId?: string | number;
+  listName?: string;
 }): Promise<{ ok: boolean; message: string }> {
   const campaignId = args.campaignId.trim();
   if (!campaignId) return { ok: false, message: 'Campaign should not be empty' };
@@ -143,8 +145,8 @@ export async function addToDialerBatch(args: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        list_id: randomDialerListId(),
-        list_name: campaignId.slice(0, 120),
+        list_id: args.listId ?? randomDialerListId(),
+        list_name: String(args.listName || campaignId).slice(0, 120),
         campaign_id: campaignId.slice(0, 64),
         leads,
       }),

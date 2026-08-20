@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import './src/lib/webShim';
 import React, { useEffect, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { FlatList, ScrollView, SectionList, Text, TextInput, View } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { hydrateStorage } from './src/lib/webShim';
 import { setupSslPinning } from './src/security/sslPins';
@@ -26,7 +26,18 @@ function lockNativeFontScaling() {
   });
 }
 
+function hideVerticalScrollbars() {
+  const components = [ScrollView, FlatList, SectionList] as unknown as ComponentWithDefaults[];
+  components.forEach((component) => {
+    component.defaultProps = {
+      ...component.defaultProps,
+      showsVerticalScrollIndicator: false,
+    };
+  });
+}
+
 lockNativeFontScaling();
+hideVerticalScrollbars();
 
 /**
  * Boot loader: hydrate persisted storage and apply the stored theme BEFORE
@@ -34,7 +45,7 @@ lockNativeFontScaling();
  * StyleSheet.create, so the palette must be final before those imports run.
  */
 export default function App() {
-  const [AppRoot, setAppRoot] = useState<React.ComponentType | null>(null);
+  const [booted, setBooted] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -53,11 +64,8 @@ export default function App() {
         /* storage best-effort — fall back to defaults */
       }
       applyStoredTheme();
-      // Lazy require so screen modules evaluate AFTER the palette is set.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require('./src/AppRoot') as { default: React.ComponentType };
       if (alive) {
-        setAppRoot(() => mod.default);
+        setBooted(true);
         // System mode: follow OS light/dark changes (requires JS reload).
         stopWatch = watchSystemThemeChanges();
       }
@@ -68,6 +76,11 @@ export default function App() {
     };
   }, []);
 
-  if (!AppRoot) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  if (!booted) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+
+  // Require AFTER theme apply, and on every render so Fast Refresh is not stuck
+  // on a cached AppRoot instance (that used to keep the website WebView alive).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const AppRoot = require('./src/AppRoot').default as React.ComponentType;
   return <AppRoot />;
 }

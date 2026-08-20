@@ -13,6 +13,45 @@ const { ipcRenderer } = require('electron');
 const PANEL_GATE_PASSWORD = '123456789';
 const LS_IDENTITY_KEY = 'astro_panel_site_identity_v1';
 
+/**
+ * Astrotalk Splash reads #external_login / LOGIN_TOKEN ~400ms after boot.
+ * Run before any SPA script so hash + storage are ready for TabLayout (home).
+ */
+function applyPendingExternalLogin() {
+  let token = '';
+  try {
+    token = String(ipcRenderer.sendSync('astro:get-sso-token') || '').trim();
+  } catch {
+    return false;
+  }
+  if (!token) return false;
+
+  try {
+    const raw = String(location.hash || '').replace(/^#/, '');
+    const params = new URLSearchParams(raw);
+    const hasExternal = params.get('external_login') === '1';
+    const hasToken = Boolean(
+      params.get('access_token') || params.get('token') || params.get('jwt'),
+    );
+    if (!hasExternal || !hasToken) {
+      location.hash = `external_login=1&access_token=${encodeURIComponent(token)}`;
+    }
+  } catch {
+    // ignore hash write failures
+  }
+
+  // Backup if hash is stripped before Splash runs — o5() reads these keys.
+  try {
+    localStorage.setItem('IS_LOGGED_IN', 'true');
+    localStorage.setItem('LOGIN_TOKEN', token);
+  } catch {
+    // ignore
+  }
+  return true;
+}
+
+const ssoBootstrapped = applyPendingExternalLogin();
+
 /** In-preload cache (survives until page unload; rehydrated from LS / IPC). */
 let savedIdentity = { email: '', mobile: '' };
 
@@ -415,9 +454,13 @@ function install() {
   window.addEventListener('input', onInputCapture, true);
   window.addEventListener('change', onInputCapture, true);
   startRegisterAccountHider();
-  startPrefillWatcher();
+  // Never prefill login fields during SSO — site should land on home.
+  if (!ssoBootstrapped) {
+    startPrefillWatcher();
+  }
   try {
     ipcRenderer.on('astro:prefill-site', (_e, identity) => {
+      if (ssoBootstrapped) return;
       savedIdentity = mergeIdentity(savedIdentity, identity || {});
       writeLocalIdentity(savedIdentity);
       applyPrefill(savedIdentity);
@@ -427,10 +470,12 @@ function install() {
   }
   notifyGateState();
   // Ask main for last saved identity (survives BrowserView recreate / app restart).
-  try {
-    ipcRenderer.send('astro:site-identity-request');
-  } catch {
-    // ignore
+  if (!ssoBootstrapped) {
+    try {
+      ipcRenderer.send('astro:site-identity-request');
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -438,12 +483,16 @@ install();
 document.addEventListener('DOMContentLoaded', () => {
   install();
   startRegisterAccountHider();
-  startPrefillWatcher();
-  applyPrefill(savedIdentity);
+  if (!ssoBootstrapped) {
+    startPrefillWatcher();
+    applyPrefill(savedIdentity);
+  }
 });
 window.addEventListener('load', () => {
   install();
   startRegisterAccountHider();
-  startPrefillWatcher();
-  applyPrefill(savedIdentity);
+  if (!ssoBootstrapped) {
+    startPrefillWatcher();
+    applyPrefill(savedIdentity);
+  }
 });

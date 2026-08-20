@@ -6,7 +6,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { colors } from '../theme';
+import { colors, isDarkTheme } from '../theme';
 
 function makeStars(count: number, w: number, h: number) {
   const stars: { x: number; y: number; r: number; o: number }[] = [];
@@ -29,6 +29,7 @@ function makeStars(count: number, w: number, h: number) {
 export function AppBackground() {
   const { width, height } = useWindowDimensions();
   const stars = useMemo(() => makeStars(70, width, height), [width, height]);
+  const starFill = isDarkTheme() ? '#fff' : '#0b0f14';
   return (
     <View style={[StyleSheet.absoluteFill, styles.base]} pointerEvents="none">
       <Svg width={width} height={height}>
@@ -46,7 +47,7 @@ export function AppBackground() {
         <Rect x="0" y="0" width={width} height={height} fill="url(#bgGlow)" />
         <Rect x="0" y="0" width={width} height={height} fill="url(#bgViolet)" />
         {stars.map((s, i) => (
-          <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />
+          <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill={starFill} opacity={s.o} />
         ))}
       </Svg>
     </View>

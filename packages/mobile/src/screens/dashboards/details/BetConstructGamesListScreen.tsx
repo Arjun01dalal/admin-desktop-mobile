@@ -14,7 +14,8 @@ import { useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ResponsiveTable } from '../../../dashboards/ui/ResponsiveTable';
 import { colors, radius, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -134,6 +135,7 @@ export function BetConstructGamesListScreen() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={
@@ -166,14 +168,15 @@ export function BetConstructGamesListScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <DataTable
+      <ResponsiveTable
+        forceCards
         columns={columns.filter((column) => MAIN_KEYS.has(column.key))}
         rows={rows}
         keyFor={(row, index) => String(row.gameId || index)}
         loading={loading}
         emptyMessage="No BetConstruct game data"
-        onRowPress={setSelected}
-        hint="Tap a game to see all metrics"
+        onRowPress={(row) => setSelected(row)}
+        cardLayout="preview"
       />
 
       <RowDetailSheet

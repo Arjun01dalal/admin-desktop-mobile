@@ -25,7 +25,6 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-toastify';
-import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -39,7 +38,8 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
-import { logSheetDownload } from '@/utils/sheetDownloadAudit';
+import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
+import { saveWorkbook } from '@/utils/downloadSheet';
 import { asList, asPaged, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import {
@@ -77,6 +77,7 @@ type RequestType = 'automatic' | 'scannerDeposit';
 
 type ColumnFilters = {
   userName: string;
+  empCode: string;
   userMobile: string;
   clientName: string;
   amount: string;
@@ -124,6 +125,7 @@ const statusChipSx = (color: string, background: string) => ({
 
 const EMPTY_FILTERS: ColumnFilters = {
   userName: '',
+  empCode: '',
   userMobile: '',
   clientName: '',
   amount: '',
@@ -164,6 +166,7 @@ export function DepositPage() {
     filters: EMPTY_FILTERS,
   });
   const [requestType, setRequestType] = useState<RequestType>('automatic');
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [mids, setMids] = useState<MidOption[]>([]);
   const [gateways, setGateways] = useState<string[]>([]);
   const [summary, setSummary] = useState<ReturnType<typeof asFundSummary>>({});
@@ -195,6 +198,7 @@ export function DepositPage() {
     const filter: Record<string, unknown> = {};
     if (f.status) filter.status = f.status;
     if (f.userName.trim()) filter.userName = f.userName.trim();
+    if (f.empCode.trim()) filter.empCode = f.empCode.trim();
     if (f.userId.trim()) filter.userId = f.userId.trim();
     if (f.clientName) filter.clientName = f.clientName;
     if (f.amount.trim()) {
@@ -397,28 +401,11 @@ export function DepositPage() {
 
   const downloadExcel = useCallback(() => {
     const source = isScanner ? scannerRows : rows;
-    if (!source.length) {
-      toast.warn('No data to export!');
-      return;
-    }
-    logSheetDownload({
-      mid: query.filters.mid || midValue || 'All',
-      type: isScanner ? 'Scanner Deposit' : 'Deposit',
+    return saveWorkbook(source as Record<string, unknown>[], {
+      sheetName: 'Deposit Data',
+      filename: `deposit_data_${Date.now()}.xlsx`,
     });
-    const worksheet = XLSX.utils.json_to_sheet(source);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Deposit Data');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `deposit_data_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [isScanner, scannerRows, rows, query.filters.mid, midValue]);
+  }, [isScanner, scannerRows, rows]);
 
   const toggleOrder = useCallback((row: DepositRow, checked: boolean) => {
     const orderId = row.orderId || '';
@@ -698,6 +685,13 @@ export function DepositPage() {
         width: 90,
         filter: searchFilter('amount', 'Amount'),
         render: (row) => formatAmount(row.amount ?? 0),
+      },
+      {
+        id: 'empCode',
+        label: 'Emp Code',
+        width: 100,
+        filter: searchFilter('empCode', 'Emp code'),
+        render: (row) => display(row.empCode),
       },
       {
         id: 'txnDetails',
@@ -1355,7 +1349,7 @@ export function DepositPage() {
               <Button
                 variant="outlined"
                 disabled={loading}
-                onClick={downloadExcel}
+                onClick={() => setDownloadOpen(true)}
                 sx={secondaryBtnSx}
               >
                 Download Data
@@ -1567,6 +1561,15 @@ export function DepositPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <SheetDownloadOtpModal
+        open={downloadOpen}
+        filter={{
+          mid: query.filters.mid || midValue || 'All',
+          type: isScanner ? 'Scanner Deposit' : 'Deposit',
+        }}
+        onClose={() => setDownloadOpen(false)}
+        onVerified={downloadExcel}
+      />
     </Box>
   );
 }

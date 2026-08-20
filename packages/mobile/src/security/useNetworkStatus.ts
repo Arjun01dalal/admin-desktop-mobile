@@ -1,8 +1,8 @@
 /**
  * Live online/offline status from NetInfo.
  * Treats airplane mode / Wi‑Fi+cellular off as offline.
- * Does not use `isInternetReachable` — that is often false on VPN even when
- * the device is online.
+ * Does not use `isInternetReachable` — that can be false even when
+ * the device has a working network connection.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';

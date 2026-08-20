@@ -35,6 +35,7 @@ import {
   spacing,
   type ThemeMode,
 } from '../theme';
+import { getAppVersion } from '../utils/appVersion';
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'dark', label: 'Dark' },
@@ -304,7 +305,9 @@ export function ProfileScreen() {
   const email = user?.email;
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.avatarWrap}>
         <View style={styles.avatar}>
           <MaterialIcons name="person" size={40} color={colors.primaryForeground} />
@@ -337,6 +340,7 @@ export function ProfileScreen() {
           <MaterialIcons name="logout" size={20} color="#fff" />
           <Text style={styles.logoutBtnText}>Logout</Text>
         </TouchableOpacity>
+        <Text style={styles.version}>App version {getAppVersion()}</Text>
       </View>
     </ScrollView>
   );
@@ -500,4 +504,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(4),
   },
   logoutBtnText: { color: colors.destructive, fontSize: 14, fontWeight: '700' },
+  version: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: spacing(1),
+  },
 });

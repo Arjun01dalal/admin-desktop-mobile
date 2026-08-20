@@ -528,13 +528,11 @@ export function CallerResponsibilityPage() {
       render: (r) => String(r.empCode ?? '-'),
     });
 
-    if (!isCaller) {
-      cols.push({
-        id: 'head',
-        label: 'Caller Head',
-        render: (r) => displayName(r.callerHead),
-      });
-    }
+    cols.push({
+      id: 'head',
+      label: 'Caller Head',
+      render: (r) => displayName(r.callerHead),
+    });
 
     return cols;
   }, [navigate, startDate, endDate, isCaller, showLocation]);
@@ -582,12 +580,14 @@ export function CallerResponsibilityPage() {
               </Typography>
               {!filtersOpen ? (
                 <>
-                  <Chip
-                    size="small"
-                    label={`${startDate} → ${endDate}`}
-                    variant="outlined"
-                    sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
-                  />
+                  {!isCaller ? (
+                    <Chip
+                      size="small"
+                      label={`${startDate} → ${endDate}`}
+                      variant="outlined"
+                      sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
+                    />
+                  ) : null}
                   <Chip
                     size="small"
                     label={`Bots: ${displayedBotCount}`}
@@ -665,24 +665,28 @@ export function CallerResponsibilityPage() {
                 useFlexGap
                 sx={{ minWidth: 0, maxWidth: '100%' }}
               >
-                <TextField
-                  type="date"
-                  label="From Date"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  sx={{ width: 170, flexShrink: 0 }}
-                />
-                <TextField
-                  type="date"
-                  label="To Date"
-                  size="small"
-                  InputLabelProps={{ shrink: true }}
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  sx={{ width: 170, flexShrink: 0 }}
-                />
+                {!isCaller ? (
+                  <>
+                    <TextField
+                      type="date"
+                      label="From Date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      sx={{ width: 170, flexShrink: 0 }}
+                    />
+                    <TextField
+                      type="date"
+                      label="To Date"
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      sx={{ width: 170, flexShrink: 0 }}
+                    />
+                  </>
+                ) : null}
                 {showCallerHead && (
                   <TextField
                     select

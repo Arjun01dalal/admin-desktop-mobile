@@ -8,7 +8,8 @@ import React, {
 } from 'react';
 import * as Location from 'expo-location';
 import { secureApi, setAuthFailureHandler } from '../api/client';
-import { appStorage, hydrateStorage } from '../lib/webShim';
+import { eraseSessionSecrets, eraseToken, persistToken, persistUser } from '../lib/secureStorage';
+import { appStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
 import { registerSosPush } from '../push/sosPush';
 import { resetTokenValidationThrottle } from './sessionCheck';
@@ -20,9 +21,9 @@ type AuthState = {
   ready: boolean;
   token: string | null;
   user: AuthUser | null;
-  login: (token: string, user: AuthUser) => void;
+  login: (token: string, user: AuthUser) => Promise<void>;
   switchRole: (roleId: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -33,27 +34,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    void (async () => {
-      await hydrateStorage();
-      const t = appStorage.getItem('token');
-      const raw = appStorage.getItem('user');
-      if (t && raw) {
-        try {
-          setUser(JSON.parse(raw) as AuthUser);
-          setToken(t);
-          void registerSosPush(); // APK builds: closed-app SOS siren push.
-        } catch {
-          /* corrupted session — stay logged out */
-        }
+    const t = appStorage.getItem('token');
+    const raw = appStorage.getItem('user');
+    if (t && raw) {
+      try {
+        setUser(JSON.parse(raw) as AuthUser);
+        setToken(t);
+        void registerSosPush(); // APK builds: closed-app SOS siren push.
+      } catch {
+        /* corrupted session — stay logged out */
       }
-      setReady(true);
-    })();
+    }
+    setReady(true);
   }, []);
 
-  const login = useCallback((newToken: string, newUser: AuthUser) => {
+  const login = useCallback(async (newToken: string, newUser: AuthUser) => {
     resetTokenValidationThrottle();
+    const userJson = JSON.stringify(newUser);
     appStorage.setItem('token', newToken);
-    appStorage.setItem('user', JSON.stringify(newUser));
+    appStorage.setItem('user', userJson);
+    await Promise.all([persistToken(newToken), persistUser(userJson)]);
     if (newUser.Role_ID) appStorage.setItem('role_id', String(newUser.Role_ID));
     try {
       persistRoleFromLogin(newUser);
@@ -72,8 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!role) throw new Error('Selected role is not available');
 
       const nextUser = await selectActiveRole(user, token, role);
+      const userJson = JSON.stringify(nextUser);
       appStorage.setItem('token', token);
-      appStorage.setItem('user', JSON.stringify(nextUser));
+      appStorage.setItem('user', userJson);
+      await persistUser(userJson);
       appStorage.setItem('role_id', role.id);
       appStorage.setItem('role', role.name);
       setUser(nextUser);
@@ -81,9 +83,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [token, user],
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     appStorage.removeItem('token');
     appStorage.removeItem('user');
+    await eraseSessionSecrets();
     appStorage.removeItem('role_id');
     appStorage.removeItem('role');
     resetTokenValidationThrottle();
@@ -96,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setAuthFailureHandler((reason) => {
       console.log(`[auth] session rejected (${reason}); logging out`);
-      logout();
+      void logout();
     });
     return () => setAuthFailureHandler(null);
   }, [logout]);
@@ -104,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Single-session: poll check-token-blacklisted while logged in.
   useTokenValidator(Boolean(token), (reason) => {
     console.log(`[auth] session superseded (${reason}); logging out`);
-    logout();
+    void logout();
   });
 
   const value = useMemo(

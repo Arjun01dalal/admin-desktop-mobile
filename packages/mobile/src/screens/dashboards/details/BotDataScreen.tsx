@@ -371,7 +371,9 @@ export function BotDataScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={styles.pickerChips}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.pickerChips}>
               {pickerOptions.map((opt) => {
                 const active = pickerSelected.includes(opt);
                 return (

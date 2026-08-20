@@ -18,6 +18,8 @@ import { BetConstructGamesListScreen } from '../screens/dashboards/details/BetCo
 import { LudoUserGgrScreen } from '../screens/dashboards/details/LudoUserGgrScreen';
 import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
 import { UserReportScreen } from '../screens/UserReportScreen';
+import { UserExposureScreen } from '../screens/UserExposureScreen';
+import { BonusEarningScreen } from '../screens/BonusEarningScreen';
 import { CallerDepositListScreen } from '../screens/dashboards/details/CallerDepositListScreen';
 import { CallerDetailsScreen } from '../screens/dashboards/details/CallerDetailsScreen';
 import { ActiveUserDataScreen } from '../screens/dashboards/details/ActiveUserDataScreen';
@@ -139,6 +141,16 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/user-report',
     title: 'User Report',
     Component: UserReportScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/user_exposure',
+    title: 'User Exposure',
+    Component: UserExposureScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/bonus-wallet-referral-earning',
+    title: 'Bonus Earning',
+    Component: BonusEarningScreen as PanelDetailRoute['Component'],
   },
   {
     path: '/caller-responsibility/deposit-list',

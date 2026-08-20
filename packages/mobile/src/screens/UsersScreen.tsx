@@ -39,7 +39,7 @@ import {
 } from './dashboards/details/DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
 import { CreateUserScreen } from './CreateUserScreen';
-import { mapUsersToBotSettings, buildBotDialoutSetting } from '../utils/dialerHelpers';
+import { mapUsersToBotSettings } from '../utils/dialerHelpers';
 import { CAMPAIGN_LIST } from '../utils/campaignList';
 import { addToDialerBatch, singleCallToDialer } from '../utils/externalDialer';
 
@@ -125,8 +125,23 @@ function isBlocked(r: Row): boolean {
   return Boolean(r.blockUser ?? r.block);
 }
 
+function empCodesEqual(a: unknown, b: unknown): boolean {
+  const x = String(a ?? '').trim();
+  const y = String(b ?? '').trim();
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+    return x.padStart(3, '0') === y.padStart(3, '0');
+  }
+  return false;
+}
+
 /** Per-type filter allowlists (desktop buildUserFilter parity — APIs reject unknown keys). */
-function searchFieldsFor(type: UserType, hideContact: boolean): readonly SearchFieldOption[] {
+function searchFieldsFor(
+  type: UserType,
+  hideContact: boolean,
+  isCaller: boolean,
+): readonly SearchFieldOption[] {
   if (type === 'Sub_Admin') {
     return [
       { key: 'name', label: 'Name' },
@@ -143,7 +158,7 @@ function searchFieldsFor(type: UserType, hideContact: boolean): readonly SearchF
     ];
   }
   if (type === 'Non_Performing_Active_User') {
-    return [{ key: 'empCode', label: 'Emp Code' }];
+    return isCaller ? [] : [{ key: 'empCode', label: 'Emp Code' }];
   }
   if (type === 'Active_User' || type === 'Todays_Active') {
     const fields: SearchFieldOption[] = [{ key: 'name', label: 'Name' }];
@@ -173,7 +188,8 @@ function searchFieldsFor(type: UserType, hideContact: boolean): readonly SearchF
     { key: 'deviceType', label: 'Device' },
   );
   if (type === 'User' || type === 'Non_Performing_User') {
-    fields.push({ key: 'empCode', label: 'Emp Code' }, { key: 'played', label: 'In (E/C/S)' });
+    if (!isCaller) fields.push({ key: 'empCode', label: 'Emp Code' });
+    fields.push({ key: 'played', label: 'In (E/C/S)' });
   }
   return fields;
 }
@@ -473,30 +489,6 @@ export function UsersScreen() {
   const dialerListId = numericCampaignId ? `9${numericCampaignId}` : '—';
   const dialerListName = `${String(adminRec.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`;
 
-  const initiateBotCall = useCallback(
-    async (row: Row) => {
-      const mobile = String(row.mobile || '').trim();
-      if (!mobile) {
-        Alert.alert('No mobile number for this user');
-        return;
-      }
-      setCallBusy(true);
-      try {
-        const res = await secureApi('callLogs.addToBotDialer', {
-          userId: adminRec._id,
-          created_by: adminRec.name,
-          dialout_settings: [
-            buildBotDialoutSetting(row, botId.trim() || '1', reasonForUserType(userType)),
-          ],
-        });
-        Alert.alert(res.ok ? 'Bot Call' : 'Bot Call failed', res.message || (res.ok ? 'Call Initiated.' : 'Failed'));
-      } finally {
-        setCallBusy(false);
-      }
-    },
-    [adminRec, botId, userType],
-  );
-
   const confirmManualCall = useCallback(async () => {
     const row = callConfirmRow;
     if (!row) return;
@@ -598,8 +590,17 @@ export function UsersScreen() {
     setLoading(true);
     setError(null);
     try {
-      // Filter: per-type allowlists come from searchFieldsFor; uniqueUser is
-      // required by every type except Sub_Admin / LAXMI (desktop parity).
+      const adminRec = (admin ?? {}) as Record<string, unknown>;
+      const loginEmpCode = String(adminRec.empCode || '').trim();
+      const callerEmpScoped = isCaller && userType !== 'Sub_Admin';
+      if (callerEmpScoped && !loginEmpCode) {
+        setError('No empCode on this login. Ask admin to assign empCode.');
+        setRows([]);
+        setTotal(0);
+        setTotalPages(1);
+        return;
+      }
+
       const filter: Record<string, unknown> = {};
       if (userType !== 'Sub_Admin' && userType !== 'LAXMI_999_Users') {
         filter.uniqueUser = false;
@@ -607,11 +608,15 @@ export function UsersScreen() {
       if (appClientName && userType !== 'Sub_Admin' && userType !== 'LAXMI_999_Users') {
         filter.clientName = appClientName;
       }
-      if (appliedSearch.text.trim()) filter[appliedSearch.field] = appliedSearch.text.trim();
+      if (appliedSearch.text.trim() && !(callerEmpScoped && appliedSearch.field === 'empCode')) {
+        filter[appliedSearch.field] = appliedSearch.text.trim();
+      }
       if (blockFilter && userType === 'User') filter.blockUser = blockFilter === 'block';
+      if (callerEmpScoped && loginEmpCode && userType !== 'In_Active_Deposit') {
+        filter.empCode = loginEmpCode;
+      }
 
       // Operator scoping (desktop UsersPage): allotted apps + per-app states.
-      const adminRec = (admin ?? {}) as Record<string, unknown>;
       const allottedApps = (adminRec.clientName || adminRec.allotedApps) as
         | string
         | string[]
@@ -688,15 +693,19 @@ export function UsersScreen() {
         return;
       }
       const raw = (res.data ?? {}) as Record<string, unknown>;
-      const list = (raw.items ?? raw.users ?? raw.user ?? raw.data ?? []) as Row[];
+      let list = (raw.items ?? raw.users ?? raw.user ?? raw.data ?? []) as Row[];
+      if (!Array.isArray(list)) list = [];
+      if (callerEmpScoped && loginEmpCode) {
+        list = list.filter((row) => empCodesEqual(row.empCode, loginEmpCode));
+      }
       setSelected(null);
-      setRows(Array.isArray(list) ? list : []);
+      setRows(list);
       setTotalPages(Math.max(1, Number(raw.totalPages ?? 1) || 1));
-      setTotal(Number(raw.total ?? raw.count ?? (Array.isArray(list) ? list.length : 0)) || 0);
+      setTotal(Number(raw.total ?? raw.count ?? list.length) || 0);
     } finally {
       setLoading(false);
     }
-  }, [admin, appClientName, appliedSearch, blockFilter, dates, page, pageSize, userType]);
+  }, [admin, appClientName, appliedSearch, blockFilter, dates, isCaller, page, pageSize, userType]);
 
   useEffect(() => {
     void load();
@@ -869,7 +878,7 @@ export function UsersScreen() {
           setPageSize(v);
           setPage(1);
         }}
-        searchFields={searchFieldsFor(userType, hideContact)}
+        searchFields={searchFieldsFor(userType, hideContact, isCaller)}
         searchField={searchField}
         onSearchFieldChange={setSearchField}
         searchText={searchDraft}
@@ -1041,7 +1050,9 @@ export function UsersScreen() {
                       </Text>
                     </View>
                   </View>
-                  {showCalling && String(r.mobile || '').trim() ? (
+                  {showCalling &&
+                  userType !== 'Sub_Admin' &&
+                  String(r.mobile || '').trim() ? (
                     <View style={styles.callBtnRow}>
                       <TouchableOpacity
                         style={[styles.callBtn, callBusy && styles.dialerBtnDisabled]}
@@ -1052,13 +1063,6 @@ export function UsersScreen() {
                         }}
                       >
                         <Text style={styles.callBtnText}>Call</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.callBtn, callBusy && styles.dialerBtnDisabled]}
-                        disabled={callBusy}
-                        onPress={() => void initiateBotCall(r)}
-                      >
-                        <Text style={styles.callBtnText}>Bot Call</Text>
                       </TouchableOpacity>
                     </View>
                   ) : null}
@@ -1122,7 +1126,9 @@ export function UsersScreen() {
                       },
                     ]
                   : []),
-                ...(showCalling && String(selected.mobile || '').trim()
+                ...(showCalling &&
+                userType !== 'Sub_Admin' &&
+                String(selected.mobile || '').trim()
                   ? [
                       {
                         label: 'Call (Add to Dialer)',
@@ -1132,16 +1138,6 @@ export function UsersScreen() {
                           const row = selected;
                           setSelected(null);
                           setCallConfirmRow(row);
-                        },
-                      },
-                      {
-                        label: 'Bot Call',
-                        tone: 'default' as const,
-                        disabled: callBusy,
-                        onPress: () => {
-                          const row = selected;
-                          setSelected(null);
-                          void initiateBotCall(row);
                         },
                       },
                     ]

@@ -48,6 +48,9 @@ import {
   type SheetField,
 } from './dashboards/details/RowDetailSheet';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../utils/dates';
+import { SheetDownloadOtpModal } from '../components/SheetDownloadOtpModal';
+import type { SheetDownloadFilter } from '../utils/sheetDownloadAudit';
+import { shareCsvFile } from '../utils/shareCsv';
 
 type Rec = Record<string, unknown>;
 
@@ -73,6 +76,8 @@ const SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'accountNo', label: 'Account No' },
 ];
 
+const BOT_CHECK_HIDDEN_STATUSES = new Set(['Cancel', 'Rejected', 'Reverse', 'Failed']);
+
 function display(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
   return String(v);
@@ -81,6 +86,18 @@ function display(v: unknown): string {
 function num(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function formatValidationDetails(details: unknown): string {
+  if (!details || typeof details !== 'object') return '';
+  return Object.entries(details as Rec)
+    .map(([k, val]) => `${k}: ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`)
+    .join('\n');
+}
+
+function formatValidationCheckedAt(value: unknown): string {
+  if (!value) return '';
+  return `${formatDisplayDate(String(value))} ${formatDisplayTime(String(value))}`.trim();
 }
 
 /** Desktop parity: fixed gateway list used in the Manual Approved / QR popups. */
@@ -382,6 +399,18 @@ export function WithdrawalScreen() {
   );
   const [provider, setProvider] = useState('');
   const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
+  const [sheetOtp, setSheetOtp] = useState<{ open: boolean; filter: SheetDownloadFilter }>({
+    open: false,
+    filter: { type: 'Withdrawal Sheet' },
+  });
+  const sheetAfterOtp = React.useRef<(() => void | Promise<boolean>) | null>(null);
+  const requestSheetDownload = (
+    filter: SheetDownloadFilter,
+    run: () => void | Promise<boolean>,
+  ) => {
+    sheetAfterOtp.current = run;
+    setSheetOtp({ open: true, filter });
+  };
   // Collapsible tools section (keeps the list visible without scrolling).
   const [toolsOpen, setToolsOpen] = useState(false);
   // Desktop toolbar parity: Sort checkbox, Bank Amount + Mid Name filters.
@@ -712,26 +741,16 @@ export function WithdrawalScreen() {
 
   /** Build a CSV file from the current rows and open the system share sheet. */
   const shareCsv = useCallback(async (fileName: string, headers: string[], data: string[][]) => {
-    try {
-      const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const csv = [headers, ...data].map((line) => line.map(esc).join(',')).join('\n');
-      const uri = `${FileSystem.cacheDirectory}${fileName}-${Date.now()}.csv`;
-      await FileSystem.writeAsStringAsync(uri, csv);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: fileName });
-      } else {
-        notify('Sharing not available on this device');
-      }
-    } catch {
-      notify('Could not create file');
-    }
+    const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [headers, ...data].map((line) => line.map(esc).join(',')).join('\n');
+    return shareCsvFile(`${fileName}-${Date.now()}.csv`, csv);
   }, []);
 
   const cell = (v: unknown) => (v === undefined || v === null ? '' : String(v));
 
   /** Desktop "Download Data" (Withdrawal_Data sheet). */
   const downloadData = useCallback(() => {
-    void shareCsv(
+    return shareCsv(
       'Withdrawal_Data',
       ['Sr No', 'Date', 'accountHolderName', 'Name (send to bank)', 'bankName', 'city', 'state', 'status', 'dp_id', 'transactionId', 'Acc No', 'Amount', 'userBankName', 'ifscCode'],
       rows.map((r, i) => [
@@ -755,7 +774,7 @@ export function WithdrawalScreen() {
 
   /** Desktop "Pay OK Data" (pay_ok_sheet). */
   const downloadPayok = useCallback(() => {
-    void shareCsv(
+    return shareCsv(
       'pay_ok_sheet',
       ['Bank Name (IFSC)', 'Bank Account', 'Amount(INR)', 'Phone Number', 'AccountName', 'Email'],
       rows.map((r) => [
@@ -771,7 +790,7 @@ export function WithdrawalScreen() {
 
   /** Desktop "Yes Bank Data" (yes_bank_sheet). */
   const downloadYesBank = useCallback(() => {
-    void shareCsv(
+    return shareCsv(
       'yes_bank_sheet',
       ['Sr No', 'Name', 'Transfer Type', 'Acc No', 'Amount', 'IFSC', 'Phone No', 'Remarks'],
       rows.map((r, i) => [
@@ -1079,6 +1098,12 @@ export function WithdrawalScreen() {
         render: (r) => display(appCodeForName(String(r.clientName || '')) || r.clientName),
       },
       {
+        key: 'empCode',
+        label: 'Emp Code',
+        width: 90,
+        render: (r) => display(r.empCode),
+      },
+      {
         key: 'status',
         label: 'Status',
         width: 100,
@@ -1229,6 +1254,12 @@ export function WithdrawalScreen() {
     setTimeout(() => setStatusModal({ row: r, status: statusName }), 350);
   };
 
+  /** Close the sheet, then open bot validation report (touch-freeze guard). */
+  const openBotReport = useCallback((r: Rec) => {
+    setSelected(null);
+    setTimeout(() => setValidationRow(r), Platform.OS === 'ios' ? 350 : 80);
+  }, []);
+
   /** Desktop row-action parity: lock/unlock, checks, status changes. */
   const sheetActions = (r: Rec): SheetAction[] => {
     const acts: SheetAction[] = [];
@@ -1253,15 +1284,11 @@ export function WithdrawalScreen() {
         onPress: () => void openAddBene(r),
       });
     }
-    if (r.validationCheckedAt) {
+    if (r.validationCheckedAt && !BOT_CHECK_HIDDEN_STATUSES.has(String(r.status || ''))) {
       acts.push({
-        label: `Bot Validation (${num(r.passedPoints)}/${num(r.totalPoints)})`,
+        label: `Bot Report (${num(r.passedPoints)}/${num(r.totalPoints)})`,
         tone: 'default',
-        onPress: () => {
-          // Close the sheet before opening another Modal (touch-freeze guard).
-          setSelected(null);
-          setTimeout(() => setValidationRow(r), 350);
-        },
+        onPress: () => openBotReport(r),
       });
     }
     const checkFirst = checkOf(r, 'checkBy');
@@ -1348,6 +1375,7 @@ export function WithdrawalScreen() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={styles.root}
       contentContainerStyle={styles.content}
       refreshControl={
@@ -1466,13 +1494,37 @@ export function WithdrawalScreen() {
       ) : null}
       {toolsOpen && perms.download ? (
         <View style={styles.toolsRow}>
-          <TouchableOpacity style={styles.bulkBtn} onPress={downloadData}>
+          <TouchableOpacity
+            style={styles.bulkBtn}
+            onPress={() =>
+              requestSheetDownload(
+                { mid: midFilter || 'withdrawal', type: 'Withdrawal Sheet' },
+                downloadData,
+              )
+            }
+          >
             <Text style={styles.bulkBtnText}>Download Data</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.bulkBtn} onPress={downloadPayok}>
+          <TouchableOpacity
+            style={styles.bulkBtn}
+            onPress={() =>
+              requestSheetDownload(
+                { mid: midFilter || 'withdrawal', type: 'Pay OK Sheet' },
+                downloadPayok,
+              )
+            }
+          >
             <Text style={styles.bulkBtnText}>Pay OK Data</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.bulkBtn} onPress={downloadYesBank}>
+          <TouchableOpacity
+            style={styles.bulkBtn}
+            onPress={() =>
+              requestSheetDownload(
+                { mid: midFilter || 'withdrawal', type: 'Yes Bank Sheet' },
+                downloadYesBank,
+              )
+            }
+          >
             <Text style={styles.bulkBtnText}>Yes Bank Data</Text>
           </TouchableOpacity>
         </View>
@@ -1574,6 +1626,7 @@ export function WithdrawalScreen() {
       ) : null}
 
       <ResponsiveTable
+        forceCards
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? r.transactionId ?? i)}
@@ -1606,7 +1659,9 @@ export function WithdrawalScreen() {
           const datePart = r.createdOn ? formatDisplayDate(String(r.createdOn)) : '—';
           const timePart = r.createdOn ? formatDisplayTime(String(r.createdOn)) : '';
           const commission = `₹${fmtAmount(r.commissionAmount)}`;
-          const hasBot = Boolean(r.validationCheckedAt);
+          const hasBot =
+            Boolean(r.validationCheckedAt) &&
+            !BOT_CHECK_HIDDEN_STATUSES.has(String(r.status || ''));
           const botPassed = num(r.passedPoints);
           const botTotal = num(r.totalPoints);
           const botOk = botPassed >= 13;
@@ -1695,6 +1750,34 @@ export function WithdrawalScreen() {
                   </View>
                 </View>
               </View>
+              {hasBot ? (
+                <View style={styles.botReportRow}>
+                  <View style={styles.botReportMeta}>
+                    <Text style={styles.sectionLabel}>Bot Report</Text>
+                    <Text
+                      style={[
+                        styles.metaVal,
+                        botOk ? styles.checkOk : styles.checkNotOk,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {botPassed}/{botTotal} passed
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.botReportBtn}
+                    onPress={() => openBotReport(r)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <MaterialCommunityIcons
+                      name="file-document-outline"
+                      size={14}
+                      color={colors.primaryForeground}
+                    />
+                    <Text style={styles.botReportBtnText}>Bot Report</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
               {showAddBene ? (
                 <View style={styles.beneCardRow}>
                   <View style={styles.beneCardMeta}>
@@ -1848,41 +1931,77 @@ export function WithdrawalScreen() {
       >
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, styles.validationCard]}>
-            <Text style={styles.modalTitle}>
-              Validation Results ({num(validationRow?.passedPoints)}/{num(validationRow?.totalPoints)})
-            </Text>
-            <ScrollView style={styles.validationList}>
+            <View style={styles.validationHeader}>
+              <View style={styles.validationHeaderMain}>
+                <Text style={styles.modalTitle}>Bot Report</Text>
+                <Text style={styles.validationSub}>
+                  Validation Results ({num(validationRow?.passedPoints)}/{num(validationRow?.totalPoints)})
+                </Text>
+                {validationRow?.validationCheckedAt ? (
+                  <Text style={styles.validationCheckedAt}>
+                    Checked: {formatValidationCheckedAt(validationRow.validationCheckedAt)}
+                  </Text>
+                ) : null}
+              </View>
+              <View
+                style={[
+                  styles.validationScoreBadge,
+                  num(validationRow?.passedPoints) >= Math.max(1, num(validationRow?.totalPoints))
+                    ? styles.validationScoreBadgePass
+                    : styles.validationScoreBadgeWarn,
+                ]}
+              >
+                <Text style={styles.validationScoreTop}>{num(validationRow?.passedPoints)}</Text>
+                <Text style={styles.validationScoreBottom}>of {num(validationRow?.totalPoints)}</Text>
+              </View>
+            </View>
+            <ScrollView style={styles.validationList} showsVerticalScrollIndicator={false}>
               {(Array.isArray(validationRow?.validationResults)
                 ? (validationRow?.validationResults as Rec[])
                 : []
               ).map((v, i) => (
                 <View key={String(v._id ?? i)} style={styles.validationItem}>
                   <View style={styles.validationHead}>
-                    <Text style={styles.validationName}>
-                      {display(v.point)} · {display(v.name)}
-                    </Text>
-                    <Text
+                    <View style={styles.validationNameWrap}>
+                      <Text style={styles.validationPointLabel}>Point {display(v.point)}</Text>
+                      <Text style={styles.validationName}>{display(v.name)}</Text>
+                    </View>
+                    <View
                       style={[
-                        styles.validationStatus,
-                        { color: v.passed ? colors.success : colors.destructive },
+                        styles.validationStatusPill,
+                        {
+                          backgroundColor: v.passed ? `${colors.success}22` : `${colors.destructive}22`,
+                          borderColor: v.passed ? `${colors.success}55` : `${colors.destructive}55`,
+                        },
                       ]}
                     >
-                      {v.passed ? 'Passed' : 'Failed'}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.validationStatus,
+                          { color: v.passed ? colors.success : colors.destructive },
+                        ]}
+                      >
+                        {v.passed ? 'Passed' : 'Failed'}
+                      </Text>
+                    </View>
                   </View>
                   {v.reason ? <Text style={styles.validationReason}>{display(v.reason)}</Text> : null}
-                  {v.details && typeof v.details === 'object' ? (
-                    <Text style={styles.validationDetails}>
-                      {Object.entries(v.details as Rec)
-                        .map(([k, val]) => `${k}: ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`)
-                        .join('\n')}
-                    </Text>
+                  {formatValidationDetails(v.details) ? (
+                    <View style={styles.validationDetailsBox}>
+                      <Text style={styles.validationDetailsLabel}>Details</Text>
+                      <Text style={styles.validationDetails}>{formatValidationDetails(v.details)}</Text>
+                    </View>
                   ) : null}
                 </View>
               ))}
               {!Array.isArray(validationRow?.validationResults) ||
               (validationRow?.validationResults as Rec[]).length === 0 ? (
-                <Text style={styles.validationReason}>No validation details available.</Text>
+                <View style={styles.validationEmptyState}>
+                  <Text style={styles.validationEmptyTitle}>No validation details available</Text>
+                  <Text style={styles.validationReason}>
+                    This withdrawal has summary points only, but no per-check breakdown was returned.
+                  </Text>
+                </View>
               ) : null}
             </ScrollView>
             <View style={styles.modalActions}>
@@ -1991,7 +2110,9 @@ export function WithdrawalScreen() {
                 No available banks — use Tools → Add Bene List first
               </Text>
             ) : (
-              <ScrollView style={styles.addBeneList} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={styles.addBeneList} keyboardShouldPersistTaps="handled">
                 {availableBanks
                   .filter((b) => {
                     const q = addBeneSearch.trim().toLowerCase();
@@ -2102,7 +2223,9 @@ export function WithdrawalScreen() {
                 <Text style={styles.confirmBtnText}>Add</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 260, marginTop: spacing(2) }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 260, marginTop: spacing(2) }}>
               {beneBusy && beneBanks.length === 0 ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : beneBanks.length === 0 ? (
@@ -2425,6 +2548,12 @@ export function WithdrawalScreen() {
           <Text style={styles.pagerBtnText}>Next ›</Text>
         </TouchableOpacity>
       </View>
+      <SheetDownloadOtpModal
+        visible={sheetOtp.open}
+        filter={sheetOtp.filter}
+        onClose={() => setSheetOtp((s) => ({ ...s, open: false }))}
+        onVerified={() => sheetAfterOtp.current?.()}
+      />
     </ScrollView>
   );
 }
@@ -2583,21 +2712,70 @@ const styles = StyleSheet.create({
   confirmBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   validationCard: { maxHeight: '85%' },
   validationList: { marginTop: spacing(2) },
+  validationHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing(3),
+  },
+  validationHeaderMain: { flex: 1 },
+  validationSub: { color: colors.muted, fontSize: 12, marginTop: -spacing(1), marginBottom: spacing(1) },
+  validationCheckedAt: { color: colors.muted, fontSize: 11 },
+  validationScoreBadge: {
+    minWidth: 72,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1.5),
+    alignItems: 'center',
+  },
+  validationScoreBadgePass: { backgroundColor: `${colors.success}18` },
+  validationScoreBadgeWarn: { backgroundColor: `${colors.primary}18` },
+  validationScoreTop: { color: colors.foreground, fontSize: 20, fontWeight: '800' },
+  validationScoreBottom: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   validationItem: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingVertical: spacing(2),
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginBottom: spacing(2),
   },
   validationHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing(2),
   },
-  validationName: { color: colors.foreground, fontSize: 13, fontWeight: '600', flex: 1 },
+  validationNameWrap: { flex: 1, gap: spacing(0.5) },
+  validationPointLabel: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  validationName: { color: colors.foreground, fontSize: 13, fontWeight: '700', flex: 1 },
+  validationStatusPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+  },
   validationStatus: { fontSize: 12, fontWeight: '700' },
   validationReason: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  validationDetails: { color: colors.muted, fontSize: 11, marginTop: spacing(1) },
+  validationDetailsBox: {
+    marginTop: spacing(2),
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(2),
+  },
+  validationDetailsLabel: { color: colors.foreground, fontSize: 11, fontWeight: '700', marginBottom: spacing(1) },
+  validationDetails: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  validationEmptyState: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(3),
+  },
+  validationEmptyTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   checkBlock: {
     gap: spacing(2),
     paddingTop: spacing(2),
@@ -2747,6 +2925,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(2.5),
   },
   addBeneBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
+  botReportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingTop: spacing(1),
+  },
+  botReportMeta: { flex: 1, minWidth: 0 },
+  botReportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+  },
+  botReportBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
   addBeneCard: { maxHeight: '85%' },
   addBeneHint: {
     color: colors.muted,

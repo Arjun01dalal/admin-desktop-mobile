@@ -21,6 +21,7 @@ import { todayIST, getStoredUser } from '@/utils/dates';
 import { CommonTable } from '@/components/CommonTable';
 import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
 import { TablePanel } from '@/components/TablePanel';
+import { campaignsForLoginUser, type CampaignItem } from './newRegisters/campaignList';
 import { COMMENT_FILTER_OPTIONS } from './callLogs/constants';
 import { CallLogsToolbar } from './callLogs/CallLogsToolbar';
 import { BotStatusTable } from './callLogs/BotStatusTable';
@@ -47,11 +48,17 @@ export function CallLogsPage() {
     botNo?: Array<string | number> | string;
   }>();
   const isCaller = isCallLogsCaller(admin);
+  const campaignOptions = useMemo(
+    () => campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
+    [admin, isCaller],
+  );
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [campaignId, setCampaignId] = useState('');
+  const [campaignId, setCampaignId] = useState(() =>
+    isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
+  );
 
   const [mobNo, setMobNo] = useState('');
   const [dpId, setDpId] = useState('');
@@ -90,6 +97,7 @@ export function CallLogsPage() {
         page={page}
         itemsPerPage={itemsPerPage}
         campaignId={campaignId}
+        campaignOptions={campaignOptions}
         mobNo={mobNo}
         dpId={dpId}
         sid={sid}
@@ -138,6 +146,7 @@ type BodyProps = {
   page: number;
   itemsPerPage: number;
   campaignId: string;
+  campaignOptions: CampaignItem[];
   mobNo: string;
   dpId: string;
   sid: string;
@@ -173,6 +182,7 @@ function CallLogsPageBody({
   page,
   itemsPerPage,
   campaignId,
+  campaignOptions,
   mobNo,
   dpId,
   sid,
@@ -216,7 +226,6 @@ function CallLogsPageBody({
     actionLoading,
     summaryData,
     setSummaryData,
-    botCall,
     dialerCall,
     connectDialer,
     endCall,
@@ -278,7 +287,6 @@ function CallLogsPageBody({
     page,
     itemsPerPage,
     onEndCall: endCall,
-    onBotCall: botCall,
     onViewSummary,
     onConnectDialer: connectDialer,
     onOpenComment: openComment,
@@ -352,6 +360,7 @@ function CallLogsPageBody({
             actionLoading={actionLoading}
             fileRef={fileRef}
             isCaller={isCaller}
+            campaigns={campaignOptions}
             onStartDateChange={setStartDate}
             onEndDateChange={setEndDate}
             onCampaignChange={setCampaignId}
@@ -361,7 +370,6 @@ function CallLogsPageBody({
             }}
             onApply={applyFilters}
             onRefresh={() => void load()}
-            onBotCall={() => void botCall()}
             onDialerCall={() => void dialerCall()}
             onUpload={(file) => {
               void onUpload(file).finally(() => {

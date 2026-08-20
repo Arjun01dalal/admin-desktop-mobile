@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -15,8 +16,6 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -24,6 +23,8 @@ import { getSessionUser, hasPermission, Permissions } from '../../../auth/permis
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
+import { rowsToCsv, shareCsvFile } from '../../../utils/shareCsv';
 
 type Row = {
   name: string;
@@ -103,22 +104,6 @@ function toIstYmd(value?: string): string {
   return ist.toISOString().slice(0, 10);
 }
 
-function csvEscape(value: unknown): string {
-  const str = value === null || value === undefined ? '' : String(value);
-  return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-}
-
-function toCsv(rows: Record<string, unknown>[]): string {
-  if (!rows.length) return '';
-  const headers = Object.keys(rows[0]);
-  const lines = [headers.join(',')];
-  for (const row of rows) {
-    lines.push(headers.map((h) => csvEscape(row[h])).join(','));
-  }
-  return lines.join('\r\n');
-}
-
-/** Mirror desktop unpackPayload: unwrap a single `.payload` object. */
 function unpackPayload(data: unknown): Record<string, unknown> {
   if (!data || typeof data !== 'object') return {};
   const obj = data as Record<string, unknown>;
@@ -187,6 +172,7 @@ export function FundsScreen() {
   const [debitCount, setDebitCount] = useState(0);
   const [requestType, setRequestType] = useState<RequestType>('automaticDeposit');
   const [txnSheet, setTxnSheet] = useState<TxnRow | null>(null);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const payinGenRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -544,23 +530,13 @@ export function FundsScreen() {
       }));
     }
     if (!rows.length) {
-      setPayinError('No data to export');
-      return;
+      Alert.alert('No data to export');
+      return false;
     }
-    try {
-      const fileUri = `${FileSystem.cacheDirectory}${sheetName.toLowerCase()}_${Date.now()}.csv`;
-      await FileSystem.writeAsStringAsync(fileUri, toCsv(rows));
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'text/csv',
-          dialogTitle: `${sheetName} sheet`,
-        });
-      } else {
-        setPayinError('Sharing is not available on this device');
-      }
-    } catch (err) {
-      setPayinError(err instanceof Error ? err.message : 'Failed to export sheet');
-    }
+    return shareCsvFile(
+      `${sheetName.toLowerCase()}_${Date.now()}.csv`,
+      rowsToCsv(rows),
+    );
   }, [requestType, transactions, coins, debitCoins, canShowMobile]);
 
   const payinRows =
@@ -721,7 +697,7 @@ export function FundsScreen() {
           ))}
           <TouchableOpacity
             style={[styles.chip, styles.downloadChip]}
-            onPress={() => void downloadSheet()}
+            onPress={() => setDownloadOpen(true)}
           >
             <Text style={styles.downloadChipText}>⬇ Download Sheet</Text>
           </TouchableOpacity>
@@ -828,6 +804,20 @@ export function FundsScreen() {
               : []
           }
           onClose={() => setTxnSheet(null)}
+        />
+        <SheetDownloadOtpModal
+          visible={downloadOpen}
+          filter={{
+            mid: selectedMid || 'All',
+            type:
+              requestType === 'automaticDeposit'
+                ? 'Funds Automatic'
+                : requestType === 'scanner add'
+                  ? 'Funds Scanner Add'
+                  : 'Funds Scanner Remove',
+          }}
+          onClose={() => setDownloadOpen(false)}
+          onVerified={() => downloadSheet()}
         />
       </ScrollView>
     );

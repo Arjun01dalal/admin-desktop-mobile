@@ -11,7 +11,7 @@ import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
-import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { formatAmount } from '@/utils/dates';
 import { maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
@@ -20,11 +20,20 @@ import {
   HISTORY_PAGINATION_SX,
   ItemsPerPageField,
   SearchFilter,
+  formatDt,
 } from './historyFilters';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type FundType = 'deposit' | 'withdrawal' | 'coin';
 type Props = { userId: string };
+
+function createdAtOf(r: HistoryRow) {
+  return r.createdOn || r.createdAt || r['CreatedOn'];
+}
+
+function updatedAtOf(r: HistoryRow) {
+  return r.updatedOn || r.updatedAt || r['UpdatedOn'] || r['updated_at'];
+}
 
 /** Fund Request — deposit columns match Laxmi (Payment Type … Date/Time). */
 export function FundRequestTab({ userId }: Props) {
@@ -250,18 +259,16 @@ export function FundRequestTab({ userId }: Props) {
             ),
         },
         {
-          id: 'date',
-          label: 'Date',
+          id: 'createdAt',
+          label: 'Created At',
           filter: null,
-          render: (r) =>
-            formatDisplayDate(r.createdOn || r.createdAt || r.updatedOn) || '-',
+          render: (r) => formatDt(createdAtOf(r)),
         },
         {
-          id: 'time',
-          label: 'Time',
+          id: 'updatedAt',
+          label: 'Updated At',
           filter: null,
-          render: (r) =>
-            formatDisplayTime(r.createdOn || r.createdAt || r.updatedOn) || '-',
+          render: (r) => formatDt(updatedAtOf(r)),
         },
       ];
     }
@@ -358,16 +365,16 @@ export function FundRequestTab({ userId }: Props) {
             ),
         },
         {
-          id: 'date',
-          label: 'Date',
+          id: 'createdAt',
+          label: 'Created At',
           filter: null,
-          render: (r) => formatDisplayDate(r.createdOn || r.createdAt) || '-',
+          render: (r) => formatDt(createdAtOf(r)),
         },
         {
-          id: 'time',
-          label: 'Time',
+          id: 'updatedAt',
+          label: 'Updated At',
           filter: null,
-          render: (r) => formatDisplayTime(r.createdOn || r.createdAt) || '-',
+          render: (r) => formatDt(updatedAtOf(r)),
         },
       ];
     }
@@ -421,16 +428,16 @@ export function FundRequestTab({ userId }: Props) {
         render: (r) => String(r.remark || '-'),
       },
       {
-        id: 'date',
-        label: 'date',
+        id: 'createdAt',
+        label: 'Created At',
         filter: null,
-        render: (r) => formatDisplayDate(r.createdOn || r.createdAt) || '-',
+        render: (r) => formatDt(createdAtOf(r)),
       },
       {
-        id: 'time',
-        label: 'time',
+        id: 'updatedAt',
+        label: 'Updated At',
         filter: null,
-        render: (r) => formatDisplayTime(r.createdOn || r.createdAt) || '-',
+        render: (r) => formatDt(updatedAtOf(r)),
       },
     ];
   }, [amount, gateway, mid, orderId, orderKeyId, paymentType, type, canShowMobile]);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ScrollView,
   StyleSheet,
@@ -9,18 +10,63 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { secureApi } from '../api/client';
+import { secureApi, type ApiResult } from '../api/client';
 import { resolveLocation, useAuth } from '../auth/AuthContext';
 import { AppBackground } from '../components/AppBackground';
 import { Button, Card, ErrorBanner, Input } from '../components/UI';
 import { colors, spacing } from '../theme';
+import { getAppVersion } from '../utils/appVersion';
 import type { AuthUser } from '../types/auth';
 import { getRoleOptions, selectActiveRole } from '../auth/roleSelection';
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
+async function secureApiWithUiTimeout<T>(
+  promise: Promise<ApiResult<T>>,
+  ms: number,
+  timeoutMessage: string,
+): Promise<ApiResult<T>> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<ApiResult<T>>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ ok: false, message: timeoutMessage }), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function promiseWithUiTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  timeoutMessage: string,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 /** OTP + location login, mirroring the desktop flow. */
-export function LoginScreen({ onBack }: { onBack: () => void }) {
+export function LoginScreen({
+  onBack,
+  onForgotPassword,
+  onTerms,
+}: {
+  onBack: () => void;
+  onForgotPassword?: () => void;
+  onTerms?: () => void;
+}) {
   const { login } = useAuth();
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
@@ -40,7 +86,11 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
       return;
     }
     setBusy(true);
-    const res = await secureApi('auth.sendOtp', { mobile });
+    const res = await secureApiWithUiTimeout(
+      secureApi('auth.sendOtp', { mobile }),
+      15_000,
+      'Network seems unstable. Please try again.',
+    );
     setBusy(false);
     if (res.ok) setOtpSent(true);
     else setError(res.message || 'Failed to send OTP');
@@ -52,29 +102,37 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
       setError('Enter the 4-digit OTP');
       return;
     }
+    // Dismiss keyboard immediately for smooth UX.
+    Keyboard.dismiss();
     setBusy(true);
     try {
-      const loc = await resolveLocation();
-      const res = await secureApi<{ token?: string; payload?: AuthUser } & AuthUser>(
-        'auth.verifyOtp',
-        {
-          mobile,
-          // Desktop sends OTP as an integer.
-          otp: parseInt(otp, 10),
-          state: loc.state || 'Madhya Pradesh',
-          city: loc.city || 'Jabalpur',
-          lat: loc.lat,
-          long: loc.long,
-          address: loc.address,
-        },
-        null,
+      // Location can be slow on Android — bound so OTP flow doesn't feel stuck.
+      const loc = await promiseWithUiTimeout(
+        resolveLocation(),
+        12_000,
+        'Location is taking too long. Please try again.',
+      );
+      const res = await secureApiWithUiTimeout(
+        secureApi<{ token?: string; payload?: AuthUser } & AuthUser>(
+          'auth.verifyOtp',
+          {
+            mobile,
+            otp: parseInt(otp, 10),
+            state: loc.state || 'Madhya Pradesh',
+            city: loc.city || 'Jabalpur',
+            lat: loc.lat,
+            long: loc.long,
+            address: loc.address,
+          },
+          null,
+        ),
+        20_000,
+        'Login request is taking too long. Please retry.',
       );
       if (!res.ok) {
         setError(res.message || 'OTP verification failed');
         return;
       }
-      // Desktop verifyOtp: session token lives on the OUTER envelope (response.data.token);
-      // the decrypted payload is the user object.
       const raw = res.data as Record<string, unknown> | undefined;
       const user = ((raw?.payload as AuthUser) ?? (raw as AuthUser)) || {};
       const token = res.token || '';
@@ -86,13 +144,12 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
         setError('This account is blocked');
         return;
       }
-
       if (getRoleOptions(user).length > 0) {
         setPendingSession({ token, user });
         setSelectedRoleId('');
         return;
       }
-      login(token, user);
+      await login(token, user);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
     } finally {
@@ -112,7 +169,6 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
       setError('Selected role is not available');
       return;
     }
-
     setBusy(true);
     setError(null);
     try {
@@ -121,7 +177,7 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
         pendingSession.token,
         role,
       );
-      login(pendingSession.token, nextUser);
+      await login(pendingSession.token, nextUser);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update role');
     } finally {
@@ -150,7 +206,11 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
           <ErrorBanner message={error} />
           {pendingSession ? (
             <>
-              <ScrollView style={styles.roleList} nestedScrollEnabled>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={styles.roleList}
+                nestedScrollEnabled
+              >
                 {getRoleOptions(pendingSession.user).map((role) => {
                   const active = selectedRoleId === role.id;
                   return (
@@ -185,6 +245,11 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
                 autoFocus
               />
               <Button title="Send OTP" onPress={() => void sendOtp()} loading={busy} />
+              {onForgotPassword ? (
+                <TouchableOpacity onPress={onForgotPassword} disabled={busy}>
+                  <Text style={styles.link}>Forgot password?</Text>
+                </TouchableOpacity>
+              ) : null}
             </>
           ) : (
             <>
@@ -208,6 +273,12 @@ export function LoginScreen({ onBack }: { onBack: () => void }) {
             </>
           )}
           {!pendingSession ? <Button title="Back" variant="outline" onPress={onBack} /> : null}
+          {!pendingSession && onTerms ? (
+            <TouchableOpacity onPress={onTerms} disabled={busy}>
+              <Text style={styles.linkMuted}>Terms & Conditions</Text>
+            </TouchableOpacity>
+          ) : null}
+          <Text style={styles.version}>v{getAppVersion()}</Text>
         </Card>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -220,6 +291,7 @@ const styles = StyleSheet.create({
   card: { gap: spacing(3) },
   title: { color: colors.foreground, fontSize: 24, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: colors.muted, fontSize: 14, textAlign: 'center', marginBottom: spacing(2) },
+  version: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: spacing(1) },
   roleList: { maxHeight: 260 },
   roleOption: {
     borderWidth: 1,
@@ -233,4 +305,6 @@ const styles = StyleSheet.create({
   roleOptionActive: { borderColor: colors.primary, backgroundColor: colors.primary },
   roleText: { color: colors.foreground, fontSize: 14, fontWeight: '600' },
   roleTextActive: { color: colors.primaryForeground },
+  link: { color: colors.primary, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  linkMuted: { color: colors.muted, fontSize: 13, textAlign: 'center', textDecorationLine: 'underline' },
 });

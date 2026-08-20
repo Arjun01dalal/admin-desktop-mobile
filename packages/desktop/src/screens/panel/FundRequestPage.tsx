@@ -20,7 +20,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { toast } from 'react-toastify';
-import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -34,7 +33,8 @@ import {
   getStoredUser,
   todayIST,
 } from '@/utils/dates';
-import { logSheetDownload } from '@/utils/sheetDownloadAudit';
+import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
+import { saveWorkbook } from '@/utils/downloadSheet';
 import { asPaged, display, maskMobile } from '@/screens/panel/shared';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
 import type { UserRow } from '@/screens/panel/users/utils';
@@ -189,6 +189,7 @@ export function FundRequestPage() {
   const today = todayIST();
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [allData, setAllData] = useState(false);
   const [summary, setSummary] = useState<DepositFundSummary>({});
   const [coinSummary, setCoinSummary] = useState<FundRequestCoinSummary>({});
@@ -364,27 +365,10 @@ export function FundRequestPage() {
       toast.warn('Open a summary card first (Deposit/Withdrawal), then Download Excel');
       return;
     }
-    if (!rows.length) {
-      toast.warn('No data to export!');
-      return;
-    }
-    logSheetDownload({
-      mid: 'All',
-      type: drillType === 'deposit' ? 'Fund Request Deposit' : 'Fund Request Withdrawal',
+    return saveWorkbook(rows as Record<string, unknown>[], {
+      sheetName: 'Fund Requests',
+      filename: `fund_request_${drillType || 'data'}_${Date.now()}.xlsx`,
     });
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Fund Requests');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fund_request_${drillType || 'data'}_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
   }, [rows, drillType]);
 
   const openEdit = useCallback((row: TxnRow) => {
@@ -806,7 +790,7 @@ export function FundRequestPage() {
               {toDisplayText('State Wise Deposit')}
             </Button>
           ) : null}
-          <Button variant="contained" disabled={tableLoading} onClick={downloadExcel} sx={orangeBtnSx}>
+          <Button variant="contained" disabled={tableLoading} onClick={() => setDownloadOpen(true)} sx={orangeBtnSx}>
             Download Excel
           </Button>
         </Stack>
@@ -895,7 +879,7 @@ export function FundRequestPage() {
               <Button variant="contained" disabled={tableLoading} onClick={commitTableFilters} sx={orangeBtnSx}>
                 Apply
               </Button>
-              <Button variant="contained" disabled={tableLoading} onClick={downloadExcel} sx={orangeBtnSx}>
+              <Button variant="contained" disabled={tableLoading} onClick={() => setDownloadOpen(true)} sx={orangeBtnSx}>
                 Download Excel
               </Button>
             </Stack>
@@ -971,6 +955,15 @@ export function FundRequestPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <SheetDownloadOtpModal
+        open={downloadOpen}
+        filter={{
+          mid: 'All',
+          type: drillType === 'deposit' ? 'Fund Request Deposit' : 'Fund Request Withdrawal',
+        }}
+        onClose={() => setDownloadOpen(false)}
+        onVerified={downloadExcel}
+      />
     </Box>
   );
 }

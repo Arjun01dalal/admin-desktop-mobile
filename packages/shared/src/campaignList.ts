@@ -451,3 +451,57 @@ export const CAMPAIGN_LIST: CampaignItem[] = [
     location: "Dubai",
   },
 ];
+
+function pushCampaignId(out: string[], value: unknown) {
+  if (Array.isArray(value)) {
+    for (const item of value) pushCampaignId(out, item);
+    return;
+  }
+  const id = String(value ?? '').trim();
+  if (id) out.push(id);
+}
+
+/** Campaign / extension IDs stored on the login user object. */
+export function campaignIdsFromLogin(user: Record<string, unknown> | null | undefined): string[] {
+  if (!user) return [];
+  const ids: string[] = [];
+  pushCampaignId(ids, user.extensionId);
+  pushCampaignId(ids, user.campaignId);
+  pushCampaignId(ids, user.campaign_id);
+  pushCampaignId(ids, user.campaignID);
+  pushCampaignId(ids, user.CampaignId);
+  return [...new Set(ids)];
+}
+
+function campaignIdMatches(loginId: string, campaignId: string): boolean {
+  const a = loginId.trim();
+  const b = campaignId.trim();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const strip = (v: string) => v.replace(/^[A-Za-z]+_/, '');
+  return strip(a) === b || strip(b) === a || strip(a) === strip(b);
+}
+
+/**
+ * Full campaign catalog for admins; callers only see IDs from login
+ * (`extensionId` / `campaignId`).
+ */
+export function campaignsForLoginUser(
+  user: Record<string, unknown> | null | undefined,
+  opts?: { assignedOnly?: boolean },
+): CampaignItem[] {
+  if (!opts?.assignedOnly) return CAMPAIGN_LIST;
+  const loginIds = campaignIdsFromLogin(user);
+  if (!loginIds.length) return [];
+  const matched = CAMPAIGN_LIST.filter((c) =>
+    loginIds.some((id) => campaignIdMatches(id, c.id)),
+  );
+  if (matched.length) return matched;
+  const serverId = String(user?.serverId ?? '');
+  return loginIds.map((id) => ({
+    id,
+    name: id,
+    serverId,
+    location: '',
+  }));
+}
