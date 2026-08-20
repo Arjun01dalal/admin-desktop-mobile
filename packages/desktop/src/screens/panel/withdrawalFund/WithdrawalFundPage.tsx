@@ -146,7 +146,10 @@ export function WithdrawalFundPage() {
   const [detailsAgentRows, setDetailsAgentRows] = useState<CountRow[]>([]);
   const [detailsEmpRows, setDetailsEmpRows] = useState<CountRow[]>([]);
   const [detailsSubtitle, setDetailsSubtitle] = useState<string | undefined>();
-
+  /** True when modal is Current Month Emp Code Report (shows date filter). */
+  const [monthReportMode, setMonthReportMode] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState(() => currentMonthRangeIst().start);
+  const [reportEndDate, setReportEndDate] = useState(() => currentMonthRangeIst().end);
   const [monthLoading, setMonthLoading] = useState(false);
 
   const formattedData = useMemo(() => transformWithdrawData(grouped), [grouped]);
@@ -193,6 +196,8 @@ export function WithdrawalFundPage() {
     subtitle?: string,
   ) => {
     const docs = (withdrawals || []) as Record<string, unknown>[];
+    setMonthReportMode(false);
+    setMonthLoading(false);
     setDetailsTitle(title);
     setDetailsTotal(totalWithdrawals);
     setDetailsAgentRows(getAgentCountRows(docs));
@@ -202,7 +207,10 @@ export function WithdrawalFundPage() {
   };
 
   const closeDetailsModal = () => {
+    if (monthLoading) return;
     setDetailsOpen(false);
+    setMonthReportMode(false);
+    setMonthLoading(false);
     setDetailsTitle('');
     setDetailsTotal(0);
     setDetailsAgentRows([]);
@@ -210,16 +218,23 @@ export function WithdrawalFundPage() {
     setDetailsSubtitle(undefined);
   };
 
-  const fetchCurrentMonthEmpCodeReport = async () => {
+  const loadEmpCodeReport = useCallback(async (start: string, end: string) => {
+    if (!start || !end) {
+      toast.error('Select from and to dates');
+      return;
+    }
+    if (start > end) {
+      toast.error('From date cannot be after To date');
+      return;
+    }
     setMonthLoading(true);
-    const { start, end } = currentMonthRangeIst();
     try {
       const res = await secureApi('withdrawalFund.report', {
         startDate: start,
         endDate: end,
       });
       if (!res.ok) {
-        toast.error(res.message || 'Failed to load current month emp code data');
+        toast.error(res.message || 'Failed to load emp code data');
         return;
       }
       const body = unpackPayload(res.data) as Record<string, unknown>;
@@ -231,20 +246,34 @@ export function WithdrawalFundPage() {
         name: item.agentName,
         count: item.withdrawalCount,
       }));
-      const total = empRows.reduce((sum, r) => sum + r.count, 0) ||
+      const total =
+        empRows.reduce((sum, r) => sum + r.count, 0) ||
         agentRows.reduce((sum, r) => sum + r.count, 0);
 
-      setDetailsTitle('Current Month — Agent / Emp Code Report');
+      setDetailsTitle('Agent / Emp Code Report');
       setDetailsSubtitle(`${start} → ${end}`);
       setDetailsTotal(total);
       setDetailsAgentRows(agentRows);
       setDetailsEmpRows(empRows);
-      setDetailsOpen(true);
     } catch {
-      toast.error('Failed to load current month emp code data');
+      toast.error('Failed to load emp code data');
     } finally {
       setMonthLoading(false);
     }
+  }, []);
+
+  const openCurrentMonthEmpCodeReport = () => {
+    const { start, end } = currentMonthRangeIst();
+    setReportStartDate(start);
+    setReportEndDate(end);
+    setMonthReportMode(true);
+    setDetailsTitle('Agent / Emp Code Report');
+    setDetailsSubtitle(`${start} → ${end}`);
+    setDetailsTotal(0);
+    setDetailsAgentRows([]);
+    setDetailsEmpRows([]);
+    setDetailsOpen(true);
+    void loadEmpCodeReport(start, end);
   };
 
   return (
@@ -306,11 +335,10 @@ export function WithdrawalFundPage() {
             variant="outlined"
             size="small"
             color="warning"
-            disabled={monthLoading}
-            onClick={() => void fetchCurrentMonthEmpCodeReport()}
+            onClick={() => openCurrentMonthEmpCodeReport()}
             sx={{ textTransform: 'none' }}
           >
-            {monthLoading ? 'Loading…' : 'Current Month Emp Code Report'}
+            Current Month Emp Code Report
           </Button>
         ) : null}
       </Stack>
@@ -401,6 +429,18 @@ export function WithdrawalFundPage() {
           agentRows={detailsAgentRows}
           empCodeRows={detailsEmpRows}
           subtitle={detailsSubtitle}
+          loading={monthReportMode ? monthLoading : false}
+          dateFilter={
+            monthReportMode
+              ? {
+                  startDate: reportStartDate,
+                  endDate: reportEndDate,
+                  onStartChange: setReportStartDate,
+                  onEndChange: setReportEndDate,
+                  onApply: () => void loadEmpCodeReport(reportStartDate, reportEndDate),
+                }
+              : null
+          }
         />
       ) : null}
     </Box>

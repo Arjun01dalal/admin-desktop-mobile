@@ -5,6 +5,7 @@ import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
 import {
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -14,12 +15,21 @@ import {
   Stack,
   Tab,
   Tabs,
+  TextField,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { orangeBtnSx } from '@/screens/panel/transactions/shared';
+import { fieldSx, orangeBtnSx } from '@/screens/panel/transactions/shared';
 import type { CountRow } from './getWithdrawalSummaryByEmpCode';
+
+type DateFilterProps = {
+  startDate: string;
+  endDate: string;
+  onStartChange: (value: string) => void;
+  onEndChange: (value: string) => void;
+  onApply: () => void;
+};
 
 type Props = {
   open: boolean;
@@ -30,6 +40,10 @@ type Props = {
   empCodeRows: CountRow[];
   /** Optional subtitle (e.g. current-month date range). */
   subtitle?: string;
+  /** When true, lists are replaced by a centered loader. */
+  loading?: boolean;
+  /** From/To + Apply for Current Month Emp Code Report. */
+  dateFilter?: DateFilterProps | null;
 };
 
 type PanelKind = 'agents' | 'emp';
@@ -227,6 +241,8 @@ export function EmpCodeWithdrawalModal({
   agentRows,
   empCodeRows,
   subtitle,
+  loading = false,
+  dateFilter = null,
 }: Props) {
   const theme = useTheme();
   const isNarrow = useMediaQuery(theme.breakpoints.down('md'));
@@ -248,7 +264,7 @@ export function EmpCodeWithdrawalModal({
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={loading ? undefined : onClose}
       maxWidth="md"
       fullWidth
       PaperProps={{
@@ -286,6 +302,7 @@ export function EmpCodeWithdrawalModal({
           aria-label="Close"
           onClick={onClose}
           size="small"
+          disabled={loading}
           sx={{
             position: 'absolute',
             right: 12,
@@ -300,97 +317,149 @@ export function EmpCodeWithdrawalModal({
       </DialogTitle>
 
       <DialogContent sx={{ px: 2.5, py: 2.25 }}>
-        <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" mb={2.25}>
-          <StatPill label="Total withdrawals" value={totalWithdrawals} accent="#ff9f0a" />
-          <StatPill label="Agents" value={agentRows.length} accent="#42a5f5" />
-          <StatPill label="Emp codes" value={empCodeRows.length} accent="#66bb6a" />
-          <StatPill
-            label="Top agent"
-            value={agentRows[0]?.name || '—'}
-            accent="#ab47bc"
-          />
-        </Stack>
-
-        {isNarrow ? (
-          <>
-            <Tabs
-              value={tab}
-              onChange={(_e, v: PanelKind) => setTab(v)}
-              sx={{
-                mb: 1.5,
-                minHeight: 40,
-                '& .MuiTab-root': {
-                  minHeight: 40,
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  fontSize: 13,
-                },
-                '& .Mui-selected': { color: '#ff9f0a !important' },
-                '& .MuiTabs-indicator': { bgcolor: '#ff9f0a' },
-              }}
+        {dateFilter ? (
+          <Stack
+            direction="row"
+            spacing={1.25}
+            alignItems="flex-end"
+            flexWrap="wrap"
+            useFlexGap
+            mt={1.5}
+            mb={2}
+          >
+            <TextField
+              size="small"
+              type="date"
+              label="From Date"
+              InputLabelProps={{ shrink: true }}
+              value={dateFilter.startDate}
+              onChange={(e) => dateFilter.onStartChange(e.target.value)}
+              disabled={loading}
+              sx={{ ...fieldSx, width: 180, minWidth: 180 }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="To Date"
+              InputLabelProps={{ shrink: true }}
+              value={dateFilter.endDate}
+              onChange={(e) => dateFilter.onEndChange(e.target.value)}
+              disabled={loading}
+              sx={{ ...fieldSx, width: 180, minWidth: 180 }}
+            />
+            <Button
+              variant="contained"
+              disabled={loading || !dateFilter.startDate || !dateFilter.endDate}
+              onClick={() => dateFilter.onApply()}
+              sx={orangeBtnSx}
             >
-              <Tab
-                value="agents"
-                icon={<GroupsOutlinedIcon sx={{ fontSize: 18 }} />}
-                iconPosition="start"
-                label={`Agents (${agentRows.length})`}
+              Apply
+            </Button>
+          </Stack>
+        ) : null}
+
+        {loading ? (
+          <Stack alignItems="center" justifyContent="center" py={8} spacing={1.5}>
+            <CircularProgress size={36} sx={{ color: '#ff9f0a' }} />
+            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+              Loading report…
+            </Typography>
+          </Stack>
+        ) : (
+          <>
+            <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" mb={2.25}>
+              <StatPill label="Total withdrawals" value={totalWithdrawals} accent="#ff9f0a" />
+              <StatPill label="Agents" value={agentRows.length} accent="#42a5f5" />
+              <StatPill label="Emp codes" value={empCodeRows.length} accent="#66bb6a" />
+              <StatPill
+                label="Top agent"
+                value={agentRows[0]?.name || '—'}
+                accent="#ab47bc"
               />
-              <Tab
-                value="emp"
-                icon={<BadgeOutlinedIcon sx={{ fontSize: 18 }} />}
-                iconPosition="start"
-                label={`Emp codes (${empCodeRows.length})`}
-              />
-            </Tabs>
-            {tab === 'agents' ? (
-              <CountList
-                rows={agentRows}
-                nameHeader="Agent name"
-                emptyLabel="No agent data found"
-              />
+            </Stack>
+
+            {isNarrow ? (
+              <>
+                <Tabs
+                  value={tab}
+                  onChange={(_e, v: PanelKind) => setTab(v)}
+                  sx={{
+                    mb: 1.5,
+                    minHeight: 40,
+                    '& .MuiTab-root': {
+                      minHeight: 40,
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      fontSize: 13,
+                    },
+                    '& .Mui-selected': { color: '#ff9f0a !important' },
+                    '& .MuiTabs-indicator': { bgcolor: '#ff9f0a' },
+                  }}
+                >
+                  <Tab
+                    value="agents"
+                    icon={<GroupsOutlinedIcon sx={{ fontSize: 18 }} />}
+                    iconPosition="start"
+                    label={`Agents (${agentRows.length})`}
+                  />
+                  <Tab
+                    value="emp"
+                    icon={<BadgeOutlinedIcon sx={{ fontSize: 18 }} />}
+                    iconPosition="start"
+                    label={`Emp codes (${empCodeRows.length})`}
+                  />
+                </Tabs>
+                {tab === 'agents' ? (
+                  <CountList
+                    rows={agentRows}
+                    nameHeader="Agent name"
+                    emptyLabel="No agent data found"
+                  />
+                ) : (
+                  <CountList
+                    rows={empCodeRows}
+                    nameHeader="Emp code"
+                    emptyLabel="No emp code data found"
+                  />
+                )}
+              </>
             ) : (
-              <CountList
-                rows={empCodeRows}
-                nameHeader="Emp code"
-                emptyLabel="No emp code data found"
-              />
+              <Stack direction="row" spacing={2} alignItems="stretch">
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} mb={1.25}>
+                    <GroupsOutlinedIcon sx={{ fontSize: 18, color: '#42a5f5' }} />
+                    <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
+                      Agent wise
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                      · {agentTotal} withdrawals
+                    </Typography>
+                  </Stack>
+                  <CountList
+                    rows={agentRows}
+                    nameHeader="Agent name"
+                    emptyLabel="No agent data found"
+                  />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} mb={1.25}>
+                    <BadgeOutlinedIcon sx={{ fontSize: 18, color: '#66bb6a' }} />
+                    <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
+                      Emp code wise
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                      · {empTotal} withdrawals
+                    </Typography>
+                  </Stack>
+                  <CountList
+                    rows={empCodeRows}
+                    nameHeader="Emp code"
+                    emptyLabel="No emp code data found"
+                  />
+                </Box>
+              </Stack>
             )}
           </>
-        ) : (
-          <Stack direction="row" spacing={2} alignItems="stretch">
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Stack direction="row" alignItems="center" spacing={1} mb={1.25}>
-                <GroupsOutlinedIcon sx={{ fontSize: 18, color: '#42a5f5' }} />
-                <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
-                  Agent wise
-                </Typography>
-                <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                  · {agentTotal} withdrawals
-                </Typography>
-              </Stack>
-              <CountList
-                rows={agentRows}
-                nameHeader="Agent name"
-                emptyLabel="No agent data found"
-              />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Stack direction="row" alignItems="center" spacing={1} mb={1.25}>
-                <BadgeOutlinedIcon sx={{ fontSize: 18, color: '#66bb6a' }} />
-                <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
-                  Emp code wise
-                </Typography>
-                <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                  · {empTotal} withdrawals
-                </Typography>
-              </Stack>
-              <CountList
-                rows={empCodeRows}
-                nameHeader="Emp code"
-                emptyLabel="No emp code data found"
-              />
-            </Box>
-          </Stack>
         )}
       </DialogContent>
 
@@ -403,7 +472,12 @@ export function EmpCodeWithdrawalModal({
           bgcolor: 'action.hover',
         }}
       >
-        <Button onClick={onClose} variant="contained" sx={{ ...orangeBtnSx, minWidth: 110 }}>
+        <Button
+          onClick={onClose}
+          variant="contained"
+          disabled={loading}
+          sx={{ ...orangeBtnSx, minWidth: 110 }}
+        >
           Close
         </Button>
       </DialogActions>

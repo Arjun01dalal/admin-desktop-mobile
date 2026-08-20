@@ -91,8 +91,21 @@ function num(v: unknown): number {
 function formatValidationDetails(details: unknown): string {
   if (!details || typeof details !== 'object') return '';
   return Object.entries(details as Rec)
-    .map(([k, val]) => `${k}: ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`)
+    .map(([k, val]) => `${k}: ${formatValidationLeaf(val)}`)
     .join('\n');
+}
+
+function formatValidationLeaf(value: unknown): string {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '—';
+    }
+  }
+  return String(value);
 }
 
 function formatValidationCheckedAt(value: unknown): string {
