@@ -36,6 +36,7 @@ import { CallerResponsibilityScreen } from '../screens/dashboards/details/Caller
 import { PlayerActivityScreen } from '../screens/dashboards/details/PlayerActivityScreen';
 import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
 import { CallLogsScreen } from '../screens/dashboards/details/CallLogsScreen';
+import { DialerPushDataScreen } from '../screens/dashboards/details/DialerPushDataScreen';
 import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersScreen';
 import { StateWiseRegistrationScreen } from '../screens/dashboards/details/StateWiseRegistrationScreen';
 import { LoginReportScreen } from '../screens/dashboards/details/LoginReportScreen';
@@ -112,6 +113,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/player-activity': PlayerActivityScreen as AnyScreen,
   '/game-activity': GameActivityScreen as AnyScreen,
   '/call-logs': CallLogsScreen as AnyScreen,
+  '/dialer-push-data': DialerPushDataScreen as AnyScreen,
   '/new-registers': NewRegistersScreen as AnyScreen,
   '/register-user-report': StateWiseRegistrationScreen as AnyScreen,
   '/login-report': LoginReportScreen as AnyScreen,

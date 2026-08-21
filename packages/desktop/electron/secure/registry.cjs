@@ -87,6 +87,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'houseGames.updateWiningPoint': {
+    method: 'POST',
+    path: '/Ludo/admin/update-wining-point',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
 
   // Caller Responsibility
   'caller.depositByEmpcodeOffice': {
@@ -199,6 +205,20 @@ module.exports = {
     path: '/SubAdmin/add-to-dialer',
     encryptRequest: false,
     decryptResponse: false,
+  },
+  /** Log dialer push to admin DB before external ganesha999 call. */
+  'callLogs.addDialerData': {
+    method: 'POST',
+    path: '/SubAdmin/add-dialer-data',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  /** Dialer Push Data list page (encrypted envelope like other SubAdmin reads). */
+  'callLogs.getDialerDatas': {
+    method: 'POST',
+    path: '/SubAdmin/get-dialer-datas',
+    encryptRequest: false,
+    decryptResponse: true,
   },
   'callLogs.deleteQueuedCalls': {
     method: 'POST',

@@ -3,6 +3,7 @@
     "name": "Astro",
     "slug": "astro",
     "version": "1.0.0",
+    "scheme": "myastroapp",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -44,6 +45,18 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "myastroapp",
+              "host": "login"
+            }
+          ]
+        }
+      ],
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

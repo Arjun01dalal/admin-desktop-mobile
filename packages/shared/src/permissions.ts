@@ -38,6 +38,7 @@ export const Permissions = {
   player_activity: 'player_activity',
   game_activity: 'game_activity',
   call_logs: 'call_logs',
+  dialer_push_data: 'dialer_push_data',
   new_registrations: 'new_registrations',
   Login_Report: 'Login_Report',
   login_logout_report: 'login_logout_report',
@@ -90,6 +91,10 @@ export const Permissions = {
   view_casino_balance: 'view_casino_balance',
   hide_show_games: 'hide_show_games',
   house_game: 'house_game',
+  /** Laxmi Responsibilities.update_ludo_bets — edit House Games bet status. */
+  update_ludo_bets: 'update_ludo_bets',
+  /** Laxmi Responsibilities.show_wining_btn — House Games trophy / winning point. */
+  show_wining_btn: 'show_wining_btn',
   View_Deposit_List: 'View_Deposit_List',
   Bonus_Wallet_Fund_Request: 'Bonus_Wallet_Fund_Request',
   Bonus_Wallet_Request: 'Bonus_Wallet_Request',
@@ -391,6 +396,30 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'House Games',
     'HouseGame',
     'HouseGames',
+  ],
+  dialer_push_data: [
+    'dialer_push_data',
+    'Dialer_Push_Data',
+    'Dialer Push Data',
+    'dialerPushData',
+    // Same audience as Call Logs / Add to Dialer buttons.
+    'call_logs',
+    'Call_Logs',
+    'Call Logs',
+  ],
+  update_ludo_bets: [
+    'update_ludo_bets',
+    'Update_Ludo_Bets',
+    'update_ludo_bet',
+    'Update Ludo Bets',
+  ],
+  show_wining_btn: [
+    'show_wining_btn',
+    'show_winning_btn',
+    'Show_Wining_Btn',
+    'Show_Winning_Btn',
+    'Show Wining Btn',
+    'Show Winning Btn',
   ],
   hide_show_games: [
     'hide_show_games',

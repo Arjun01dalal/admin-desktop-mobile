@@ -68,6 +68,9 @@ export function RoundIdFilter() {
 export function SessionIdFilter() {
   return <TextFilter field="sessionId" placeholder="Session ID" />;
 }
+export function OperatorIdFilter() {
+  return <TextFilter field="operatorId" placeholder="Operator ID" width={110} />;
+}
 export function GameIdFilter() {
   useRevealCodes();
   const { filters, onFilterChange, onSearch, gameIdOptions } =

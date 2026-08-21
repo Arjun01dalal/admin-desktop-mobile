@@ -166,7 +166,66 @@ function dialerResultMessage(data, fallback) {
   return fallback;
 }
 
-async function addToDialer(payload = {}) {
+function sanitizeDialerLead(item = {}) {
+  return {
+    first_name: String(item.first_name || item.client_name || item.name || '').slice(0, 120),
+    last_name: String(item.last_name || '').slice(0, 120),
+    phone_number: String(item.phone_number || item.mobile || '').replace(/\D/g, '').slice(0, 20),
+    city: String(item.city ?? '').slice(0, 80),
+    state: String(item.state ?? '').slice(0, 80),
+    email: String(item.email || item.clientName || item.app_name || '').slice(0, 120),
+    comments: String(item.comments || item.clientName || item.app_name || '').slice(0, 200),
+    province: String(item.province || item._id || item.caller_user_id || '').slice(0, 80),
+  };
+}
+
+function randomDialerListId() {
+  // Match laxminarayan NewRegisterUsers: Math.floor(10000 + Math.random() * 90000)
+  return Math.floor(10000 + Math.random() * 90000);
+}
+
+/**
+ * Persist dialer push on admin API before hitting api|api2.ganesha999.com
+ * (admin-panel-domains postGaneshaDialerApi).
+ */
+async function postAddDialerData(body, token) {
+  const safeToken = sanitizeToken(token);
+  if (!safeToken) {
+    return { ok: false, message: 'Auth token missing. Please login again.' };
+  }
+  try {
+    const response = await apiClient('callLogs.addDialerData').post(
+      '/SubAdmin/add-dialer-data',
+      body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${safeToken}`,
+        },
+        timeout: 60000,
+      },
+    );
+    const data = response?.data || {};
+    if (data.success === false) {
+      return {
+        ok: false,
+        message: data.message || 'Failed to save dialer data',
+        data,
+      };
+    }
+    return { ok: true, data, message: data.message };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to save dialer data',
+    };
+  }
+}
+
+async function addToDialer(payload = {}, token = null) {
   const {
     campaignName,
     users = [],
@@ -196,21 +255,22 @@ async function addToDialer(payload = {}) {
   const url = dialerBaseUrl(serverId, campaignName || numericId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
+  const dialerBody = {
+    list_id: `9${numericId}`,
+    list_name: `${String(adminName).toUpperCase()} BOT CALLING LIST`,
+    campaign_id: numericId,
+    leads,
+  };
+
+  const logged = await postAddDialerData(dialerBody, token);
+  if (!logged.ok) return logged;
+
   try {
-    const response = await http.post(
-      url,
-      {
-        list_id: `9${numericId}`,
-        list_name: `${String(adminName).toUpperCase()} BOT CALLING LIST`,
-        campaign_id: numericId,
-        leads,
-      },
-      {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 60000,
-        metadata: { action: 'users.addToDialer', start: Date.now() },
-      },
-    );
+    const response = await http.post(url, dialerBody, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+      metadata: { action: 'users.addToDialer', start: Date.now() },
+    });
     const data = response?.data || {};
     if (isDialerSuccess(data)) {
       return {
@@ -235,25 +295,7 @@ async function addToDialer(payload = {}) {
   }
 }
 
-function sanitizeDialerLead(item = {}) {
-  return {
-    first_name: String(item.first_name || item.client_name || item.name || '').slice(0, 120),
-    last_name: String(item.last_name || '').slice(0, 120),
-    phone_number: String(item.phone_number || item.mobile || '').replace(/\D/g, '').slice(0, 20),
-    city: String(item.city ?? '').slice(0, 80),
-    state: String(item.state ?? '').slice(0, 80),
-    email: String(item.email || item.clientName || item.app_name || '').slice(0, 120),
-    comments: String(item.comments || item.clientName || item.app_name || '').slice(0, 200),
-    province: String(item.province || item._id || item.caller_user_id || '').slice(0, 80),
-  };
-}
-
-function randomDialerListId() {
-  // Match laxminarayan NewRegisterUsers: Math.floor(10000 + Math.random() * 90000)
-  return Math.floor(10000 + Math.random() * 90000);
-}
-
-async function externalDialerBatch(payload = {}) {
+async function externalDialerBatch(payload = {}, token = null) {
   const campaignId = String(
     payload.campaignId || payload.campaign_id || '',
   ).trim();
@@ -286,21 +328,22 @@ async function externalDialerBatch(payload = {}) {
     payload.listName || payload.list_name || campaignId,
   ).slice(0, 120);
 
+  const dialerBody = {
+    list_id: listId,
+    list_name: listName,
+    campaign_id: campaignId.slice(0, 64),
+    leads: safeLeads,
+  };
+
+  const logged = await postAddDialerData(dialerBody, token);
+  if (!logged.ok) return logged;
+
   try {
-    const response = await http.post(
-      url,
-      {
-        list_id: listId,
-        list_name: listName,
-        campaign_id: campaignId.slice(0, 64),
-        leads: safeLeads,
-      },
-      {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 60000,
-        metadata: { action: 'callLogs.externalDialerBatch', start: Date.now() },
-      },
-    );
+    const response = await http.post(url, dialerBody, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+      metadata: { action: 'callLogs.externalDialerBatch', start: Date.now() },
+    });
     const data = response?.data || {};
     if (isDialerSuccess(data)) {
       return {
@@ -329,7 +372,7 @@ async function externalDialerBatch(payload = {}) {
   }
 }
 
-async function externalDialerSingle(payload = {}) {
+async function externalDialerSingle(payload = {}, token = null) {
   const { details = {}, extensionId = [], adminName = 'ADMIN', serverId } = payload;
   const ids = Array.isArray(extensionId) ? extensionId.map(String) : [];
   const numericId = ids.find((val) => /^\d+$/.test(val));
@@ -342,31 +385,32 @@ async function externalDialerSingle(payload = {}) {
   const url = dialerBaseUrl(serverId, numericId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
+  const dialerBody = {
+    list_id: `9${numericId}`,
+    list_name: `${String(adminName).toUpperCase()} BOT CALLING LIST`,
+    campaign_id: numericId,
+    leads: [
+      sanitizeDialerLead({
+        first_name: details?.client_name,
+        phone_number: details?.phone_number,
+        city: details?.city,
+        state: details?.state,
+        email: details?.clientName || details?.app_name,
+        comments: details?.clientName || details?.app_name,
+        province: details?.caller_user_id,
+      }),
+    ],
+  };
+
+  const logged = await postAddDialerData(dialerBody, token);
+  if (!logged.ok) return logged;
+
   try {
-    const response = await http.post(
-      url,
-      {
-        list_id: `9${numericId}`,
-        list_name: `${String(adminName).toUpperCase()} BOT CALLING LIST`,
-        campaign_id: numericId,
-        leads: [
-          sanitizeDialerLead({
-            first_name: details?.client_name,
-            phone_number: details?.phone_number,
-            city: details?.city,
-            state: details?.state,
-            email: details?.clientName || details?.app_name,
-            comments: details?.clientName || details?.app_name,
-            province: details?.caller_user_id,
-          }),
-        ],
-      },
-      {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 60000,
-        metadata: { action: 'callLogs.externalDialerSingle', start: Date.now() },
-      },
-    );
+    const response = await http.post(url, dialerBody, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+      metadata: { action: 'callLogs.externalDialerSingle', start: Date.now() },
+    });
     const data = response?.data || {};
     return {
       ok: isDialerSuccess(data) || data.success !== false,
@@ -602,13 +646,13 @@ async function execute(action, payload = {}, token = null) {
       };
     }
     if (action === 'users.addToDialer') {
-      return addToDialer(safePayload);
+      return addToDialer(safePayload, safeToken);
     }
     if (action === 'callLogs.externalDialerBatch') {
-      return externalDialerBatch(safePayload);
+      return externalDialerBatch(safePayload, safeToken);
     }
     if (action === 'callLogs.externalDialerSingle') {
-      return externalDialerSingle(safePayload);
+      return externalDialerSingle(safePayload, safeToken);
     }
     if (action === 'callLogs.processCall') {
       return processCallSummary(safePayload);

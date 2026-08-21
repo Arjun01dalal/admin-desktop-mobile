@@ -246,19 +246,122 @@ function exposureCell(row: Rec, col: ExposureColDef): string {
   return display(raw);
 }
 
+const PLUTUS_SKIP_KEYS = new Set([
+  'txnState',
+  'age',
+  'rawPayload',
+  '__v',
+  '_v',
+  '_id',
+]);
+
+const PLUTUS_DATE_KEYS = new Set([
+  'createdOn',
+  'updatedOn',
+  'createdAt',
+  'updatedAt',
+  'CreatedOn',
+  'UpdatedOn',
+]);
+
+const PLUTUS_AMOUNT_KEYS = new Set([
+  'amount',
+  'betAmount',
+  'winAmount',
+  'stake',
+  'winning',
+  'wining',
+]);
+
+function humanizePlutusKey(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function mergePlutusRow(row: Rec): Rec {
+  const merged: Rec = { ...row };
+  const raw = row.rawPayload;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    Object.assign(merged, raw as Rec);
+  }
+  return merged;
+}
+
+function plutusCardFields(row: Rec): { label: string; value: string }[] {
+  const merged = mergePlutusRow(row);
+  const preferred = [
+    'gameName',
+    'gameId',
+    'transactionId',
+    'roundId',
+    'amount',
+    'betAmount',
+    'stake',
+    'winAmount',
+    'status',
+    'betStatus',
+    'createdOn',
+    'updatedOn',
+    'createdAt',
+    'updatedAt',
+  ];
+  const keys = [
+    ...preferred.filter((k) => merged[k] != null && merged[k] !== ''),
+    ...Object.keys(merged).filter(
+      (k) =>
+        !PLUTUS_SKIP_KEYS.has(k) &&
+        !preferred.includes(k) &&
+        merged[k] != null &&
+        merged[k] !== '',
+    ),
+  ];
+  return keys.map((key) => {
+    const kind: ExposureColDef['kind'] = PLUTUS_DATE_KEYS.has(key)
+      ? 'date'
+      : PLUTUS_AMOUNT_KEYS.has(key)
+        ? 'amount'
+        : undefined;
+    return {
+      label: humanizePlutusKey(key),
+      value: exposureCell(merged, { label: key, key, kind }),
+    };
+  });
+}
+
+function plutusCardSummary(fields: { label: string; value: string }[]): {
+  title: string;
+  subtitle: string;
+} {
+  const pick = (...labels: string[]) =>
+    fields.find((f) => labels.includes(f.label.toLowerCase()))?.value;
+  const title =
+    pick('game name', 'gamename') ||
+    pick('transaction id', 'transactionid') ||
+    fields[0]?.value ||
+    'Bet';
+  const parts = [
+    pick('amount', 'bet amount', 'betamount', 'stake'),
+    pick('status', 'bet status', 'betstatus'),
+  ].filter((v) => v && v !== '—');
+  return { title: String(title), subtitle: parts.join(' · ') || `${fields.length} fields` };
+}
+
 function buildPlutusCols(rows: Rec[]): ExposureColDef[] {
   if (!rows.length) return EXPOSURE_TABLE_COLS['Plutus Gaming'];
-  const keys = Object.keys(rows[0]).filter(
-    (k) => k !== 'txnState' && k !== 'age' && k !== 'rawPayload',
-  );
+  const sample = mergePlutusRow(rows[0]);
+  const keys = Object.keys(sample).filter((k) => !PLUTUS_SKIP_KEYS.has(k));
   return [
     { label: 'Sr. No', key: '__srNo', width: 70 },
     ...keys.map((k) => ({
-      label: k,
+      label: humanizePlutusKey(k),
       key: k,
-      kind: (['createdOn', 'updatedOn'].includes(k) ? 'date' : undefined) as
-        | ExposureColDef['kind']
-        | undefined,
+      kind: (PLUTUS_DATE_KEYS.has(k)
+        ? 'date'
+        : PLUTUS_AMOUNT_KEYS.has(k)
+          ? 'amount'
+          : undefined) as ExposureColDef['kind'] | undefined,
       width: 130,
     })),
   ];
@@ -285,6 +388,10 @@ export function UserExposureScreen() {
   const [msg, setMsg] = useState('');
   const [plutusPage, setPlutusPage] = useState(1);
   const [plutusPerPage, setPlutusPerPage] = useState(20);
+  const [plutusDetail, setPlutusDetail] = useState<{
+    sr: number;
+    fields: { label: string; value: string }[];
+  } | null>(null);
   const [edit, setEdit] = useState<{
     row: Rec;
     status: string;
@@ -302,6 +409,7 @@ export function UserExposureScreen() {
       if (!userId) return;
       setProvider(next);
       setEdit(null);
+      setPlutusDetail(null);
       setPlutusPage(1);
       setLoading(true);
       setMsg('');
@@ -518,6 +626,40 @@ export function UserExposureScreen() {
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : msg ? (
         <Text style={styles.muted}>{msg}</Text>
+      ) : isPlutus ? (
+        rows.length === 0 ? (
+          <Text style={styles.muted}>No exposure details</Text>
+        ) : (
+          <View style={styles.plutusList}>
+            {pageRows.map((r, i) => {
+              const sr = (plutusPage - 1) * plutusPerPage + i + 1;
+              const fields = plutusCardFields(r);
+              const summary = plutusCardSummary(fields);
+              return (
+                <TouchableOpacity
+                  key={String(r._id ?? r.transactionId ?? i)}
+                  style={styles.plutusCard}
+                  activeOpacity={0.75}
+                  onPress={() => setPlutusDetail({ sr, fields })}
+                >
+                  <View style={styles.plutusCardCollapsed}>
+                    <View style={styles.plutusCardMid}>
+                      <Text style={styles.plutusCardTitle} numberOfLines={1}>
+                        #{sr} · {summary.title}
+                      </Text>
+                      {summary.subtitle ? (
+                        <Text style={styles.plutusCardSub} numberOfLines={1}>
+                          {summary.subtitle}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.plutusChevron}>▼</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )
       ) : (
         <ResponsiveTable
           forceCards
@@ -549,6 +691,43 @@ export function UserExposureScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      <Modal
+        visible={plutusDetail != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPlutusDetail(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.plutusModalCard]}>
+            <Text style={styles.modalTitle}>
+              Plutus Gaming #{plutusDetail?.sr ?? ''}
+            </Text>
+            <ScrollView
+              style={styles.plutusModalScroll}
+              contentContainerStyle={styles.plutusFieldGrid}
+              showsVerticalScrollIndicator={false}
+            >
+              {(plutusDetail?.fields ?? []).map((f) => (
+                <View key={f.label} style={styles.plutusField}>
+                  <Text style={styles.plutusFieldLabel} numberOfLines={1}>
+                    {f.label}
+                  </Text>
+                  <Text style={styles.plutusFieldValue} numberOfLines={3}>
+                    {f.value}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.plutusModalClose}
+              onPress={() => setPlutusDetail(null)}
+            >
+              <Text style={styles.plutusModalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={edit != null} transparent animationType="fade" onRequestClose={() => setEdit(null)}>
         <View style={styles.modalBackdrop}>
@@ -640,6 +819,68 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: colors.primaryForeground },
+  plutusList: { gap: spacing(2) },
+  plutusCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing(2.5),
+    paddingHorizontal: spacing(3),
+  },
+  plutusCardCollapsed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+  },
+  plutusCardMid: { flex: 1, minWidth: 0 },
+  plutusCardTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  plutusCardSub: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  plutusChevron: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  plutusFieldGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(1.5),
+  },
+  plutusField: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(2),
+    minWidth: '46%',
+    flexGrow: 1,
+  },
+  plutusFieldLabel: { color: colors.muted, fontSize: 10, marginBottom: 2 },
+  plutusFieldValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  plutusModalCard: { maxHeight: '80%' },
+  plutusModalScroll: { maxHeight: 420, marginTop: spacing(1) },
+  plutusModalClose: {
+    marginTop: spacing(3),
+    alignSelf: 'flex-end',
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(2),
+  },
+  plutusModalCloseText: {
+    color: colors.primaryForeground,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   pagerRow: {
     flexDirection: 'row',
     alignItems: 'center',

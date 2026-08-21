@@ -148,7 +148,7 @@ export const QTECH_STATUS_OPTIONS = [
 export function formatDt(raw: unknown) {
   const d = formatDisplayDate(raw);
   const t = formatDisplayTime(raw);
-  return d ? `${d} ${t}`.trim() : '-';
+  return d ? `${d} , ${t}`.trim() : '-';
 }
 
 export function SearchFilter({

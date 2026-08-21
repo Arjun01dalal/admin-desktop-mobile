@@ -13,6 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
+import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { hasPermission } from '@/auth/permissions';
@@ -106,38 +107,29 @@ export function WithdrawUserDataPage() {
     state.mid || state.providerName || state.name || display(state.record?.mid);
 
   const dialerCall = async (item: WithdrawalDoc) => {
-    const SERVER_MAP: Record<string, string> = {
-      '1': 'api2',
-      '3': 'api',
-      default: 'api',
-    };
-    const serverPrefix =
-      SERVER_MAP[String(admin?.serverId ?? '')] || SERVER_MAP.default;
-    const apiUrl = `https://${serverPrefix}.ganesha999.com/API/`;
-    const payload = {
-      list_id: '990001',
-      list_name: 'Withdrawal Campaign1',
-      campaign_id: 'WDL1',
-      leads: [
-        {
-          first_name: item?.name || item?.accountHolderName || item?.userName,
-          phone_number: item?.mobile || item?.userMobile,
-          city: item?.city,
-          state: item?.state,
-          email: item?.clientName,
-          comments: item?.clientName,
-          province: item?._id,
-        },
-      ],
-    };
     try {
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const res = await secureApi('callLogs.externalDialerBatch', {
+        campaignId: 'WDL1',
+        listId: '990001',
+        listName: 'Withdrawal Campaign1',
+        serverId: admin?.serverId,
+        leads: [
+          {
+            first_name: item?.name || item?.accountHolderName || item?.userName,
+            phone_number: item?.mobile || item?.userMobile,
+            city: item?.city,
+            state: item?.state,
+            email: item?.clientName,
+            comments: item?.clientName,
+            province: item?._id,
+          },
+        ],
       });
-      if (!res.ok) throw new Error('failed');
-      toast.success('Data sent successfully');
+      if (!res.ok) {
+        toast.error(res.message || 'API request failed');
+        return;
+      }
+      toast.success(res.message || 'Data sent successfully');
     } catch {
       toast.error('API request failed');
     }
@@ -156,6 +148,12 @@ export function WithdrawUserDataPage() {
         label: 'Account Holder Name',
         width: 140,
         render: (r) => display(r.accountHolderName || r.userName || r.name),
+      },
+      {
+        id: 'empCode',
+        label: 'Emp Code',
+        width: 90,
+        render: (r) => display(r.empCode),
       },
       {
         id: 'amount',
@@ -182,12 +180,6 @@ export function WithdrawUserDataPage() {
             </Button>
           </Stack>
         ),
-      },
-      {
-        id: 'empCode',
-        label: 'Emp Code',
-        width: 90,
-        render: (r) => display(r.empCode),
       },
       {
         id: 'accountNo',

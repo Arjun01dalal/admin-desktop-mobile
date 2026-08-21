@@ -28,11 +28,30 @@ type FundType = 'deposit' | 'withdrawal' | 'coin';
 type Props = { userId: string };
 
 function createdAtOf(r: HistoryRow) {
-  return r.createdOn || r.createdAt || r['CreatedOn'];
+  const action = r.action;
+  const actionDate =
+    action && typeof action === 'object' && !Array.isArray(action)
+      ? (action as Record<string, unknown>).date
+      : undefined;
+  return (
+    r.createdOn ||
+    r.createdAt ||
+    r['CreatedOn'] ||
+    r.date ||
+    actionDate ||
+    null
+  );
 }
 
 function updatedAtOf(r: HistoryRow) {
-  return r.updatedOn || r.updatedAt || r['UpdatedOn'] || r['updated_at'];
+  return (
+    r.updatedOn ||
+    r.updatedAt ||
+    r['UpdatedOn'] ||
+    r['updated_at'] ||
+    r['UpdatedAt'] ||
+    null
+  );
 }
 
 /** Fund Request — deposit columns match Laxmi (Payment Type … Date/Time). */
@@ -147,6 +166,18 @@ export function FundRequestTab({ userId }: Props) {
           render: (r) => formatAmount(r.amount ?? 0),
         },
         {
+          id: 'createdAt',
+          label: 'Created At',
+          filter: null,
+          render: (r) => formatDt(createdAtOf(r)),
+        },
+        {
+          id: 'updatedAt',
+          label: 'Updated At',
+          filter: null,
+          render: (r) => formatDt(updatedAtOf(r)),
+        },
+        {
           id: 'order',
           label: 'Order Id',
           filter: (
@@ -258,18 +289,6 @@ export function FundRequestTab({ userId }: Props) {
                 '-',
             ),
         },
-        {
-          id: 'createdAt',
-          label: 'Created At',
-          filter: null,
-          render: (r) => formatDt(createdAtOf(r)),
-        },
-        {
-          id: 'updatedAt',
-          label: 'Updated At',
-          filter: null,
-          render: (r) => formatDt(updatedAtOf(r)),
-        },
       ];
     }
 
@@ -292,6 +311,18 @@ export function FundRequestTab({ userId }: Props) {
           label: 'amount',
           filter: null,
           render: (r) => formatAmount(r.amount ?? 0),
+        },
+        {
+          id: 'createdAt',
+          label: 'Created At',
+          filter: null,
+          render: (r) => formatDt(createdAtOf(r)),
+        },
+        {
+          id: 'updatedAt',
+          label: 'Updated At',
+          filter: null,
+          render: (r) => formatDt(updatedAtOf(r)),
         },
         {
           id: 'status',
@@ -364,18 +395,6 @@ export function FundRequestTab({ userId }: Props) {
               r.commissionAmount ?? r.CommissionAmount ?? r.commission ?? 0,
             ),
         },
-        {
-          id: 'createdAt',
-          label: 'Created At',
-          filter: null,
-          render: (r) => formatDt(createdAtOf(r)),
-        },
-        {
-          id: 'updatedAt',
-          label: 'Updated At',
-          filter: null,
-          render: (r) => formatDt(updatedAtOf(r)),
-        },
       ];
     }
 
@@ -397,6 +416,18 @@ export function FundRequestTab({ userId }: Props) {
         label: 'balance',
         filter: null,
         render: (r) => formatAmount(r.balance ?? r.amount ?? 0),
+      },
+      {
+        id: 'createdAt',
+        label: 'Created At',
+        filter: null,
+        render: (r) => formatDt(createdAtOf(r)),
+      },
+      {
+        id: 'updatedAt',
+        label: 'Updated At',
+        filter: null,
+        render: (r) => formatDt(updatedAtOf(r)),
       },
       {
         id: 'by',
@@ -426,18 +457,6 @@ export function FundRequestTab({ userId }: Props) {
         label: 'remark',
         filter: null,
         render: (r) => String(r.remark || '-'),
-      },
-      {
-        id: 'createdAt',
-        label: 'Created At',
-        filter: null,
-        render: (r) => formatDt(createdAtOf(r)),
-      },
-      {
-        id: 'updatedAt',
-        label: 'Updated At',
-        filter: null,
-        render: (r) => formatDt(updatedAtOf(r)),
       },
     ];
   }, [amount, gateway, mid, orderId, orderKeyId, paymentType, type, canShowMobile]);

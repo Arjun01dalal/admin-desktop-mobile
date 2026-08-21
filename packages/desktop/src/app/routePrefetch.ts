@@ -36,6 +36,7 @@ const LOADERS: Record<string, Loader> = {
   '/game-activity': () => import('@/screens/panel/GameActivityPage'),
   '/game-activity/details': () => import('@/screens/panel/GameActivityDetailsPage'),
   '/call-logs': () => import('@/screens/panel/CallLogsPage'),
+  '/dialer-push-data': () => import('@/screens/panel/DialerPushDataPage'),
   '/new-registers': () => import('@/screens/panel/NewRegistersPage'),
   '/register-user-report': () => import('@/screens/panel/StateWiseRegistrationPage'),
   '/login-report': () => import('@/screens/panel/LoginReportPage'),

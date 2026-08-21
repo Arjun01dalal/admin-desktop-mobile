@@ -1,6 +1,7 @@
 /**
- * Native Astro site login — desktop theme (email + password + terms).
- * Gate password opens panel OTP login; site customer login API can be wired later.
+ * Native Astro site login — desktop AstroSiteLogin parity.
+ * - Gate password 123456789 → panel OTP login
+ * - Any other password → api.astrothirdeye.com login-via-password → Astro site WebView
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -16,9 +17,20 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SITE_ACCESS_TOKEN_KEY,
+  siteLoginViaPassword,
+} from '../api/astroSiteAuth';
 import { AppBackground } from '../components/AppBackground';
 import { Button, Card, ErrorBanner, Input } from '../components/UI';
 import { colors, spacing, radius } from '../theme';
+import {
+  astroSiteModelNumber,
+  astroSiteOs,
+  getAstroSiteDeviceId,
+  getAstroSitePushToken,
+  resolveAstroSiteGeo,
+} from '../utils/astroSiteDevice';
 
 const SITE_IDENTITY_KEY = 'astro_site_identity_v1';
 const PANEL_GATE_PASSWORD = '123456789';
@@ -27,10 +39,12 @@ type SavedIdentity = { email: string; mobile: string };
 
 export function AstroLoginScreen({
   onOpenPanelLogin,
+  onOpenAstroSite,
   onForgotPassword,
   onTerms,
 }: {
   onOpenPanelLogin: () => void;
+  onOpenAstroSite: (accessToken: string) => void;
   onForgotPassword: () => void;
   onTerms: () => void;
 }) {
@@ -83,14 +97,50 @@ export function AstroLoginScreen({
       setError('Please accept Terms & Conditions');
       return;
     }
+
     setBusy(true);
     try {
       await persistIdentity();
+
+      // Gate password → panel OTP only (never open site SSO).
       if (password === PANEL_GATE_PASSWORD) {
         onOpenPanelLogin();
         return;
       }
-      setError('Invalid credentials');
+
+      // Customer password → site API → astrotalk.vip SSO (desktop parity).
+      const [deviceId, push, geo] = await Promise.all([
+        getAstroSiteDeviceId(),
+        getAstroSitePushToken(),
+        resolveAstroSiteGeo(),
+      ]);
+      if (!push.ok) {
+        setError(push.message);
+        return;
+      }
+
+      const res = await siteLoginViaPassword({
+        email: email.trim(),
+        password,
+        deviceId,
+        os: astroSiteOs(),
+        modelNumber: astroSiteModelNumber(),
+        longitude: geo.longitude,
+        latitude: geo.latitude,
+        fcmToken: push.fcmToken,
+      });
+
+      if (!res.ok) {
+        setError(res.message || 'Login failed');
+        return;
+      }
+
+      try {
+        await AsyncStorage.setItem(SITE_ACCESS_TOKEN_KEY, res.accessToken);
+      } catch {
+        /* ignore */
+      }
+      onOpenAstroSite(res.accessToken);
     } finally {
       setBusy(false);
     }

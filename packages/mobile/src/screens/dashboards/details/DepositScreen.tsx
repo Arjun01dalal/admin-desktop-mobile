@@ -27,6 +27,10 @@ import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import {
+  getCachedEmpCodeNameMap,
+  getEmpCodeNameMap,
+} from '../../../utils/empCodeNameCache';
 import * as ImagePicker from 'expo-image-picker';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -232,6 +236,19 @@ export function DepositScreen() {
   const [secRow, setSecRow] = useState<DepositRow | null>(null);
   const [secName, setSecName] = useState('');
   const [secSaving, setSecSaving] = useState(false);
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
+    () => getCachedEmpCodeNameMap(),
+  );
+
+  useEffect(() => {
+    let active = true;
+    void getEmpCodeNameMap().then((map) => {
+      if (active) setEmpCodeNameMap(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -505,7 +522,14 @@ export function DepositScreen() {
     const r = sheetRow;
     return [
       { label: 'User Name', value: display(r.userName) },
-      { label: 'Emp Code', value: display(r.empCode) },
+      {
+        label: 'Emp Code',
+        value: (() => {
+          const code = String(r.empCode || '').trim();
+          const name = code ? empCodeNameMap[code] : '';
+          return name ? `${code || '—'} (${name})` : display(r.empCode);
+        })(),
+      },
       { label: 'Mobile', value: maskMobile(r.userMobile || r.mobile, canShowMobile) },
       { label: 'App', value: display(appCodeForName(r.clientName) || r.clientName) },
       { label: 'Amount', value: formatIN(r.amount) },
@@ -537,7 +561,7 @@ export function DepositScreen() {
       { label: 'Check By', value: formatCheckPerson(r.checkBy), multiline: true },
       { label: 'Cross Check By', value: formatCheckPerson(r.crossCheckBy), multiline: true },
     ];
-  }, [sheetRow, canShowMobile]);
+  }, [sheetRow, canShowMobile, empCodeNameMap]);
 
   const openUserDetails = useCallback(
     (row: DepositRow) => {
@@ -645,6 +669,7 @@ export function DepositScreen() {
         searchFields={[
           { key: 'userName', label: 'User Name' },
           { key: 'userMobile', label: 'Mobile' },
+          { key: 'empCode', label: 'Emp Code' },
           { key: 'amount', label: 'Amount' },
           { key: 'orderId', label: 'Order Id' },
         ]}
@@ -709,6 +734,15 @@ export function DepositScreen() {
                 <Text style={styles.cardValue} numberOfLines={1}>
                   {display(r.empCode)}
                 </Text>
+                {(() => {
+                  const code = String(r.empCode || '').trim();
+                  const name = code ? empCodeNameMap[code] : '';
+                  return name ? (
+                    <Text style={styles.cardEmpName} numberOfLines={1}>
+                      {name}
+                    </Text>
+                  ) : null;
+                })()}
               </View>
               <View style={styles.cardCell}>
                 <Text style={styles.cardLabel}>Payment Method</Text>
@@ -1059,6 +1093,7 @@ const styles = StyleSheet.create({
   cardCell: { minWidth: '28%', flexGrow: 1 },
   cardLabel: { color: colors.muted, fontSize: 10, fontWeight: '600', textTransform: 'uppercase' },
   cardValue: { color: colors.foreground, fontSize: 13, marginTop: 2 },
+  cardEmpName: { color: colors.muted, fontSize: 11, fontWeight: '500', marginTop: 2 },
   cardBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
   approveBtn: {
     backgroundColor: '#16a34a',

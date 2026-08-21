@@ -7,6 +7,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -17,6 +19,7 @@ import {
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
+import { hasPermission, Permissions, canAccessNavItem } from '../../../auth/permissions';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { monthStartIST, todayIST } from '../../../utils/dates';
@@ -40,6 +43,7 @@ type TxnRow = {
   status?: string;
   currency?: string;
   amount?: number;
+  winningAmount?: number | string;
   winingPoint?: number;
   roundCapacity?: number | string;
   isBot?: boolean | string | number;
@@ -192,6 +196,14 @@ function isBotValue(row: TxnRow): string {
 
 export function HouseGamesScreen() {
   const isFocused = useIsFocused();
+  const canOpenHouseGames = canAccessNavItem({
+    id: 'houseGames',
+    permission: Permissions.house_game,
+  });
+  const canUpdateBets =
+    hasPermission(Permissions.update_ludo_bets) || canOpenHouseGames;
+  const canUpdateWinningPoint =
+    hasPermission(Permissions.show_wining_btn) || canOpenHouseGames;
 
   const [draftStart, setDraftStart] = useState(monthStartIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -211,6 +223,15 @@ export function HouseGamesScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<TxnRow | null>(null);
+  const [editItem, setEditItem] = useState<TxnRow | null>(null);
+  const [editStatus, setEditStatus] = useState('');
+  const [editWinningAmount, setEditWinningAmount] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [winItem, setWinItem] = useState<TxnRow | null>(null);
+  const [winStatus, setWinStatus] = useState('W');
+  const [winPoint, setWinPoint] = useState('');
+  const [winAmount, setWinAmount] = useState('');
+  const [winLoading, setWinLoading] = useState(false);
   const genRef = React.useRef(0);
 
   const load = useCallback(async () => {
@@ -312,7 +333,133 @@ export function HouseGamesScreen() {
     setPageNo(1);
   }, []);
 
+  const openUpdateModal = useCallback((item: TxnRow) => {
+    setEditItem(item);
+    setEditStatus(String(item.status ?? ''));
+    setEditWinningAmount(String(item.winningAmount ?? item.amount ?? ''));
+    setSelected(null);
+  }, []);
+
+  const closeUpdateModal = useCallback(() => {
+    if (editLoading) return;
+    setEditItem(null);
+    setEditStatus('');
+    setEditWinningAmount('');
+  }, [editLoading]);
+
+  const openWinningPointModal = useCallback((item: TxnRow) => {
+    setWinItem(item);
+    setWinStatus(String(item.status ?? 'W'));
+    setWinPoint(String(item.winingPoint ?? ''));
+    setWinAmount(String(item.amount ?? ''));
+    setSelected(null);
+  }, []);
+
+  const closeWinningPointModal = useCallback(() => {
+    if (winLoading) return;
+    setWinItem(null);
+    setWinStatus('W');
+    setWinPoint('');
+    setWinAmount('');
+  }, [winLoading]);
+
+  const submitUpdateStatus = useCallback(async () => {
+    if (!editItem?._id) {
+      Alert.alert('Error', 'Invalid transaction selected');
+      return;
+    }
+    if (!editStatus) {
+      Alert.alert('Error', 'Please select status');
+      return;
+    }
+    if (editStatus === 'W' && !editWinningAmount) {
+      Alert.alert('Error', 'Please enter winning amount');
+      return;
+    }
+
+    const payload: Record<string, unknown> = {
+      _id: editItem._id,
+      status: editStatus,
+    };
+    if (editStatus === 'W') {
+      payload.winningAmount = Number(editWinningAmount);
+    }
+
+    setEditLoading(true);
+    try {
+      const res = await secureApi('houseGames.updateBetStatus', payload);
+      if (res.ok && res.success !== false) {
+        Alert.alert('Success', res.message || 'Bet status updated successfully');
+        setEditItem(null);
+        setEditStatus('');
+        setEditWinningAmount('');
+        void load();
+      } else {
+        Alert.alert('Error', res.message || 'Failed to update bet status');
+      }
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to update bet status');
+    } finally {
+      setEditLoading(false);
+    }
+  }, [editItem, editStatus, editWinningAmount, load]);
+
+  const submitWinningPoint = useCallback(async () => {
+    if (!winItem?._id) {
+      Alert.alert('Error', 'Invalid transaction selected');
+      return;
+    }
+
+    const isWinType = String(winItem.type ?? '').toLowerCase() === 'win';
+    let payload: Record<string, unknown>;
+
+    if (isWinType) {
+      if (winAmount === '' || Number.isNaN(Number(winAmount))) {
+        Alert.alert('Error', 'Please enter a valid amount');
+        return;
+      }
+      payload = { _id: winItem._id, amount: Number(winAmount) };
+    } else {
+      if (!winStatus) {
+        Alert.alert('Error', 'Please select status');
+        return;
+      }
+      if (winPoint === '' || Number.isNaN(Number(winPoint))) {
+        Alert.alert('Error', 'Please enter a valid winning point');
+        return;
+      }
+      payload = {
+        _id: winItem._id,
+        winingPoint: Number(winPoint),
+        status: winStatus,
+      };
+    }
+
+    setWinLoading(true);
+    try {
+      const res = await secureApi('houseGames.updateWiningPoint', payload);
+      if (res.ok && res.success !== false) {
+        Alert.alert('Success', res.message || 'Winning point updated successfully');
+        setWinItem(null);
+        setWinStatus('W');
+        setWinPoint('');
+        setWinAmount('');
+        void load();
+      } else {
+        Alert.alert('Error', res.message || 'Failed to update winning point');
+      }
+    } catch (e) {
+      Alert.alert(
+        'Error',
+        e instanceof Error ? e.message : 'Failed to update winning point',
+      );
+    } finally {
+      setWinLoading(false);
+    }
+  }, [winItem, winStatus, winPoint, winAmount, load]);
+
   return (
+    <>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
@@ -489,6 +636,28 @@ export function HouseGamesScreen() {
                 <Text style={styles.cardTitle} numberOfLines={1}>
                   {String(row.name || '-')}
                 </Text>
+                {canUpdateBets ? (
+                  <TouchableOpacity
+                    style={styles.editIconBtn}
+                    onPress={() => openUpdateModal(row)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Update Bet Status"
+                  >
+                    <Text style={styles.editIconText}>✎</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {canUpdateWinningPoint ? (
+                  <TouchableOpacity
+                    style={styles.trophyIconBtn}
+                    onPress={() => openWinningPointModal(row)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Update Winning Point"
+                  >
+                    <Text style={styles.trophyIconText}>🏆</Text>
+                  </TouchableOpacity>
+                ) : null}
                 <Text
                   style={[
                     styles.statusPill,
@@ -556,9 +725,200 @@ export function HouseGamesScreen() {
               }))
             : []
         }
+        actions={
+          selected && (canUpdateBets || canUpdateWinningPoint)
+            ? [
+                ...(canUpdateBets
+                  ? [
+                      {
+                        label: 'Update Bet Status',
+                        tone: 'warning' as const,
+                        onPress: () => openUpdateModal(selected),
+                      },
+                    ]
+                  : []),
+                ...(canUpdateWinningPoint
+                  ? [
+                      {
+                        label: 'Update Winning Point',
+                        tone: 'primary' as const,
+                        onPress: () => openWinningPointModal(selected),
+                      },
+                    ]
+                  : []),
+              ]
+            : undefined
+        }
         onClose={() => setSelected(null)}
       />
     </ScrollView>
+
+    <Modal
+      visible={editItem !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={closeUpdateModal}
+    >
+      <View style={styles.editBackdrop}>
+        <View style={styles.editCard}>
+          <Text style={styles.editTitle}>{toDisplayText('Update Bet Status')}</Text>
+          <Text style={styles.editLabel}>Document ID</Text>
+          <Text style={styles.editValue} numberOfLines={2}>
+            {String(editItem?._id ?? '')}
+          </Text>
+
+          <Text style={styles.editLabel}>Status</Text>
+          <View style={styles.chipGroupRow}>
+            {(
+              [
+                { value: 'L', label: `${toDisplayText('Loss')} (L)` },
+                { value: 'R', label: `${toDisplayText('Refund')} (R)` },
+                { value: 'W', label: `${toDisplayText('Win')} (W)` },
+              ] as const
+            ).map((opt) => {
+              const active = editStatus === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setEditStatus(opt.value)}
+                  disabled={editLoading}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {editStatus === 'W' ? (
+            <>
+              <Text style={styles.editLabel}>{toDisplayText('Winning Amount')}</Text>
+              <TextInput
+                style={styles.filterInput}
+                value={editWinningAmount}
+                onChangeText={setEditWinningAmount}
+                keyboardType="numeric"
+                placeholder="Enter winning amount"
+                placeholderTextColor={colors.muted}
+                editable={!editLoading}
+              />
+            </>
+          ) : null}
+
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={closeUpdateModal}
+              disabled={editLoading}
+            >
+              <Text style={styles.clearBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.applyBtn, editLoading && styles.pagerBtnDisabled]}
+              onPress={() => void submitUpdateStatus()}
+              disabled={editLoading}
+            >
+              <Text style={styles.applyBtnText}>
+                {editLoading ? 'Updating...' : 'Update'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+
+    <Modal
+      visible={winItem !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={closeWinningPointModal}
+    >
+      <View style={styles.editBackdrop}>
+        <View style={styles.editCard}>
+          <Text style={styles.editTitle}>{toDisplayText('Update Winning Point')}</Text>
+          <Text style={styles.editLabel}>Document ID</Text>
+          <Text style={styles.editValue} numberOfLines={2}>
+            {String(winItem?._id ?? '')}
+          </Text>
+          <Text style={styles.editLabel}>Type</Text>
+          <Text style={styles.editValue}>{String(winItem?.type ?? '')}</Text>
+
+          {String(winItem?.type ?? '').toLowerCase() === 'win' ? (
+            <>
+              <Text style={styles.editLabel}>{toDisplayText('Amount')}</Text>
+              <TextInput
+                style={styles.filterInput}
+                value={winAmount}
+                onChangeText={setWinAmount}
+                keyboardType="numeric"
+                placeholder="Enter amount"
+                placeholderTextColor={colors.muted}
+                editable={!winLoading}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.editLabel}>Status</Text>
+              <View style={styles.chipGroupRow}>
+                {(
+                  [
+                    { value: 'L', label: `${toDisplayText('Loss')} (L)` },
+                    { value: 'R', label: `${toDisplayText('Refund')} (R)` },
+                    { value: 'W', label: `${toDisplayText('Win')} (W)` },
+                  ] as const
+                ).map((opt) => {
+                  const active = winStatus === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setWinStatus(opt.value)}
+                      disabled={winLoading}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={styles.editLabel}>{toDisplayText('Winning Point')}</Text>
+              <TextInput
+                style={styles.filterInput}
+                value={winPoint}
+                onChangeText={setWinPoint}
+                keyboardType="numeric"
+                placeholder="Enter winning point"
+                placeholderTextColor={colors.muted}
+                editable={!winLoading}
+              />
+            </>
+          )}
+
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={closeWinningPointModal}
+              disabled={winLoading}
+            >
+              <Text style={styles.clearBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.applyBtn, winLoading && styles.pagerBtnDisabled]}
+              onPress={() => void submitWinningPoint()}
+              disabled={winLoading}
+            >
+              <Text style={styles.applyBtnText}>
+                {winLoading ? 'Updating...' : 'Update'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -707,6 +1067,26 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  editIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,159,10,0.16)',
+    marginRight: spacing(1),
+  },
+  editIconText: { color: '#ff9f0a', fontSize: 14, fontWeight: '700' },
+  trophyIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(245,166,35,0.18)',
+    marginRight: spacing(1),
+  },
+  trophyIconText: { fontSize: 13 },
   editCityBtn: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -733,4 +1113,41 @@ const styles = StyleSheet.create({
   pagerBtnDisabled: { opacity: 0.4 },
   pagerBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
   pagerLabel: { color: colors.muted, fontSize: 13 },
+  editBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    padding: spacing(4),
+  },
+  editCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing(4),
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editTitle: {
+    color: colors.foreground,
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: spacing(3),
+  },
+  editLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: spacing(1),
+    marginTop: spacing(2),
+  },
+  editValue: {
+    color: colors.foreground,
+    fontSize: 13,
+    marginBottom: spacing(1),
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing(2),
+    marginTop: spacing(4),
+  },
 });

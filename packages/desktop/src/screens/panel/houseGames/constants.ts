@@ -9,6 +9,7 @@ export const TABLE_COLUMNS = [
   'Round ID',
   'Session ID',
   'Krida',
+  'Operator ID',
   'Type',
   'Status',
   'Currency',
@@ -27,6 +28,7 @@ export const TEXT_FILTER_FIELDS = [
   { key: 'roundId', placeholder: 'Round ID' },
   { key: 'sessionId', placeholder: 'Session ID' },
   { key: 'gameId', placeholder: 'Krida' },
+  { key: 'operatorId', placeholder: 'Operator ID' },
   { key: 'currency', placeholder: 'Currency' },
   { key: 'roundCapacity', placeholder: 'Round Capacity', type: 'number' },
 ] as const;
@@ -63,6 +65,7 @@ export const INITIAL_FILTERS = {
   roundId: '',
   sessionId: '',
   gameId: '',
+  operatorId: '',
   type: '',
   status: '',
   name: '',

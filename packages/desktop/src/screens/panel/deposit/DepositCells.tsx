@@ -701,7 +701,14 @@ export const IndexCell = memo(function IndexCell({
   onEdit,
 }: IndexCellProps) {
   const status = String(row.status || '');
-  const visual = status ? statusVisual(status) : null;
+  const statusKey = status.toLowerCase();
+  // Approved already uses green row background (Laxmi-style). Skip the
+  // checkmark icon so Sr No stays clean — keep icons for pending/edit etc.
+  const hideStatusIcon =
+    statusKey === 'approved' ||
+    statusKey === 'success' ||
+    statusKey === 'approved-clr';
+  const visual = status && !hideStatusIcon ? statusVisual(status) : null;
   const StatusIcon = visual?.Icon;
 
   return (

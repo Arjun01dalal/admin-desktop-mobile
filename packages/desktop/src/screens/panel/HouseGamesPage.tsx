@@ -16,6 +16,7 @@ import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { TablePanel } from '@/components/TablePanel';
 import TransactionTable from './houseGames/TransactionTable';
 import UpdateBetStatusModal from './houseGames/UpdateBetStatusModal';
+import UpdateWinningPointModal from './houseGames/UpdateWinningPointModal';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import {
@@ -37,6 +38,7 @@ export function HouseGamesPage() {
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [currentPage, setCurrentPage] = useState(1);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showWinningPointModal, setShowWinningPointModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<HouseGameTransaction | null>(
     null,
   );
@@ -70,6 +72,11 @@ export function HouseGamesPage() {
   const onEdit = useCallback((item: HouseGameTransaction) => {
     setSelectedItem(item);
     setShowUpdateModal(true);
+  }, []);
+
+  const onUpdateWinningPoint = useCallback((item: HouseGameTransaction) => {
+    setSelectedItem(item);
+    setShowWinningPointModal(true);
   }, []);
 
   if (!canView) {
@@ -197,6 +204,7 @@ export function HouseGamesPage() {
           onCheckboxChange={updateCheckboxFilter}
           onSearch={handleSearch}
           onEdit={onEdit}
+          onUpdateWinningPoint={onUpdateWinningPoint}
         />
       </TablePanel>
 
@@ -204,6 +212,16 @@ export function HouseGamesPage() {
         isOpen={showUpdateModal}
         onClose={() => {
           setShowUpdateModal(false);
+          setSelectedItem(null);
+        }}
+        selectedItem={selectedItem}
+        onSuccess={() => void getTransactions(currentPage)}
+      />
+
+      <UpdateWinningPointModal
+        isOpen={showWinningPointModal}
+        onClose={() => {
+          setShowWinningPointModal(false);
           setSelectedItem(null);
         }}
         selectedItem={selectedItem}

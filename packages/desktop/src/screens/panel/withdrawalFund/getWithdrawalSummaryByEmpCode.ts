@@ -20,6 +20,13 @@ export type CountRow = {
   count: number;
 };
 
+/** Agent × EmpCode withdrawal counts (e.g. current-month report). */
+export type AgentEmpCountRow = {
+  agentName: string;
+  empCode: string;
+  count: number;
+};
+
 const UNASSIGNED_EMP_CODE = 'Unassigned';
 const UNASSIGNED_AGENT = 'Unassigned';
 
@@ -267,3 +274,26 @@ export const getEmpCodeCountRows = (
   withdrawals: Record<string, unknown>[] = [],
 ): CountRow[] =>
   countByKey(withdrawals, (withdrawal) => normalizeEmpCode(withdrawal?.empCode));
+
+/** Per agent, how many withdrawals for each empCode. */
+export const getAgentEmpCodeCountRows = (
+  withdrawals: Record<string, unknown>[] = [],
+): AgentEmpCountRow[] => {
+  const map = new Map<string, AgentEmpCountRow>();
+
+  withdrawals.forEach((withdrawal) => {
+    const agentName = getAgentName(withdrawal);
+    const empCode = normalizeEmpCode(withdrawal?.empCode);
+    const key = `${agentName}||${empCode}`;
+    const current = map.get(key) || { agentName, empCode, count: 0 };
+    current.count += 1;
+    map.set(key, current);
+  });
+
+  return Array.from(map.values()).sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    const byAgent = a.agentName.localeCompare(b.agentName);
+    if (byAgent !== 0) return byAgent;
+    return a.empCode.localeCompare(b.empCode);
+  });
+};

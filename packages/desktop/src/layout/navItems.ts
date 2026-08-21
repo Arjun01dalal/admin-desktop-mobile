@@ -87,6 +87,12 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/call-logs",
     permission: Permissions.call_logs,
   },
+  {
+    id: "dialerPushData",
+    label: "Dialer Push Data",
+    path: "/dialer-push-data",
+    permission: Permissions.dialer_push_data,
+  },
   // Always listed (laxminarayan App route has no Responsibility gate).
   {
     id: "botPerformance",

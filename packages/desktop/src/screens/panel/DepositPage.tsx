@@ -72,6 +72,10 @@ import {
   canShowCheckAction,
   type ScannerRow,
 } from '@/screens/panel/deposit/logic';
+import {
+  getCachedEmpCodeNameMap,
+  getEmpCodeNameMap,
+} from '@/utils/empCodeNameCache';
 
 type RequestType = 'automatic' | 'scannerDeposit';
 
@@ -190,8 +194,21 @@ export function DepositPage() {
   const [checkingId, setCheckingId] = useState('');
   const [scannerRows, setScannerRows] = useState<ScannerRow[]>([]);
   const [scannerLoading, setScannerLoading] = useState(false);
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
+    () => getCachedEmpCodeNameMap(),
+  );
 
   const isScanner = requestType === 'scannerDeposit';
+
+  useEffect(() => {
+    let active = true;
+    void getEmpCodeNameMap().then((map) => {
+      if (active) setEmpCodeNameMap(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const buildPayload = useCallback(() => {
     const f = query.filters;
@@ -689,9 +706,32 @@ export function DepositPage() {
       {
         id: 'empCode',
         label: 'Emp Code',
-        width: 100,
+        width: 110,
         filter: searchFilter('empCode', 'Emp code'),
-        render: (row) => display(row.empCode),
+        render: (row) => {
+          const code = String(row.empCode || '').trim();
+          const empName = code ? empCodeNameMap[code] : '';
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                lineHeight: 1.3,
+              }}
+            >
+              <span>{code || '—'}</span>
+              {empName ? (
+                <Typography
+                  component="span"
+                  sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }}
+                >
+                  {empName}
+                </Typography>
+              ) : null}
+            </Box>
+          );
+        },
       },
       {
         id: 'txnDetails',
@@ -878,6 +918,7 @@ export function DepositPage() {
     markChecked,
     load,
     navigate,
+    empCodeNameMap,
   ]);
 
   const scannerColumns = useMemo<CommonTableColumn<ScannerRow>[]>(

@@ -38,10 +38,46 @@ import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
-import { getSessionUser, hasPermission } from '../../../auth/permissions';
+import {
+  getRoleName,
+  getSessionUser,
+  hasPermission,
+  isSosExemptRole,
+} from '../../../auth/permissions';
+import { appStorage } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
+import { EmpCodePieChartModal, type ChartCountRow } from './EmpCodePieChartModal';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+
+/** Current Month Chart — 9608010101 + full_access / dev_full_access. */
+const WITHDRAWAL_FUND_CHART_MOBILES = new Set(['9608010101']);
+
+function canShowCurrentMonthChart(
+  user: {
+    mobile?: string;
+    Role_ID?: string;
+    Role_Name?: string;
+    roleName?: string;
+    role?: string;
+    roles?: Record<string, string> | unknown;
+  } | null,
+): boolean {
+  const mobile = String(user?.mobile || appStorage.getItem('mobile') || '').trim();
+  if (WITHDRAWAL_FUND_CHART_MOBILES.has(mobile)) return true;
+  if (isSosExemptRole(user)) return true;
+
+  const role = String(getRoleName(user) || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+  return (
+    role === 'dev_full_access' ||
+    role.includes('dev_full_access') ||
+    role === 'full_access' ||
+    role.endsWith('_full_access')
+  );
+}
 
 type WithdrawalDoc = {
   _id?: string;
@@ -255,6 +291,23 @@ function parseAgentSummaries(agentWiseSummary: unknown): AgentSummary[] {
   });
 }
 
+function countEmpCodes(rows: WithdrawalDoc[]): { empCode: string; count: number }[] {
+  const map = new Map<string, number>();
+  rows.forEach((r) => {
+    const code = String(r.empCode || '').trim() || 'Unassigned';
+    map.set(code, (map.get(code) || 0) + 1);
+  });
+  return Array.from(map.entries())
+    .map(([empCode, count]) => ({ empCode, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function currentMonthRangeIst(): { start: string; end: string } {
+  const end = todayIST();
+  const start = `${end.slice(0, 7)}-01`;
+  return { start, end };
+}
+
 function typeTotal(typeItem: TypeGroup): number {
   return typeItem.providers.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
 }
@@ -262,8 +315,21 @@ function typeTotal(typeItem: TypeGroup): number {
 export function WithdrawalFundScreen() {
   // Read once — getSessionUser returns a fresh object each call; using it directly
   // in hook deps retriggers load() every render (infinite API polling).
-  const sessionUser = useMemo(() => getSessionUser() as { serverId?: string | number } | null, []);
+  const sessionUser = useMemo(
+    () =>
+      getSessionUser() as {
+        serverId?: string | number;
+        mobile?: string;
+        Role_ID?: string;
+        Role_Name?: string;
+        roleName?: string;
+        role?: string;
+        roles?: Record<string, string> | unknown;
+      } | null,
+    [],
+  );
   const canShowMobile = hasPermission('show_mobile');
+  const canViewChart = canShowCurrentMonthChart(sessionUser);
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -298,37 +364,38 @@ export function WithdrawalFundScreen() {
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
 
+  // Current Month Chart (emp / agent pie).
+  const [chartOpen, setChartOpen] = useState(false);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartStart, setChartStart] = useState(() => currentMonthRangeIst().start);
+  const [chartEnd, setChartEnd] = useState(() => currentMonthRangeIst().end);
+  const [chartEmpRows, setChartEmpRows] = useState<ChartCountRow[]>([]);
+  const [chartAgentRows, setChartAgentRows] = useState<ChartCountRow[]>([]);
+  const chartGenRef = useRef(0);
+
   /** Push a single entry to the dialer campaign (exact desktop payload). */
   const dialerCall = useCallback(
     async (item: WithdrawalDoc) => {
-      const SERVER_MAP: Record<string, string> = { '1': 'api2', '3': 'api', default: 'api' };
-      const serverPrefix = SERVER_MAP[String(sessionUser?.serverId ?? '')] || SERVER_MAP.default;
-      const apiUrl = `https://${serverPrefix}.ganesha999.com/API/`;
-      const payload = {
-        list_id: '990001',
-        list_name: 'Withdrawal Campaign1',
-        campaign_id: 'WDL1',
-        leads: [
-          {
-            first_name: item?.name || item?.accountHolderName || item?.userName,
-            phone_number: item?.mobile || item?.userMobile,
-            city: item?.city,
-            state: item?.state,
-            email: item?.clientName,
-            comments: item?.clientName,
-            province: item?._id,
-          },
-        ],
-      };
       setDialerBusy(true);
       try {
-        const res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+        const { addToDialerBatch } = await import('../../../utils/externalDialer');
+        const res = await addToDialerBatch({
+          campaignId: 'WDL1',
+          serverId: String(sessionUser?.serverId ?? ''),
+          listId: '990001',
+          listName: 'Withdrawal Campaign1',
+          leads: [
+            {
+              name: String(item?.name || item?.accountHolderName || item?.userName || ''),
+              mobile: String(item?.mobile || item?.userMobile || ''),
+              city: String(item?.city || ''),
+              state: String(item?.state || ''),
+              clientName: String(item?.clientName || ''),
+              _id: String(item?._id || ''),
+            },
+          ],
         });
-        if (!res.ok) throw new Error('failed');
-        Alert.alert('Dialer Call', 'Data sent successfully');
+        Alert.alert('Dialer Call', res.message || (res.ok ? 'Data sent successfully' : 'Failed'));
       } catch {
         Alert.alert('Dialer Call', 'API request failed');
       } finally {
@@ -386,6 +453,58 @@ export function WithdrawalFundScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadChartReport = useCallback(async (start: string, end: string) => {
+    if (!start || !end) {
+      Alert.alert('Chart', 'Select from and to dates');
+      return;
+    }
+    if (start > end) {
+      Alert.alert('Chart', 'From date cannot be after To date');
+      return;
+    }
+    const gen = ++chartGenRef.current;
+    setChartLoading(true);
+    try {
+      const res = await secureApi<unknown>('withdrawalFund.report', {
+        startDate: start,
+        endDate: end,
+      });
+      if (gen !== chartGenRef.current) return;
+      if (!res.ok) {
+        Alert.alert('Chart', res.message || 'Failed to load chart data');
+        return;
+      }
+      const body = unpackPayload(res.data);
+      const agents = parseAgentSummaries(body.agentWiseSummary);
+      const agentRows: ChartCountRow[] = agents
+        .map((a) => ({ name: a.name, count: a.approvedCount || a.withdrawals.length }))
+        .sort((a, b) => b.count - a.count);
+      const allDocs = agents.flatMap((a) => a.withdrawals);
+      const empRows: ChartCountRow[] = countEmpCodes(allDocs).map((e) => ({
+        name: e.empCode,
+        count: e.count,
+      }));
+      setChartAgentRows(agentRows);
+      setChartEmpRows(empRows);
+    } catch {
+      if (gen === chartGenRef.current) {
+        Alert.alert('Chart', 'Failed to load chart data');
+      }
+    } finally {
+      if (gen === chartGenRef.current) setChartLoading(false);
+    }
+  }, []);
+
+  const openCurrentMonthChart = useCallback(() => {
+    const { start, end } = currentMonthRangeIst();
+    setChartStart(start);
+    setChartEnd(end);
+    setChartEmpRows([]);
+    setChartAgentRows([]);
+    setChartOpen(true);
+    void loadChartReport(start, end);
+  }, [loadChartReport]);
 
   const loadMidReports = useCallback(
     async (provider: ProviderRow) => {
@@ -733,15 +852,19 @@ export function WithdrawalFundScreen() {
                 </View>
                 <View style={styles.cardSplitRow}>
                   <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    App Code: {appCodeForName(r.clientName)}
+                    Emp Code: {display(r.empCode)}
                   </Text>
                   <Text style={styles.cardSplitRight} numberOfLines={1}>
                     Status: {display(r.status)}
                   </Text>
                 </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Mobile</Text>
-                  <Text style={styles.cardValue}>{mobile}</Text>
+                <View style={styles.cardSplitRow}>
+                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                    App Code: {appCodeForName(r.clientName)}
+                  </Text>
+                  <Text style={styles.cardSplitRight} numberOfLines={1}>
+                    Mobile: {mobile}
+                  </Text>
                 </View>
                 <View style={styles.cardRow}>
                   <Text style={styles.cardLabel}>Date</Text>
@@ -810,6 +933,12 @@ export function WithdrawalFundScreen() {
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Amount: {formatAmount(totalAmount)}
       </Text>
+
+      {canViewChart ? (
+        <TouchableOpacity style={styles.chartBtn} onPress={openCurrentMonthChart} activeOpacity={0.85}>
+          <Text style={styles.chartBtnText}>Current Month Chart</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <DetailFilterBar
         startDate={draftStart}
@@ -893,6 +1022,19 @@ export function WithdrawalFundScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      <EmpCodePieChartModal
+        visible={chartOpen}
+        onClose={() => !chartLoading && setChartOpen(false)}
+        loading={chartLoading}
+        empCodeRows={chartEmpRows}
+        agentRows={chartAgentRows}
+        startDate={chartStart}
+        endDate={chartEnd}
+        onStartDateChange={setChartStart}
+        onEndDateChange={setChartEnd}
+        onApply={() => void loadChartReport(chartStart, chartEnd)}
+      />
     </ScrollView>
   );
 
@@ -960,6 +1102,16 @@ const styles = StyleSheet.create({
   content: { padding: spacing(4), paddingBottom: spacing(10) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+  chartBtn: {
+    marginTop: spacing(3),
+    marginBottom: spacing(1),
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    paddingHorizontal: spacing(4),
+    alignItems: 'center',
+  },
+  chartBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   backLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginBottom: spacing(2) },
   agentWrap: { marginTop: spacing(3), gap: spacing(2) },
   rowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },

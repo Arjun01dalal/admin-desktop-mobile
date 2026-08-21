@@ -13,3 +13,4 @@ export * from './pagination';
 export * from './vipClients';
 export * from './userTypes';
 export * from './callLogs';
+export * from './empCodeNameCache';

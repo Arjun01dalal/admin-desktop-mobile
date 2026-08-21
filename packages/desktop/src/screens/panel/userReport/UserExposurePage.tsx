@@ -2,13 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
+  Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   MenuItem,
   Pagination,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -236,19 +242,169 @@ function cellValue(row: Row, col: ColDef, opts?: { srNo?: number }): string {
   return String(raw);
 }
 
+const PLUTUS_SKIP_KEYS = new Set([
+  'txnState',
+  'age',
+  'rawPayload',
+  '__v',
+  '_v',
+  '_id',
+]);
+
+const PLUTUS_DATE_KEYS = new Set([
+  'createdOn',
+  'updatedOn',
+  'createdAt',
+  'updatedAt',
+  'CreatedOn',
+  'UpdatedOn',
+]);
+
+const PLUTUS_AMOUNT_KEYS = new Set([
+  'amount',
+  'betAmount',
+  'winAmount',
+  'stake',
+  'winning',
+  'wining',
+]);
+
+function humanizePlutusKey(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function mergePlutusRow(row: Row): Row {
+  const merged: Row = { ...row };
+  const raw = row.rawPayload;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    Object.assign(merged, raw as Row);
+  }
+  return merged;
+}
+
+/** Field chips for Plutus — same CompactStat look as User Report summary cards. */
+function plutusCardFields(row: Row): { label: string; value: string }[] {
+  const merged = mergePlutusRow(row);
+  const preferred = [
+    'gameName',
+    'gameId',
+    'transactionId',
+    'roundId',
+    'amount',
+    'betAmount',
+    'stake',
+    'winAmount',
+    'status',
+    'betStatus',
+    'createdOn',
+    'updatedOn',
+    'createdAt',
+    'updatedAt',
+  ];
+  const keys = [
+    ...preferred.filter((k) => merged[k] != null && merged[k] !== ''),
+    ...Object.keys(merged).filter(
+      (k) =>
+        !PLUTUS_SKIP_KEYS.has(k) &&
+        !preferred.includes(k) &&
+        merged[k] != null &&
+        merged[k] !== '',
+    ),
+  ];
+  return keys.map((key) => {
+    const kind: ColDef['kind'] = PLUTUS_DATE_KEYS.has(key)
+      ? 'date'
+      : PLUTUS_AMOUNT_KEYS.has(key)
+        ? 'amount'
+        : undefined;
+    return {
+      label: humanizePlutusKey(key),
+      value: cellValue(merged, { label: key, key, kind }),
+    };
+  });
+}
+
+function plutusCardSummary(fields: { label: string; value: string }[]): {
+  title: string;
+  subtitle: string;
+} {
+  const pick = (...labels: string[]) =>
+    fields.find((f) => labels.includes(f.label.toLowerCase()))?.value;
+  const title =
+    pick('game name', 'gamename') ||
+    pick('transaction id', 'transactionid') ||
+    fields[0]?.value ||
+    'Bet';
+  const parts = [
+    pick('amount', 'bet amount', 'betamount', 'stake'),
+    pick('status', 'bet status', 'betstatus'),
+  ].filter((v) => v && v !== '-');
+  return { title: String(title), subtitle: parts.join(' · ') || `${fields.length} fields` };
+}
+
+function PlutusFieldChips({ fields }: { fields: { label: string; value: string }[] }) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))',
+        gap: 0.5,
+      }}
+    >
+      {fields.map((f) => (
+        <Box
+          key={f.label}
+          sx={{
+            minWidth: 0,
+            px: 0.6,
+            py: 0.35,
+            bgcolor: '#f6f7f9',
+            border: '1px solid #e5e7eb',
+            borderRadius: 1,
+          }}
+        >
+          <Typography
+            noWrap
+            title={f.label}
+            sx={{ fontSize: 10, lineHeight: 1.15, color: '#667085' }}
+          >
+            {f.label}
+          </Typography>
+          <Typography
+            noWrap
+            title={f.value}
+            sx={{
+              fontSize: 12,
+              lineHeight: 1.35,
+              fontWeight: 700,
+              color: '#111827',
+            }}
+          >
+            {f.value}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 function buildPlutusColumns(rows: Row[]): ColDef[] {
   if (!rows.length) return TABLE_COLS.PlutusGaming;
-  const keys = Object.keys(rows[0]).filter(
-    (k) => k !== 'txnState' && k !== 'age' && k !== 'rawPayload',
-  );
+  const sample = mergePlutusRow(rows[0]);
+  const keys = Object.keys(sample).filter((k) => !PLUTUS_SKIP_KEYS.has(k));
   return [
     { label: 'Sr. No', key: '__srNo', kind: 'srNo' },
     ...keys.map((k) => ({
-      label: k,
+      label: humanizePlutusKey(k),
       key: k,
-      kind: (['createdOn', 'updatedOn'].includes(k) ? 'date' : undefined) as
-        | ColDef['kind']
-        | undefined,
+      kind: (PLUTUS_DATE_KEYS.has(k)
+        ? 'date'
+        : PLUTUS_AMOUNT_KEYS.has(k)
+          ? 'amount'
+          : undefined) as ColDef['kind'] | undefined,
     })),
   ];
 }
@@ -271,6 +427,10 @@ export function UserExposurePage() {
   });
   const [plutusPage, setPlutusPage] = useState(1);
   const [plutusItemsPerPage, setPlutusItemsPerPage] = useState(20);
+  const [plutusDetail, setPlutusDetail] = useState<{
+    sr: number;
+    fields: { label: string; value: string }[];
+  } | null>(null);
 
   const loadLists = useCallback(async () => {
     if (!userId) return;
@@ -304,6 +464,7 @@ export function UserExposurePage() {
   const onProviderChange = async (next: string) => {
     setProvider(next);
     setPlutusPage(1);
+    setPlutusDetail(null);
     if (next !== 'WCO' && next !== 'AAA Exchange' && next !== 'Plutus Gaming') {
       return;
     }
@@ -436,6 +597,98 @@ export function UserExposurePage() {
         <Stack alignItems="center" py={6}>
           <CircularProgress />
         </Stack>
+      ) : isPlutus ? (
+        <Stack spacing={1}>
+          {rows.length === 0 ? (
+            <Typography color="text.secondary" textAlign="center" py={4}>
+              No data found
+            </Typography>
+          ) : (
+            rows.map((r, i) => {
+              const sr = (plutusPage - 1) * plutusItemsPerPage + i + 1;
+              const fields = plutusCardFields(r);
+              const summary = plutusCardSummary(fields);
+              return (
+                <Box
+                  key={String(r._id || r.transactionId || i)}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setPlutusDetail({ sr, fields })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setPlutusDetail({ sr, fields });
+                    }
+                  }}
+                  sx={{
+                    px: 1.25,
+                    py: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    bgcolor: 'background.paper',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    transition: 'border-color 0.15s ease, background-color 0.15s ease',
+                    '&:hover': {
+                      borderColor: 'warning.main',
+                      bgcolor: '#fffaf3',
+                    },
+                  }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography
+                      noWrap
+                      sx={{ fontSize: 13, fontWeight: 700, color: '#111827' }}
+                    >
+                      #{sr} · {summary.title}
+                    </Typography>
+                    {summary.subtitle ? (
+                      <Typography
+                        noWrap
+                        sx={{ fontSize: 11, color: '#667085', mt: 0.15 }}
+                      >
+                        {summary.subtitle}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                  <ExpandMoreIcon sx={{ color: '#98a2b3', fontSize: 22, flexShrink: 0 }} />
+                </Box>
+              );
+            })
+          )}
+          {totalPages > 1 ? (
+            <Stack alignItems="center" py={1.5}>
+              <Pagination
+                count={totalPages}
+                page={plutusPage}
+                onChange={(_e, p) => setPlutusPage(p)}
+                color="secondary"
+              />
+            </Stack>
+          ) : null}
+
+          <Dialog
+            open={plutusDetail != null}
+            onClose={() => setPlutusDetail(null)}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
+              {toDisplayText('Plutus Gaming')} #{plutusDetail?.sr ?? ''}
+            </DialogTitle>
+            <DialogContent dividers>
+              {plutusDetail ? <PlutusFieldChips fields={plutusDetail.fields} /> : null}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setPlutusDetail(null)} sx={{ textTransform: 'none' }}>
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </Stack>
       ) : (
         <TablePanel>
           <CommonTable
@@ -446,20 +699,10 @@ export function UserExposurePage() {
             }
             loading={loading}
             emptyMessage="No data found"
-            minWidth={isPlutus ? 900 : 1200}
+            minWidth={1200}
             dense
             maxHeight="100%"
           />
-          {isPlutus && totalPages > 1 ? (
-            <Stack alignItems="center" py={1.5}>
-              <Pagination
-                count={totalPages}
-                page={plutusPage}
-                onChange={(_e, p) => setPlutusPage(p)}
-                color="secondary"
-              />
-            </Stack>
-          ) : null}
         </TablePanel>
       )}
     </Box>

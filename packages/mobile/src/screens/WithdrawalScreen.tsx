@@ -70,6 +70,7 @@ const STATUSES = [
 const SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'userName', label: 'User Name' },
   { key: 'mobile', label: 'Mobile' },
+  { key: 'empCode', label: 'Emp Code' },
   { key: 'amount', label: 'Amount' },
   { key: 'transactionId', label: 'Transaction Id' },
   { key: 'dp_id', label: 'DP Id' },
@@ -86,31 +87,6 @@ function display(v: unknown): string {
 function num(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
-}
-
-function formatValidationDetails(details: unknown): string {
-  if (!details || typeof details !== 'object') return '';
-  return Object.entries(details as Rec)
-    .map(([k, val]) => `${k}: ${formatValidationLeaf(val)}`)
-    .join('\n');
-}
-
-function formatValidationLeaf(value: unknown): string {
-  if (value == null || value === '') return '—';
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return '—';
-    }
-  }
-  return String(value);
-}
-
-function formatValidationCheckedAt(value: unknown): string {
-  if (!value) return '';
-  return `${formatDisplayDate(String(value))} ${formatDisplayTime(String(value))}`.trim();
 }
 
 /** Desktop parity: fixed gateway list used in the Manual Approved / QR popups. */
@@ -330,6 +306,180 @@ function statusColor(s: unknown): string | undefined {
   if (v === 'rejected' || v === 'failed' || v === 'cancel') return colors.destructive;
   if (v === 'pending' || v === 'in progress' || v === 'processing') return '#f5b942';
   return undefined;
+}
+
+function statusBadgeBg(status: unknown): string {
+  const s = String(status || '').toLowerCase();
+  if (s === 'approved' || s === 'manual approved' || s === 'success') return '#16a34a';
+  if (s === 'pending' || s === 'in progress' || s === 'processing' || s === 'on hold') return '#d97706';
+  if (s === 'lock') return '#2563eb';
+  if (s === 'rejected' || s === 'failed' || s === 'cancel' || s === 'reverse') return '#dc2626';
+  return '#64748b';
+}
+
+function isRecord(value: unknown): value is Rec {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function formatPrimitive(value: unknown): string {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '—';
+    }
+  }
+  return String(value);
+}
+
+function NestedDetailValue({
+  label,
+  value,
+  depth = 0,
+}: {
+  label: string;
+  value: unknown;
+  depth?: number;
+}) {
+  if (depth > 6) {
+    return (
+      <View style={nestedStyles.row}>
+        <Text style={nestedStyles.label}>{label}</Text>
+        <Text style={nestedStyles.value}>{formatPrimitive(value)}</Text>
+      </View>
+    );
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      <View style={nestedStyles.group}>
+        <Text style={nestedStyles.groupTitle}>{label}</Text>
+        {value.length === 0 ? (
+          <Text style={nestedStyles.muted}>—</Text>
+        ) : (
+          value.map((entry, i) => (
+            <View key={`${label}-${i}`} style={nestedStyles.nestedBox}>
+              {isRecord(entry) ? (
+                Object.entries(entry).map(([k, v]) => (
+                  <NestedDetailValue key={k} label={k} value={v} depth={depth + 1} />
+                ))
+              ) : (
+                <Text style={nestedStyles.value}>{formatPrimitive(entry)}</Text>
+              )}
+            </View>
+          ))
+        )}
+      </View>
+    );
+  }
+
+  if (isRecord(value)) {
+    const keys = Object.keys(value);
+    return (
+      <View style={nestedStyles.group}>
+        <Text style={nestedStyles.groupTitle}>{label}</Text>
+        <View style={nestedStyles.objectBox}>
+          {keys.length === 0 ? (
+            <Text style={nestedStyles.muted}>—</Text>
+          ) : (
+            keys.map((k) => (
+              <NestedDetailValue key={k} label={k} value={value[k]} depth={depth + 1} />
+            ))
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={nestedStyles.row}>
+      <Text style={nestedStyles.label}>{label}</Text>
+      <Text style={nestedStyles.value}>{formatPrimitive(value)}</Text>
+    </View>
+  );
+}
+
+function ValidationDetailsBlock({ details }: { details: unknown }) {
+  if (!isRecord(details) || Object.keys(details).length === 0) return null;
+  return (
+    <View style={nestedStyles.detailsBox}>
+      <Text style={nestedStyles.detailsLabel}>Details</Text>
+      {Object.entries(details).map(([k, v]) => (
+        <NestedDetailValue key={k} label={k} value={v} />
+      ))}
+    </View>
+  );
+}
+
+const nestedStyles = StyleSheet.create({
+  detailsBox: {
+    marginTop: spacing(2),
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing(2),
+    gap: spacing(1),
+  },
+  detailsLabel: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: spacing(0.5),
+  },
+  group: { marginTop: spacing(0.5), marginBottom: spacing(0.5) },
+  groupTitle: {
+    color: colors.foreground,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: spacing(0.75),
+  },
+  nestedBox: {
+    marginLeft: spacing(0.5),
+    marginTop: spacing(0.75),
+    padding: spacing(1.5),
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    gap: spacing(0.5),
+  },
+  objectBox: {
+    marginLeft: spacing(0.5),
+    padding: spacing(1.5),
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    gap: spacing(0.5),
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing(2),
+    paddingVertical: 4,
+  },
+  label: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    minWidth: 96,
+    flexShrink: 0,
+  },
+  value: {
+    color: colors.foreground,
+    fontSize: 12,
+    flex: 1,
+  },
+  muted: { color: colors.muted, fontSize: 12 },
+});
+
+function formatValidationCheckedAt(value: unknown): string {
+  if (!value) return '';
+  return `${formatDisplayDate(String(value))} ${formatDisplayTime(String(value))}`.trim();
 }
 
 export function WithdrawalScreen() {
@@ -658,10 +808,11 @@ export function WithdrawalScreen() {
       midSel: string,
       providerSel?: string,
     ) => {
-      // Desktop parity: only Approved and Reverse are exempt from gateway/MID;
-      // non-Approved statuses need a remark.
+      // Desktop/admin parity: Approved / Reverse / Rejected / on hold skip gateway+MID.
       const needsRemark = newStatus !== 'Approved';
-      const needsGateway = !['Approved', 'Reverse'].includes(newStatus);
+      const needsGateway = !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(
+        newStatus,
+      );
       if (needsRemark && !reasonText.trim()) {
         setModalErr('Remark is required');
         return;
@@ -694,10 +845,15 @@ export function WithdrawalScreen() {
         };
         // Desktop parity: Approve without an explicit gateway still sends the
         // default payout-account provider as withdrewalProviderName.
-        const providerName = gw || providerSel || defaultGateway;
-        if (providerName) payload.withdrewalProviderName = providerName;
-        if (gw) payload.gatewayName = gw;
-        if (midSel) payload.mid = midSel;
+        // Rejected / Reverse / on hold: do not attach gateway or MID.
+        if (needsGateway || newStatus === 'Approved') {
+          const providerName = gw || providerSel || defaultGateway;
+          if (providerName) payload.withdrewalProviderName = providerName;
+        }
+        if (needsGateway) {
+          if (gw) payload.gatewayName = gw;
+          if (midSel) payload.mid = midSel;
+        }
         const res = await secureApi('withdrawals.statusUpdate', payload);
         if (!res.ok) {
           notify(res.message || 'Status update failed');
@@ -1105,16 +1261,16 @@ export function WithdrawalScreen() {
         render: (r) => fmtAmount(r.amount ?? r.Amount),
       },
       {
-        key: 'app',
-        label: 'App',
-        width: 80,
-        render: (r) => display(appCodeForName(String(r.clientName || '')) || r.clientName),
-      },
-      {
         key: 'empCode',
         label: 'Emp Code',
         width: 90,
         render: (r) => display(r.empCode),
+      },
+      {
+        key: 'app',
+        label: 'App',
+        width: 80,
+        render: (r) => display(appCodeForName(String(r.clientName || '')) || r.clientName),
       },
       {
         key: 'status',
@@ -1157,9 +1313,21 @@ export function WithdrawalScreen() {
         key: 'provider',
         label: 'Provider',
         width: 120,
-        render: (r) => display(r.withdrewalProviderName ?? r.paymentGatewayName),
+        render: (r) => {
+          // Desktop/admin parity: gateway + MID only for Approved.
+          if (String(r.status || '').toLowerCase() !== 'approved') return '—';
+          return display(r.withdrewalProviderName ?? r.paymentGatewayName);
+        },
       },
-      { key: 'mid', label: 'MID', width: 100, render: (r) => display(r.mid) },
+      {
+        key: 'mid',
+        label: 'MID',
+        width: 100,
+        render: (r) => {
+          if (String(r.status || '').toLowerCase() !== 'approved') return '—';
+          return display(r.mid);
+        },
+      },
       {
         key: 'checkBot',
         label: 'Check By Bot',
@@ -1640,12 +1808,18 @@ export function WithdrawalScreen() {
 
       <ResponsiveTable
         forceCards
+        previewFieldCount={3}
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? r.transactionId ?? i)}
         loading={loading}
         emptyMessage="No withdrawals"
         hint={bulkMode ? 'Tap cards to select/deselect for bulk actions' : 'Tap a card for details & actions'}
+        getCardBadge={(r) => {
+          const text = display(r.status);
+          if (text === '—') return null;
+          return { text, color: statusBadgeBg(r.status) };
+        }}
         onRowPress={(r) => {
           if (bulkMode) {
             const id = txnIdOf(r);
@@ -1999,12 +2173,7 @@ export function WithdrawalScreen() {
                     </View>
                   </View>
                   {v.reason ? <Text style={styles.validationReason}>{display(v.reason)}</Text> : null}
-                  {formatValidationDetails(v.details) ? (
-                    <View style={styles.validationDetailsBox}>
-                      <Text style={styles.validationDetailsLabel}>Details</Text>
-                      <Text style={styles.validationDetails}>{formatValidationDetails(v.details)}</Text>
-                    </View>
-                  ) : null}
+                  <ValidationDetailsBlock details={v.details} />
                 </View>
               ))}
               {!Array.isArray(validationRow?.validationResults) ||
@@ -2477,7 +2646,10 @@ export function WithdrawalScreen() {
               placeholderTextColor={colors.muted}
               multiline
             />
-            {statusModal && !['Approved', 'Reverse', 'on hold'].includes(statusModal.status) ? (
+            {statusModal &&
+            !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(
+              statusModal.status,
+            ) ? (
               <>
                 <Text style={styles.modalSub}>Gateway</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -2771,16 +2943,6 @@ const styles = StyleSheet.create({
   },
   validationStatus: { fontSize: 12, fontWeight: '700' },
   validationReason: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  validationDetailsBox: {
-    marginTop: spacing(2),
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(2),
-  },
-  validationDetailsLabel: { color: colors.foreground, fontSize: 11, fontWeight: '700', marginBottom: spacing(1) },
-  validationDetails: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   validationEmptyState: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,

@@ -11,12 +11,10 @@ import {
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { secureApi } from '@/api/secureClient';
-import { formatAmount, formatLocalDate, getStoredUser } from '@/utils/dates';
+import { isCallerRole, getRoleId, getRoleName } from '@/auth/permissions';
+import { formatAmount, formatLocalDate } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
-import {
-  roleFlags,
-  type StoredCallerUser,
-} from '@/screens/panel/callerResponsibility/utils';
+import { CALLER_HEAD_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
 import { WalletLedgerTable } from './WalletLedgerTable';
 import type { EncryptedUser } from './types';
 
@@ -24,6 +22,22 @@ type Props = {
   userId: string;
   encrypted?: EncryptedUser | null;
 };
+
+/** Callers (+ caller heads): only Exposure + Bonus Earning tiles. */
+function restrictCallerAmountTiles(): boolean {
+  if (isCallerRole()) return true;
+  const id = String(getRoleId() || '');
+  if (id && CALLER_HEAD_ROLE_IDS.has(id)) return true;
+  const name = String(getRoleName() || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+  return (
+    name === 'caller' ||
+    name === 'caller_new' ||
+    name.startsWith('caller_head')
+  );
+}
 
 type BonusEarning = {
   userReferral?: number;
@@ -142,12 +156,9 @@ function pickLastActivity(encrypted?: EncryptedUser | null): unknown {
 /** Wallet History tab — layout mirrors admin-panel WalletHistory.css */
 export function WalletHistoryView({ userId, encrypted }: Props) {
   const navigate = useNavigate();
-  const { isCaller } = useMemo(() => {
-    const user = getStoredUser<StoredCallerUser>();
-    return roleFlags(user?.Role_ID);
-  }, []);
+  const isCaller = useMemo(() => restrictCallerAmountTiles(), []);
 
-  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(() => restrictCallerAmountTiles());
   const [loading, setLoading] = useState(true);
   const [depositTotal, setDepositTotal] = useState(0);
   const [withdrawalTotal, setWithdrawalTotal] = useState(0);

@@ -1,8 +1,9 @@
 /**
  * External dialer batch push — port of desktop electron/secure externalDialerBatch.
- * The dialer is a plain HTTPS API (api|api2.ganesha999.com), so mobile can call
- * it directly with fetch; no desktop bridge needed.
+ * Calls SubAdmin/add-dialer-data first, then api|api2.ganesha999.com (same body).
  */
+
+import { secureApi } from '../api/client';
 
 export type DialerLeadSource = {
   _id?: string;
@@ -11,6 +12,12 @@ export type DialerLeadSource = {
   city?: string;
   state?: string;
   clientName?: string;
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  email?: string;
+  comments?: string;
+  province?: string;
 };
 
 const DIALER_SERVER_MAP: Record<string, string> = {
@@ -48,6 +55,20 @@ function dialerBaseUrl(serverId: unknown, campaignId?: unknown): string | null {
 
 /** Same shape the web panel sends (mapUsersToDialerLeads + sanitizeDialerLead). */
 function toLead(item: DialerLeadSource) {
+  if (item.phone_number || item.first_name) {
+    return {
+      first_name: String(item.first_name || item.name || '').slice(0, 120),
+      last_name: String(item.last_name || '').slice(0, 120),
+      phone_number: String(item.phone_number || item.mobile || '')
+        .replace(/\D/g, '')
+        .slice(0, 20),
+      city: String(item.city ?? '').slice(0, 80),
+      state: String(item.state ?? '').slice(0, 80),
+      email: String(item.email || item.clientName || '').slice(0, 120),
+      comments: String(item.comments || item.clientName || '').slice(0, 200),
+      province: String(item.province || item._id || '').slice(0, 80),
+    };
+  }
   const name = String(item.name || '').replace(/_/g, ' ').trim();
   const [first = name, ...rest] = name.split(' ');
   return {
@@ -70,13 +91,25 @@ function isDialerSuccess(data: Record<string, unknown> | null): boolean {
 }
 
 function randomDialerListId(): number {
-  // Match web panel: Math.floor(10000 + Math.random() * 90000)
   return Math.floor(10000 + Math.random() * 90000);
+}
+
+async function postAddDialerData(body: Record<string, unknown>): Promise<{
+  ok: boolean;
+  message: string;
+}> {
+  const res = await secureApi('callLogs.addDialerData', body);
+  if (!res.ok || res.success === false) {
+    return {
+      ok: false,
+      message: res.message || 'Failed to save dialer data',
+    };
+  }
+  return { ok: true, message: res.message || 'ok' };
 }
 
 /**
  * Single-lead push — port of desktop externalDialerSingle (CallingBtn "Call").
- * Uses the admin's numeric extension ID as the campaign and `9<ext>` as list id.
  */
 export async function singleCallToDialer(args: {
   lead: DialerLeadSource;
@@ -92,12 +125,21 @@ export async function singleCallToDialer(args: {
   const numericId = ids.find((val) => /^\d+$/.test(val));
   if (!numericId) return { ok: false, message: 'Dialer extension ID not found for this admin' };
 
-  // Call uses extension as campaign_id: 3xxx → api; 1xxx → api2
   const url = dialerBaseUrl(args.serverId, numericId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   const lead = toLead(args.lead);
   if (!lead.phone_number) return { ok: false, message: 'No valid phone number' };
+
+  const body = {
+    list_id: `9${numericId}`,
+    list_name: `${String(args.adminName || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
+    campaign_id: numericId,
+    leads: [lead],
+  };
+
+  const logged = await postAddDialerData(body);
+  if (!logged.ok) return logged;
 
   try {
     const controller = new AbortController();
@@ -105,18 +147,16 @@ export async function singleCallToDialer(args: {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        list_id: `9${numericId}`,
-        list_name: `${String(args.adminName || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
-        campaign_id: numericId,
-        leads: [lead],
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     clearTimeout(timer);
     const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
     const ok = isDialerSuccess(data) || (data != null && data.success !== false);
-    return { ok, message: String(data?.message || (ok ? 'Connected to dialer' : 'Connect dialer failed')) };
+    return {
+      ok,
+      message: String(data?.message || (ok ? 'Connected to dialer' : 'Connect dialer failed')),
+    };
   } catch {
     return { ok: false, message: 'Could not reach the dialer server' };
   }
@@ -138,25 +178,33 @@ export async function addToDialerBatch(args: {
   const url = dialerBaseUrl(args.serverId, campaignId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
+  const body = {
+    list_id: args.listId ?? randomDialerListId(),
+    list_name: String(args.listName || campaignId).slice(0, 120),
+    campaign_id: campaignId.slice(0, 64),
+    leads,
+  };
+
+  const logged = await postAddDialerData(body);
+  if (!logged.ok) return logged;
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 60000);
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        list_id: args.listId ?? randomDialerListId(),
-        list_name: String(args.listName || campaignId).slice(0, 120),
-        campaign_id: campaignId.slice(0, 64),
-        leads,
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     clearTimeout(timer);
     const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
     if (isDialerSuccess(data)) {
       const inserted = data?.inserted ?? leads.length;
-      return { ok: true, message: String(data?.message || `${inserted} inserted successfully.`) };
+      return {
+        ok: true,
+        message: String(data?.message || `${inserted} inserted successfully.`),
+      };
     }
     return { ok: false, message: String(data?.message || 'Failed to add to dialer') };
   } catch {

@@ -1,6 +1,7 @@
 import { memo, useDeferredValue, useMemo } from 'react';
 import { IconButton, Stack } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { formatAmount } from '@/utils/dates';
 import {
@@ -10,6 +11,7 @@ import {
   HumanFilter,
   IsBotFilter,
   NameFilter,
+  OperatorIdFilter,
   RefTxnIdFilter,
   RoundCapacityFilter,
   RoundIdFilter,
@@ -25,6 +27,7 @@ import type { HouseGameTransaction } from './types';
 import { formatDateTime, getIsBotValue, getPlayerIdentity } from './utils';
 import { houseGameIdLabel, toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { useRevealCodes } from '@/context/useRevealCodes';
+import { canAccessNavItem, hasPermission, Permissions } from '@/auth/permissions';
 
 type Props = {
   data: HouseGameTransaction[];
@@ -36,6 +39,7 @@ type Props = {
   onCheckboxChange: (key: 'isBot' | 'human', checked: boolean) => void;
   onSearch: () => void;
   onEdit: (item: HouseGameTransaction) => void;
+  onUpdateWinningPoint: (item: HouseGameTransaction) => void;
 };
 
 const TransactionTable = ({
@@ -48,32 +52,60 @@ const TransactionTable = ({
   onCheckboxChange,
   onSearch,
   onEdit,
+  onUpdateWinningPoint,
 }: Props) => {
   const rowOffset = (currentPage - 1) * itemsPerPage;
   const deferredData = useDeferredValue(data);
   const { active: revealActive } = useRevealCodes();
+  const canOpenHouseGames = canAccessNavItem({
+    id: 'houseGames',
+    permission: Permissions.house_game,
+  });
+  // Laxmi: update_ludo_bets for pencil; also allow page-access / full_access.
+  const canUpdateBets =
+    hasPermission(Permissions.update_ludo_bets) || canOpenHouseGames;
+  // Laxmi: show_wining_btn for trophy (world-cup) icon.
+  const canUpdateWinningPoint =
+    hasPermission(Permissions.show_wining_btn) || canOpenHouseGames;
 
   const columns = useMemo<CommonTableColumn<HouseGameTransaction>[]>(
     () => [
       {
         id: 'sr',
         label: toDisplayText(TABLE_COLUMNS[0]),
-        width: 72,
+        width: 110,
         filter: null,
         render: (item, index) => (
-          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+          <Stack direction="row" spacing={0.25} alignItems="center" justifyContent="center">
             <span>{index + 1 + rowOffset}</span>
-            <IconButton
-              size="small"
-              aria-label={toDisplayText('Update Bet Status')}
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(item);
-              }}
-              sx={{ color: '#ff9f0a', width: 26, height: 26 }}
-            >
-              <EditIcon sx={{ fontSize: 15 }} />
-            </IconButton>
+            {canUpdateBets ? (
+              <IconButton
+                size="small"
+                aria-label={toDisplayText('Update Bet Status')}
+                title={toDisplayText('Update Bet Status')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(item);
+                }}
+                sx={{ color: '#ff9f0a', width: 28, height: 28 }}
+              >
+                <EditIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            ) : null}
+            {canUpdateWinningPoint ? (
+              <IconButton
+                size="small"
+                aria-label={toDisplayText('Update Winning Point')}
+                title={toDisplayText('Update Winning Point')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdateWinningPoint(item);
+                }}
+                sx={{ color: '#f5a623', width: 28, height: 28 }}
+              >
+                <EmojiEventsIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            ) : null}
           </Stack>
         ),
       },
@@ -120,56 +152,62 @@ const TransactionTable = ({
         render: (item) => houseGameIdLabel(item?.gameId),
       },
       {
-        id: 'type',
+        id: 'operatorId',
         label: toDisplayText(TABLE_COLUMNS[8]),
+        filter: <OperatorIdFilter />,
+        render: (item) => String(item?.operatorId ?? '-'),
+      },
+      {
+        id: 'type',
+        label: toDisplayText(TABLE_COLUMNS[9]),
         filter: <TypeFilter />,
         render: (item) => toDisplayText(String(item?.type ?? '-')),
       },
       {
         id: 'status',
-        label: toDisplayText(TABLE_COLUMNS[9]),
+        label: toDisplayText(TABLE_COLUMNS[10]),
         filter: <StatusFilter />,
         render: (item) => String(item?.status ?? '-'),
       },
       {
         id: 'currency',
-        label: toDisplayText(TABLE_COLUMNS[10]),
+        label: toDisplayText(TABLE_COLUMNS[11]),
         filter: <CurrencyFilter />,
         render: (item) => String(item?.currency ?? '-'),
       },
       {
         id: 'amount',
-        label: toDisplayText(TABLE_COLUMNS[11]),
+        label: toDisplayText(TABLE_COLUMNS[12]),
         filter: <AmountFilter />,
         render: (item) => formatAmount(item?.amount ?? 0),
       },
       {
         id: 'winingPoint',
-        label: toDisplayText(TABLE_COLUMNS[12]),
+        label: toDisplayText(TABLE_COLUMNS[13]),
         filter: null,
         render: (item) => String(item?.winingPoint ?? '-'),
       },
       {
         id: 'roundCapacity',
-        label: toDisplayText(TABLE_COLUMNS[13]),
+        label: toDisplayText(TABLE_COLUMNS[14]),
         filter: <RoundCapacityFilter />,
         render: (item) => String(item?.roundCapacity ?? '-'),
       },
       {
         id: 'isBot',
-        label: toDisplayText(TABLE_COLUMNS[14]),
+        label: toDisplayText(TABLE_COLUMNS[15]),
         filter: <IsBotFilter />,
         render: (item) => getIsBotValue(item),
       },
       {
         id: 'player',
-        label: toDisplayText(TABLE_COLUMNS[15]),
+        label: toDisplayText(TABLE_COLUMNS[16]),
         filter: <HumanFilter />,
         render: (item) => getPlayerIdentity(item),
       },
       {
         id: 'created',
-        label: toDisplayText(TABLE_COLUMNS[16]),
+        label: toDisplayText(TABLE_COLUMNS[17]),
         filter: null,
         render: (item) =>
           formatDateTime(
@@ -177,7 +215,7 @@ const TransactionTable = ({
           ),
       },
     ],
-    [onEdit, rowOffset, revealActive],
+    [canUpdateBets, canUpdateWinningPoint, onEdit, onUpdateWinningPoint, rowOffset, revealActive],
   );
 
   const gameIdOptions = useMemo(() => {
@@ -209,7 +247,7 @@ const TransactionTable = ({
         loading={loading}
         emptyMessage="No transactions found"
         stickyHeader
-        minWidth={2100}
+        minWidth={2300}
         dense
         virtualize
         maxHeight="100%"

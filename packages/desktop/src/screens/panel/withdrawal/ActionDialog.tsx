@@ -7,7 +7,6 @@ import {
   MenuItem,
   Stack,
   TextField,
-  Typography,
 } from '@mui/material';
 import { fieldSx, orangeBtnSx } from '@/screens/panel/transactions/shared';
 import type { MidOption } from '@/screens/panel/transactions/shared';
@@ -49,9 +48,12 @@ export function ActionDialog({
   onClose,
   onSubmit,
 }: Props) {
-  const needsGatewayMid = !['Approved', 'Reverse', 'on hold'].includes(status);
+  // Admin parity: Gateway/MID not shown for Approved / Reverse / Rejected / on hold.
+  const needsGatewayMid = !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(
+    status,
+  );
   const gatewayOptions =
-    status === 'Manual Approved' || status === 'Rejected'
+    status === 'Manual Approved'
       ? Array.from(new Set([...MANUAL_GATEWAYS, ...payoutGateways]))
       : payoutGateways;
 
@@ -123,11 +125,7 @@ export function ActionDialog({
                 ))}
               </TextField>
             </>
-          ) : (
-            <Typography variant="caption" color="text.secondary">
-              Gateway / Mid optional for {status}
-            </Typography>
-          )}
+          ) : null}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>

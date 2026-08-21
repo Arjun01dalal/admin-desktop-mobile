@@ -544,7 +544,10 @@ export function WithdrawalPage() {
       toast.error('Missing transaction id');
       return;
     }
-    const needsGatewayMid = !['Approved', 'Reverse', 'on hold'].includes(actionStatus);
+    // Admin parity: Rejected does not require / send gateway + MID.
+    const needsGatewayMid = !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(
+      actionStatus,
+    );
     if (needsGatewayMid && (!actionGateway || !actionMid)) {
       toast.error('Gateway and Mid are required');
       return;
@@ -573,11 +576,11 @@ export function WithdrawalPage() {
           long: geo.long,
         },
       };
-      if (actionStatus === 'Manual Approved' || actionGateway) {
+      if (actionStatus === 'Manual Approved' || (actionGateway && needsGatewayMid)) {
         payload.withdrewalProviderName = actionGateway;
       }
-      if (actionMid) payload.mid = actionMid;
-      if (actionGateway) payload.gatewayName = actionGateway;
+      if (needsGatewayMid && actionMid) payload.mid = actionMid;
+      if (needsGatewayMid && actionGateway) payload.gatewayName = actionGateway;
 
       const res = await secureApi('withdrawals.statusUpdate', payload);
       if (!res.ok) {
@@ -1363,7 +1366,12 @@ export function WithdrawalPage() {
         label: 'Withdrawal Provider',
         filter: midSelect,
         render: (row) => {
-          const provider = display(row.withdrewalProviderName || row.paymentGatewayName, '');
+          // Admin parity: show gateway + MID only for Approved; hide for Rejected / Cancel / etc.
+          if (String(row.status || '').toLowerCase() !== 'approved') return '—';
+          const provider = display(
+            row.withdrewalProviderName || row.paymentGatewayName,
+            '',
+          );
           const mid = row.mid != null && row.mid !== '' ? String(row.mid) : '';
           if (!provider && !mid) return '—';
           return mid ? `${provider} - ${mid}` : provider;

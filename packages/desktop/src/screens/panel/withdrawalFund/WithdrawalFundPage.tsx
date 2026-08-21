@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { getRoleName } from '@/auth/permissions';
+import { getRoleName, isSosExemptRole } from '@/auth/permissions';
 import { getStoredUser, todayIST } from '@/utils/dates';
 import {
   orangeBtnSx,
@@ -23,11 +23,14 @@ import { NestedFundTable } from './NestedFundTable';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { SheetUploadDialog } from './SheetUploadDialog';
 import { EmpCodeWithdrawalModal } from './EmpCodeWithdrawalModal';
+import { EmpCodePieChartModal } from './EmpCodePieChartModal';
 import {
   getAgentCountRows,
+  getAgentEmpCodeCountRows,
   getAgentWithdrawalSummary,
   getEmpCodeCountRows,
   getWithdrawalSummaryByEmpCode,
+  type AgentEmpCountRow,
   type CountRow,
 } from './getWithdrawalSummaryByEmpCode';
 import {
@@ -45,27 +48,8 @@ function currentMonthRangeIst(): { start: string; end: string } {
   return { start, end };
 }
 
-/** View Details + Current Month Emp Code Report — restricted audience. */
+/** Chart / Emp report / View Details — full_access + dev_full_access (+ allowlisted mobile). */
 const WITHDRAWAL_FUND_DETAILS_MOBILES = new Set(['9608010101']);
-const WITHDRAWAL_FUND_DETAILS_ROLES = new Set([
-  'full_access',
-  'fullaccess',
-  'dev_full_access',
-  'devfullaccess',
-]);
-/** Known Role_IDs for full_access / dev_full_access (shared permissions). */
-const WITHDRAWAL_FUND_DETAILS_ROLE_IDS = new Set([
-  '64f710d9a2ab78980020c5fb',
-  '6a33c137a6558491e0d20464',
-]);
-
-function normalizeAccessRole(value: unknown): string {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[-\s]+/g, '_')
-    .replace(/_+/g, '_');
-}
 
 function canShowWithdrawalFundDetails(
   user: {
@@ -84,33 +68,21 @@ function canShowWithdrawalFundDetails(
   ).trim();
   if (WITHDRAWAL_FUND_DETAILS_MOBILES.has(mobile)) return true;
 
-  const roleId = String(
-    user?.Role_ID ||
-      (typeof localStorage !== 'undefined' ? localStorage.getItem('role_id') : '') ||
-      '',
-  ).trim();
-  if (WITHDRAWAL_FUND_DETAILS_ROLE_IDS.has(roleId)) return true;
+  // Shared helper: Role_ID 6a33c137… + name variants for "dev_full_access" / "Dev Full Access"
+  if (isSosExemptRole(user)) return true;
 
-  const candidates: unknown[] = [
-    typeof localStorage !== 'undefined' ? localStorage.getItem('role') : null,
-    getRoleName(user ?? null),
-    user?.Role_Name,
-    user?.roleName,
-    user?.role,
-  ];
-
-  const roles = user?.roles;
-  if (roles && typeof roles === 'object' && !Array.isArray(roles)) {
-    for (const [key, value] of Object.entries(roles as Record<string, unknown>)) {
-      candidates.push(key, value);
-    }
-  }
-
-  for (const candidate of candidates) {
-    const role = normalizeAccessRole(candidate);
-    if (!role) continue;
-    if (WITHDRAWAL_FUND_DETAILS_ROLES.has(role)) return true;
-    if (WITHDRAWAL_FUND_DETAILS_ROLES.has(role.replace(/_/g, ''))) return true;
+  // Extra soft match on display name from getRoleName
+  const role = String(getRoleName(user) || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+  if (
+    role === 'dev_full_access' ||
+    role.includes('dev_full_access') ||
+    role === 'full_access' ||
+    role.endsWith('_full_access')
+  ) {
+    return true;
   }
 
   return false;
@@ -145,9 +117,11 @@ export function WithdrawalFundPage() {
   const [detailsTotal, setDetailsTotal] = useState(0);
   const [detailsAgentRows, setDetailsAgentRows] = useState<CountRow[]>([]);
   const [detailsEmpRows, setDetailsEmpRows] = useState<CountRow[]>([]);
+  const [detailsAgentEmpRows, setDetailsAgentEmpRows] = useState<AgentEmpCountRow[]>([]);
   const [detailsSubtitle, setDetailsSubtitle] = useState<string | undefined>();
   /** True when modal is Current Month Emp Code Report (shows date filter). */
   const [monthReportMode, setMonthReportMode] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
   const [reportStartDate, setReportStartDate] = useState(() => currentMonthRangeIst().start);
   const [reportEndDate, setReportEndDate] = useState(() => currentMonthRangeIst().end);
   const [monthLoading, setMonthLoading] = useState(false);
@@ -202,6 +176,7 @@ export function WithdrawalFundPage() {
     setDetailsTotal(totalWithdrawals);
     setDetailsAgentRows(getAgentCountRows(docs));
     setDetailsEmpRows(getEmpCodeCountRows(docs));
+    setDetailsAgentEmpRows(getAgentEmpCodeCountRows(docs));
     setDetailsSubtitle(subtitle);
     setDetailsOpen(true);
   };
@@ -215,6 +190,7 @@ export function WithdrawalFundPage() {
     setDetailsTotal(0);
     setDetailsAgentRows([]);
     setDetailsEmpRows([]);
+    setDetailsAgentEmpRows([]);
     setDetailsSubtitle(undefined);
   };
 
@@ -242,10 +218,22 @@ export function WithdrawalFundPage() {
         name: item.empCode,
         count: item.withdrawalCount,
       }));
-      const agentRows = getAgentWithdrawalSummary(body).map((item) => ({
+      const agentSummaries = getAgentWithdrawalSummary(body);
+      const agentRows = agentSummaries.map((item) => ({
         name: item.agentName,
         count: item.withdrawalCount,
       }));
+      const allDocs = agentSummaries.flatMap((item) => item.withdrawals);
+      const agentEmpRows =
+        allDocs.length > 0
+          ? getAgentEmpCodeCountRows(allDocs)
+          : getWithdrawalSummaryByEmpCode(body).flatMap((item) =>
+              getAgentCountRows(item.withdrawals).map((a) => ({
+                agentName: a.name,
+                empCode: item.empCode,
+                count: a.count,
+              })),
+            );
       const total =
         empRows.reduce((sum, r) => sum + r.count, 0) ||
         agentRows.reduce((sum, r) => sum + r.count, 0);
@@ -255,6 +243,12 @@ export function WithdrawalFundPage() {
       setDetailsTotal(total);
       setDetailsAgentRows(agentRows);
       setDetailsEmpRows(empRows);
+      setDetailsAgentEmpRows(
+        agentEmpRows.sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return a.agentName.localeCompare(b.agentName);
+        }),
+      );
     } catch {
       toast.error('Failed to load emp code data');
     } finally {
@@ -267,13 +261,34 @@ export function WithdrawalFundPage() {
     setReportStartDate(start);
     setReportEndDate(end);
     setMonthReportMode(true);
+    setChartOpen(false);
     setDetailsTitle('Agent / Emp Code Report');
     setDetailsSubtitle(`${start} → ${end}`);
     setDetailsTotal(0);
     setDetailsAgentRows([]);
     setDetailsEmpRows([]);
+    setDetailsAgentEmpRows([]);
     setDetailsOpen(true);
     void loadEmpCodeReport(start, end);
+  };
+
+  const openCurrentMonthChart = () => {
+    const { start, end } = currentMonthRangeIst();
+    setReportStartDate(start);
+    setReportEndDate(end);
+    setDetailsOpen(false);
+    setMonthReportMode(false);
+    setDetailsSubtitle(`${start} → ${end}`);
+    setDetailsAgentRows([]);
+    setDetailsEmpRows([]);
+    setDetailsAgentEmpRows([]);
+    setChartOpen(true);
+    void loadEmpCodeReport(start, end);
+  };
+
+  const closeChartModal = () => {
+    if (monthLoading) return;
+    setChartOpen(false);
   };
 
   return (
@@ -331,15 +346,26 @@ export function WithdrawalFundPage() {
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mb={1.5} alignItems="center">
         <Chip label={`Total Amount: ${totalAmount}`} sx={chipSx} />
         {canViewDetails ? (
-          <Button
-            variant="outlined"
-            size="small"
-            color="warning"
-            onClick={() => openCurrentMonthEmpCodeReport()}
-            sx={{ textTransform: 'none' }}
-          >
-            Current Month Emp Code Report
-          </Button>
+          <>
+            <Button
+              variant="contained"
+              size="small"
+              color="warning"
+              onClick={() => openCurrentMonthChart()}
+              sx={{ ...orangeBtnSx, textTransform: 'none', fontWeight: 800 }}
+            >
+              Current Month Chart
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              color="warning"
+              onClick={() => openCurrentMonthEmpCodeReport()}
+              sx={{ textTransform: 'none' }}
+            >
+              Current Month Emp Code Report
+            </Button>
+          </>
         ) : null}
       </Stack>
 
@@ -420,6 +446,23 @@ export function WithdrawalFundPage() {
         onDone={() => void load()}
       />
 
+      <EmpCodePieChartModal
+        open={chartOpen}
+        onClose={closeChartModal}
+        title="Current Month Chart"
+        subtitle={detailsSubtitle}
+        loading={monthLoading}
+        empCodeRows={detailsEmpRows}
+        agentRows={detailsAgentRows}
+        dateFilter={{
+          startDate: reportStartDate,
+          endDate: reportEndDate,
+          onStartChange: setReportStartDate,
+          onEndChange: setReportEndDate,
+          onApply: () => void loadEmpCodeReport(reportStartDate, reportEndDate),
+        }}
+      />
+
       {canViewDetails ? (
         <EmpCodeWithdrawalModal
           open={detailsOpen}
@@ -428,6 +471,7 @@ export function WithdrawalFundPage() {
           totalWithdrawals={detailsTotal}
           agentRows={detailsAgentRows}
           empCodeRows={detailsEmpRows}
+          agentEmpRows={detailsAgentEmpRows}
           subtitle={detailsSubtitle}
           loading={monthReportMode ? monthLoading : false}
           dateFilter={

@@ -15,7 +15,8 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { getSessionUser, isCallerRole } from '../auth/permissions';
+import { getRoleId, getRoleName, getSessionUser, isCallerRole } from '../auth/permissions';
+import { CALLER_HEAD_ROLE_IDS } from '../auth/callerRoles';
 import { colors, radius, spacing } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import { type DataTableColumn } from '../dashboards/ui/DataTable';
@@ -31,6 +32,22 @@ import {
   useHistoryFilters,
 } from './userReport/HistoryFilterBar';
 import { TabSelect } from './userReport/TabSelect';
+
+/** Callers (+ caller heads): only Exposure + Bonus Earning tiles. */
+function restrictCallerAmountTiles(): boolean {
+  if (isCallerRole()) return true;
+  const id = String(getRoleId() || '');
+  if (id && CALLER_HEAD_ROLE_IDS.has(id)) return true;
+  const name = String(getRoleName() || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+  return (
+    name === 'caller' ||
+    name === 'caller_new' ||
+    name.startsWith('caller_head')
+  );
+}
 
 type Rec = Record<string, unknown>;
 
@@ -181,9 +198,9 @@ export function UserReportScreen() {
   const compact = width < 380;
 
   const [tab, setTab] = useState<Tab>('Wallet History');
-  const [amountsOpen, setAmountsOpen] = useState(false);
+  const [amountsOpen, setAmountsOpen] = useState(true);
   const summary = useWalletSummary(userId);
-  const isCaller = isCallerRole();
+  const isCaller = restrictCallerAmountTiles();
 
   const openBonus = useCallback(
     (kind: BonusKind) => {
@@ -288,7 +305,9 @@ export function UserReportScreen() {
         onPress={() => setAmountsOpen((o) => !o)}
         activeOpacity={0.8}
       >
-        <Text style={styles.collapseTitle}>Amounts</Text>
+        <Text style={styles.collapseTitle}>
+          {isCaller ? 'Exposure & Bonus' : 'Amounts'}
+        </Text>
         <Text style={styles.collapseChevron}>{amountsOpen ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       {amountsOpen ? (
@@ -811,11 +830,24 @@ function FundTab({ userId }: { userId: string }) {
       const u = r.updatedBy;
       return u && typeof u === 'object' ? display((u as Rec).name) : display(u);
     };
+    const createdStamp = (r: Rec) => {
+      const action = r.action;
+      const actionDate =
+        action && typeof action === 'object' && !Array.isArray(action)
+          ? (action as Rec).date
+          : undefined;
+      return stamp(r.createdOn ?? r.createdAt ?? r.CreatedOn ?? r.date ?? actionDate);
+    };
+    const updatedStamp = (r: Rec) =>
+      stamp(r.updatedOn ?? r.updatedAt ?? r.UpdatedOn ?? r.updated_at ?? r.UpdatedAt);
+
     if (type === 'withdrawal') {
       return [
         { key: 'ptype', label: 'Payment Type', width: 100, render: (r) => display(r.paymentType ?? r.type) },
-        { key: 'dp', label: 'DP Id', width: 110, render: (r) => display(r.dp_id ?? r.userId) },
         { key: 'amount', label: 'Amount', width: 90, render: (r) => floorNum(num(r.amount)).toLocaleString('en-IN') },
+        { key: 'createdAt', label: 'Created At', width: 160, render: createdStamp },
+        { key: 'updatedAt', label: 'Updated At', width: 160, render: updatedStamp },
+        { key: 'dp', label: 'DP Id', width: 110, render: (r) => display(r.dp_id ?? r.userId) },
         { key: 'status', label: 'Status', width: 90, render: (r) => display(r.status) },
         { key: 'txn', label: 'Transaction Id', width: 140, render: (r) => display(r.transactionId ?? r.orderId) },
         { key: 'mobile', label: 'Mobile', width: 110, render: (r) => display(r.mobile) },
@@ -827,26 +859,26 @@ function FundTab({ userId }: { userId: string }) {
         { key: 'bank', label: 'Bank', width: 110, render: (r) => display(r.bankName) },
         { key: 'provider', label: 'Provider', width: 120, render: (r) => display(r.withdrewalProviderName) },
         { key: 'commission', label: 'Commission', width: 90, render: (r) => floorNum(num(r.CommissionAmount ?? r.commission)).toLocaleString('en-IN') },
-        { key: 'createdAt', label: 'Created At', width: 150, render: (r) => stamp(r.createdOn ?? r.createdAt) },
-        { key: 'updatedAt', label: 'Updated At', width: 150, render: (r) => stamp(r.updatedOn ?? r.updatedAt) },
       ];
     }
     if (type === 'coin') {
       return [
         { key: 'ptype', label: 'Payment Type', width: 100, render: (r) => display(r.paymentType ?? r.type) },
-        { key: 'uid', label: 'User Id', width: 110, render: (r) => display(r.userId) },
         { key: 'amount', label: 'Balance', width: 90, render: (r) => floorNum(num(r.balance ?? r.amount)).toLocaleString('en-IN') },
+        { key: 'createdAt', label: 'Created At', width: 160, render: createdStamp },
+        { key: 'updatedAt', label: 'Updated At', width: 160, render: updatedStamp },
+        { key: 'uid', label: 'User Id', width: 110, render: (r) => display(r.userId) },
         { key: 'updatedBy', label: 'Updated By', width: 120, render: updatedByName },
         { key: 'reason', label: 'Reason', width: 130, render: (r) => display(r.reason) },
         { key: 'tag', label: 'Tag', width: 90, render: (r) => display(r.tag) },
         { key: 'remark', label: 'Remark', width: 140, render: (r) => display(r.remark) },
-        { key: 'createdAt', label: 'Created At', width: 150, render: (r) => stamp(r.createdOn ?? r.createdAt) },
-        { key: 'updatedAt', label: 'Updated At', width: 150, render: (r) => stamp(r.updatedOn ?? r.updatedAt) },
       ];
     }
     return [
       { key: 'ptype', label: 'Payment Type', width: 100, render: (r) => display(r.paymentType ?? r.type) },
       { key: 'amount', label: 'Amount', width: 90, render: (r) => floorNum(num(r.amount)).toLocaleString('en-IN') },
+      { key: 'createdAt', label: 'Created At', width: 160, render: createdStamp },
+      { key: 'updatedAt', label: 'Updated At', width: 160, render: updatedStamp },
       { key: 'orderKey', label: 'Order Key Id', width: 150, render: (r) => display(r.orderKeyId ?? r.order_key_id ?? r.orderKey ?? r.orderkeyid) },
       { key: 'orderId', label: 'Order Id', width: 150, render: (r) => display(r.orderId ?? r.order_id) },
       { key: 'gateway', label: 'Gateway', width: 110, render: (r) => display(r.paymentGatewayName ?? r.gateway) },
@@ -860,8 +892,6 @@ function FundTab({ userId }: { userId: string }) {
       { key: 'lat', label: 'Latitude', width: 90, render: (r) => display(r.latitude) },
       { key: 'lng', label: 'Longitude', width: 90, render: (r) => display(r.longitude) },
       { key: 'updatedBy', label: 'Updated By', width: 120, render: updatedByName },
-      { key: 'createdAt', label: 'Created At', width: 150, render: (r) => stamp(r.createdOn ?? r.createdAt) },
-      { key: 'updatedAt', label: 'Updated At', width: 150, render: (r) => stamp(r.updatedOn ?? r.updatedAt) },
     ];
   }, [type]);
 
@@ -897,6 +927,7 @@ function FundTab({ userId }: { userId: string }) {
       ) : null}
       <ResponsiveTable
         forceCards
+        previewFieldCount={4}
         columns={columns}
         rows={rows}
         keyFor={(r, i) => String(r._id ?? i)}

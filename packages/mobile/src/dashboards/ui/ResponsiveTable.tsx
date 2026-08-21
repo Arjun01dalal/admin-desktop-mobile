@@ -42,10 +42,14 @@ type Props<Row> = {
   /** Always use cards, even on tablet. */
   forceCards?: boolean;
   /**
-   * `preview` (default): title + 2 fields, tap opens a sheet.
+   * `preview` (default): title + preview fields, tap opens a sheet.
    * `full`: every column as label/value on the card (no sheet).
    */
   cardLayout?: 'preview' | 'full';
+  /** How many columns (after title) to show on compact cards. Default 2. */
+  previewFieldCount?: number;
+  /** Optional status/badge shown on the right side of each phone card. */
+  getCardBadge?: (row: Row, index: number) => { text: string; color?: string } | null | undefined;
 };
 
 export function ResponsiveTable<Row>(props: Props<Row>) {
@@ -67,7 +71,9 @@ function CardList<Row>({
   rowBg,
   renderCardFooter,
   getSheetActions,
+  getCardBadge,
   cardLayout = 'preview',
+  previewFieldCount = 2,
 }: Props<Row>) {
   const [sheetRow, setSheetRow] = React.useState<{ row: Row; index: number } | null>(null);
   const fullCards = cardLayout === 'full';
@@ -105,7 +111,9 @@ function CardList<Row>({
   const [titleCol, ...restCols] = columns;
   const dataCols = columns.filter((col) => !col.onCellPress);
   const actionCols = columns.filter((col) => col.onCellPress);
-  const previewCols = restCols.filter((col) => !col.onCellPress).slice(0, 2);
+  const previewCols = restCols
+    .filter((col) => !col.onCellPress)
+    .slice(0, Math.max(0, previewFieldCount));
 
   return (
     <View style={styles.list}>
@@ -170,6 +178,7 @@ function CardList<Row>({
           );
         }
 
+        const badge = getCardBadge?.(row, index);
         const body = (
           <View>
             <View style={styles.cardTop}>
@@ -193,12 +202,30 @@ function CardList<Row>({
                 <Text style={styles.cardHint}>Details ›</Text>
               )}
             </View>
-            <Text
-              style={[styles.cardTitle, titleCol.color?.(row) ? { color: titleCol.color(row) } : null]}
-              numberOfLines={2}
-            >
-              {titleValue}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text
+                style={[
+                  styles.cardTitle,
+                  styles.cardTitleFlex,
+                  titleCol.color?.(row) ? { color: titleCol.color(row) } : null,
+                ]}
+                numberOfLines={2}
+              >
+                {titleValue}
+              </Text>
+              {badge ? (
+                <View
+                  style={[
+                    styles.statusPill,
+                    badge.color ? { backgroundColor: badge.color } : null,
+                  ]}
+                >
+                  <Text style={styles.statusPillText} numberOfLines={1}>
+                    {toDisplayText(badge.text)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             {previewCols.length > 0 ? (
               <View style={styles.metaRow}>
                 {previewCols.map((col) => (
@@ -329,6 +356,13 @@ const styles = StyleSheet.create({
   },
   indexPillText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   cardHint: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    marginBottom: spacing(1.5),
+  },
   cardTitle: {
     color: colors.foreground,
     fontSize: 15,
@@ -336,15 +370,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
     marginBottom: spacing(1.5),
   },
+  cardTitleFlex: {
+    flex: 1,
+    marginBottom: 0,
+    minWidth: 0,
+  },
+  statusPill: {
+    backgroundColor: colors.muted,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: 4,
+    maxWidth: '46%',
+    alignSelf: 'flex-start',
+  },
+  statusPillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   cardSub: { color: colors.muted, fontSize: 11, marginTop: 2 },
   cardFooter: { marginTop: spacing(2) },
   metaRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing(2),
     paddingTop: spacing(0.5),
   },
   metaItem: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 96,
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     paddingHorizontal: spacing(2.5),
