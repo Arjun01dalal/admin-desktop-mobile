@@ -1,6 +1,6 @@
 {
   "name": "@astro/desktop",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Astro CS Panel — Electron desktop app with secure admin login.",
   "main": "electron/main.cjs",
   "author": "Your Name",
