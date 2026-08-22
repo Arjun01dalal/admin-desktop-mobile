@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import { ItemsPerPageField } from './historyFilters';
 
@@ -158,7 +158,7 @@ export function HistoryTable<T extends HistoryRow>({
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <TablePanel
+      <UserReportTablePanel
         footerJustify="center"
         footer={
           totalPages > 1 ? (
@@ -182,7 +182,7 @@ export function HistoryTable<T extends HistoryRow>({
           dense
           maxHeight="100%"
         />
-      </TablePanel>
+      </UserReportTablePanel>
     </Box>
   );
 }

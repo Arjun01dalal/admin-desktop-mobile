@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
 import { Box, type SxProps, type Theme } from '@mui/material';
-import { useFitTableHeight } from '@/hooks/useFitTableHeight';
+import {
+  useFitTableHeight,
+  type FitTableHeightOptions,
+} from '@/hooks/useFitTableHeight';
 
-type Props = {
+type Props = FitTableHeightOptions & {
   /** Table markup. Pass `maxHeight="100%"` to CommonTable so it fills the frame. */
   children: ReactNode;
   /** Pagination / totals row pinned to the bottom of the frame. */
@@ -24,10 +27,12 @@ export function TablePanel({
   children,
   footer,
   footerJustify = 'space-between',
+  bottomGap,
+  fallbackSubtract,
   sx,
   footerSx,
 }: Props) {
-  const { ref, height, fits } = useFitTableHeight();
+  const { ref, height, fits } = useFitTableHeight({ bottomGap, fallbackSubtract });
 
   return (
     <Box

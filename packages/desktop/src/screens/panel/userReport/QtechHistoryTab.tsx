@@ -21,7 +21,7 @@ import {
   StatusSelectFilter,
   formatDt,
 } from './historyFilters';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type Props = { userId: string };
@@ -292,7 +292,7 @@ export function QtechHistoryTab({ userId }: Props) {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <TablePanel
+      <UserReportTablePanel
         footerJustify="center"
         footerSx={{ bgcolor: '#f4f6f8', borderColor: '#dde2e8' }}
         footer={
@@ -322,7 +322,7 @@ export function QtechHistoryTab({ userId }: Props) {
           maxHeight="100%"
           getRowSx={(r) => ({ bgcolor: rowBg(r.status) })}
         />
-      </TablePanel>
+      </UserReportTablePanel>
     </Box>
   );
 }

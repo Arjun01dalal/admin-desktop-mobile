@@ -27,7 +27,7 @@ import {
   formatDisplayDate,
   formatDisplayTime,
 } from '@/utils/dates';
-import { BLOCK_STATUS_OPTIONS, type UserType } from './constants';
+import { BLOCK_STATUS_OPTIONS, PLAY_IN_OPTIONS, type UserType } from './constants';
 import {
   CompactDpId,
   DateRangeFilter,
@@ -123,6 +123,8 @@ export type UseUsersColumnsParams = {
   search: () => void;
   clientName: string;
   setClientName: (v: string) => void;
+  playedIn: string;
+  setPlayedIn: (v: string) => void;
   setPage: (p: number) => void;
   botId: string;
   canShowMobile: boolean;
@@ -159,6 +161,8 @@ export function useUsersColumns(p: UseUsersColumnsParams) {
     search,
     clientName,
     setClientName,
+    playedIn,
+    setPlayedIn,
     setPage,
     botId,
     canShowMobile,
@@ -1316,7 +1320,35 @@ cols.push(
     width: PLAY_COL.width,
     headSx: PLAY_COL.sx,
     cellSx: PLAY_COL.sx,
-    filter: null,
+    filter: (
+      <TextField
+        select
+        size="small"
+        fullWidth
+        value={playedIn}
+        onChange={(e) => {
+          setPlayedIn(e.target.value);
+          setPage(1);
+        }}
+        sx={{
+          '& .MuiInputBase-root': {
+            bgcolor: '#fff',
+            color: '#111',
+            fontSize: 12,
+          },
+          '& .MuiSelect-select': {
+            color: '#111 !important',
+            WebkitTextFillColor: '#111 !important',
+          },
+        }}
+      >
+        {PLAY_IN_OPTIONS.map((opt) => (
+          <MenuItem key={opt.value || 'all'} value={opt.value}>
+            {opt.label}
+          </MenuItem>
+        ))}
+      </TextField>
+    ),
     render: (r) => pickPlayIn(r),
   },
 );
@@ -1631,6 +1663,7 @@ return cols;
     canEditSubAdminRole,
     canShowMobile,
     clientName,
+    playedIn,
     draft,
     hideContact,
     isCaller,
@@ -1648,6 +1681,7 @@ return cols;
     renderUserName,
     search,
     setClientName,
+    setPlayedIn,
     setDraft,
     setDraftField,
     setLocationDraft,

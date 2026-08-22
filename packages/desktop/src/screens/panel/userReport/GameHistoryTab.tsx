@@ -20,7 +20,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import {
   formatAmount,
   formatDisplayDate,
@@ -434,7 +434,7 @@ export function GameHistoryTab({ userId }: Props) {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <TablePanel
+      <UserReportTablePanel
         footerJustify="center"
         footer={
           totalPages > 1 ? (
@@ -457,7 +457,7 @@ export function GameHistoryTab({ userId }: Props) {
           dense
           maxHeight="100%"
         />
-      </TablePanel>
+      </UserReportTablePanel>
 
       <Dialog open={Boolean(settleId)} onClose={() => setSettleId(null)}>
         <DialogTitle>Settle Bet</DialogTitle>

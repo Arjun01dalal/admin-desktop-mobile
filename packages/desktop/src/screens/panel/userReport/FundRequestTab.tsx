@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import { formatAmount } from '@/utils/dates';
 import { maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
@@ -518,7 +518,7 @@ export function FundRequestTab({ userId }: Props) {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <TablePanel
+      <UserReportTablePanel
         footerJustify="center"
         footer={
           totalPages > 1 ? (
@@ -541,7 +541,7 @@ export function FundRequestTab({ userId }: Props) {
           dense
           maxHeight="100%"
         />
-      </TablePanel>
+      </UserReportTablePanel>
     </Box>
   );
 }

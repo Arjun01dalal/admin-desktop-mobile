@@ -2,7 +2,30 @@ import { useEffect, useRef, useState } from 'react';
 
 /** Table needs at least this much room before we stop shrinking it. */
 export const MIN_TABLE_HEIGHT = 320;
-const BOTTOM_GAP = 12;
+const DEFAULT_BOTTOM_GAP = 12;
+const DEFAULT_FALLBACK_SUBTRACT = 260;
+
+export type FitTableHeightOptions = {
+  bottomGap?: number;
+  fallbackSubtract?: number;
+};
+
+function observePrecedingSiblings(
+  el: HTMLElement,
+  scroller: HTMLElement,
+  observe: (node: Element | null) => void,
+) {
+  let current: HTMLElement | null = el;
+  while (current && current !== scroller) {
+    observe(current.parentElement);
+    let sibling = current.previousElementSibling;
+    while (sibling) {
+      observe(sibling);
+      sibling = sibling.previousElementSibling;
+    }
+    current = current.parentElement;
+  }
+}
 
 /**
  * The app shell marks its single scrolling region, so the panel never measures
@@ -34,7 +57,12 @@ function findScroller(el: HTMLElement): HTMLElement {
  * `fits` is false when the panel had to be clamped to MIN_TABLE_HEIGHT — a
  * sticky footer would then float over the rows, so callers should skip sticky.
  */
-export function useFitTableHeight<T extends HTMLElement = HTMLDivElement>() {
+export function useFitTableHeight<T extends HTMLElement = HTMLDivElement>(
+  options?: FitTableHeightOptions,
+) {
+  const bottomGap = options?.bottomGap ?? DEFAULT_BOTTOM_GAP;
+  const fallbackSubtract =
+    options?.fallbackSubtract ?? DEFAULT_FALLBACK_SUBTRACT;
   const ref = useRef<T | null>(null);
   const [available, setAvailable] = useState<number | null>(null);
 
@@ -56,7 +84,7 @@ export function useFitTableHeight<T extends HTMLElement = HTMLDivElement>() {
       const padBottom =
         parseFloat(window.getComputedStyle(scroller).paddingBottom) || 0;
       const next = Math.round(
-        scroller.clientHeight - padBottom - top - BOTTOM_GAP,
+        scroller.clientHeight - padBottom - top - bottomGap,
       );
       setAvailable((prev) =>
         prev != null && Math.abs(prev - next) < 2 ? prev : next,
@@ -66,20 +94,15 @@ export function useFitTableHeight<T extends HTMLElement = HTMLDivElement>() {
     measure();
 
     // Anything above the panel (filters, collapsible summaries) shifts its top.
-    // Watch the siblings themselves: a collapse inside one of them does not
-    // always change the shared parent's box.
+    // Walk up the tree so sections like Top Casino Games (uncle nodes) also
+    // trigger a remeasure when collapsed or expanded.
     const observer = new ResizeObserver(measure);
     const observe = (node: Element | null) => {
       if (node instanceof HTMLElement) observer.observe(node);
     };
 
     observe(scroller);
-    observe(el.parentElement);
-    let sibling = el.previousElementSibling;
-    while (sibling) {
-      observe(sibling);
-      sibling = sibling.previousElementSibling;
-    }
+    observePrecedingSiblings(el, scroller, observe);
 
     window.addEventListener('resize', measure);
 
@@ -87,13 +110,13 @@ export function useFitTableHeight<T extends HTMLElement = HTMLDivElement>() {
       observer.disconnect();
       window.removeEventListener('resize', measure);
     };
-  }, []);
+  }, [bottomGap]);
 
   return {
     ref,
     height:
       available == null
-        ? 'calc(100vh - 260px)'
+        ? `calc(100vh - ${fallbackSubtract}px)`
         : Math.max(MIN_TABLE_HEIGHT, available),
     fits: available == null || available >= MIN_TABLE_HEIGHT,
   };

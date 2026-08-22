@@ -51,6 +51,10 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../utils/dates';
 import { SheetDownloadOtpModal } from '../components/SheetDownloadOtpModal';
 import type { SheetDownloadFilter } from '../utils/sheetDownloadAudit';
 import { shareCsvFile } from '../utils/shareCsv';
+import {
+  getCachedEmpCodeNameMap,
+  getEmpCodeNameMap,
+} from '../utils/empCodeNameCache';
 
 type Rec = Record<string, unknown>;
 
@@ -515,6 +519,28 @@ export function WithdrawalScreen() {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<Summary>([]);
   const [msg, setMsg] = useState('');
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
+    () => getCachedEmpCodeNameMap(),
+  );
+
+  useEffect(() => {
+    let active = true;
+    void getEmpCodeNameMap().then((map) => {
+      if (active) setEmpCodeNameMap(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const formatEmpCode = useCallback(
+    (r: Rec) => {
+      const code = String(r.empCode || '').trim();
+      const name = code ? empCodeNameMap[code] : '';
+      return name ? `${code || '—'} (${name})` : display(r.empCode);
+    },
+    [empCodeNameMap],
+  );
 
   // Row detail sheet + action state.
   const [selected, setSelected] = useState<Rec | null>(null);
@@ -1264,7 +1290,7 @@ export function WithdrawalScreen() {
         key: 'empCode',
         label: 'Emp Code',
         width: 90,
-        render: (r) => display(r.empCode),
+        render: (r) => formatEmpCode(r),
       },
       {
         key: 'app',
@@ -1405,7 +1431,7 @@ export function WithdrawalScreen() {
         render: (r) => (r.createdOn ? formatDisplayTime(String(r.createdOn)) : '—'),
       },
     ],
-    [perms.showMobile],
+    [perms.showMobile, formatEmpCode],
   );
 
   /** Confirm before lock/unlock (sheet closed first — touch-freeze guard). */

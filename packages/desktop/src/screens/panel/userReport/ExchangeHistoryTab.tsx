@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import type { SecureAction } from '@/api/secureActions';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import { formatAmount } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
@@ -398,7 +398,7 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
         {loading && <CircularProgress size={22} />}
       </Stack>
 
-      <TablePanel
+      <UserReportTablePanel
         footerJustify="center"
         footer={
           totalPages > 1 ? (
@@ -421,7 +421,7 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
           dense
           maxHeight="100%"
         />
-      </TablePanel>
+      </UserReportTablePanel>
     </Box>
   );
 }

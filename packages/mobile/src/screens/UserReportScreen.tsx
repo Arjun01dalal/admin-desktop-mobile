@@ -32,6 +32,7 @@ import {
   useHistoryFilters,
 } from './userReport/HistoryFilterBar';
 import { TabSelect } from './userReport/TabSelect';
+import { TopCasinoGamesSection } from './userReport/TopCasinoGamesSection';
 
 /** Callers (+ caller heads): only Exposure + Bonus Earning tiles. */
 function restrictCallerAmountTiles(): boolean {
@@ -343,6 +344,8 @@ export function UserReportScreen() {
           {!summary ? <Text style={styles.muted}>Loading summary…</Text> : null}
         </View>
       ) : null}
+
+      <TopCasinoGamesSection userId={userId} />
 
       <TabBody tab={tab} userId={userId} />
     </ScrollView>

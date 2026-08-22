@@ -1479,6 +1479,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'userReport.topCasinoGames': {
+    method: 'POST',
+    path: '/User/top-casino-games',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'userReport.walletHistory': {
     method: 'POST',
     path: '/wallet-History',
@@ -1832,6 +1838,12 @@ module.exports = {
   'topGames.addGameObject': {
     method: 'POST',
     path: '/change-percentage/top-games/add-game-object',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'topGames.updateImage': {
+    method: 'POST',
+    path: '/change-percentage/top-games/update-image',
     encryptRequest: true,
     decryptResponse: true,
   },

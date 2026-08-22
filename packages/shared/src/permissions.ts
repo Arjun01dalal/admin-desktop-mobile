@@ -711,6 +711,20 @@ export function isSosExemptRole(
   return false;
 }
 
+/** Unique Deposit Pending — empCode column + search (9608010101, full_access, dev_full_access). */
+export const UNIQUE_DEPOSIT_EMPCODE_MOBILES = new Set(['9608010101']);
+
+export function canShowUniqueDepositEmpCode(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  const mobile = String(
+    user?.mobile || storage?.getItem?.('mobile') || '',
+  ).trim();
+  if (UNIQUE_DEPOSIT_EMPCODE_MOBILES.has(mobile)) return true;
+  return isSosExemptRole(user, storage);
+}
+
 /** Gather every place the app may store the active role name. */
 function collectRoleNameCandidates(
   user: PermissionUser | null,

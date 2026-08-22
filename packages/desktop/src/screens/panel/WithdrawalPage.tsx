@@ -46,6 +46,10 @@ import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
 import { saveWorkbook } from '@/utils/downloadSheet';
 import type { SheetDownloadFilter } from '@/utils/sheetDownloadAudit';
 import { copyToClipboard } from '@/utils/clipboard';
+import {
+  getCachedEmpCodeNameMap,
+  getEmpCodeNameMap,
+} from '@/utils/empCodeNameCache';
 import { asPaged, asList, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
@@ -209,6 +213,19 @@ export function WithdrawalPage() {
   };
   const [qrMid, setQrMid] = useState('');
   const [qrSaving, setQrSaving] = useState(false);
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
+    () => getCachedEmpCodeNameMap(),
+  );
+
+  useEffect(() => {
+    let active = true;
+    void getEmpCodeNameMap().then((map) => {
+      if (active) setEmpCodeNameMap(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const buildPayload = useCallback(() => {
     const filter: Record<string, unknown> = {};
@@ -1111,9 +1128,32 @@ export function WithdrawalPage() {
       {
         id: 'empCode',
         label: 'Emp Code',
-        width: 100,
+        width: 110,
         filter: searchFilter('empCode', 'Emp code'),
-        render: (row) => display(row.empCode),
+        render: (row) => {
+          const code = String(row.empCode || '').trim();
+          const empName = code ? empCodeNameMap[code] : '';
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                lineHeight: 1.3,
+              }}
+            >
+              <span>{code || '—'}</span>
+              {empName ? (
+                <Typography
+                  component="span"
+                  sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }}
+                >
+                  {empName}
+                </Typography>
+              ) : null}
+            </Box>
+          );
+        },
       },
       {
         id: 'amount',
@@ -1513,6 +1553,7 @@ export function WithdrawalPage() {
     canOpenUserReport,
     hideContact,
     busyId,
+    empCodeNameMap,
     selectedIds,
     searchFilter,
     selectFilter,

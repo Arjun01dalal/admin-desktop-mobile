@@ -25,7 +25,6 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import HideImageOutlinedIcon from '@mui/icons-material/HideImageOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
@@ -37,6 +36,12 @@ import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/paginati
 import { display } from '@/screens/panel/shared';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import { GameImageUploadCell } from '@/screens/panel/topGames/GameImageUploadCell';
+import { UpdateGameImageDialog } from '@/screens/panel/topGames/UpdateGameImageDialog';
+import {
+  buildUpdateGameImagePayload,
+  type GameImageUpdateTarget,
+} from '@/screens/panel/topGames/updateGameImage';
 
 type CasinoGameRow = {
   _id: string;
@@ -131,6 +136,19 @@ function imageUrl(row: CasinoGameRow): string | null {
   return row.images?.[0]?.url || row.images?.[1]?.url || row.Thumbnail || null;
 }
 
+function casinoGameId(row: CasinoGameRow): string {
+  return String(row.gameId || row.Game_Code || '').trim();
+}
+
+function casinoProviderRaw(row: CasinoGameRow): string {
+  return String(
+    row.provider?.name ||
+      row.Provider_ID ||
+      (row as { providerName?: string }).providerName ||
+      '',
+  ).trim();
+}
+
 function asProvider(value: unknown): CasinoProvider {
   return value === 'WACS' ? 'WACS' : 'QTECH';
 }
@@ -197,6 +215,8 @@ export function CasinoGamesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [imageTarget, setImageTarget] = useState<GameImageUpdateTarget | null>(null);
+  const [imageSaving, setImageSaving] = useState(false);
   const { next, isCurrent, begin, end } = useRequestGeneration();
 
   const loadConfig = useCallback(async () => {
@@ -423,6 +443,60 @@ export function CasinoGamesPage() {
     }
   }, []);
 
+  const openImageUpdate = useCallback((row: CasinoGameRow) => {
+    const gameId = casinoGameId(row);
+    if (!gameId) {
+      toast.error('Game ID is required');
+      return;
+    }
+    const provider = casinoProviderRaw(row);
+    if (!provider) {
+      toast.error('Provider is required');
+      return;
+    }
+    setImageTarget({
+      gameId,
+      provider,
+      name: String(row.Name || gameId),
+      currentImageUrl: imageUrl(row) || '',
+    });
+  }, []);
+
+  const handleImageUpdate = useCallback(
+    async (imagePath: string) => {
+      if (!imageTarget) return;
+      setImageSaving(true);
+      try {
+        const payload = buildUpdateGameImagePayload(
+          imageTarget.gameId,
+          imagePath,
+          imageTarget.provider,
+        );
+        const res = await secureApi('topGames.updateImage', payload);
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update game image');
+          return;
+        }
+        setRows((prev) =>
+          prev.map((item) => {
+            const id = casinoGameId(item);
+            if (id !== imageTarget.gameId) return item;
+            return {
+              ...item,
+              Thumbnail: imagePath,
+              images: [{ url: imagePath }, ...(item.images || []).slice(1)],
+            };
+          }),
+        );
+        toast.success('Game image updated successfully');
+        setImageTarget(null);
+      } finally {
+        setImageSaving(false);
+      }
+    },
+    [imageTarget],
+  );
+
   const columns = useMemo<CommonTableColumn<CasinoGameRow>[]>(() => {
     const cols: CommonTableColumn<CasinoGameRow>[] = [
       {
@@ -513,34 +587,23 @@ export function CasinoGamesPage() {
       {
         id: 'image',
         label: 'Image',
-        width: 100,
-        render: (row) => {
-          const src = imageUrl(row);
-          return src ? (
-            <Box
-              component="img"
-              src={src}
-              alt={row.Name || 'game'}
-              sx={{
-                height: 40,
-                width: 64,
-                objectFit: 'cover',
-                borderRadius: 1,
-                display: 'block',
-                mx: 'auto',
-              }}
-            />
-          ) : (
-            <HideImageOutlinedIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-          );
-        },
+        width: 104,
+        render: (row) => (
+          <GameImageUploadCell
+            imageUrl={imageUrl(row)}
+            alt={String(row.Name || casinoGameId(row) || 'game')}
+            disabled={imageSaving || !casinoGameId(row)}
+            onUpdate={() => openImageUpdate(row)}
+            variant="wide"
+          />
+        ),
       },
       {
         id: 'status',
         label: 'Status',
         width: 120,
         render: (row) => (
-          <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center">
+          <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center" sx={{ py: 0.25 }}>
             <Switch
               size="small"
               checked={Boolean(row.status)}
@@ -552,7 +615,7 @@ export function CasinoGamesPage() {
               size="small"
               label={row.status ? 'Active' : 'Inactive'}
               color={row.status ? 'success' : 'default'}
-              sx={{ fontWeight: 600, fontSize: 11 }}
+              sx={{ fontWeight: 600, fontSize: 11, height: 22 }}
             />
           </Stack>
         ),
@@ -570,6 +633,8 @@ export function CasinoGamesPage() {
     toggleStatus,
     activeProvider,
     openTableIdDialog,
+    openImageUpdate,
+    imageSaving,
   ]);
 
   return (
@@ -837,6 +902,14 @@ export function CasinoGamesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <UpdateGameImageDialog
+        open={!!imageTarget}
+        loading={imageSaving}
+        target={imageTarget}
+        onClose={() => setImageTarget(null)}
+        onSubmit={(path) => void handleImageUpdate(path)}
+      />
     </Box>
   );
 }

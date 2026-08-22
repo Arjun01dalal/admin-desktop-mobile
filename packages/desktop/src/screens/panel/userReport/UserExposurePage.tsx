@@ -8,24 +8,25 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   MenuItem,
   Pagination,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import {
   formatAmount,
   formatDisplayDate,
   formatDisplayTime,
+  getStoredUser,
 } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
-import { fieldSx } from '@/screens/panel/transactions/shared';
 
 type ProviderKey =
   | 'SattaMatka'
@@ -64,6 +65,57 @@ type ColDef = {
   kind?: 'date' | 'layBack' | 'amount' | 'srNo';
 };
 
+const EXPOSURE_FIELD_SX = {
+  width: '100%',
+  minWidth: 0,
+  flex: '0 0 auto',
+  '& .MuiInputLabel-root': {
+    fontSize: 13,
+    color: '#667085',
+    '&.Mui-focused': { color: '#344054' },
+  },
+  '& .MuiOutlinedInput-root': {
+    bgcolor: '#fff',
+    color: '#111',
+    fontSize: 13,
+    '& fieldset': { borderColor: '#b8c2cf' },
+    '&:hover fieldset': { borderColor: '#98a2b3' },
+    '&.Mui-focused fieldset': { borderColor: '#1976d2' },
+  },
+  '& .MuiSelect-select': {
+    color: '#111 !important',
+    WebkitTextFillColor: '#111 !important',
+  },
+  '& .MuiSelect-icon': { color: '#667085' },
+};
+
+const EXPOSURE_STATUS: Record<string, { value: string; label: string }[]> = {
+  SattaMatka: [
+    { value: 'w', label: 'Win' },
+    { value: 'l', label: 'Loss' },
+  ],
+  Falcon: [
+    { value: 'C', label: 'Cancel' },
+    { value: 'W', label: 'Win' },
+    { value: 'L', label: 'Loss' },
+  ],
+  Jetfair: [
+    { value: 'settle', label: 'Settle' },
+    { value: 'Cancel', label: 'Cancel' },
+  ],
+  WCO: [
+    { value: 'L', label: 'Loss' },
+    { value: 'W', label: 'Win' },
+    { value: 'R', label: 'Rollback' },
+    { value: 'C', label: 'Completed' },
+  ],
+  AAAExchange: [
+    { value: 'Cancel', label: 'Cancel' },
+    { value: 'Resettle Market', label: 'Resettle Market' },
+    { value: 'C', label: 'Completed' },
+  ],
+};
+
 const TABLE_COLS: Record<ProviderKey, ColDef[]> = {
   SattaMatka: [
     { label: 'Bazar Name', key: 'bazar_name' },
@@ -82,11 +134,19 @@ const TABLE_COLS: Record<ProviderKey, ColDef[]> = {
   ],
   Falcon: [
     { label: 'Event Name', key: 'Eventname' },
-    { label: 'Market Name', key: 'Marketname' },
+    { label: 'Event Type Name', key: 'Eventtypename' },
     { label: 'Market ID', key: 'MarketID' },
+    { label: 'Market Name', key: 'Marketname' },
+    { label: 'Market Type', key: 'Markettype' },
+    { label: 'Runner ID', key: 'RunnerID' },
     { label: 'Runner Name', key: 'Runnername' },
     { label: 'TransactionID', key: 'TransactionID' },
     { label: 'Amount', key: 'Amount', kind: 'amount' },
+    { label: 'Commission Amount', key: 'CommissionAmount', kind: 'amount' },
+    { label: 'Cashout Amount', key: 'cashoutAmount', kind: 'amount' },
+    { label: 'Payable Amount', key: 'PayableAmount', kind: 'amount' },
+    { label: 'Session Point', key: 'SessionPoint' },
+    { label: 'Point', key: 'Point' },
     { label: 'NetPL', key: 'NetPL' },
     { label: 'Rate', key: 'Rate' },
     { label: 'Stake', key: 'Stake' },
@@ -100,7 +160,10 @@ const TABLE_COLS: Record<ProviderKey, ColDef[]> = {
     { label: 'Market Name', key: 'marketName' },
     { label: 'Market ID', key: 'marketId' },
     { label: 'Transaction ID', key: 'transactionId' },
+    { label: 'Transaction Code', key: 'transactionCode' },
+    { label: 'Transaction Type', key: 'transactionType' },
     { label: 'Amount', key: 'amount', kind: 'amount' },
+    { label: 'Commission', key: 'commissionAmount', kind: 'amount' },
     { label: 'Rate', key: 'rate' },
     { label: 'Stake', key: 'stake' },
     { label: 'Net P/L', key: 'netPL' },
@@ -111,11 +174,13 @@ const TABLE_COLS: Record<ProviderKey, ColDef[]> = {
   WCO: [
     { label: 'Provider Name', key: 'providerName' },
     { label: 'Game Name', key: 'gameName' },
+    { label: 'Name', key: 'Name' },
     { label: 'Transaction ID', key: 'transactionId' },
+    { label: 'Provider Transaction ID', key: 'providerTransactionId' },
     { label: 'Round ID', key: 'roundId' },
     { label: 'Action', key: 'action' },
     { label: 'Amount', key: 'amount', kind: 'amount' },
-    { label: 'Winning', key: 'wining' },
+    { label: 'Winning', key: 'wining', kind: 'amount' },
     { label: 'Status', key: 'status' },
     { label: 'Created On', key: 'createdOn', kind: 'date' },
     { label: 'Updated On', key: 'updatedOn', kind: 'date' },
@@ -123,15 +188,24 @@ const TABLE_COLS: Record<ProviderKey, ColDef[]> = {
   AAAExchange: [
     { label: 'User ID', key: 'userId' },
     { label: 'Transaction ID', key: 'transactionId' },
+    { label: 'Transaction Type', key: 'transactionType' },
     { label: 'Sport Name', key: 'sportName' },
+    { label: 'Tournament Name', key: 'tournamentName' },
+    { label: 'Game ID', key: 'gameId' },
     { label: 'Game Name', key: 'gameName' },
+    { label: 'Game Name Exch', key: 'gameNameExchange' },
+    { label: 'Market ID', key: 'marketId' },
     { label: 'Market Name', key: 'marketName' },
+    { label: 'Market Type', key: 'marketType' },
+    { label: 'Runner', key: 'runner' },
     { label: 'Bet Type', key: 'isBack', kind: 'layBack' },
     { label: 'Rate', key: 'rate' },
-    { label: 'Stake', key: 'stake' },
+    { label: 'Run', key: 'run' },
     { label: 'Amount', key: 'amount', kind: 'amount' },
-    { label: 'Status', key: 'status' },
+    { label: 'Balance', key: 'balance', kind: 'amount' },
     { label: 'Updated On', key: 'updatedOn', kind: 'date' },
+    { label: 'Status', key: 'status' },
+    { label: 'Action', key: 'action' },
   ],
   /** Fallback only — Plutus columns are built dynamically from row keys. */
   PlutusGaming: [
@@ -285,112 +359,6 @@ function mergePlutusRow(row: Row): Row {
   return merged;
 }
 
-/** Field chips for Plutus — same CompactStat look as User Report summary cards. */
-function plutusCardFields(row: Row): { label: string; value: string }[] {
-  const merged = mergePlutusRow(row);
-  const preferred = [
-    'gameName',
-    'gameId',
-    'transactionId',
-    'roundId',
-    'amount',
-    'betAmount',
-    'stake',
-    'winAmount',
-    'status',
-    'betStatus',
-    'createdOn',
-    'updatedOn',
-    'createdAt',
-    'updatedAt',
-  ];
-  const keys = [
-    ...preferred.filter((k) => merged[k] != null && merged[k] !== ''),
-    ...Object.keys(merged).filter(
-      (k) =>
-        !PLUTUS_SKIP_KEYS.has(k) &&
-        !preferred.includes(k) &&
-        merged[k] != null &&
-        merged[k] !== '',
-    ),
-  ];
-  return keys.map((key) => {
-    const kind: ColDef['kind'] = PLUTUS_DATE_KEYS.has(key)
-      ? 'date'
-      : PLUTUS_AMOUNT_KEYS.has(key)
-        ? 'amount'
-        : undefined;
-    return {
-      label: humanizePlutusKey(key),
-      value: cellValue(merged, { label: key, key, kind }),
-    };
-  });
-}
-
-function plutusCardSummary(fields: { label: string; value: string }[]): {
-  title: string;
-  subtitle: string;
-} {
-  const pick = (...labels: string[]) =>
-    fields.find((f) => labels.includes(f.label.toLowerCase()))?.value;
-  const title =
-    pick('game name', 'gamename') ||
-    pick('transaction id', 'transactionid') ||
-    fields[0]?.value ||
-    'Bet';
-  const parts = [
-    pick('amount', 'bet amount', 'betamount', 'stake'),
-    pick('status', 'bet status', 'betstatus'),
-  ].filter((v) => v && v !== '-');
-  return { title: String(title), subtitle: parts.join(' · ') || `${fields.length} fields` };
-}
-
-function PlutusFieldChips({ fields }: { fields: { label: string; value: string }[] }) {
-  return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))',
-        gap: 0.5,
-      }}
-    >
-      {fields.map((f) => (
-        <Box
-          key={f.label}
-          sx={{
-            minWidth: 0,
-            px: 0.6,
-            py: 0.35,
-            bgcolor: '#f6f7f9',
-            border: '1px solid #e5e7eb',
-            borderRadius: 1,
-          }}
-        >
-          <Typography
-            noWrap
-            title={f.label}
-            sx={{ fontSize: 10, lineHeight: 1.15, color: '#667085' }}
-          >
-            {f.label}
-          </Typography>
-          <Typography
-            noWrap
-            title={f.value}
-            sx={{
-              fontSize: 12,
-              lineHeight: 1.35,
-              fontWeight: 700,
-              color: '#111827',
-            }}
-          >
-            {f.value}
-          </Typography>
-        </Box>
-      ))}
-    </Box>
-  );
-}
-
 function buildPlutusColumns(rows: Row[]): ColDef[] {
   if (!rows.length) return TABLE_COLS.PlutusGaming;
   const sample = mergePlutusRow(rows[0]);
@@ -409,11 +377,16 @@ function buildPlutusColumns(rows: Row[]): ColDef[] {
   ];
 }
 
+function statusOptionsFor(providerKey: ProviderKey) {
+  return EXPOSURE_STATUS[providerKey] ?? [];
+}
+
 /** Laxmi UserExposure — opened when User Exposure Total Sum > 0. */
 export function UserExposurePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const userId = resolveUserId(location.state);
+  const admin = getStoredUser<{ _id?: string; name?: string; mobile?: string }>();
 
   const [provider, setProvider] = useState('SattaMatka');
   const [loading, setLoading] = useState(false);
@@ -427,10 +400,12 @@ export function UserExposurePage() {
   });
   const [plutusPage, setPlutusPage] = useState(1);
   const [plutusItemsPerPage, setPlutusItemsPerPage] = useState(20);
-  const [plutusDetail, setPlutusDetail] = useState<{
-    sr: number;
-    fields: { label: string; value: string }[];
-  } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editRow, setEditRow] = useState<Row | null>(null);
+  const [editStatus, setEditStatus] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editWinning, setEditWinning] = useState('0');
+  const [saving, setSaving] = useState(false);
 
   const loadLists = useCallback(async () => {
     if (!userId) return;
@@ -464,7 +439,8 @@ export function UserExposurePage() {
   const onProviderChange = async (next: string) => {
     setProvider(next);
     setPlutusPage(1);
-    setPlutusDetail(null);
+    setEditOpen(false);
+    setEditRow(null);
     if (next !== 'WCO' && next !== 'AAA Exchange' && next !== 'Plutus Gaming') {
       return;
     }
@@ -511,9 +487,112 @@ export function UserExposurePage() {
     }
   };
 
+  const reloadCurrentProvider = useCallback(async () => {
+    if (provider === 'Plutus Gaming' || provider === 'WCO' || provider === 'AAA Exchange') {
+      await onProviderChange(provider);
+      return;
+    }
+    await loadLists();
+  }, [provider, loadLists]);
+
   const providerKey =
     PROVIDERS.find((p) => p.value === provider)?.key || 'SattaMatka';
   const isPlutus = provider === 'Plutus Gaming';
+  const statusOptions = statusOptionsFor(providerKey);
+  const showWinningField =
+    provider === 'WCO' && (editStatus === 'W' || editStatus === 'R');
+  const showAmountField = provider === 'SattaMatka' && editStatus === 'w';
+
+  const openEdit = useCallback(
+    (row: Row) => {
+      if (provider === 'Plutus Gaming') return;
+      setEditRow(row);
+      setEditStatus(providerKey === 'SattaMatka' ? 'l' : '');
+      setEditAmount('');
+      setEditWinning('0');
+      setEditOpen(true);
+    },
+    [provider, providerKey],
+  );
+
+  const submitEdit = useCallback(async () => {
+    if (!editRow || !userId || provider === 'Plutus Gaming') return;
+    const status = editStatus.trim();
+    if (!status) {
+      toast.error('Please select a status');
+      return;
+    }
+    setSaving(true);
+    try {
+      const updatedBy = {
+        _id: admin?._id,
+        name: admin?.name,
+        mobile: admin?.mobile,
+      };
+      let action:
+        | 'userReport.updateBetsAdmin'
+        | 'userReport.updateBetsFalcon'
+        | 'userReport.updateBetsJetfair'
+        | 'userReport.updateWcoWinning'
+        | 'userReport.updateExchangePendingBet';
+      let payload: Record<string, unknown>;
+
+      if (provider === 'WCO') {
+        action = 'userReport.updateWcoWinning';
+        payload = {
+          userId,
+          transactionId: editRow.transactionId ?? editRow.TransactionID,
+          wining: Number(editWinning) || 0,
+          status,
+          updatedBy,
+        };
+      } else if (provider === 'AAA Exchange') {
+        action = 'userReport.updateExchangePendingBet';
+        payload = {
+          userId,
+          transactionId: editRow.transactionId ?? editRow.TransactionID,
+          status,
+          updatedBy,
+        };
+      } else if (provider === 'Falcon') {
+        action = 'userReport.updateBetsFalcon';
+        payload = { status, _id: editRow._id, updatedBy };
+      } else if (provider === 'Jetfair') {
+        action = 'userReport.updateBetsJetfair';
+        payload = { status, _id: editRow._id, updatedBy };
+      } else {
+        action = 'userReport.updateBetsAdmin';
+        payload = {
+          _id: editRow._id,
+          status,
+          amount: editAmount,
+          updatedBy: { _id: admin?._id, name: admin?.name },
+        };
+      }
+
+      const res = await secureApi(action, payload);
+      if (!res.ok) {
+        toast.error(res.message || 'Could not update this bet');
+        return;
+      }
+      toast.success(`${provider} updated successfully`);
+      setEditOpen(false);
+      setEditRow(null);
+      await reloadCurrentProvider();
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    admin,
+    editAmount,
+    editRow,
+    editStatus,
+    editWinning,
+    provider,
+    reloadCurrentProvider,
+    userId,
+  ]);
+
   const allRows = dataMap[providerKey] || [];
   const totalPages = isPlutus
     ? Math.max(1, Math.ceil(allRows.length / plutusItemsPerPage))
@@ -526,20 +605,37 @@ export function UserExposurePage() {
     : allRows;
   const colDefs = isPlutus ? buildPlutusColumns(allRows) : TABLE_COLS[providerKey];
 
-  const columns = useMemo<CommonTableColumn<Row>[]>(
-    () =>
-      colDefs.map((col) => ({
-        id: col.key,
-        label: col.label,
-        render: (r, index) =>
-          cellValue(r, col, {
-            srNo: isPlutus
-              ? (plutusPage - 1) * plutusItemsPerPage + index + 1
-              : undefined,
-          }),
-      })),
-    [colDefs, isPlutus, plutusItemsPerPage, plutusPage],
-  );
+  const columns = useMemo<CommonTableColumn<Row>[]>(() => {
+    const dataCols: CommonTableColumn<Row>[] = colDefs.map((col) => ({
+      id: col.key,
+      label: col.label,
+      render: (r, index) =>
+        cellValue(r, col, {
+          srNo: isPlutus
+            ? (plutusPage - 1) * plutusItemsPerPage + index + 1
+            : undefined,
+        }),
+    }));
+    if (isPlutus) return dataCols;
+    return [
+      ...dataCols,
+      {
+        id: 'edit',
+        label: 'Edit',
+        width: 64,
+        render: (row) => (
+          <IconButton
+            size="small"
+            aria-label="Edit exposure row"
+            onClick={() => openEdit(row)}
+            sx={{ color: 'warning.main' }}
+          >
+            <EditOutlinedIcon fontSize="small" />
+          </IconButton>
+        ),
+      },
+    ];
+  }, [colDefs, isPlutus, openEdit, plutusItemsPerPage, plutusPage]);
 
   return (
     <Box sx={{ p: 1 }}>
@@ -549,9 +645,9 @@ export function UserExposurePage() {
         spacing={1.5}
         mb={1.5}
         mt={0.5}
-        flexWrap="nowrap"
+        flexWrap="wrap"
         useFlexGap
-        sx={{ overflowX: 'auto', pt: 0.75 }}
+        sx={{ pt: 0.75 }}
       >
         <Typography fontWeight={700} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
           {toDisplayText('User Exposure')}
@@ -563,7 +659,10 @@ export function UserExposurePage() {
           value={provider}
           onChange={(e) => void onProviderChange(e.target.value)}
           InputLabelProps={{ shrink: true }}
-          sx={{ ...fieldSx, width: 200, minWidth: 200, flex: '0 0 auto' }}
+          SelectProps={{
+            renderValue: (value) => toDisplayText(String(value)),
+          }}
+          sx={{ ...EXPOSURE_FIELD_SX, width: 220, minWidth: 220 }}
         >
           {PROVIDERS.map((p) => (
             <MenuItem key={p.value} value={p.value}>
@@ -576,13 +675,14 @@ export function UserExposurePage() {
             select
             size="small"
             label="Items / page"
+            fullWidth={false}
             value={String(plutusItemsPerPage)}
             onChange={(e) => {
               setPlutusItemsPerPage(Number(e.target.value) || 20);
               setPlutusPage(1);
             }}
             InputLabelProps={{ shrink: true }}
-            sx={{ ...fieldSx, width: 140, minWidth: 140, flex: '0 0 auto' }}
+            sx={{ ...EXPOSURE_FIELD_SX, width: 140, minWidth: 140 }}
           >
             {[10, 20, 50, 100].map((n) => (
               <MenuItem key={n} value={String(n)}>
@@ -597,100 +697,20 @@ export function UserExposurePage() {
         <Stack alignItems="center" py={6}>
           <CircularProgress />
         </Stack>
-      ) : isPlutus ? (
-        <Stack spacing={1}>
-          {rows.length === 0 ? (
-            <Typography color="text.secondary" textAlign="center" py={4}>
-              No data found
-            </Typography>
-          ) : (
-            rows.map((r, i) => {
-              const sr = (plutusPage - 1) * plutusItemsPerPage + i + 1;
-              const fields = plutusCardFields(r);
-              const summary = plutusCardSummary(fields);
-              return (
-                <Box
-                  key={String(r._id || r.transactionId || i)}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setPlutusDetail({ sr, fields })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setPlutusDetail({ sr, fields });
-                    }
-                  }}
-                  sx={{
-                    px: 1.25,
-                    py: 1,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    bgcolor: 'background.paper',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    transition: 'border-color 0.15s ease, background-color 0.15s ease',
-                    '&:hover': {
-                      borderColor: 'warning.main',
-                      bgcolor: '#fffaf3',
-                    },
-                  }}
-                >
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography
-                      noWrap
-                      sx={{ fontSize: 13, fontWeight: 700, color: '#111827' }}
-                    >
-                      #{sr} · {summary.title}
-                    </Typography>
-                    {summary.subtitle ? (
-                      <Typography
-                        noWrap
-                        sx={{ fontSize: 11, color: '#667085', mt: 0.15 }}
-                      >
-                        {summary.subtitle}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                  <ExpandMoreIcon sx={{ color: '#98a2b3', fontSize: 22, flexShrink: 0 }} />
-                </Box>
-              );
-            })
-          )}
-          {totalPages > 1 ? (
-            <Stack alignItems="center" py={1.5}>
+      ) : (
+        <UserReportTablePanel
+          footer={
+            isPlutus && totalPages > 1 ? (
               <Pagination
                 count={totalPages}
                 page={plutusPage}
                 onChange={(_e, p) => setPlutusPage(p)}
                 color="secondary"
               />
-            </Stack>
-          ) : null}
-
-          <Dialog
-            open={plutusDetail != null}
-            onClose={() => setPlutusDetail(null)}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
-              {toDisplayText('Plutus Gaming')} #{plutusDetail?.sr ?? ''}
-            </DialogTitle>
-            <DialogContent dividers>
-              {plutusDetail ? <PlutusFieldChips fields={plutusDetail.fields} /> : null}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setPlutusDetail(null)} sx={{ textTransform: 'none' }}>
-                Close
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </Stack>
-      ) : (
-        <TablePanel>
+            ) : undefined
+          }
+          footerJustify="center"
+        >
           <CommonTable
             columns={columns}
             rows={rows}
@@ -699,12 +719,82 @@ export function UserExposurePage() {
             }
             loading={loading}
             emptyMessage="No data found"
-            minWidth={1200}
+            minWidth={isPlutus ? 1800 : 1400}
             dense
             maxHeight="100%"
           />
-        </TablePanel>
+        </UserReportTablePanel>
       )}
+
+      <Dialog
+        open={editOpen}
+        onClose={() => !saving && setEditOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          {['WCO', 'AAA Exchange'].includes(provider)
+            ? `Update ${toDisplayText(provider)}`
+            : 'Update Record'}
+        </DialogTitle>
+        <DialogContent dividers sx={{ display: 'grid', gap: 1.5, pt: 2 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Select Status"
+            value={editStatus}
+            onChange={(e) => setEditStatus(e.target.value)}
+            sx={EXPOSURE_FIELD_SX}
+          >
+            <MenuItem value="">Select Status</MenuItem>
+            {statusOptions.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          {showWinningField ? (
+            <TextField
+              fullWidth
+              size="small"
+              type="number"
+              label="Winning Amount"
+              value={editWinning}
+              onChange={(e) => setEditWinning(e.target.value)}
+              sx={EXPOSURE_FIELD_SX}
+            />
+          ) : null}
+          {showAmountField ? (
+            <TextField
+              fullWidth
+              size="small"
+              type="number"
+              label="Enter Amount"
+              value={editAmount}
+              onChange={(e) => setEditAmount(e.target.value)}
+              sx={EXPOSURE_FIELD_SX}
+            />
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button
+            onClick={() => setEditOpen(false)}
+            disabled={saving}
+            sx={{ textTransform: 'none' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={saving}
+            onClick={() => void submitEdit()}
+            sx={{ textTransform: 'none' }}
+          >
+            {saving ? 'Updating…' : 'Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

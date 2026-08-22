@@ -22,7 +22,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { hasPermission } from '@/auth/permissions';
+import { canShowUniqueDepositEmpCode, hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { TablePanel } from '@/components/TablePanel';
@@ -37,6 +37,10 @@ import {
 } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { asPaged, display, useReportQuery } from '@/screens/panel/shared';
+import {
+  getCachedEmpCodeNameMap,
+  getEmpCodeNameMap,
+} from '@/utils/empCodeNameCache';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
 import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
@@ -60,6 +64,7 @@ type UniquePendingRow = {
   state?: string;
   userCity?: string;
   city?: string;
+  empCode?: string;
   transactionId?: string;
   uniquePendingReason?: { reason?: string; name?: string; _id?: string };
 };
@@ -70,6 +75,7 @@ type ColumnFilters = {
   amount: string;
   state: string;
   city: string;
+  empCode: string;
 };
 
 type QueryState = {
@@ -84,6 +90,7 @@ const EMPTY_FILTERS: ColumnFilters = {
   amount: '',
   state: '',
   city: '',
+  empCode: '',
 };
 
 const orangeBtnSx = {
@@ -129,6 +136,7 @@ function unpackPayload(data: unknown): Record<string, unknown> {
 export function UniqueDepositPendingPage() {
   const navigate = useNavigate();
   const admin = getStoredUser<{ _id?: string; name?: string; mobile?: string }>();
+  const canShowEmpCode = canShowUniqueDepositEmpCode(admin);
   const canChangeStatus = hasPermission('change_status');
   const canDownload = hasPermission('show_download_botton');
   const canWhatsApp = hasPermission('whatsapp_icon');
@@ -154,6 +162,20 @@ export function UniqueDepositPendingPage() {
   const [statusRemark, setStatusRemark] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
+    () => getCachedEmpCodeNameMap(),
+  );
+
+  useEffect(() => {
+    if (!canShowEmpCode) return;
+    let active = true;
+    void getEmpCodeNameMap().then((map) => {
+      if (active) setEmpCodeNameMap(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [canShowEmpCode]);
 
   const buildPayload = useCallback(() => {
     const filter: Record<string, unknown> = {};
@@ -163,6 +185,7 @@ export function UniqueDepositPendingPage() {
     if (f.state) filter.state = f.state;
     if (f.amount.trim()) filter.amount = f.amount.trim();
     if (f.userId.trim()) filter.userId = f.userId.trim();
+    if (canShowEmpCode && f.empCode.trim()) filter.empCode = f.empCode.trim();
 
     const payload: Record<string, unknown> = {
       pageNo: page,
@@ -172,7 +195,7 @@ export function UniqueDepositPendingPage() {
     if (query.startDate) payload.startDate = query.startDate;
     if (query.endDate) payload.endDate = query.endDate;
     return payload;
-  }, [query, page, itemsPerPage]);
+  }, [query, page, itemsPerPage, canShowEmpCode]);
 
   const unpack = useCallback(
     (res: { data?: unknown }) => asPaged<UniquePendingRow>(res.data),
@@ -248,6 +271,18 @@ export function UniqueDepositPendingPage() {
   const onDraftChange =
     (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
       setDraftField(key)(e.target.value);
+
+  const searchFilter = useCallback(
+    (key: keyof ColumnFilters, placeholder: string) => (
+      <TableSearchBar
+        value={draft[key]}
+        onChange={onDraftChange(key)}
+        onSearch={() => commitQuery()}
+        placeholder={placeholder}
+      />
+    ),
+    [draft, commitQuery],
+  );
 
   const submitComment = useCallback(
     async (row: UniquePendingRow) => {
@@ -455,6 +490,40 @@ export function UniqueDepositPendingPage() {
         ),
         render: (row) => display(row.userId),
       },
+      ...(canShowEmpCode
+        ? [
+            {
+              id: 'empCode',
+              label: 'Emp Code',
+              width: 110,
+              filter: searchFilter('empCode', 'Emp code'),
+              render: (row: UniquePendingRow) => {
+                const code = String(row.empCode || '').trim();
+                const empName = code ? empCodeNameMap[code] : '';
+                return (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    <span>{code || '—'}</span>
+                    {empName ? (
+                      <Typography
+                        component="span"
+                        sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }}
+                      >
+                        {empName}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                );
+              },
+            } satisfies CommonTableColumn<UniquePendingRow>,
+          ]
+        : []),
       {
         id: 'mobile',
         label: 'Mobile No',
@@ -678,10 +747,13 @@ export function UniqueDepositPendingPage() {
     itemsPerPage,
     draft,
     canChangeStatus,
+    canShowEmpCode,
     canWhatsApp,
+    empCodeNameMap,
     comments,
     submittingCommentId,
     commitQuery,
+    searchFilter,
     setDraftField,
     submitComment,
     openStatusDialog,

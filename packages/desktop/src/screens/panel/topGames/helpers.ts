@@ -24,6 +24,11 @@ export function getProviderName(item: TopGameItem): string {
   return raw === '-' ? raw : toDisplayText(raw);
 }
 
+/** Raw provider string for API payloads (not Jyotish display). */
+export function getRawProviderName(item: TopGameItem): string {
+  return String(item.providerName || item.provider?.name || '').trim();
+}
+
 export function formatDateValue(value?: string | { $date?: string }): string {
   if (!value) return '-';
   const raw = typeof value === 'string' ? value : value.$date;

@@ -30,8 +30,12 @@ import { useNavigation } from '@react-navigation/native';
 import { pickPageSizes, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-import { getSessionUser, hasPermission } from '../../../auth/permissions';
+import { canShowUniqueDepositEmpCode, getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import {
+  getCachedEmpCodeNameMap,
+  getEmpCodeNameMap,
+} from '../../../utils/empCodeNameCache';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
@@ -54,6 +58,7 @@ type UniquePendingRow = {
   state?: string;
   userCity?: string;
   city?: string;
+  empCode?: string;
   transactionId?: string;
   uniquePendingReason?: { reason?: string; name?: string; _id?: string };
 };
@@ -134,6 +139,10 @@ export function UniqueDepositPendingScreen() {
   const canDownload = hasPermission('show_download_botton');
   const canWhatsApp = hasPermission('whatsapp_icon');
   const canShowMobile = hasPermission('show_mobile');
+  const canShowEmpCode = canShowUniqueDepositEmpCode(admin);
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
+    () => getCachedEmpCodeNameMap(),
+  );
 
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
@@ -169,6 +178,37 @@ export function UniqueDepositPendingScreen() {
 
   // OTP download modal.
   const [downloadOpen, setDownloadOpen] = useState(false);
+
+  useEffect(() => {
+    if (!canShowEmpCode) return;
+    let active = true;
+    void getEmpCodeNameMap().then((map) => {
+      if (active) setEmpCodeNameMap(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, [canShowEmpCode]);
+
+  const searchFields = useMemo(
+    () => [
+      { key: 'userId', label: 'DP Id' },
+      ...(canShowEmpCode ? [{ key: 'empCode', label: 'Emp Code' }] : []),
+      { key: 'amount', label: 'Amount' },
+      { key: 'city', label: 'City' },
+      { key: 'state', label: 'State' },
+    ],
+    [canShowEmpCode],
+  );
+
+  const formatEmpCode = useCallback(
+    (row: UniquePendingRow) => {
+      const code = String(row.empCode || '').trim();
+      const name = code ? empCodeNameMap[code] : '';
+      return name ? `${code || '—'} (${name})` : display(row.empCode);
+    },
+    [empCodeNameMap],
+  );
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -348,6 +388,9 @@ export function UniqueDepositPendingScreen() {
       { label: 'Mobile No', value: maskMobile(rowMobile(sheetRow), canShowMobile) },
       { label: 'App Code', value: appCodeForName(sheetRow.clientName) },
       { label: 'DP ID', value: display(sheetRow.userId) },
+      ...(canShowEmpCode
+        ? [{ label: 'Emp Code', value: formatEmpCode(sheetRow) }]
+        : []),
       { label: 'Amount', value: formatIN(sheetRow.amount) },
       { label: 'State', value: display(sheetRow.userState || sheetRow.state) },
       { label: 'City', value: display(sheetRow.userCity || sheetRow.city) },
@@ -373,7 +416,7 @@ export function UniqueDepositPendingScreen() {
         multiline: true,
       },
     ];
-  }, [sheetRow, canShowMobile]);
+  }, [sheetRow, canShowMobile, canShowEmpCode, formatEmpCode]);
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
@@ -452,12 +495,7 @@ export function UniqueDepositPendingScreen() {
           setPageSize(n);
           setPage(1);
         }}
-        searchFields={[
-          { key: 'userId', label: 'DP Id' },
-          { key: 'amount', label: 'Amount' },
-          { key: 'city', label: 'City' },
-          { key: 'state', label: 'State' },
-        ]}
+        searchFields={searchFields}
         searchField={searchField}
         onSearchFieldChange={setSearchField}
         searchText={draftSearch}
@@ -545,6 +583,14 @@ export function UniqueDepositPendingScreen() {
                   {display(row.userId)}
                 </Text>
               </View>
+              {canShowEmpCode ? (
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>Emp Code</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {formatEmpCode(row)}
+                  </Text>
+                </View>
+              ) : null}
               <View style={styles.cardRow}>
                 <Text style={styles.cardLabel}>Date</Text>
                 <Text style={styles.cardValue}>

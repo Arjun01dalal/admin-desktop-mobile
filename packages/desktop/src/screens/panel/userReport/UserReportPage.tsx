@@ -30,6 +30,7 @@ import { FundRequestTab } from './FundRequestTab';
 import { ProviderHistoryTab } from './ProviderHistoryTab';
 import { QtechBetDetailsTab } from './QtechBetDetailsTab';
 import { SettleJetfairModal } from './SettleJetfairModal';
+import { TopCasinoGamesSection } from './TopCasinoGamesSection';
 import {
   canShowAddBonusCoinsTab,
   canShowCoinsTab,
@@ -438,7 +439,10 @@ export function UserReportPage() {
           <CircularProgress />
         </Stack>
       ) : (
-        <TabBody tab={tab} userId={userId} encrypted={encrypted} />
+        <>
+          <TopCasinoGamesSection userId={userId} />
+          <TabBody tab={tab} userId={userId} encrypted={encrypted} />
+        </>
       )}
 
       <Dialog open={smSettleOpen} onClose={() => setSmSettleOpen(false)}>

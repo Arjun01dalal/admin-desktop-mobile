@@ -11,7 +11,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import { formatAmount, todayIST } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
@@ -714,7 +714,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
         {loading && <CircularProgress size={22} />}
       </Box>
 
-      <TablePanel>
+      <UserReportTablePanel>
         <CommonTable
           columns={columns}
           rows={rows}
@@ -725,7 +725,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
           dense
           maxHeight="100%"
         />
-      </TablePanel>
+      </UserReportTablePanel>
 
       {!raw && !loading && null}
     </Box>

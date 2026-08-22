@@ -21,6 +21,8 @@ import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { AddTopGamePanel } from '@/screens/panel/topGames/AddTopGamePanel';
+import { GameImageUploadCell } from '@/screens/panel/topGames/GameImageUploadCell';
+import { UpdateGameImageDialog } from '@/screens/panel/topGames/UpdateGameImageDialog';
 import {
   buildGameRows,
   formatCategoryLabel,
@@ -28,6 +30,7 @@ import {
   getGameName,
   getImageUrl,
   getProviderName,
+  getRawProviderName,
   normalizePayload,
 } from '@/screens/panel/topGames/helpers';
 import type {
@@ -36,6 +39,10 @@ import type {
   StatusTarget,
   TopGamesDoc,
 } from '@/screens/panel/topGames/types';
+import {
+  buildUpdateGameImagePayload,
+  type GameImageUpdateTarget,
+} from '@/screens/panel/topGames/updateGameImage';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
@@ -64,6 +71,7 @@ export function TopGamesPage() {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [statusTarget, setStatusTarget] = useState<StatusTarget | null>(null);
+  const [imageTarget, setImageTarget] = useState<GameImageUpdateTarget | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
   const loadGames = useCallback(async () => {
@@ -145,6 +153,61 @@ export function TopGamesPage() {
       status,
       name: getGameName(item),
     });
+  };
+
+  const openImageUpdate = (item: GameRow) => {
+    if (!item.gameId) {
+      toast.error('Game ID is required');
+      return;
+    }
+    const provider = getRawProviderName(item);
+    if (!provider) {
+      toast.error('Provider is required');
+      return;
+    }
+    setImageTarget({
+      gameId: item.gameId,
+      provider,
+      name: getGameName(item),
+      currentImageUrl: getImageUrl(item) || '',
+    });
+  };
+
+  const handleImageUpdate = async (imagePath: string) => {
+    if (!imageTarget) return;
+    setActionLoading(true);
+    try {
+      const payload = buildUpdateGameImagePayload(
+        imageTarget.gameId,
+        imagePath,
+        imageTarget.provider,
+      );
+      const res = await secureApi('topGames.updateImage', payload);
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update game image');
+        return;
+      }
+      setDoc((prev) => {
+        if (!prev?.data) return prev;
+        const nextData: typeof prev.data = {};
+        Object.entries(prev.data).forEach(([category, list]) => {
+          nextData[category] = list.map((game) =>
+            game.gameId === imageTarget.gameId
+              ? {
+                  ...game,
+                  imagePath,
+                  images: [{ type: 'logo-square', url: imagePath }],
+                }
+              : game,
+          );
+        });
+        return { ...prev, data: nextData };
+      });
+      toast.success('Game image updated successfully');
+      setImageTarget(null);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -246,26 +309,15 @@ export function TopGamesPage() {
       {
         id: 'image',
         label: 'Image',
-        width: 100,
-        render: (row) => {
-          const url = getImageUrl(row);
-          if (!url) return '-';
-          return (
-            <Box
-              component="img"
-              src={url}
-              alt={getGameName(row)}
-              sx={{
-                width: 72,
-                height: 72,
-                objectFit: 'cover',
-                borderRadius: 1,
-                display: 'block',
-                mx: 'auto',
-              }}
-            />
-          );
-        },
+        width: 96,
+        render: (row) => (
+          <GameImageUploadCell
+            imageUrl={getImageUrl(row) || null}
+            alt={getGameName(row)}
+            disabled={actionLoading || !row.gameId}
+            onUpdate={() => openImageUpdate(row)}
+          />
+        ),
       },
       {
         id: 'name',
@@ -445,7 +497,7 @@ export function TopGamesPage() {
           emptyMessage="No top games found"
           minWidth={1200}
           maxHeight="100%"
-          estimateRowHeight={84}
+          estimateRowHeight={96}
         />
       </TablePanel>
 
@@ -499,6 +551,14 @@ export function TopGamesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <UpdateGameImageDialog
+        open={!!imageTarget}
+        loading={actionLoading}
+        target={imageTarget}
+        onClose={() => setImageTarget(null)}
+        onSubmit={(path) => void handleImageUpdate(path)}
+      />
     </Box>
   );
 }

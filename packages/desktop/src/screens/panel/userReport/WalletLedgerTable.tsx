@@ -18,7 +18,7 @@ import {
   formatDisplayTime,
 } from '@/utils/dates';
 import { BetAmountBars } from './BetAmountBars';
-import { TablePanel } from '@/components/TablePanel';
+import { UserReportTablePanel } from './UserReportTablePanel';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { WalletRow } from './types';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -558,7 +558,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
   );
 
   const table = (
-    <TablePanel
+    <UserReportTablePanel
       sx={{ mt: wrapOverview ? 1 : 2 }}
       footerJustify="center"
       footerSx={{ bgcolor: '#f4f6f8', borderColor: '#dde2e8' }}
@@ -606,7 +606,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
         estimateRowHeight={40}
         getRowSx={(r) => ({ bgcolor: rowBg(r.action) })}
       />
-    </TablePanel>
+    </UserReportTablePanel>
   );
 
   if (wrapOverview) {

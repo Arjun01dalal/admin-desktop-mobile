@@ -32,6 +32,12 @@ import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { asList, useReportQuery } from '@/screens/panel/shared';
 import { AddGameLaunchBannerModal } from '@/screens/panel/banners/AddGameLaunchBannerModal';
+import { GameImageUploadCell } from '@/screens/panel/topGames/GameImageUploadCell';
+import { UpdateGameImageDialog } from '@/screens/panel/topGames/UpdateGameImageDialog';
+import {
+  buildUpdateGameImagePayload,
+  type GameImageUpdateTarget,
+} from '@/screens/panel/topGames/updateGameImage';
 import { replaceS3WithCloudfront } from '@/utils/cdnUrl';
 import {
   BANNER_CATEGORY_OPTIONS,
@@ -45,11 +51,27 @@ type BannerRow = {
   _id: string;
   imagePath?: string;
   gameName?: string;
+  gameId?: string;
+  providerName?: string;
   type?: string;
   status?: boolean;
   position?: number;
   [key: string]: unknown;
 };
+
+function isGameBanner(row: BannerRow): boolean {
+  if (row.type === 'game') return true;
+  if (String(row.category || '') === 'gameLaunch') return true;
+  return Boolean(String(row.gameId || '').trim());
+}
+
+function bannerGameId(row: BannerRow): string {
+  return String(row.gameId || '').trim();
+}
+
+function bannerProvider(row: BannerRow): string {
+  return String(row.providerName || row.provider || '').trim();
+}
 
 type AddForm = {
   imageDataUrl: string;
@@ -132,6 +154,10 @@ export function BannersPage() {
   const [updateImageId, setUpdateImageId] = useState('');
   const [updateImagePath, setUpdateImagePath] = useState('');
   const [updateImageName, setUpdateImageName] = useState('');
+  const [gameImageTarget, setGameImageTarget] = useState<GameImageUpdateTarget | null>(
+    null,
+  );
+  const [gameImageSaving, setGameImageSaving] = useState(false);
   const [updatingImage, setUpdatingImage] = useState(false);
 
   const canAdd = hasPermission(Permissions.Add_Banner);
@@ -332,11 +358,55 @@ export function BannersPage() {
   );
 
   const openUpdateImage = useCallback((row: BannerRow) => {
+    if (isGameBanner(row)) {
+      const gameId = bannerGameId(row);
+      const provider = bannerProvider(row);
+      if (!gameId) {
+        toast.error('Game ID is required');
+        return;
+      }
+      if (!provider) {
+        toast.error('Provider is required');
+        return;
+      }
+      setGameImageTarget({
+        gameId,
+        provider,
+        name: row.gameName || gameId,
+        currentImageUrl: row.imagePath ? replaceS3WithCloudfront(row.imagePath) : '',
+      });
+      return;
+    }
     setUpdateImageId(row._id);
     setUpdateImagePath(row.imagePath || '');
     setUpdateImageName(row.gameName || '');
     setUpdateImageOpen(true);
   }, []);
+
+  const handleGameImageUpdate = useCallback(
+    async (imagePath: string) => {
+      if (!gameImageTarget) return;
+      setGameImageSaving(true);
+      try {
+        const payload = buildUpdateGameImagePayload(
+          gameImageTarget.gameId,
+          imagePath,
+          gameImageTarget.provider,
+        );
+        const res = await secureApi('topGames.updateImage', payload);
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update game image');
+          return;
+        }
+        toast.success('Game image updated successfully');
+        setGameImageTarget(null);
+        void load();
+      } finally {
+        setGameImageSaving(false);
+      }
+    },
+    [gameImageTarget, load],
+  );
 
   const closeUpdateImage = useCallback(() => {
     if (updatingImage) return;
@@ -405,26 +475,36 @@ export function BannersPage() {
       {
         id: 'image',
         label: 'Image',
-        width: 120,
+        width: 108,
         render: (row) => {
-          if (!row.imagePath) return '—';
+          if (!row.imagePath && !isGameBanner(row)) return '—';
+          const src = row.imagePath ? replaceS3WithCloudfront(row.imagePath) : null;
           const isVideo =
-            row.imagePath.toLowerCase().includes('.mp4') ||
-            row.imagePath.toLowerCase().includes('video');
+            Boolean(src) &&
+            (src!.toLowerCase().includes('.mp4') || src!.toLowerCase().includes('video'));
+
+          if (isGameBanner(row)) {
+            return (
+              <GameImageUploadCell
+                imageUrl={src}
+                alt={row.gameName || bannerGameId(row) || 'Banner game'}
+                disabled={gameImageSaving || !bannerGameId(row)}
+                onUpdate={() => openUpdateImage(row)}
+                variant="wide"
+                isVideo={isVideo}
+              />
+            );
+          }
+
+          if (!src) return '—';
           return (
-            <Box
-              component={isVideo ? 'video' : 'img'}
-              src={row.imagePath}
-              controls={isVideo || undefined}
-              alt={isVideo ? undefined : row.gameName || 'Banner'}
-              sx={{
-                height: 56,
-                width: 96,
-                objectFit: 'cover',
-                borderRadius: 1,
-                display: 'block',
-                mx: 'auto',
-              }}
+            <GameImageUploadCell
+              imageUrl={src}
+              alt={row.gameName || 'Banner'}
+              disabled={updatingImage}
+              onUpdate={() => openUpdateImage(row)}
+              variant="wide"
+              isVideo={isVideo}
             />
           );
         },
@@ -575,6 +655,8 @@ export function BannersPage() {
     handleUpdatePosition,
     openUpdateImage,
     openDelete,
+    gameImageSaving,
+    updatingImage,
   ]);
 
   return (
@@ -867,6 +949,14 @@ export function BannersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <UpdateGameImageDialog
+        open={!!gameImageTarget}
+        loading={gameImageSaving}
+        target={gameImageTarget}
+        onClose={() => setGameImageTarget(null)}
+        onSubmit={(path) => void handleGameImageUpdate(path)}
+      />
 
       <Dialog
         open={videoOpen}

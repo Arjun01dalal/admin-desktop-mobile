@@ -166,6 +166,8 @@ export function UsersPage() {
     search: query.search,
     clientName: query.clientName,
     setClientName: query.setClientName,
+    playedIn: query.playedIn,
+    setPlayedIn: query.setPlayedIn,
     setPage: query.setPage,
     botId: dialer.botId,
     canShowMobile,

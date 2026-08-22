@@ -388,10 +388,6 @@ export function UserExposureScreen() {
   const [msg, setMsg] = useState('');
   const [plutusPage, setPlutusPage] = useState(1);
   const [plutusPerPage, setPlutusPerPage] = useState(20);
-  const [plutusDetail, setPlutusDetail] = useState<{
-    sr: number;
-    fields: { label: string; value: string }[];
-  } | null>(null);
   const [edit, setEdit] = useState<{
     row: Rec;
     status: string;
@@ -409,7 +405,6 @@ export function UserExposureScreen() {
       if (!userId) return;
       setProvider(next);
       setEdit(null);
-      setPlutusDetail(null);
       setPlutusPage(1);
       setLoading(true);
       setMsg('');
@@ -626,40 +621,6 @@ export function UserExposureScreen() {
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : msg ? (
         <Text style={styles.muted}>{msg}</Text>
-      ) : isPlutus ? (
-        rows.length === 0 ? (
-          <Text style={styles.muted}>No exposure details</Text>
-        ) : (
-          <View style={styles.plutusList}>
-            {pageRows.map((r, i) => {
-              const sr = (plutusPage - 1) * plutusPerPage + i + 1;
-              const fields = plutusCardFields(r);
-              const summary = plutusCardSummary(fields);
-              return (
-                <TouchableOpacity
-                  key={String(r._id ?? r.transactionId ?? i)}
-                  style={styles.plutusCard}
-                  activeOpacity={0.75}
-                  onPress={() => setPlutusDetail({ sr, fields })}
-                >
-                  <View style={styles.plutusCardCollapsed}>
-                    <View style={styles.plutusCardMid}>
-                      <Text style={styles.plutusCardTitle} numberOfLines={1}>
-                        #{sr} · {summary.title}
-                      </Text>
-                      {summary.subtitle ? (
-                        <Text style={styles.plutusCardSub} numberOfLines={1}>
-                          {summary.subtitle}
-                        </Text>
-                      ) : null}
-                    </View>
-                    <Text style={styles.plutusChevron}>▼</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )
       ) : (
         <ResponsiveTable
           forceCards
@@ -691,43 +652,6 @@ export function UserExposureScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
-
-      <Modal
-        visible={plutusDetail != null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPlutusDetail(null)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.plutusModalCard]}>
-            <Text style={styles.modalTitle}>
-              Plutus Gaming #{plutusDetail?.sr ?? ''}
-            </Text>
-            <ScrollView
-              style={styles.plutusModalScroll}
-              contentContainerStyle={styles.plutusFieldGrid}
-              showsVerticalScrollIndicator={false}
-            >
-              {(plutusDetail?.fields ?? []).map((f) => (
-                <View key={f.label} style={styles.plutusField}>
-                  <Text style={styles.plutusFieldLabel} numberOfLines={1}>
-                    {f.label}
-                  </Text>
-                  <Text style={styles.plutusFieldValue} numberOfLines={3}>
-                    {f.value}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.plutusModalClose}
-              onPress={() => setPlutusDetail(null)}
-            >
-              <Text style={styles.plutusModalCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={edit != null} transparent animationType="fade" onRequestClose={() => setEdit(null)}>
         <View style={styles.modalBackdrop}>
