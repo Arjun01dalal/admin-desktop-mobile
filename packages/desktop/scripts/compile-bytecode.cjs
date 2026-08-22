@@ -58,6 +58,7 @@ const COMPILE = [
   'ipcRegistry.cjs',
   'siteAuth.cjs',
   'fcmToken.cjs',
+  'fcmListener.cjs',
   'secure/index.cjs',
   'secure/registry.cjs',
   'secure/crypto.cjs',

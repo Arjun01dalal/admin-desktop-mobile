@@ -18,7 +18,13 @@
     "./vipClients": "./src/vipClients.ts",
     "./userTypes": "./src/userTypes.ts",
     "./callLogs": "./src/callLogs.ts",
-    "./states": "./src/states.ts"
+    "./states": "./src/states.ts",
+    "./midLimits": "./src/midLimits.ts",
+    "./updateGameImage": "./src/updateGameImage.ts",
+    "./ludoRtp": "./src/ludoRtp.ts",
+    "./walletOtp": "./src/walletOtp.ts",
+    "./subAdminFcm": "./src/subAdminFcm.ts",
+    "./depositWithdrawalReport": "./src/depositWithdrawalReport.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

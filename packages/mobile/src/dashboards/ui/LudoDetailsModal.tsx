@@ -2,7 +2,7 @@
  * Ludo Update Game IDs + Update RTP dialogs
  * (port of desktop LudoDetailsModal for React Native).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -12,9 +12,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { formatLudoRtp, parseLudoRtpList, type LudoRtpRow } from '@astro/shared/ludoRtp';
+import {
+  apiOtpFailed,
+  maskOtpMobile,
+  resolveWalletOtpMobile,
+} from '@astro/shared/walletOtp';
 import { secureApi } from '../../api/client';
+import { getSessionUser } from '../../auth/permissions';
 import { colors, radius, spacing } from '../../theme';
 import { Button, Input } from '../../components/UI';
+
 export type LudoModalAction = 'update' | 'rtp' | null;
 
 type Props = {
@@ -50,10 +58,19 @@ export function LudoDetailsModal({
   const [rtpValue, setRtpValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [rtpLoading, setRtpLoading] = useState(false);
+  const [rtpListLoading, setRtpListLoading] = useState(false);
+  const [rtpRows, setRtpRows] = useState<LudoRtpRow[]>([]);
   const [currentGameIds, setCurrentGameIds] = useState<string[]>([]);
   const [message, setMessage] = useState<Msg>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmRtp, setConfirmRtp] = useState(false);
+  const [otpPending, setOtpPending] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+
+  const otpMobile = resolveWalletOtpMobile(getSessionUser()?.mobile);
 
   const gameIdsKey = existingGameIds.join(',');
   const updateOpen = open && action === 'update';
@@ -62,10 +79,6 @@ export function LudoDetailsModal({
   useEffect(() => {
     const gameIds = existingGameIds.filter((id) => id && id !== 'All');
     setCurrentGameIds(gameIds);
-    if (!selectedRtpGameId && gameIds.length) {
-      setSelectedRtpGameId(gameIds[0]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameIdsKey]);
 
   useEffect(() => {
@@ -76,12 +89,41 @@ export function LudoDetailsModal({
     setMessage(null);
     setConfirmRemove(false);
     setConfirmRtp(false);
-    const gameIds = existingGameIds.filter((id) => id && id !== 'All');
-    if (action === 'rtp') {
-      setSelectedRtpGameId(gameIds[0] || '');
+    setOtpPending(false);
+    setOtp('');
+    setOtpSending(false);
+    setOtpVerifying(false);
+    setOtpSent(false);
+    setSelectedRtpGameId('');
+  }, [open, action]);
+
+  const loadRtpList = useCallback(async () => {
+    setRtpListLoading(true);
+    setMessage(null);
+    try {
+      const res = await secureApi<unknown>('dashboard.ludoRtpGet', {});
+      if (!res.ok) {
+        setRtpRows([]);
+        setMessage({ text: res.message || 'Failed to load RTP list', error: true });
+        return;
+      }
+      const rows = parseLudoRtpList(res.data);
+      setRtpRows(rows);
+      if (rows.length) {
+        setSelectedRtpGameId((prev) => prev || rows[0].gameId);
+        setRtpValue((prev) => (prev ? prev : String(rows[0].rtp ?? '')));
+      }
+    } catch {
+      setRtpRows([]);
+      setMessage({ text: 'Failed to load RTP list', error: true });
+    } finally {
+      setRtpListLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, action, gameIdsKey]);
+  }, []);
+
+  useEffect(() => {
+    if (rtpOpen) void loadRtpList();
+  }, [rtpOpen, loadRtpList]);
 
   const callGameIdsApi = async (payload: Record<string, unknown>) => {
     setLoading(true);
@@ -139,16 +181,24 @@ export function LudoDetailsModal({
     );
   };
 
-  const handleUpdateRtp = async () => {
+  const selectRtpRow = (row: LudoRtpRow) => {
+    setSelectedRtpGameId(row.gameId);
+    setRtpValue(String(row.rtp ?? ''));
     setConfirmRtp(false);
+    setOtpPending(false);
+    setOtp('');
+    setMessage(null);
+  };
+
+  const performRtpUpdate = async () => {
     if (!selectedRtpGameId) {
-      setMessage({ text: 'Select a game ID', error: true });
-      return;
+      setMessage({ text: 'Select a game', error: true });
+      return false;
     }
     const rtp = Number(rtpValue);
     if (!rtpValue.trim() || !Number.isFinite(rtp) || rtp < 0) {
       setMessage({ text: 'Enter a valid RTP value', error: true });
-      return;
+      return false;
     }
     setRtpLoading(true);
     setMessage(null);
@@ -159,22 +209,92 @@ export function LudoDetailsModal({
       });
       if (!res.ok) {
         setMessage({ text: res.message || 'Failed to update RTP', error: true });
-        return;
+        return false;
       }
-      setRtpValue('');
-      onClose();
+      setMessage({ text: res.message || 'RTP updated successfully', error: false });
+      setRtpRows((prev) =>
+        prev.map((row) =>
+          row.gameId === selectedRtpGameId ? { ...row, rtp } : row,
+        ),
+      );
+      setOtpPending(false);
+      setOtp('');
+      return true;
     } catch {
       setMessage({ text: 'Failed to update RTP', error: true });
+      return false;
     } finally {
       setRtpLoading(false);
     }
   };
 
-  const busy = loading || rtpLoading;
+  const sendRtpOtp = async () => {
+    setOtpSending(true);
+    setMessage(null);
+    try {
+      const res = await secureApi<unknown>('users.sendWalletOtp', { mobile: otpMobile });
+      if (apiOtpFailed(res)) {
+        setMessage({ text: res.message || 'Failed to send OTP', error: true });
+        return false;
+      }
+      setOtpSent(true);
+      setMessage({
+        text: `OTP sent to SuperAdmin (${maskOtpMobile(otpMobile)})`,
+        error: false,
+      });
+      return true;
+    } catch {
+      setMessage({ text: 'Failed to send OTP', error: true });
+      return false;
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const beginRtpOtpVerification = async () => {
+    setConfirmRtp(false);
+    if (!selectedRtpGameId) {
+      setMessage({ text: 'Select a game', error: true });
+      return;
+    }
+    const rtp = Number(rtpValue);
+    if (!rtpValue.trim() || !Number.isFinite(rtp) || rtp < 0) {
+      setMessage({ text: 'Enter a valid RTP value', error: true });
+      return;
+    }
+    setOtp('');
+    setOtpPending(true);
+    await sendRtpOtp();
+  };
+
+  const verifyRtpOtpAndUpdate = async () => {
+    const code = otp.trim();
+    if (!/^\d{4}$/.test(code)) {
+      setMessage({ text: 'OTP must be 4 digits', error: true });
+      return;
+    }
+    setOtpVerifying(true);
+    setMessage(null);
+    try {
+      const res = await secureApi<unknown>('users.verifyBlockOtp', {
+        mobile: otpMobile,
+        otp: Number(code),
+      });
+      if (apiOtpFailed(res)) {
+        setMessage({ text: res.message || 'Invalid OTP', error: true });
+        return;
+      }
+      await performRtpUpdate();
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+  const busy = loading || rtpLoading || rtpListLoading || otpSending || otpVerifying;
   const handleClose = () => {
     if (busy) return;
     onClose();
   };
+  const selectedRow = rtpRows.find((row) => row.gameId === selectedRtpGameId);
 
   return (
     <Modal
@@ -187,7 +307,8 @@ export function LudoDetailsModal({
         <View style={styles.sheet}>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.sheetContent}>
+            contentContainerStyle={styles.sheetContent}
+          >
             {updateOpen && (
               <>
                 <Text style={styles.title}>Update Game IDs</Text>
@@ -274,87 +395,153 @@ export function LudoDetailsModal({
 
             {rtpOpen && (
               <>
-                <Text style={styles.title}>Update RTP</Text>
+                <View style={styles.rtpHeaderRow}>
+                  <Text style={styles.title}>Update RTP</Text>
+                  <TouchableOpacity
+                    onPress={() => void loadRtpList()}
+                    disabled={rtpListLoading || rtpLoading}
+                    style={styles.refreshBtn}
+                  >
+                    <Text style={styles.refreshBtnText}>
+                      {rtpListLoading ? 'Loading…' : 'Refresh'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-                <Text style={styles.sectionLabel}>Game ID</Text>
-                {currentGameIds.length ? (
-                  <View style={styles.chipWrap}>
-                    {currentGameIds.map((id) => {
-                      const active = selectedRtpGameId === id;
+                <Text style={styles.sectionLabel}>Game-wise RTP</Text>
+                {rtpListLoading ? (
+                  <ActivityIndicator color={colors.primary} style={styles.rtpLoader} />
+                ) : rtpRows.length ? (
+                  <View style={styles.rtpList}>
+                    {rtpRows.map((row) => {
+                      const active = selectedRtpGameId === row.gameId;
                       return (
                         <TouchableOpacity
-                          key={id}
-                          onPress={() => {
-                            setSelectedRtpGameId(id);
-                            setConfirmRtp(false);
-                          }}
+                          key={row.gameId}
+                          style={[styles.rtpRow, active && styles.rtpRowActive]}
+                          onPress={() => selectRtpRow(row)}
                           disabled={rtpLoading}
-                          style={[styles.chip, active && styles.chipActive]}
                         >
-                          <Text style={[styles.chipText, active && styles.chipActiveText]}>
-                            {id}
-                          </Text>
+                          <View style={styles.rtpRowMain}>
+                            <Text style={styles.rtpGameId} numberOfLines={1}>
+                              {row.gameName || row.gameId}
+                            </Text>
+                            {row.gameName ? (
+                              <Text style={styles.rtpGameSub} numberOfLines={1}>
+                                ID: {row.gameId}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Text style={styles.rtpValue}>{formatLudoRtp(row.rtp)}</Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
                 ) : (
-                  <Text style={styles.mutedText}>No game IDs available</Text>
+                  <Text style={styles.mutedText}>No RTP data found</Text>
                 )}
 
-                <Text style={styles.sectionLabel}>RTP</Text>
-                <Input
-                  placeholder="RTP"
-                  value={rtpValue}
-                  onChangeText={(v) => {
-                    setRtpValue(v);
-                    setConfirmRtp(false);
-                  }}
-                  editable={!rtpLoading}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-
-                {confirmRtp ? (
-                  <View style={styles.confirmRow}>
-                    <Text style={styles.confirmText}>
-                      Set RTP of {selectedRtpGameId} to {rtpValue}?
-                    </Text>
-                    <View style={styles.btnRow}>
-                      <Button
-                        title="Cancel"
-                        variant="outline"
-                        onPress={() => setConfirmRtp(false)}
-                        style={styles.smallBtn}
-                      />
-                      <Button
-                        title="Confirm"
-                        onPress={() => void handleUpdateRtp()}
-                        loading={rtpLoading}
-                        style={styles.smallBtn}
-                      />
-                    </View>
-                  </View>
-                ) : (
-                  <Button
-                    title="Update"
-                    onPress={() => {
-                      setMessage(null);
-                      const rtp = Number(rtpValue);
-                      if (!selectedRtpGameId) {
-                        setMessage({ text: 'Select a game ID', error: true });
-                        return;
-                      }
-                      if (!rtpValue.trim() || !Number.isFinite(rtp) || rtp < 0) {
-                        setMessage({ text: 'Enter a valid RTP value', error: true });
-                        return;
-                      }
-                      setConfirmRtp(true);
+                <View style={styles.box}>
+                  <Text style={styles.sectionLabel}>
+                    {selectedRow
+                      ? `Edit RTP — ${selectedRow.gameName || selectedRow.gameId}`
+                      : 'Edit RTP'}
+                  </Text>
+                  <Input
+                    placeholder="RTP (e.g. 0.8, 0.9, 1)"
+                    value={rtpValue}
+                    onChangeText={(v) => {
+                      setRtpValue(v);
+                      setConfirmRtp(false);
+                      setOtpPending(false);
+                      setOtp('');
                     }}
-                    disabled={rtpLoading || !currentGameIds.length}
-                    style={styles.smallBtn}
+                    editable={!rtpLoading && !otpVerifying && Boolean(selectedRtpGameId)}
+                    keyboardType="numeric"
+                    style={styles.input}
                   />
-                )}
+
+                  {confirmRtp ? (
+                    <View style={styles.confirmRow}>
+                      <Text style={styles.confirmText}>
+                        Set RTP of {selectedRtpGameId} to {rtpValue}?
+                      </Text>
+                      <View style={styles.btnRow}>
+                        <Button
+                          title="Cancel"
+                          variant="outline"
+                          onPress={() => setConfirmRtp(false)}
+                          style={styles.smallBtn}
+                        />
+                        <Button
+                          title="Confirm"
+                          onPress={() => void beginRtpOtpVerification()}
+                          loading={otpSending}
+                          style={styles.smallBtn}
+                        />
+                      </View>
+                    </View>
+                  ) : otpPending ? (
+                    <View style={styles.confirmRow}>
+                      <Text style={styles.confirmText}>
+                        OTP sent to SuperAdmin ({maskOtpMobile(otpMobile)}). Enter OTP to
+                        update RTP for {selectedRtpGameId} → {rtpValue}.
+                      </Text>
+                      <Input
+                        placeholder="4-digit OTP"
+                        value={otp}
+                        onChangeText={(v) => setOtp(v.replace(/\D/g, '').slice(0, 4))}
+                        editable={!otpVerifying && !rtpLoading}
+                        keyboardType="number-pad"
+                        style={styles.input}
+                      />
+                      <View style={styles.btnRow}>
+                        <Button
+                          title="Cancel"
+                          variant="outline"
+                          onPress={() => {
+                            setOtpPending(false);
+                            setOtp('');
+                          }}
+                          style={styles.smallBtn}
+                        />
+                        <Button
+                          title="Resend"
+                          variant="outline"
+                          onPress={() => void sendRtpOtp()}
+                          disabled={otpSending || otpVerifying}
+                          style={styles.smallBtn}
+                        />
+                        <Button
+                          title={otpVerifying ? 'Verifying…' : 'Verify & Update'}
+                          onPress={() => void verifyRtpOtpAndUpdate()}
+                          loading={otpVerifying || rtpLoading}
+                          disabled={!otpSent || otp.trim().length !== 4}
+                          style={styles.smallBtn}
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <Button
+                      title="Update RTP"
+                      onPress={() => {
+                        setMessage(null);
+                        const rtp = Number(rtpValue);
+                        if (!selectedRtpGameId) {
+                          setMessage({ text: 'Select a game from the list', error: true });
+                          return;
+                        }
+                        if (!rtpValue.trim() || !Number.isFinite(rtp) || rtp < 0) {
+                          setMessage({ text: 'Enter a valid RTP value', error: true });
+                          return;
+                        }
+                        setConfirmRtp(true);
+                      }}
+                      disabled={rtpLoading || rtpListLoading || otpPending || !selectedRtpGameId}
+                      style={styles.smallBtn}
+                    />
+                  )}
+                </View>
               </>
             )}
 
@@ -396,7 +583,22 @@ const styles = StyleSheet.create({
     maxHeight: '85%',
   },
   sheetContent: { padding: spacing(4) },
-  title: { color: colors.foreground, fontSize: 17, fontWeight: '800', marginBottom: spacing(3) },
+  title: { color: colors.foreground, fontSize: 17, fontWeight: '800' },
+  rtpHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing(3),
+    gap: spacing(2),
+  },
+  refreshBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  },
+  refreshBtnText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
   sectionLabel: {
     color: colors.foreground,
     fontSize: 13,
@@ -404,6 +606,34 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
     marginTop: spacing(1),
   },
+  rtpLoader: { marginVertical: spacing(3) },
+  rtpList: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    marginBottom: spacing(3),
+  },
+  rtpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  rtpRowActive: {
+    backgroundColor: 'rgba(255,159,10,0.12)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9f0a',
+  },
+  rtpRowMain: { flex: 1, minWidth: 0 },
+  rtpGameId: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  rtpGameSub: { color: colors.muted, fontSize: 11, marginTop: 2 },
+  rtpValue: { color: colors.primary, fontSize: 15, fontWeight: '800' },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -418,8 +648,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipActiveText: { color: colors.primaryForeground },
   chipRemove: { backgroundColor: colors.destructive, borderColor: colors.destructive },
   chipRemoveText: { color: '#fff' },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },

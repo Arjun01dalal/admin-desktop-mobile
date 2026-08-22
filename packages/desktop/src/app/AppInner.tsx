@@ -237,6 +237,19 @@ export function AppInner() {
     };
   }, [inPanel, user, logout]);
 
+  // FCM toasts on splash / Astro login / OTP login (panel uses AppShell hook).
+  useEffect(() => {
+    if (inPanel) return;
+    const unsub = window.gcalc?.onPushNotification?.((payload) => {
+      const title = String(payload?.title || 'Notification').trim();
+      const body = String(payload?.body || '').trim();
+      toast.info(body ? `${title}: ${body}` : title, { autoClose: 9000 });
+    });
+    return () => {
+      unsub?.();
+    };
+  }, [inPanel]);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

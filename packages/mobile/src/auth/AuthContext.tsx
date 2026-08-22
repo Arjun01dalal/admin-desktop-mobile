@@ -12,6 +12,7 @@ import { eraseSessionSecrets, eraseToken, persistToken, persistUser } from '../l
 import { appStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
 import { registerSosPush } from '../push/sosPush';
+import { registerSubAdminFcmToken } from './registerFcmToken';
 import { resetTokenValidationThrottle } from './sessionCheck';
 import { useTokenValidator } from './useTokenValidator';
 import type { AuthUser } from '../types/auth';
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(newToken);
     setUser(newUser);
     void registerSosPush(); // APK builds: enable closed-app SOS siren push.
+    void registerSubAdminFcmToken(newUser);
   }, []);
 
   const switchRole = useCallback(

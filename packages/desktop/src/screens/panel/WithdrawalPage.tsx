@@ -16,6 +16,7 @@ import {
   Pagination,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -26,6 +27,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TuneIcon from '@mui/icons-material/Tune';
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { secureApi } from '@/api/secureClient';
@@ -96,6 +98,8 @@ import {
   withdrawalRowBg,
   maskAccount,
   maskIfsc,
+  resolveWithdrawalReportUserId,
+  showWithdrawalMidReport,
 } from '@/screens/panel/withdrawal/logic';
 import { requireWithdrawalGeo } from '@/screens/panel/withdrawal/geo';
 import { ActionDialog } from '@/screens/panel/withdrawal/ActionDialog';
@@ -104,6 +108,7 @@ import { AddBeneDialog } from '@/screens/panel/withdrawal/AddBeneDialog';
 import { QrApproveDialog } from '@/screens/panel/withdrawal/QrApproveDialog';
 import { BeneListDialog } from '@/screens/panel/withdrawal/BeneListDialog';
 import { BeneficiarySelect } from '@/screens/panel/withdrawal/BeneficiarySelect';
+import { DepositWithdrawalMidModal } from '@/screens/panel/withdrawal/DepositWithdrawalMidModal';
 
 const CLIENT_NAME_OPTIONS = ['', ...CLIENT_NAMES];
 const STATE_OPTIONS = ['', ...INDIA_STATES];
@@ -135,6 +140,103 @@ function Copyable({ value, masked }: { value?: string; masked: string }) {
         <ContentCopyIcon sx={{ fontSize: 14 }} />
       </IconButton>
     </Stack>
+  );
+}
+
+function UserNameMidReportCell({
+  row,
+  canOpenUserReport,
+  onOpenMidReport,
+  onOpenUserReport,
+}: {
+  row: WithdrawalRow;
+  canOpenUserReport: boolean;
+  onOpenMidReport: (row: WithdrawalRow) => void;
+  onOpenUserReport: (row: WithdrawalRow, label: string, userId: string) => void;
+}) {
+  const label = displayUserName(row);
+  const reportUserId = resolveWithdrawalReportUserId(row);
+  const midReportVisible = Boolean(reportUserId) && showWithdrawalMidReport(row.status);
+  const canLink = canOpenUserReport && Boolean(reportUserId) && label !== '—';
+
+  return (
+    <Box
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 0.5,
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+      }}
+    >
+      <Typography
+        component={canLink ? 'button' : 'span'}
+        type={canLink ? 'button' : undefined}
+        title={label}
+        onClick={
+          canLink
+            ? (e) => {
+                e.stopPropagation();
+                onOpenUserReport(row, label, reportUserId);
+              }
+            : undefined
+        }
+        sx={{
+          ...(canLink
+            ? {
+                all: 'unset',
+                cursor: 'pointer',
+                color: '#4fc3f7 !important',
+                '&:hover': {
+                  color: '#81d4fa !important',
+                  textDecoration: 'underline',
+                },
+              }
+            : null),
+          fontSize: 12,
+          fontWeight: 700,
+          lineHeight: 1.25,
+          minWidth: 0,
+          maxWidth: midReportVisible ? 'calc(100% - 26px)' : '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          textAlign: 'center',
+        }}
+      >
+        {label}
+      </Typography>
+      {midReportVisible ? (
+        <Tooltip title="Choose MID for Withdrawal" arrow placement="top">
+          <IconButton
+            size="small"
+            aria-label="Choose MID for Withdrawal"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenMidReport(row);
+            }}
+            sx={{
+              flexShrink: 0,
+              color: '#ff9f0a',
+              width: 22,
+              height: 22,
+              p: 0,
+              borderRadius: 1,
+              border: '1px solid rgba(255,159,10,0.35)',
+              bgcolor: 'rgba(255,159,10,0.1)',
+              '&:hover': {
+                bgcolor: 'rgba(255,159,10,0.22)',
+                borderColor: 'rgba(255,159,10,0.55)',
+              },
+            }}
+          >
+            <AssessmentOutlinedIcon sx={{ fontSize: 13 }} />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+    </Box>
   );
 }
 
@@ -198,6 +300,9 @@ export function WithdrawalPage() {
 
   const [beneOpen, setBeneOpen] = useState(false);
   const [beneRow, setBeneRow] = useState<WithdrawalRow | null>(null);
+
+  const [midReportOpen, setMidReportOpen] = useState(false);
+  const [midReportRow, setMidReportRow] = useState<WithdrawalRow | null>(null);
 
   const [qrOpen, setQrOpen] = useState(false);
   const [qrRow, setQrRow] = useState<WithdrawalRow | null>(null);
@@ -1016,46 +1121,27 @@ export function WithdrawalPage() {
       {
         id: 'userName',
         label: 'User Name',
-        width: 140,
+        width: 148,
         stickyLeft: true,
+        cellSx: { py: '6px !important', px: 0.75 },
         filter: searchFilter('userName', 'User name'),
-        render: (row) => {
-          const label = displayUserName(row);
-          // Withdrawal rows carry the user id in `dp_id` (same as Add Bene flow).
-          const userId = String(row.dp_id || row.userId || '').trim();
-          if (!canOpenUserReport || !userId || label === '—') return label;
-          return (
-            <Typography
-              component="button"
-              type="button"
-              title={label}
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(
-                  `/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(
-                    row.userName || row.accountHolderName || label,
-                  )}`,
-                );
-              }}
-              sx={{
-                all: 'unset',
-                cursor: 'pointer',
-                // Row background styling sets `td { color: … !important }`
-                color: '#4fc3f7 !important',
-                fontSize: 12,
-                fontWeight: 700,
-                textDecoration: 'underline',
-                maxWidth: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                '&:hover': { color: '#81d4fa !important' },
-              }}
-            >
-              {label}
-            </Typography>
-          );
-        },
+        render: (row) => (
+          <UserNameMidReportCell
+            row={row}
+            canOpenUserReport={canOpenUserReport}
+            onOpenMidReport={(target) => {
+              setMidReportRow(target);
+              setMidReportOpen(true);
+            }}
+            onOpenUserReport={(target, label, userId) => {
+              navigate(
+                `/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(
+                  target.userName || target.accountHolderName || label,
+                )}`,
+              );
+            }}
+          />
+        ),
       },
       {
         id: 'sendToBank',
@@ -1322,7 +1408,6 @@ export function WithdrawalPage() {
           );
         },
       },
-      // Old panel order: Lock By → Check By → Delay → Cross Check By
       {
         id: 'lockBy',
         label: 'Lock By',
@@ -1962,6 +2047,16 @@ export function WithdrawalPage() {
       />
 
       <BotValidationModal open={botOpen} items={botItems} onClose={() => setBotOpen(false)} />
+
+      <DepositWithdrawalMidModal
+        open={midReportOpen}
+        row={midReportRow}
+        catalogMids={mids.map((m) => String(m.mid ?? '').trim()).filter(Boolean)}
+        onClose={() => {
+          setMidReportOpen(false);
+          setMidReportRow(null);
+        }}
+      />
 
       <AddBeneDialog
         open={beneOpen}

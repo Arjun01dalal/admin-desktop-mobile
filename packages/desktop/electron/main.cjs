@@ -87,6 +87,7 @@ let cachedAuthToken = null;
 let sosMonitor = null;
 /** @type {{ stop?: () => void, publishSos?: () => Promise<boolean>, publishClear?: () => Promise<boolean> } | null} */
 let pushClient = null;
+let fcmListener = null;
 
 function tokenStorePath() {
   return path.join(app.getPath('userData'), 'session.token');
@@ -733,6 +734,19 @@ app.whenReady().then(() => {
     onSosCleared: () => sosMonitor?.forceClear?.(),
   });
 
+  // Firebase Cloud Messaging — OS notifications + in-app toasts for all pushes.
+  try {
+    const { startFcmListener } = require('./fcmListener.cjs');
+    fcmListener = startFcmListener({
+      broadcastToPanels: (channel, payload) =>
+        panelWindows.broadcastToPanels(channel, payload),
+      showMainWindow: () => showMainWindow(),
+      getSosMonitor: () => sosMonitor,
+    });
+  } catch (err) {
+    console.warn('[fcm-listen] init failed:', err?.message || err);
+  }
+
   // Warn early (non-blocking) if the API's live cert no longer matches our pins.
   require('./certPin.cjs').startupPinHealthCheck();
 
@@ -743,6 +757,11 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  try {
+    fcmListener?.stop?.();
+  } catch {
+    // ignore
+  }
 });
 
 // Never quit when the last window is hidden — tray keeps SOS monitoring.

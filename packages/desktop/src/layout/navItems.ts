@@ -256,6 +256,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_PayIn_Accounts,
   },
   {
+    id: "midLimits",
+    label: "MID Limits",
+    path: "/mid-limits",
+    permission: Permissions.View_MID_Limits,
+  },
+  {
     id: "depositConfig",
     label: "Deposit Config",
     path: "/deposit-config",

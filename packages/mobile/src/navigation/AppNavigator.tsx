@@ -63,6 +63,7 @@ import { UtrProviderScreen } from '../screens/dashboards/details/UtrProviderScre
 import { InstantDepositProvidersScreen } from '../screens/dashboards/details/InstantDepositProvidersScreen';
 import { DepositProvidersScreen } from '../screens/dashboards/details/DepositProvidersScreen';
 import { DepositConfigScreen } from '../screens/dashboards/details/DepositConfigScreen';
+import { MidLimitsScreen } from '../screens/dashboards/details/MidLimitsScreen';
 import { DepositScreen } from '../screens/dashboards/details/DepositScreen';
 import { UsersKycScreen } from '../screens/dashboards/details/UsersKycScreen';
 import { FundRequestScreen } from '../screens/dashboards/details/FundRequestScreen';
@@ -140,6 +141,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/instant-provider': InstantDepositProvidersScreen as AnyScreen,
   '/pay-g-mid': DepositProvidersScreen as AnyScreen,
   '/deposit-config': DepositConfigScreen as AnyScreen,
+  '/mid-limits': MidLimitsScreen as AnyScreen,
   '/deposit': DepositScreen as AnyScreen,
   '/users-kyc': UsersKycScreen as AnyScreen,
   '/fund-request': FundRequestScreen as AnyScreen,

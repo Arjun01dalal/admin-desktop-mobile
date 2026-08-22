@@ -175,6 +175,15 @@ contextBridge.exposeInMainWorld('gcalc', {
       ipcRenderer.removeListener('sos:state', handler);
     };
   },
+  /** FCM / push notification from main process (OS notification + in-app toast). */
+  onPushNotification: (cb) => {
+    if (typeof cb !== 'function') return () => {};
+    const handler = (_e, d) => cb(d && typeof d === 'object' ? d : {});
+    ipcRenderer.on('gcalc:push-notification', handler);
+    return () => {
+      ipcRenderer.removeListener('gcalc:push-notification', handler);
+    };
+  },
   /**
    * Dev only (`npm run dev`) — main-process HTTP logs.
    * Disabled in packaged builds; Network tab cannot see main-process traffic anyway.

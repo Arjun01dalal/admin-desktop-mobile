@@ -47,6 +47,22 @@ const recentByKey = new Map<string, { at: number; result: ApiResult<unknown> }>(
 /** Identical read results reused briefly (StrictMode / remount / double fetch). */
 const READ_CACHE_TTL_MS = 2_000;
 
+/** Reads that must always hit the network (limits change often; stale cache confuses admins). */
+const NO_READ_CACHE = new Set<SecureAction>(['midLimits.get']);
+
+/** Drop cached read results after a mutation (e.g. midLimits.get after upsert). */
+export function invalidateSecureReadCache(action?: SecureAction): void {
+  if (!action) {
+    recentByKey.clear();
+    return;
+  }
+
+  const prefix = `${action}::`;
+  for (const key of recentByKey.keys()) {
+    if (key.startsWith(prefix)) recentByKey.delete(key);
+  }
+}
+
 function isMutationAction(action: SecureAction): boolean {
   return MUTATION_RE.test(action);
 }
@@ -160,7 +176,7 @@ export async function secureApi<T = unknown>(
   }
 
   // Mutations: always go through (no dedupe / cache).
-  if (isMutationAction(action)) {
+  if (isMutationAction(action) || NO_READ_CACHE.has(action)) {
     return invokeSecureApi<T>(action, cleaned.value, token, hadToken);
   }
 

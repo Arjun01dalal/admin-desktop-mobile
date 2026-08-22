@@ -54,6 +54,20 @@ function pickMessage(body: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Match electron/secure/index.cjs execute() payload unwrapping. */
+function resolvePayloadOut(
+  data: Record<string, unknown>,
+  keepDataEnvelope?: boolean,
+): unknown {
+  if (Array.isArray(data)) return data;
+  if (keepDataEnvelope) return data?.data ?? data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.payload)) return data.payload;
+
+  const inner = data?.data as Record<string, unknown> | undefined;
+  return inner?.payload ?? data?.data ?? data?.payload ?? data;
+}
+
 function maybeAuthFailure(
   action: SecureAction,
   hadToken: boolean,
@@ -294,13 +308,7 @@ export async function secureApi<T = unknown>(
       }
     }
 
-    const inner = data?.data as Record<string, unknown> | undefined;
-    const payloadOut = entry.keepDataEnvelope
-      ? (data?.data ?? data)
-      : ((inner && typeof inner === 'object' ? inner.payload : undefined) ??
-        data?.data ??
-        data?.payload ??
-        data);
+    const payloadOut = resolvePayloadOut(data, entry.keepDataEnvelope);
 
     // Some backends return HTTP 200 with success:false + a blacklist/expired
     // message instead of a 401. Catch that here too.

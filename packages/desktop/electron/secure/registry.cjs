@@ -73,6 +73,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  'auth.updateFcmToken': {
+    method: 'POST',
+    path: '/SubAdmin/update-fcm-token',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
 
   // House Games
   'houseGames.transactions': {
@@ -284,6 +290,12 @@ module.exports = {
     method: 'POST',
     path: '/SubAdmin/send-verification-otp',
     // Plain body: { mobile }
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'users.sendWalletOtp': {
+    method: 'POST',
+    path: '/User/sendOtp-walletToWallet',
     encryptRequest: false,
     decryptResponse: false,
   },
@@ -699,6 +711,30 @@ module.exports = {
   'depositProviders.cloneIntentPay': {
     method: 'POST',
     path: '/payinAccounts/clone-intent-pay',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'midLimits.get': {
+    method: 'POST',
+    path: '/payinAccounts/mid-limits/get',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'midLimits.upsert': {
+    method: 'POST',
+    path: '/payinAccounts/mid-limits/upsert',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'midLimits.getRecipients': {
+    method: 'POST',
+    path: '/payinAccounts/mid-limit-alerts/get-recipients',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'midLimits.setRecipients': {
+    method: 'POST',
+    path: '/payinAccounts/mid-limit-alerts/set-recipients',
     encryptRequest: true,
     decryptResponse: true,
   },
@@ -1407,6 +1443,12 @@ module.exports = {
   },
   'dashboard.ludoRtp': {
     method: 'POST',
+    path: '/Ludo/admin/rtp',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  'dashboard.ludoRtpGet': {
+    method: 'GET',
     path: '/Ludo/admin/rtp',
     encryptRequest: false,
     decryptResponse: false,

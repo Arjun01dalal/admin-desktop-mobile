@@ -44,7 +44,8 @@ export function RolesResponsibilitiesScreen() {
   const canView = hasPermission(Permissions.View_Roles_and_Responsibilities, user);
   const canEdit = hasPermission(Permissions.Edit_Role, user);
   const canDelete = hasPermission(Permissions.Delete_Role, user);
-  const canAdd = hasPermission(Permissions.add_new_role_responsibility, user);
+  const canAdd =
+    hasPermission(Permissions.add_new_role_responsibility, user) || canEdit;
   // Web panel gates the Coin Permission button on this dedicated responsibility.
   const canCoinPerm = hasPermission('Add_Coin_Permission', user);
 

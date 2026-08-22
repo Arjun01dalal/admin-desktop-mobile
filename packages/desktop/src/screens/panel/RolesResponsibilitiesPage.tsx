@@ -49,11 +49,31 @@ const orangeBtnSx = {
 };
 
 const TRUNCATE_LEN = 100;
+const ALL_GROUPS = 'ALL';
+
+function filterResponsibilitiesList(
+  list: Responsibility[],
+  search: string,
+  groupFilter: string,
+): Responsibility[] {
+  const q = search.trim().toLowerCase();
+  return list.filter((item) => {
+    const group = item.Group || 'Other';
+    if (groupFilter !== ALL_GROUPS && group !== groupFilter) return false;
+    if (!q) return true;
+    const name = String(item.Name || '').toLowerCase();
+    const enumVal = String(item.Enum || '').toLowerCase();
+    const id = String(item._id || '').toLowerCase();
+    return name.includes(q) || enumVal.includes(q) || id.includes(q);
+  });
+}
 
 export function RolesResponsibilitiesPage() {
   const canEdit = hasPermission(Permissions.Edit_Role);
   const canDelete = hasPermission(Permissions.Delete_Role);
-  const canAdd = hasPermission(Permissions.add_new_role_responsibility);
+  /** Laxmi: add_new_role_responsibility; also allow role editors to add entries. */
+  const canAdd =
+    hasPermission(Permissions.add_new_role_responsibility) || canEdit;
   const canView = hasPermission(Permissions.View_Roles_and_Responsibilities);
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -76,6 +96,10 @@ export function RolesResponsibilitiesPage() {
   const [deleteId, setDeleteId] = useState('');
   const [viewOpen, setViewOpen] = useState(false);
   const [viewRoleId, setViewRoleId] = useState('');
+  const [editRespSearch, setEditRespSearch] = useState('');
+  const [editRespGroupFilter, setEditRespGroupFilter] = useState(ALL_GROUPS);
+  const [viewRespSearch, setViewRespSearch] = useState('');
+  const [viewRespGroupFilter, setViewRespGroupFilter] = useState(ALL_GROUPS);
   const [submitting, setSubmitting] = useState(false);
 
   const respById = useMemo(() => {
@@ -130,6 +154,8 @@ export function RolesResponsibilitiesPage() {
     setEditId(role._id);
     setEditName(role.Name || '');
     setEditRespIds([...(role.Responsibilities || [])]);
+    setEditRespSearch('');
+    setEditRespGroupFilter(ALL_GROUPS);
     setEditOpen(true);
   };
 
@@ -237,6 +263,77 @@ export function RolesResponsibilitiesPage() {
     return responsibilityNames(role?.Responsibilities);
   }, [roles, viewRoleId, responsibilityNames]);
 
+  const viewResponsibilities = useMemo(() => {
+    const role = roles.find((r) => r._id === viewRoleId);
+    const items = (role?.Responsibilities || [])
+      .map((id) => respById.get(id))
+      .filter((item): item is Responsibility => Boolean(item));
+    return filterResponsibilitiesList(items, viewRespSearch, viewRespGroupFilter);
+  }, [roles, viewRoleId, respById, viewRespSearch, viewRespGroupFilter]);
+
+  const filteredEditGroups = useMemo(() => {
+    if (editRespGroupFilter !== ALL_GROUPS) return [editRespGroupFilter];
+    return groups;
+  }, [editRespGroupFilter, groups]);
+
+  const editResponsibilityFilters = (
+    <>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+        <TextField
+          select
+          label="Group"
+          size="small"
+          fullWidth
+          value={editRespGroupFilter}
+          onChange={(e) => setEditRespGroupFilter(e.target.value)}
+        >
+          <MenuItem value={ALL_GROUPS}>All groups</MenuItem>
+          {groups.map((group) => (
+            <MenuItem key={group} value={group}>
+              {group}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          label="Search responsibilities"
+          size="small"
+          fullWidth
+          value={editRespSearch}
+          onChange={(e) => setEditRespSearch(e.target.value)}
+          placeholder="Name or enum"
+        />
+      </Stack>
+    </>
+  );
+
+  const viewResponsibilityFilters = (
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} mb={1.5}>
+      <TextField
+        select
+        label="Group"
+        size="small"
+        fullWidth
+        value={viewRespGroupFilter}
+        onChange={(e) => setViewRespGroupFilter(e.target.value)}
+      >
+        <MenuItem value={ALL_GROUPS}>All groups</MenuItem>
+        {groups.map((group) => (
+          <MenuItem key={group} value={group}>
+            {group}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        label="Search responsibilities"
+        size="small"
+        fullWidth
+        value={viewRespSearch}
+        onChange={(e) => setViewRespSearch(e.target.value)}
+        placeholder="Name or enum"
+      />
+    </Stack>
+  );
+
   const columns = useMemo<CommonTableColumn<Role>[]>(
     () => [
       {
@@ -259,6 +356,8 @@ export function RolesResponsibilitiesPage() {
                   size="small"
                   onClick={() => {
                     setViewRoleId(row._id);
+                    setViewRespSearch('');
+                    setViewRespGroupFilter(ALL_GROUPS);
                     setViewOpen(true);
                   }}
                   sx={{ textTransform: 'none', color: '#ff9f0a', minWidth: 0, px: 0.5 }}
@@ -459,15 +558,21 @@ export function RolesResponsibilitiesPage() {
               <Typography variant="subtitle2" fontWeight={700}>
                 Responsibilities
               </Typography>
-              {groups.map((group) => (
+              {editResponsibilityFilters}
+              {filteredEditGroups.map((group) => {
+                const items = filterResponsibilitiesList(
+                  responsibilities.filter((r) => (r.Group || 'Other') === group),
+                  editRespSearch,
+                  editRespGroupFilter,
+                );
+                if (!items.length) return null;
+                return (
                 <Box key={group}>
                   <Typography variant="caption" color="text.secondary" fontWeight={700}>
                     {group}
                   </Typography>
                   <FormGroup row sx={{ gap: 0.5 }}>
-                    {responsibilities
-                      .filter((r) => (r.Group || 'Other') === group)
-                      .map((r) => (
+                    {items.map((r) => (
                         <FormControlLabel
                           key={r._id}
                           control={
@@ -484,7 +589,8 @@ export function RolesResponsibilitiesPage() {
                       ))}
                   </FormGroup>
                 </Box>
-              ))}
+                );
+              })}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -519,9 +625,25 @@ export function RolesResponsibilitiesPage() {
       <Dialog open={viewOpen} onClose={() => setViewOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Responsibilities</DialogTitle>
         <DialogContent>
-          <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 14 }}>
-            {viewNames || '—'}
-          </Typography>
+          {viewResponsibilityFilters}
+          {viewResponsibilities.length ? (
+            <Stack spacing={0.75} sx={{ maxHeight: 360, overflow: 'auto' }}>
+              {viewResponsibilities.map((item) => (
+                <Typography key={item._id} sx={{ fontSize: 14 }}>
+                  {item.Name || item.Enum || item._id}
+                  {item.Group ? (
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {` · ${item.Group}`}
+                    </Typography>
+                  ) : null}
+                </Typography>
+              ))}
+            </Stack>
+          ) : (
+            <Typography color="text.secondary" sx={{ fontSize: 14 }}>
+              {viewNames ? 'No responsibilities match your search.' : '—'}
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setViewOpen(false)}>Close</Button>

@@ -257,6 +257,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_PayIn_Accounts,
   },
   {
+    id: "midLimits",
+    label: "MID Limits",
+    path: "/mid-limits",
+    permission: Permissions.View_MID_Limits,
+  },
+  {
     id: "depositConfig",
     label: "Deposit Config",
     path: "/deposit-config",
@@ -440,6 +446,8 @@ export const PANEL_PATHS = new Set<string>([
   "/bonus-wallet-history",
   "/state-wise-deposit",
   "/withdraw-user-data",
+  "/bonus-wallet-referral-earning",
+  "/user_exposure",
   "/depositList/user-wise",
   "/funds/mid",
   "/funds/payin",

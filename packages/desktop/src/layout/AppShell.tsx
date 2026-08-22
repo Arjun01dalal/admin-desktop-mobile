@@ -44,6 +44,7 @@ import {
   prefetchPanelRoute,
   prefetchPanelRoutesIdle,
 } from '@/app/routePrefetch';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   buildSosEnablePayload,
   canAccessNavItem,
@@ -82,6 +83,7 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
   const navigate = useNavigate();
   const location = useLocation();
+  usePushNotifications();
   const [sosOpen, setSosOpen] = useState(false);
   const [sosLoading, setSosLoading] = useState(false);
   const [userVersion, setUserVersion] = useState(0);

@@ -22,6 +22,7 @@ import {
   type RoleOption,
 } from '@/auth/roleSelection';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
+import { registerSubAdminFcmToken } from '@/auth/registerFcmToken';
 import type { AddressInfo, AuthUser } from '@/types/gcalc';
 import { getAuthToken, setAuthToken } from '@/utils/authToken';
 import { resetTokenValidationThrottle } from '@/utils/sessionCheck';
@@ -237,6 +238,7 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
         })() || result.user;
 
       toast.success('Login successful');
+      void registerSubAdminFcmToken(syncedUser);
       onSuccess(syncedUser, result.token);
     } finally {
       setLoading(false);
@@ -258,6 +260,7 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
     try {
       const nextUser = await selectActiveRole(pendingUser, role);
       toast.success('Role is updated');
+      void registerSubAdminFcmToken(nextUser);
       onSuccess(nextUser, getAuthToken() || '');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update role');

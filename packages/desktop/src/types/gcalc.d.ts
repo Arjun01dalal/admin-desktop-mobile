@@ -57,6 +57,16 @@ export type IpLocationResult = {
   address?: AddressInfo;
 };
 
+export type PushNotificationPayload = {
+  title?: string;
+  body?: string;
+  data?: Record<string, string>;
+  fcmMessageId?: string;
+  receivedAt?: string;
+  /** Set when user clicks the native OS notification. */
+  clicked?: boolean;
+};
+
 export type GCalcApi = {
   version: string;
   /** Packaged Electron app version (`app.getVersion()`). */
@@ -203,6 +213,8 @@ export type GCalcApi = {
   getSosState: () => Promise<{ active?: boolean }>;
   /** Subscribe to main-process SOS state changes. Returns unsubscribe. */
   onSosState: (cb: (d: { active?: boolean }) => void) => () => void;
+  /** FCM push from main — OS notification already shown; use for in-app toast / navigation. */
+  onPushNotification: (cb: (d: PushNotificationPayload) => void) => () => void;
   /**
    * Dev: main-process HTTP request logs (secure API / dialer).
    * Shows in DevTools Console — Network tab cannot see main-process traffic.

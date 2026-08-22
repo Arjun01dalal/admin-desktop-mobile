@@ -19,12 +19,17 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import {
+  buildUpdateGameImagePayload,
+  type GameImageUpdateTarget,
+} from '@astro/shared/updateGameImage';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { UpdateGameImageModal } from './UpdateGameImageModal';
 import {
   BANNER_CATEGORY_OPTIONS,
   BANNER_TYPE_OPTIONS,
@@ -39,6 +44,10 @@ type Row = {
   _id?: string;
   imagePath?: string;
   gameName?: string;
+  gameId?: string;
+  providerName?: string;
+  provider?: string;
+  category?: string;
   type?: string;
   status?: boolean;
   position?: number;
@@ -76,6 +85,20 @@ const POSITION_OPTIONS = Array.from({ length: 25 }, (_, i) => i + 1);
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
+}
+
+function isGameBanner(row: Row): boolean {
+  if (row.type === 'game') return true;
+  if (String(row.category || '') === 'gameLaunch') return true;
+  return Boolean(String(row.gameId || '').trim());
+}
+
+function bannerGameId(row: Row): string {
+  return String(row.gameId || '').trim();
+}
+
+function bannerProvider(row: Row): string {
+  return String(row.providerName || row.provider || '').trim();
 }
 
 function asList<T>(data: unknown): T[] {
@@ -217,6 +240,8 @@ export function BannersScreen() {
   const [updateImageName, setUpdateImageName] = useState('');
   const [updatingImage, setUpdatingImage] = useState(false);
   const [updateImageMsg, setUpdateImageMsg] = useState('');
+  const [gameImageTarget, setGameImageTarget] = useState<GameImageUpdateTarget | null>(null);
+  const [gameImageSaving, setGameImageSaving] = useState(false);
 
   const genRef = useRef(0);
 
@@ -559,6 +584,26 @@ export function BannersScreen() {
   }, [positionRow, positionDraft, load]);
 
   const openUpdateImage = useCallback((row: Row) => {
+    if (isGameBanner(row)) {
+      const gameId = bannerGameId(row);
+      const provider = bannerProvider(row);
+      if (!gameId) {
+        Alert.alert('Error', 'Game ID is required');
+        return;
+      }
+      if (!provider) {
+        Alert.alert('Error', 'Provider is required');
+        return;
+      }
+      setGameImageTarget({
+        gameId,
+        provider,
+        name: row.gameName || gameId,
+        currentImageUrl: row.imagePath ? replaceS3WithCloudfront(row.imagePath) : '',
+      });
+      setSheetRow(null);
+      return;
+    }
     setUpdateImageId(String(row._id || ''));
     setUpdateImagePath(row.imagePath || '');
     setUpdateImageName(row.gameName || '');
@@ -607,6 +652,31 @@ export function BannersScreen() {
       setUpdatingImage(false);
     }
   }, [load, updateImageId, updateImagePath]);
+
+  const handleGameImageUpdate = useCallback(
+    async (imagePath: string) => {
+      if (!gameImageTarget) return;
+      setGameImageSaving(true);
+      try {
+        const payload = buildUpdateGameImagePayload(
+          gameImageTarget.gameId,
+          imagePath,
+          gameImageTarget.provider,
+        );
+        const res = await secureApi<unknown>('topGames.updateImage', payload);
+        if (!res.ok) {
+          Alert.alert('Error', res.message || 'Failed to update game image');
+          return;
+        }
+        Alert.alert('Success', 'Game image updated successfully');
+        setGameImageTarget(null);
+        void load();
+      } finally {
+        setGameImageSaving(false);
+      }
+    },
+    [gameImageTarget, load],
+  );
 
   const deleteBanner = useCallback(
     (row: Row) => {
@@ -860,6 +930,14 @@ export function BannersScreen() {
           </Text>
         </TouchableOpacity>
       </ModalShell>
+
+      <UpdateGameImageModal
+        visible={gameImageTarget !== null}
+        loading={gameImageSaving}
+        target={gameImageTarget}
+        onClose={() => !gameImageSaving && setGameImageTarget(null)}
+        onSubmit={(path) => void handleGameImageUpdate(path)}
+      />
 
       {/* Add — image banner (Laxmi "Add") */}
       <ModalShell visible={addOpen} title="Add" onClose={() => !submitting && setAddOpen(false)}>

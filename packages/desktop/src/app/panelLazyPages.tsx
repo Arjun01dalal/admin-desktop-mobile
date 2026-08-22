@@ -178,6 +178,10 @@ const MidGroupsPage = lazyNamed(
   () => import('@/screens/panel/MidGroupsPage'),
   'MidGroupsPage',
 );
+const MidLimitsPage = lazyNamed(
+  () => import('@/screens/panel/MidLimitsPage'),
+  'MidLimitsPage',
+);
 const FundsPayinPage = lazyNamed(
   () => import('@/screens/panel/FundsPayinPage'),
   'FundsPayinPage',
@@ -419,6 +423,7 @@ export {
   FundsPage,
   FundsMidPage,
   MidGroupsPage,
+  MidLimitsPage,
   FundsPayinPage,
   WhatsappPage,
   CasinoTopupBalancePage,

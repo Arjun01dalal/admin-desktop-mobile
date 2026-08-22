@@ -15,7 +15,9 @@ import {
   buildSosEnablePayload as sharedBuildSosEnablePayload,
   canAccessDashboard as sharedCanAccessDashboard,
   canAccessNavItem as sharedCanAccessNavItem,
+  canEditMidLimits as sharedCanEditMidLimits,
   canShowSos as sharedCanShowSos,
+  canViewMidLimits as sharedCanViewMidLimits,
   deriveRoleNameFromLogin,
   getResponsibilities as sharedGetResponsibilities,
   getRoleId as sharedGetRoleId,
@@ -103,6 +105,14 @@ export function canAccessNavItem(
   user: StoredUser | null = getSessionUser(),
 ): boolean {
   return sharedCanAccessNavItem(item, user, storage);
+}
+
+export function canViewMidLimits(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanViewMidLimits(user, storage);
+}
+
+export function canEditMidLimits(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanEditMidLimits(user, storage);
 }
 
 export function canShowSos(user: StoredUser | null = getSessionUser()): boolean {

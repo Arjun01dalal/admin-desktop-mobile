@@ -65,6 +65,32 @@ function writeStored(credentials) {
   }
 }
 
+/** Full stored credentials (keys + gcm + fcm + persistentIds). */
+function getStoredCredentials() {
+  hydrateFromDisk();
+  const stored = readStored();
+  return stored?.credentials || null;
+}
+
+function ensurePersistentIds(credentials) {
+  if (!credentials || typeof credentials !== 'object') return [];
+  if (!Array.isArray(credentials.persistentIds)) {
+    credentials.persistentIds = [];
+  }
+  return credentials.persistentIds;
+}
+
+function appendPersistentId(persistentId) {
+  const id = String(persistentId || '').trim();
+  if (!id) return;
+  const credentials = getStoredCredentials();
+  if (!credentials) return;
+  const ids = ensurePersistentIds(credentials);
+  if (ids.includes(id)) return;
+  ids.push(id);
+  writeStored(credentials);
+}
+
 /** Sync hydrate from disk into memory (instant on 2nd+ launch). */
 function hydrateFromDisk() {
   if (cachedToken) return cachedToken;
@@ -179,4 +205,7 @@ module.exports = {
   warmFcmToken,
   isWarmed,
   firebaseConfig,
+  getStoredCredentials,
+  ensurePersistentIds,
+  appendPersistentId,
 };

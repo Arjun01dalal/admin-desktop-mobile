@@ -68,6 +68,10 @@ export const Permissions = {
   Add_PayIn_Account: 'Add_PayIn_Account',
   Toggle_PayIn_Account: 'Toggle_PayIn_Account',
   Delete_PayIn_Account: 'Delete_PayIn_Account',
+  /** MID Limits page — view list and limits. */
+  View_MID_Limits: 'View_MID_Limits',
+  /** MID Limits — edit limits and alert recipients. */
+  Edit_MID_Limits: 'Edit_MID_Limits',
   Disable_Deposit_Provider_Edit: 'Disable_Deposit_Provider_Edit',
   Update_Deposit_Amount_Edit: 'Update_Deposit_Amount_Edit',
   Deposit_Config: 'Deposit_Config',
@@ -465,6 +469,25 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'Profit_Loss',
     'Profit Loss',
   ],
+  add_new_role_responsibility: [
+    'add_new_role_responsibility',
+    'Add New Role Responsibility',
+    'Add Role Responsibility',
+    'add role responsibility',
+  ],
+  View_MID_Limits: [
+    'View_MID_Limits',
+    'View MID Limits',
+    'MID Limits',
+    'mid_limits',
+    'View_Mid_Limits',
+  ],
+  Edit_MID_Limits: [
+    'Edit_MID_Limits',
+    'Edit MID Limits',
+    'edit_mid_limits',
+    'Add_PayIn_Account',
+  ],
 };
 
 function normalizeResponsibility(value: string): string {
@@ -577,6 +600,26 @@ function isFullAccessNavRole(
   return false;
 }
 
+/** MID Limits page — view nav + page content. */
+export function canViewMidLimits(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  if (isFullAccessNavRole(user, storage)) return true;
+  if (hasPermission(Permissions.View_MID_Limits, user)) return true;
+  if (hasPermission(Permissions.Edit_MID_Limits, user)) return true;
+  // Same audience as Deposit Providers until View_MID_Limits is assigned on backend.
+  if (hasPermission(Permissions.View_PayIn_Accounts, user)) return true;
+  return false;
+}
+
+/** MID Limits — edit limits + alert recipients. */
+export function canEditMidLimits(user: PermissionUser | null = null): boolean {
+  if (hasPermission(Permissions.Edit_MID_Limits, user)) return true;
+  if (hasPermission(Permissions.Add_PayIn_Account, user)) return true;
+  return false;
+}
+
 /** True for plain Caller roles (not Caller Head). */
 export function isCallerRole(
   user: PermissionUser | null = null,
@@ -611,6 +654,10 @@ export function canAccessNavItem(
 
   // Full / dev / QA access — show the complete menu without waiting on new Responsibility rows.
   if (isFullAccessNavRole(user, storage)) return true;
+
+  if (item.id === 'midLimits') {
+    return canViewMidLimits(user, storage);
+  }
 
   const allow = roleAllowlist(user, storage);
   // Hard role allowlist is the base set (e.g. callers). Also honor Responsibilities

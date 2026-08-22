@@ -63,6 +63,7 @@ const LOADERS: Record<string, Loader> = {
   '/utr-provider': () => import('@/screens/panel/UtrProviderPage'),
   '/instant-provider': () => import('@/screens/panel/InstantDepositProvidersPage'),
   '/pay-g-mid': () => import('@/screens/panel/DepositProvidersPage'),
+  '/mid-limits': () => import('@/screens/panel/MidLimitsPage'),
   '/deposit-config': () => import('@/screens/panel/DepositConfigPage'),
   '/payout-accounts': () => import('@/screens/panel/WithdrawalProvidersPage'),
   '/botData': () => import('@/screens/panel/BotDataPage'),

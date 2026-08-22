@@ -15,11 +15,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  buildUpdateGameImagePayload,
+  type GameImageUpdateTarget,
+} from '@astro/shared/updateGameImage';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
+import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { UpdateGameImageModal } from './UpdateGameImageModal';
 
 type Item = {
   _id?: string;
@@ -53,16 +59,20 @@ function providerName(item: Item): string {
   return String(item.providerName || item.provider?.name || '—');
 }
 
+function rawProviderName(item: Item): string {
+  return String(item.providerName || item.provider?.name || '').trim();
+}
+
 /** Desktop getImageUrl: imagePath, else preferred image type. */
 function getImageUrl(item: Item): string {
-  if (item.imagePath) return item.imagePath;
+  if (item.imagePath) return replaceS3WithCloudfront(item.imagePath);
   const images = item.images || [];
   const preferred =
     images.find((img) => img.type === 'logo-square') ||
     images.find((img) => img.type === 'banner') ||
     images.find((img) => img.type === 'logo-round') ||
     images[0];
-  return preferred?.url || '';
+  return replaceS3WithCloudfront(preferred?.url || '');
 }
 
 /** Desktop normalizePayload: canonical { data: { [category]: Item[] } }. */
@@ -94,6 +104,8 @@ export function TopGamesScreen() {
   const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
   const [sheetRow, setSheetRow] = useState<GameRow | null>(null);
+  const [imageTarget, setImageTarget] = useState<GameImageUpdateTarget | null>(null);
+  const [imageSaving, setImageSaving] = useState(false);
   const genRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -195,6 +207,51 @@ export function TopGamesScreen() {
       ]);
     },
     [load],
+  );
+
+  const openImageUpdate = useCallback((row: GameRow) => {
+    const gameId = String(row.gameId || '').trim();
+    if (!gameId) {
+      Alert.alert('Error', 'Game ID is required');
+      return;
+    }
+    const provider = rawProviderName(row);
+    if (!provider) {
+      Alert.alert('Error', 'Provider is required');
+      return;
+    }
+    setSheetRow(null);
+    setImageTarget({
+      gameId,
+      provider,
+      name: gameName(row),
+      currentImageUrl: getImageUrl(row) || '',
+    });
+  }, []);
+
+  const handleImageUpdate = useCallback(
+    async (imagePath: string) => {
+      if (!imageTarget) return;
+      setImageSaving(true);
+      try {
+        const payload = buildUpdateGameImagePayload(
+          imageTarget.gameId,
+          imagePath,
+          imageTarget.provider,
+        );
+        const res = await secureApi<unknown>('topGames.updateImage', payload);
+        if (!res.ok) {
+          Alert.alert('Error', res.message || 'Failed to update game image');
+          return;
+        }
+        Alert.alert('Success', 'Game image updated successfully');
+        setImageTarget(null);
+        void load();
+      } finally {
+        setImageSaving(false);
+      }
+    },
+    [imageTarget, load],
   );
 
   const columns = useMemo<DataTableColumn<GameRow>[]>(
@@ -332,6 +389,11 @@ export function TopGamesScreen() {
           sheetRow
             ? [
                 {
+                  label: 'Update Image',
+                  tone: 'primary',
+                  onPress: () => openImageUpdate(sheetRow),
+                },
+                {
                   label: sheetRow.status ? 'Hide game' : 'Show game',
                   tone: sheetRow.status ? 'warning' : 'primary',
                   onPress: () => toggleStatus(sheetRow),
@@ -341,6 +403,14 @@ export function TopGamesScreen() {
             : []
         }
         onClose={() => setSheetRow(null)}
+      />
+
+      <UpdateGameImageModal
+        visible={imageTarget !== null}
+        loading={imageSaving}
+        target={imageTarget}
+        onClose={() => !imageSaving && setImageTarget(null)}
+        onSubmit={(path) => void handleImageUpdate(path)}
       />
     </ScrollView>
   );

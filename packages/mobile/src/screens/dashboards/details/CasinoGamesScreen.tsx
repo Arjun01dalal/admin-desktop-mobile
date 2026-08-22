@@ -16,12 +16,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  buildUpdateGameImagePayload,
+  type GameImageUpdateTarget,
+} from '@astro/shared/updateGameImage';
+import { pickPageSizes } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
+import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { pickPageSizes } from '@astro/shared';
+import { UpdateGameImageModal } from './UpdateGameImageModal';
 
 type Row = {
   _id?: string;
@@ -61,6 +67,24 @@ function display(value: unknown): string {
 
 function asProvider(value: unknown): Provider {
   return value === 'WACS' ? 'WACS' : 'QTECH';
+}
+
+function imageUrl(row: Row): string {
+  const raw = row.images?.[0]?.url || row.images?.[1]?.url || row.Thumbnail || '';
+  return raw ? replaceS3WithCloudfront(raw) : '';
+}
+
+function casinoGameId(row: Row): string {
+  return String(row.gameId || row.Game_Code || '').trim();
+}
+
+function casinoProviderRaw(row: Row): string {
+  return String(
+    row.provider?.name ||
+      row.Provider_ID ||
+      (row as { providerName?: string }).providerName ||
+      '',
+  ).trim();
 }
 
 function asProviderNames(data: unknown): string[] {
@@ -106,6 +130,8 @@ export function CasinoGamesScreen() {
   const [applied, setApplied] = useState<{ name: string; id: string }>({ name: '', id: '' });
   const [sheetRow, setSheetRow] = useState<Row | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [imageTarget, setImageTarget] = useState<GameImageUpdateTarget | null>(null);
+  const [imageSaving, setImageSaving] = useState(false);
   const genRef = useRef(0);
 
   // Active provider from config (desktop reads res.data.activeCasinoProvider).
@@ -200,6 +226,51 @@ export function CasinoGamesScreen() {
       );
     },
     [load],
+  );
+
+  const openImageUpdate = useCallback((row: Row) => {
+    const gameId = casinoGameId(row);
+    if (!gameId) {
+      Alert.alert('Error', 'Game ID is required');
+      return;
+    }
+    const providerRaw = casinoProviderRaw(row);
+    if (!providerRaw) {
+      Alert.alert('Error', 'Provider is required');
+      return;
+    }
+    setSheetRow(null);
+    setImageTarget({
+      gameId,
+      provider: providerRaw,
+      name: String(row.Name || row.name || gameId),
+      currentImageUrl: imageUrl(row) || '',
+    });
+  }, []);
+
+  const handleImageUpdate = useCallback(
+    async (imagePath: string) => {
+      if (!imageTarget) return;
+      setImageSaving(true);
+      try {
+        const payload = buildUpdateGameImagePayload(
+          imageTarget.gameId,
+          imagePath,
+          imageTarget.provider,
+        );
+        const res = await secureApi<unknown>('topGames.updateImage', payload);
+        if (!res.ok) {
+          Alert.alert('Error', res.message || 'Failed to update game image');
+          return;
+        }
+        Alert.alert('Success', 'Game image updated successfully');
+        setImageTarget(null);
+        void load();
+      } finally {
+        setImageSaving(false);
+      }
+    },
+    [imageTarget, load],
   );
 
   const columns = useMemo<DataTableColumn<Row>[]>(
@@ -408,7 +479,7 @@ export function CasinoGamesScreen() {
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.Name || sheetRow.name) : ''}
         imageUri={
-          sheetRow?.images?.[0]?.url || sheetRow?.images?.[1]?.url || sheetRow?.Thumbnail || undefined
+          sheetRow ? imageUrl(sheetRow) || undefined : undefined
         }
         fields={
           sheetRow
@@ -421,6 +492,11 @@ export function CasinoGamesScreen() {
           sheetRow
             ? [
                 {
+                  label: 'Update Image',
+                  tone: 'primary',
+                  onPress: () => openImageUpdate(sheetRow),
+                },
+                {
                   label: sheetRow.status ? 'Disable game' : 'Enable game',
                   tone: sheetRow.status ? 'warning' : 'primary',
                   disabled: togglingId === String(sheetRow._id || ''),
@@ -431,6 +507,14 @@ export function CasinoGamesScreen() {
         }
         note="Provider switching, Mirai and Table ID management are available on the desktop panel."
         onClose={() => setSheetRow(null)}
+      />
+
+      <UpdateGameImageModal
+        visible={imageTarget !== null}
+        loading={imageSaving}
+        target={imageTarget}
+        onClose={() => !imageSaving && setImageTarget(null)}
+        onSubmit={(path) => void handleImageUpdate(path)}
       />
 
       <View style={styles.pager}>
