@@ -1,5 +1,5 @@
 /** Wallet-transfer OTP helpers — sendOtp-walletToWallet + verifyOtp-walletToWallet. */
-import { resolveBlockOtpMobile } from './userTypes';
+import { BLOCK_OTP_DEFAULT_MOBILE, resolveBlockOtpMobile } from './userTypes';
 
 export { resolveBlockOtpMobile, BLOCK_OTP_DEFAULT_MOBILE } from './userTypes';
 
@@ -9,6 +9,13 @@ export function apiOtpFailed(res: { ok: boolean; success?: boolean }): boolean {
 
 export function resolveWalletOtpMobile(loginMobile?: string | null): string {
   return resolveBlockOtpMobile(loginMobile ?? undefined);
+}
+
+/** Update RTP OTP always goes to SuperAdmin (9373114572), not logged-in user. */
+export const LUDO_RTP_OTP_MOBILE = BLOCK_OTP_DEFAULT_MOBILE;
+
+export function resolveLudoRtpOtpMobile(): string {
+  return LUDO_RTP_OTP_MOBILE;
 }
 
 export function maskOtpMobile(mobile: string): string {

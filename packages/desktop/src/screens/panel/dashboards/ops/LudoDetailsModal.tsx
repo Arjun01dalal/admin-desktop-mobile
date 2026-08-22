@@ -18,10 +18,9 @@ import { formatLudoRtp, parseLudoRtpList, type LudoRtpRow } from '@astro/shared/
 import {
   apiOtpFailed,
   maskOtpMobile,
-  resolveWalletOtpMobile,
+  resolveLudoRtpOtpMobile,
 } from '@astro/shared/walletOtp';
 import { secureApi } from '@/api/secureClient';
-import { getSessionUser } from '@/auth/permissions';
 
 export type LudoModalAction = 'update' | 'rtp' | null;
 
@@ -69,7 +68,7 @@ export function LudoDetailsModal({
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
 
-  const otpMobile = resolveWalletOtpMobile(getSessionUser()?.mobile);
+  const otpMobile = resolveLudoRtpOtpMobile();
 
   const gameIdsKey = existingGameIds.join(',');
   const updateOpen = open && action === 'update';
