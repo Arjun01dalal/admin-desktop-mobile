@@ -1,7 +1,7 @@
 /** Typed wrapper around window.gcalc.secureApi — no URLs or secrets here. */
 
 import type { ApiResult } from '@astro/shared';
-import { isAuthFailureMessage } from '@astro/shared';
+import { isAuthFailureMessage, networkForbiddenUserMessage } from '@astro/shared';
 import { sanitizeBridgePayload } from './bridgeSanitize';
 import { isSecureAction, type SecureAction } from './secureActions';
 import { getAuthToken } from '@/utils/authToken';
@@ -137,10 +137,15 @@ async function invokeSecureApi<T>(
     scheduleSessionRecheck();
   }
 
+  const displayMessage =
+    status === 403 && message && !isAuthFailureMessage(status, message)
+      ? networkForbiddenUserMessage(message)
+      : message;
+
   return {
     ok: result.ok === true,
     success: result.success,
-    message,
+    message: displayMessage,
     data: result.data as T | undefined,
     status,
   };

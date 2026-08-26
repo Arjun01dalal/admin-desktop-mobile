@@ -4,7 +4,7 @@
  * Encrypted responses arrive as response.data.data (string) and are decrypted,
  * then unwrapped to `.payload` unless keepDataEnvelope.
  */
-import { isAuthFailureMessage } from '@astro/shared';
+import { isAuthFailureMessage, networkForbiddenUserMessage } from '@astro/shared';
 import { REGISTRY, type SecureAction } from './registry.generated';
 import { encryptPayload, decryptPayload } from './crypto';
 import { getApiBaseUrl } from '../config';
@@ -186,6 +186,120 @@ async function uploadBannerVideo(
   }
 }
 
+/**
+ * Admin LLM voice — multipart /llm-chat/send-voice (audio URI + encrypted history).
+ */
+async function uploadLlmVoice(
+  payload: Record<string, unknown> = {},
+  tokenOverride?: string | null,
+): Promise<ApiResult> {
+  const audioUri = typeof payload.audioUri === 'string' ? payload.audioUri.trim() : '';
+  const audioBase64 =
+    typeof payload.audioBase64 === 'string' ? payload.audioBase64.trim() : '';
+  const mimeType = String(payload.mimeType || 'audio/m4a').slice(0, 80);
+  const history = Array.isArray(payload.history) ? payload.history : [];
+
+  const ext = mimeType.includes('ogg')
+    ? 'ogg'
+    : mimeType.includes('webm')
+      ? 'webm'
+      : mimeType.includes('mp4') || mimeType.includes('m4a')
+        ? 'm4a'
+        : 'm4a';
+  const fileName = String(payload.fileName || `voice.${ext}`)
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .slice(0, 120);
+
+  if (!audioUri && !audioBase64) {
+    return { ok: false, message: 'No audio captured' };
+  }
+
+  try {
+    const token = tokenOverride ?? appStorage.getItem('token');
+    const form = new FormData();
+    form.append('token', encryptPayload({ history }));
+
+    if (audioUri) {
+      form.append('audio', {
+        uri: audioUri,
+        name: fileName,
+        type: mimeType,
+      } as unknown as Blob);
+    } else {
+      // Fallback for rare base64 path (tests / web).
+      const raw = audioBase64.includes(',') ? audioBase64.split(',').pop()! : audioBase64;
+      form.append('audio', {
+        uri: `data:${mimeType};base64,${raw}`,
+        name: fileName,
+        type: mimeType,
+      } as unknown as Blob);
+    }
+
+    const url = `${getApiBaseUrl()}/llm-chat/send-voice`;
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent':
+        'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 180_000);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: form,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    let json: unknown = null;
+    try {
+      json = await res.json();
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok) {
+      const message = pickMessage(json, `Request failed (${res.status})`);
+      maybeAuthFailure('llmChat.sendVoice', Boolean(token), res.status, message);
+      return { ok: false, message, status: res.status };
+    }
+
+    let data = (json && typeof json === 'object' ? json : {}) as Record<string, unknown>;
+    if (data?.data != null && typeof data.data === 'string') {
+      try {
+        data = { ...data, data: decryptPayload(data.data as string) };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof Error ? err.message : 'Decrypt failed',
+          status: res.status,
+        };
+      }
+    }
+    const payloadOut = resolvePayloadOut(data);
+    return {
+      ok: true,
+      success: data.success !== false,
+      message: typeof data.message === 'string' ? data.message : undefined,
+      data: payloadOut,
+      status: res.status,
+    };
+  } catch (err) {
+    const message =
+      err instanceof Error && err.name === 'AbortError'
+        ? 'Request timed out'
+        : err instanceof Error
+          ? err.message
+          : 'Failed to send voice message';
+    return { ok: false, message };
+  }
+}
+
 export async function secureApi<T = unknown>(
   action: SecureAction,
   payload: Record<string, unknown> = {},
@@ -197,6 +311,9 @@ export async function secureApi<T = unknown>(
   // Multipart video upload — desktop does this in Electron; mirror on mobile.
   if (action === 'ops.bannersUploadVideo') {
     return uploadBannerVideo(payload, tokenOverride) as Promise<ApiResult<T>>;
+  }
+  if (action === 'llmChat.sendVoice') {
+    return uploadLlmVoice(payload, tokenOverride) as Promise<ApiResult<T>>;
   }
 
   if (entry.type === 'local' || !entry.method || !entry.path) {
@@ -275,7 +392,10 @@ export async function secureApi<T = unknown>(
       console.log(
         `[api] ${action} failed: HTTP ${res.status} body=${JSON.stringify(json)?.slice(0, 300)}`,
       );
-      const message = pickMessage(json, `Request failed (${res.status})`);
+      let message = pickMessage(json, `Request failed (${res.status})`);
+      if (res.status === 403 && !isAuthFailureMessage(res.status, message)) {
+        message = networkForbiddenUserMessage(message);
+      }
       maybeAuthFailure(action, hadToken, res.status, message);
       return { ok: false, status: res.status, message };
     }

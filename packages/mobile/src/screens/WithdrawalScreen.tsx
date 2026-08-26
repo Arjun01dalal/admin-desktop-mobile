@@ -33,6 +33,10 @@ import * as Sharing from 'expo-sharing';
 import QRCode from 'react-native-qrcode-svg';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { appCodeForName } from '@astro/shared';
+import {
+  resolveWithdrawalReportUserId,
+  showWithdrawalMidReport,
+} from '@astro/shared/depositWithdrawalReport';
 import { secureApi } from '../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../auth/permissions';
 import { colors, radius, spacing } from '../theme';
@@ -51,6 +55,7 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../utils/dates';
 import { SheetDownloadOtpModal } from '../components/SheetDownloadOtpModal';
 import type { SheetDownloadFilter } from '../utils/sheetDownloadAudit';
 import { shareCsvFile } from '../utils/shareCsv';
+import { DepositWithdrawalMidModal } from './withdrawal/DepositWithdrawalMidModal';
 import {
   getCachedEmpCodeNameMap,
   getEmpCodeNameMap,
@@ -544,6 +549,8 @@ export function WithdrawalScreen() {
 
   // Row detail sheet + action state.
   const [selected, setSelected] = useState<Rec | null>(null);
+  const [midReportRow, setMidReportRow] = useState<Rec | null>(null);
+  const [midReportOpen, setMidReportOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   // Status-change modal (Rejected / on hold / Reverse need remark; some need gateway+MID).
   const [statusModal, setStatusModal] = useState<{ row: Rec; status: string } | null>(null);
@@ -553,6 +560,35 @@ export function WithdrawalScreen() {
   const [mid, setMid] = useState('');
   const [gateways, setGateways] = useState<string[]>([]);
   const [mids, setMids] = useState<{ label: string; mid: string; gateway: string }[]>([]);
+
+  const catalogMids = useMemo(
+    () => mids.map((m) => String(m.mid ?? '').trim()).filter(Boolean),
+    [mids],
+  );
+
+  const openMidReport = useCallback((row: Rec) => {
+    setMidReportRow(row);
+    setMidReportOpen(true);
+  }, []);
+
+  const renderWithdrawalMidIcon = useCallback(
+    (row: Rec) => {
+      const reportUserId = resolveWithdrawalReportUserId(row);
+      if (!reportUserId || !showWithdrawalMidReport(String(row.status || ''))) return null;
+      return (
+        <TouchableOpacity
+          accessibilityLabel="Choose MID for Withdrawal"
+          onPress={() => openMidReport(row)}
+          style={styles.midReportBtn}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <MaterialCommunityIcons name="chart-box-outline" size={15} color="#ff9f0a" />
+        </TouchableOpacity>
+      );
+    },
+    [openMidReport],
+  );
+
   // Bot validation results modal (desktop ValidationModal parity).
   const [validationRow, setValidationRow] = useState<Rec | null>(null);
   // Bulk selection mode (desktop bulk lock/unlock/approve/manual approve).
@@ -1837,6 +1873,7 @@ export function WithdrawalScreen() {
         previewFieldCount={3}
         columns={columns}
         rows={rows}
+        renderCardTitleSuffix={renderWithdrawalMidIcon}
         keyFor={(r, i) => String(r._id ?? r.transactionId ?? i)}
         loading={loading}
         emptyMessage="No withdrawals"
@@ -2133,6 +2170,16 @@ export function WithdrawalScreen() {
         onClose={() => (actionBusy ? undefined : setSelected(null))}
         actions={selected ? sheetActions(selected) : undefined}
         note={actionBusy ? 'Working…' : undefined}
+      />
+
+      <DepositWithdrawalMidModal
+        open={midReportOpen}
+        row={midReportRow}
+        catalogMids={catalogMids}
+        onClose={() => {
+          setMidReportOpen(false);
+          setMidReportRow(null);
+        }}
       />
 
       {/* Bot validation results (desktop ValidationModal parity) */}
@@ -3182,4 +3229,15 @@ const styles = StyleSheet.create({
   },
   addBeneCheck: { fontSize: 14, fontWeight: '700', width: 18 },
   addBeneItemText: { color: colors.foreground, fontSize: 13, flex: 1 },
+  midReportBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,159,10,0.35)',
+    backgroundColor: 'rgba(255,159,10,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
 });

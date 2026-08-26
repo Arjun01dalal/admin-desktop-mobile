@@ -374,3 +374,32 @@ export function mergeMidReportWithCatalog(
 
   return merged.sort((a, b) => a.mid.localeCompare(b.mid));
 }
+
+const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+
+/** Prefer Mongo userId for depositList.report — matches Deposit List filter.userId. */
+export function resolveWithdrawalReportUserId(row: {
+  userId?: unknown;
+  dp_id?: unknown;
+}): string {
+  const candidates = [row.userId, row.dp_id]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  const objectId = candidates.find((id) => OBJECT_ID_RE.test(id));
+  if (objectId) return objectId;
+
+  return candidates[0] || '';
+}
+
+/** MID report icon — active workflow rows only. */
+export function showWithdrawalMidReport(status?: string): boolean {
+  const normalized = String(status || '').trim().toUpperCase();
+  return (
+    normalized === 'PENDING' ||
+    normalized === 'IN PROGRESS' ||
+    normalized === 'LOCK' ||
+    normalized === 'PROCESSING' ||
+    normalized === 'ON HOLD'
+  );
+}

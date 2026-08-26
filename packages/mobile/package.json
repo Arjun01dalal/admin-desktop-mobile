@@ -54,10 +54,11 @@
     "typescript": "~5.9.2"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
+    "start": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo start",
+    "start:go": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo start --go --lan",
+    "android": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo run:android",
+    "ios": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo run:ios",
+    "web": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo start --web",
     "typecheck": "tsc --noEmit"
   },
   "expo": {

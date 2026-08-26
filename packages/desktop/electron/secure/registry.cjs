@@ -225,6 +225,9 @@ module.exports = {
     path: '/SubAdmin/get-dialer-datas',
     encryptRequest: false,
     decryptResponse: true,
+    // Keep full decrypted object — do not collapse to a short `.data` array
+    // when campaign-keyed maps + totalCount are also present.
+    keepDataEnvelope: true,
   },
   'callLogs.deleteQueuedCalls': {
     method: 'POST',
@@ -246,6 +249,24 @@ module.exports = {
   },
   'callLogs.externalDialerSingle': {
     type: 'local',
+  },
+
+  // Admin LLM Chatbot (admin-panel-domains AdminLlmChat)
+  'llmChat.send': {
+    method: 'POST',
+    path: '/llm-chat/send',
+    encryptRequest: true,
+    decryptResponse: true,
+    timeout: 180000,
+  },
+  'llmChat.sendVoice': {
+    type: 'local',
+  },
+  'users.getDialerDataByIds': {
+    method: 'POST',
+    path: '/SubAdmin/get-users-dialer-data-by-ids',
+    encryptRequest: true,
+    decryptResponse: true,
   },
 
   // New Registers
@@ -1303,16 +1324,17 @@ module.exports = {
     decryptResponse: true,
     keepDataEnvelope: true,
   },
+  // Live Match Total — Laxmi book via laxminarayan (encrypted response)
+  'dashboard.finalBookLaxmi': {
+    method: 'POST',
+    path: '/SubAdmin/final-book-laxmi',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   // Live Match Total (external AAA hosts — absolute URLs)
   'dashboard.oddsGameList': {
     method: 'GET',
     path: 'https://nodebackend.aaryapaar.exchange/api/v2/odds/gameList',
-    encryptRequest: false,
-    decryptResponse: false,
-  },
-  'dashboard.finalBookLaxmi': {
-    method: 'GET',
-    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/os/finalBookLaxmi',
     encryptRequest: false,
     decryptResponse: false,
   },

@@ -14,13 +14,17 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
-import { CAMPAIGN_LIST, pickPageSizes } from '@astro/shared';
+import {
+  CAMPAIGN_LIST,
+  buildExtensionAssigneeMap,
+  dialerCampaignLabel,
+  pickPageSizes,
+} from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { canAccessNavItem, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import {
-  monthStartIST,
   todayIST,
   formatDisplayDate,
   formatDisplayTime,
@@ -49,6 +53,10 @@ const PAGE_SIZES = pickPageSizes([10, 25, 50, 100, 200, 500, 1000]);
 const COLUMN_LABELS: Record<string, string> = {
   province: 'User ID',
   Province: 'User ID',
+  provience: 'User ID',
+  Provience: 'User ID',
+  userId: 'User ID',
+  user_id: 'User ID',
   email: 'App Name',
   phone_number: 'Mobile No',
   last_name: 'Last Name',
@@ -57,8 +65,12 @@ const COLUMN_LABELS: Record<string, string> = {
   campaign_id: 'Campaign ID',
   list_id: 'List ID',
   list_name: 'List Name',
-  createdAt: 'Created At',
-  updatedAt: 'Updated At',
+  createdAt: 'Created On',
+  createdOn: 'Created On',
+  created_at: 'Created On',
+  updatedAt: 'Updated On',
+  updatedOn: 'Updated On',
+  updated_at: 'Updated On',
   city: 'City',
   state: 'State',
 };
@@ -87,8 +99,12 @@ const FALLBACK_COLUMNS = [
   'state',
   'email',
   'province',
+  'userId',
   'subAdminId',
   'createdAt',
+  'createdOn',
+  'updatedAt',
+  'updatedOn',
 ];
 
 function display(value: unknown): string {
@@ -114,16 +130,6 @@ function formatDateTime(value: unknown): string {
   return joined || '—';
 }
 
-function campaignLabel(campaignKey: string): string {
-  if (!campaignKey || campaignKey === 'Unknown') return 'Unknown Campaign';
-  const match = CAMPAIGN_LIST.find(
-    (item) => String(item.id).trim() === String(campaignKey).trim(),
-  );
-  return match
-    ? `${match.id.trim()} - ${match.name}`
-    : `Campaign ID: ${campaignKey}`;
-}
-
 const META_KEYS = new Set([
   'totalCount',
   'total',
@@ -137,6 +143,18 @@ const META_KEYS = new Set([
   'message',
   'status',
   'statusCode',
+]);
+
+/** List wrapper keys — never treat these as Campaign IDs. */
+const LIST_KEYS = new Set([
+  'data',
+  'items',
+  'docs',
+  'leads',
+  'records',
+  'list',
+  'result',
+  'results',
 ]);
 
 /** True when row looks like a real dialer lead (not a campaign wrapper). */
@@ -171,7 +189,7 @@ function withCampaign(
 function extractCampaignMap(obj: Record<string, unknown>): DialerPushRow[] {
   const out: DialerPushRow[] = [];
   for (const [key, value] of Object.entries(obj)) {
-    if (META_KEYS.has(key)) continue;
+    if (META_KEYS.has(key) || LIST_KEYS.has(key)) continue;
 
     if (Array.isArray(value)) {
       for (const item of value) {
@@ -221,7 +239,7 @@ function extractCampaignMap(obj: Record<string, unknown>): DialerPushRow[] {
 }
 
 function isCampaignMapObject(obj: Record<string, unknown>): boolean {
-  const keys = Object.keys(obj).filter((k) => !META_KEYS.has(k));
+  const keys = Object.keys(obj).filter((k) => !META_KEYS.has(k) && !LIST_KEYS.has(k));
   if (keys.length === 0) return false;
   let hits = 0;
   for (const k of keys) {
@@ -423,14 +441,44 @@ export function DialerPushDataPage() {
   const [listName, setListName] = useState('');
   const [campaignId, setCampaignId] = useState('');
   const [subAdminId, setSubAdminId] = useState('');
-  const [startDate, setStartDate] = useState(() => monthStartIST());
+  const [startDate, setStartDate] = useState(() => todayIST());
   const [endDate, setEndDate] = useState(() => todayIST());
   const [pageNo, setPageNo] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(1000);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<DialerPushRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  /** extension / dialer id → assignee name (Caller Allotment). */
+  const [extensionAssigneeMap, setExtensionAssigneeMap] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    if (!canView) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await secureApi<{ byRole?: unknown[] }>(
+          'ops.callerAllotmentSubadmins',
+          { filter: {} },
+        );
+        if (cancelled || !res.ok) return;
+        const raw = (res.data ?? {}) as Record<string, unknown>;
+        const byRole = (raw.byRole ??
+          (raw.payload as Record<string, unknown> | undefined)?.byRole ??
+          []) as Array<{
+          subAdmins?: Array<Record<string, unknown>>;
+        }>;
+        setExtensionAssigneeMap(buildExtensionAssigneeMap(byRole));
+      } catch {
+        /* non-fatal — campaign headers still show without assignee */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canView]);
 
   const load = useCallback(
     async (page = pageNo) => {
@@ -525,16 +573,24 @@ export function DialerPushDataPage() {
   const [openCampaigns, setOpenCampaigns] = useState<Record<string, boolean>>(
     {},
   );
+  /** Per-campaign page for the nested table (50 rows at a time). */
+  const [campaignPage, setCampaignPage] = useState<Record<string, number>>({});
+  const CAMPAIGN_PAGE_SIZE = 50;
+
   useEffect(() => {
     if (!groupedByCampaign.length) {
       setOpenCampaigns({});
+      setCampaignPage({});
       return;
     }
     const next: Record<string, boolean> = {};
+    const pages: Record<string, number> = {};
     groupedByCampaign.forEach(([key], index) => {
       next[key] = index === 0;
+      pages[key] = 1;
     });
     setOpenCampaigns(next);
+    setCampaignPage(pages);
   }, [groupedByCampaign]);
 
   const toggleCampaign = useCallback((campaignKey: string) => {
@@ -545,12 +601,15 @@ export function DialerPushDataPage() {
   }, []);
 
   const makeColumns = useCallback(
-    (campaignRows: DialerPushRow[]): CommonTableColumn<DialerPushRow>[] => [
+    (
+      campaignRows: DialerPushRow[],
+      rowOffset = 0,
+    ): CommonTableColumn<DialerPushRow>[] => [
       {
         id: 'sr',
         label: 'SR',
         width: 56,
-        render: (_row, index) => String(index + 1),
+        render: (_row, index) => String(rowOffset + index + 1),
       },
       ...columnsKeys.map((col) => ({
         id: col,
@@ -574,7 +633,14 @@ export function DialerPushDataPage() {
               </Box>
             );
           }
-          if (col === 'createdAt' || col === 'updatedAt') {
+          if (
+            col === 'createdAt' ||
+            col === 'updatedAt' ||
+            col === 'createdOn' ||
+            col === 'updatedOn' ||
+            col === 'created_at' ||
+            col === 'updated_at'
+          ) {
             return formatDateTime(row[col]);
           }
           return display(row[col]);
@@ -718,6 +784,17 @@ export function DialerPushDataPage() {
       ) : (
         groupedByCampaign.map(([campaignKey, campaignRows]) => {
           const isOpen = Boolean(openCampaigns[campaignKey]);
+          const page = Math.max(1, campaignPage[campaignKey] || 1);
+          const campaignTotalPages = Math.max(
+            1,
+            Math.ceil(campaignRows.length / CAMPAIGN_PAGE_SIZE),
+          );
+          const safePage = Math.min(page, campaignTotalPages);
+          const pageStart = (safePage - 1) * CAMPAIGN_PAGE_SIZE;
+          const pagedRows = campaignRows.slice(
+            pageStart,
+            pageStart + CAMPAIGN_PAGE_SIZE,
+          );
           return (
             <Box key={campaignKey} sx={{ mb: 1.5 }}>
               <Stack
@@ -754,7 +831,7 @@ export function DialerPushDataPage() {
                     <ExpandMoreIcon fontSize="small" />
                   </IconButton>
                   <Typography fontWeight={700}>
-                    {campaignLabel(campaignKey)}
+                    {dialerCampaignLabel(campaignKey, extensionAssigneeMap)}
                   </Typography>
                 </Stack>
                 <Typography variant="body2">
@@ -764,10 +841,10 @@ export function DialerPushDataPage() {
               <Collapse in={isOpen} timeout="auto" unmountOnExit>
                 <Box sx={{ minWidth: 0, overflowX: 'auto', mt: 1 }}>
                   <CommonTable
-                    columns={makeColumns(campaignRows)}
-                    rows={campaignRows}
+                    columns={makeColumns(pagedRows, pageStart)}
+                    rows={pagedRows}
                     getRowKey={(row, index) =>
-                      String(row._id || `${campaignKey}-${index}`)
+                      String(row._id || `${campaignKey}-${pageStart + index}`)
                     }
                     loading={loading}
                     emptyMessage="No data found"
@@ -776,6 +853,33 @@ export function DialerPushDataPage() {
                     minWidth={1400}
                   />
                 </Box>
+                {campaignTotalPages > 1 ? (
+                  <Stack
+                    alignItems="center"
+                    sx={{ mt: 1.25, mb: 0.5 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Pagination
+                      count={campaignTotalPages}
+                      page={safePage}
+                      color="primary"
+                      size="small"
+                      showFirstButton
+                      showLastButton
+                      onChange={(_e, value) =>
+                        setCampaignPage((prev) => ({
+                          ...prev,
+                          [campaignKey]: value,
+                        }))
+                      }
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Showing {pageStart + 1}–
+                      {Math.min(pageStart + CAMPAIGN_PAGE_SIZE, campaignRows.length)} of{' '}
+                      {campaignRows.length}
+                    </Typography>
+                  </Stack>
+                ) : null}
               </Collapse>
             </Box>
           );

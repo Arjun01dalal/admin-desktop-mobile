@@ -32,33 +32,10 @@ export function displayUserName(row: WithdrawalRow): string {
   return String(row.accountHolderName || row.userName || '').trim() || '—';
 }
 
-const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
-
-/** Prefer Mongo userId for depositList.report — matches Deposit List filter.userId. */
-export function resolveWithdrawalReportUserId(
-  row: Pick<WithdrawalRow, 'userId' | 'dp_id'>,
-): string {
-  const candidates = [row.userId, row.dp_id]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-
-  const objectId = candidates.find((id) => OBJECT_ID_RE.test(id));
-  if (objectId) return objectId;
-
-  return candidates[0] || '';
-}
-
-/** MID report icon — active workflow rows only. */
-export function showWithdrawalMidReport(status?: string): boolean {
-  const normalized = String(status || '').trim().toUpperCase();
-  return (
-    normalized === 'PENDING' ||
-    normalized === 'IN PROGRESS' ||
-    normalized === 'LOCK' ||
-    normalized === 'PROCESSING' ||
-    normalized === 'ON HOLD'
-  );
-}
+export {
+  resolveWithdrawalReportUserId,
+  showWithdrawalMidReport,
+} from '@astro/shared/depositWithdrawalReport';
 
 export function bothChecksOk(row: WithdrawalRow): boolean {
   return Boolean(row.checkBy?.status && row.crossCheckBy?.status);

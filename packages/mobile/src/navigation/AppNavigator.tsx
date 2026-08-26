@@ -20,6 +20,7 @@ import { PANEL_DETAIL_ROUTES } from './panelDetail';
 import { canAccessNavItem } from '../auth/permissions';
 import { SosProvider } from '../auth/useSosGuard';
 import { SosAlertOverlay } from '../components/SosAlertOverlay';
+import { AdminLlmChatHeaderButton } from '../components/AdminLlmChatWidget';
 import { useAuth } from '../auth/AuthContext';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
 import { useRevealCodes } from '../context/useRevealCodes';
@@ -269,6 +270,16 @@ function Screened({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Header actions — Admin LLM + profile. */
+function PanelHeaderRight() {
+  return (
+    <View style={styles.headerRightRow}>
+      <AdminLlmChatHeaderButton />
+      <ProfileHeaderButton />
+    </View>
+  );
+}
+
 /** Header profile button — opens account page (SOS / theme / reveal / logout). */
 function ProfileHeaderButton() {
   const navigation = useNavigation();
@@ -301,7 +312,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.foreground,
           headerTitleStyle: { fontWeight: '600', fontSize: 16 },
-          headerRight: () => <ProfileHeaderButton />,
+          headerRight: () => <PanelHeaderRight />,
           drawerType: 'front',
           overlayColor: 'rgba(0,0,0,0.55)',
           drawerStyle: {
@@ -465,6 +476,10 @@ const styles = StyleSheet.create({
   headerIconBtn: {
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   drawerNoMatch: {
     color: colors.muted,

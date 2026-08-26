@@ -15,9 +15,14 @@ export const ApiActions = {
   },
   users: {
     getAll: 'users.getAll',
+    getDialerDataByIds: 'users.getDialerDataByIds',
   },
   callLogs: {
     externalDialerBatch: 'callLogs.externalDialerBatch',
+  },
+  llmChat: {
+    send: 'llmChat.send',
+    sendVoice: 'llmChat.sendVoice',
   },
 } as const;
 

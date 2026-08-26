@@ -24,6 +24,7 @@ import {
   setSessionExpiredHandler,
 } from '@/utils/session';
 import { initAuthToken } from '@/utils/authToken';
+import { showPushToast } from '@/utils/showPushToast';
 import { useAstroDeepLinkLogout } from '@/hooks/useAstroDeepLinkLogout';
 import { readStoredSession } from '@/app/readStoredSession';
 import { PanelRoutes } from '@/app/PanelRoutes';
@@ -217,7 +218,7 @@ export function AppInner() {
 
   const inPanel = screen === 'welcome';
 
-  // Register before child useEffects so API 401/403 can leave the panel immediately.
+  // Register before child useEffects so API 401 (and auth-message 403) can leave the panel immediately.
   useLayoutEffect(() => {
     if (!(inPanel && user)) {
       setSessionExpiredHandler(null);
@@ -241,9 +242,9 @@ export function AppInner() {
   useEffect(() => {
     if (inPanel) return;
     const unsub = window.gcalc?.onPushNotification?.((payload) => {
-      const title = String(payload?.title || 'Notification').trim();
-      const body = String(payload?.body || '').trim();
-      toast.info(body ? `${title}: ${body}` : title, { autoClose: 9000 });
+      if (payload?.clicked) return;
+      // OS/main already plays notify.mp3 — toast is visual only.
+      showPushToast(payload, { playSound: false });
     });
     return () => {
       unsub?.();

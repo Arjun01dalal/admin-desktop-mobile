@@ -36,6 +36,7 @@ import {
 } from '@/layout/BackRowActions';
 import { RevealCodesOtpModal } from '@/components/RevealCodesOtpModal';
 import { ProfileMenu } from '@/components/ProfileMenu';
+import { AdminLlmChatWidget } from '@/components/AdminLlmChatWidget';
 import { secureApi } from '@/api/secureClient';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { useTheme } from '@mui/material/styles';
@@ -400,6 +401,8 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
           >
             New window
           </Button>
+
+          <AdminLlmChatWidget />
 
           <ProfileMenu
             user={user}

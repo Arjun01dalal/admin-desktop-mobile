@@ -26,10 +26,12 @@ function withAndroidJvmMemory(config) {
   return withGradleProperties(config, (cfg) => {
     const props = {
       'org.gradle.jvmargs':
-        '-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8',
-      'kotlin.daemon.jvmargs': '-Xmx2048m -XX:MaxMetaspaceSize=512m',
-      'org.gradle.workers.max': '2',
+        '-Xmx6144m -XX:MaxMetaspaceSize=2048m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8',
+      'kotlin.daemon.jvmargs': '-Xmx3072m -XX:MaxMetaspaceSize=1024m',
+      'org.gradle.workers.max': '1',
       'android.lint.checkReleaseBuilds': 'false',
+      // Prod APK: real devices only — drop x86 / x86_64 (emulator ABIs).
+      reactNativeArchitectures: 'armeabi-v7a,arm64-v8a',
     };
     for (const [key, value] of Object.entries(props)) {
       cfg.modResults = cfg.modResults.filter(

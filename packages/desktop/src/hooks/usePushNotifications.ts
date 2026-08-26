@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import type { PushNotificationPayload } from '@/types/gcalc';
+import { showPushToast } from '@/utils/showPushToast';
 
 function isPanelPath(path: string): boolean {
   return path.startsWith('/') && !path.startsWith('//');
@@ -16,11 +16,11 @@ export function usePushNotifications() {
 
   useEffect(() => {
     const unsub = window.gcalc?.onPushNotification?.((payload: PushNotificationPayload) => {
-      const title = String(payload?.title || 'Notification').trim();
-      const body = String(payload?.body || '').trim();
-      const message = body ? `${title}: ${body}` : title;
-
-      toast.info(message, { autoClose: 9000 });
+      // Avoid duplicate toast when user clicked the OS banner (focus + navigate only).
+      if (!payload?.clicked) {
+        // OS/main already plays notify.mp3 — toast is visual only.
+        showPushToast(payload, { playSound: false });
+      }
 
       if (!payload?.clicked) return;
 

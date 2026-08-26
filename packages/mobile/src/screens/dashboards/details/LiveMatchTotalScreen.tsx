@@ -1,7 +1,7 @@
 /**
  * Live Match Total — port of desktop LiveMatchTotalPage.
  * variant selects the book API:
- *   laxmi  -> dashboard.finalBookLaxmi
+ *   laxmi  -> dashboard.finalBookLaxmi (POST /SubAdmin/final-book-laxmi, decrypt)
  *   master -> dashboard.finalBookVip
  *   both   -> dashboard.finalBookBoth
  * Also fetches dashboard.oddsGameList for live odds and merges by match name.

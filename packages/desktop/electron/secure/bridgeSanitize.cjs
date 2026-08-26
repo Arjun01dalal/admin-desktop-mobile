@@ -11,7 +11,7 @@ const MAX_STRING = 100_000;
 /** Banner image / video / dialler uploads travel as base64 on the bridge. */
 const MAX_LONG_STRING = 16_000_000;
 const MAX_JSON_CHARS = 20_000_000;
-const LONG_STRING_KEYS = new Set(['Image', 'fileBase64', 'videoBase64']);
+const LONG_STRING_KEYS = new Set(['Image', 'fileBase64', 'videoBase64', 'audioBase64']);
 
 function isPlainObject(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {

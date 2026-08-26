@@ -23,6 +23,8 @@ import {
   getRoleName as sharedGetRoleName,
   getSosTypeForRole as sharedGetSosTypeForRole,
   hasPermission as sharedHasPermission,
+  canUseAdminLlmChat as sharedCanUseAdminLlmChat,
+  isFullAccessNavRole as sharedIsFullAccessNavRole,
   isCallerRole as sharedIsCallerRole,
   isPathAllowed,
   isSosExemptRole as sharedIsSosExemptRole,
@@ -86,6 +88,18 @@ export function hasPermission(
   user: StoredUser | null = getSessionUser(),
 ): boolean {
   return sharedHasPermission(permission, user);
+}
+
+export function canUseAdminLlmChat(
+  user: StoredUser | null = getSessionUser(),
+): boolean {
+  return sharedCanUseAdminLlmChat(user, storage);
+}
+
+export function isFullAccessNavRole(
+  user: StoredUser | null = getSessionUser(),
+): boolean {
+  return sharedIsFullAccessNavRole(user, storage);
 }
 
 export function canAccessDashboard(

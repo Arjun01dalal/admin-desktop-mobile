@@ -251,9 +251,9 @@ function enableGeolocationPermissions() {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowGeo(permission));
 }
 
-/** Packaged builds: no DevTools / inspector for end users. */
+/** Packaged builds: no DevTools / inspector for end users. Unpackaged (dev / local electron) allows them. */
 function allowDevTools() {
-  return Boolean(useViteDevServer) && !app.isPackaged;
+  return !app.isPackaged;
 }
 
 /**
@@ -350,8 +350,18 @@ function hardenWebContents(wc) {
   }
 
   wc.on('before-input-event', (event, input) => {
-    if (!allowDevTools() && isDevtoolsShortcut(input)) {
+    if (!isDevtoolsShortcut(input)) return;
+    if (!allowDevTools()) {
       event.preventDefault();
+      return;
+    }
+    // Explicit toggle — Chromium defaults are unreliable without a View menu role.
+    event.preventDefault();
+    try {
+      if (wc.isDevToolsOpened()) wc.closeDevTools();
+      else wc.openDevTools({ mode: 'detach' });
+    } catch {
+      // ignore
     }
   });
 
@@ -445,6 +455,8 @@ function createWindow(opts = {}) {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      // Persist SkyTalk (and panel) session cookies across restarts.
+      partition: 'persist:skytalk',
       // Never ship Inspect Element / DevTools to end users.
       devTools: allowDevTools(),
     },
@@ -480,6 +492,15 @@ function createWindow(opts = {}) {
       // ignore
     }
     win.show();
+    // Local unpackaged runs: open DevTools so debugging does not depend on shortcuts alone.
+    if (allowDevTools() && useViteDevServer) {
+      try {
+        win.webContents.openDevTools({ mode: 'detach' });
+        console.log('[dev] DevTools opened (Cmd+Option+I / Ctrl+Shift+I / F12 to toggle)');
+      } catch {
+        // ignore
+      }
+    }
   });
 
   win.on('resize', () => {

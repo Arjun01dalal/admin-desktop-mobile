@@ -50,6 +50,8 @@ type Props<Row> = {
   previewFieldCount?: number;
   /** Optional status/badge shown on the right side of each phone card. */
   getCardBadge?: (row: Row, index: number) => { text: string; color?: string } | null | undefined;
+  /** Optional control beside the card title (e.g. withdrawal MID report icon). */
+  renderCardTitleSuffix?: (row: Row, index: number) => React.ReactNode;
 };
 
 export function ResponsiveTable<Row>(props: Props<Row>) {
@@ -72,6 +74,7 @@ function CardList<Row>({
   renderCardFooter,
   getSheetActions,
   getCardBadge,
+  renderCardTitleSuffix,
   cardLayout = 'preview',
   previewFieldCount = 2,
 }: Props<Row>) {
@@ -203,16 +206,19 @@ function CardList<Row>({
               )}
             </View>
             <View style={styles.titleRow}>
-              <Text
-                style={[
-                  styles.cardTitle,
-                  styles.cardTitleFlex,
-                  titleCol.color?.(row) ? { color: titleCol.color(row) } : null,
-                ]}
-                numberOfLines={2}
-              >
-                {titleValue}
-              </Text>
+              <View style={styles.titleWithSuffix}>
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    styles.cardTitleFlex,
+                    titleCol.color?.(row) ? { color: titleCol.color(row) } : null,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {titleValue}
+                </Text>
+                {renderCardTitleSuffix?.(row, index)}
+              </View>
               {badge ? (
                 <View
                   style={[
@@ -362,6 +368,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing(2),
     marginBottom: spacing(1.5),
+  },
+  titleWithSuffix: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1.5),
   },
   cardTitle: {
     color: colors.foreground,

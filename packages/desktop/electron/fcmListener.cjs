@@ -1,11 +1,13 @@
 /**
  * Listen for Firebase Cloud Messaging pushes in the Electron main process.
  *
- * - Shows native OS notifications (works while app is in tray)
+ * - Shows native OS notifications (title / body / image / sound)
  * - Broadcasts to panel renderers for in-app toasts / optional navigation
  * - Routes SOS activate/clear payloads to sosMonitor (same as ntfy push)
  */
-const { Notification } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const { Notification, nativeImage, app, net } = require('electron');
 const {
   getFcmToken,
   getStoredCredentials,
@@ -28,6 +30,10 @@ function log(...args) {
 
 function warn(...args) {
   console.warn('[fcm-listen]', ...args);
+}
+
+function appIconPath() {
+  return path.join(__dirname, '..', 'build', 'icon.png');
 }
 
 function preloadListenModule() {
@@ -57,6 +63,14 @@ function normalizeData(raw) {
   return data;
 }
 
+function firstHttpsUrl(...candidates) {
+  for (const raw of candidates) {
+    const url = String(raw || '').trim();
+    if (/^https?:\/\//i.test(url)) return url;
+  }
+  return '';
+}
+
 function parsePushPayload(notificationData) {
   const info =
     notificationData && typeof notificationData === 'object'
@@ -70,9 +84,21 @@ function parsePushPayload(notificationData) {
   if (!body) body = String(data.body || data.message || data.text || '').trim();
   if (!title) title = 'Astro CS Panel';
 
+  const imageUrl = firstHttpsUrl(
+    info.image,
+    info.icon,
+    data.image,
+    data.imageUrl,
+    data.image_url,
+    data.picture,
+    data.icon,
+    data.photo,
+  );
+
   return {
     title,
     body,
+    imageUrl: imageUrl || undefined,
     data,
     fcmMessageId: String(notificationData?.fcmMessageId || ''),
     receivedAt: new Date().toISOString(),
@@ -125,15 +151,131 @@ function destroyListenClient() {
   listenClient = null;
 }
 
-function showOsNotification(handlers, payload) {
+/**
+ * Download a remote image for the OS notification icon (best-effort, 4s timeout).
+ * @param {string} url
+ * @returns {Promise<string | null>} local file path
+ */
+function downloadImageToTemp(url) {
+  return new Promise((resolve) => {
+    const timedOut = setTimeout(() => resolve(null), 4000);
+    try {
+      const request = net.request({ method: 'GET', url });
+      const chunks = [];
+      request.on('response', (response) => {
+        const status = Number(response.statusCode || 0);
+        if (status < 200 || status >= 300) {
+          clearTimeout(timedOut);
+          resolve(null);
+          return;
+        }
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => {
+          clearTimeout(timedOut);
+          try {
+            const buf = Buffer.concat(chunks);
+            if (!buf.length || buf.length > 2_500_000) {
+              resolve(null);
+              return;
+            }
+            const ext = /\.jpe?g(\?|$)/i.test(url)
+              ? '.jpg'
+              : /\.webp(\?|$)/i.test(url)
+                ? '.webp'
+                : /\.gif(\?|$)/i.test(url)
+                  ? '.gif'
+                  : '.png';
+            const file = path.join(
+              app.getPath('temp'),
+              `astro-push-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`,
+            );
+            fs.writeFileSync(file, buf);
+            const img = nativeImage.createFromPath(file);
+            if (img.isEmpty()) {
+              try {
+                fs.unlinkSync(file);
+              } catch {
+                // ignore
+              }
+              resolve(null);
+              return;
+            }
+            resolve(file);
+          } catch {
+            resolve(null);
+          }
+        });
+        response.on('error', () => {
+          clearTimeout(timedOut);
+          resolve(null);
+        });
+      });
+      request.on('error', () => {
+        clearTimeout(timedOut);
+        resolve(null);
+      });
+      request.end();
+    } catch {
+      clearTimeout(timedOut);
+      resolve(null);
+    }
+  });
+}
+
+async function resolveNotificationIcon(imageUrl) {
+  const fallback = appIconPath();
+  const fallbackOk = fs.existsSync(fallback) ? fallback : undefined;
+  if (!imageUrl) return fallbackOk;
+  const local = await downloadImageToTemp(imageUrl);
+  return local || fallbackOk;
+}
+
+function notifySoundPath() {
+  const candidates = [
+    path.join(__dirname, '..', 'public', 'sounds', 'notify.mp3'),
+    path.join(__dirname, '..', 'dist', 'sounds', 'notify.mp3'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+/** Play a loud local WAV even when the renderer audio context is locked. */
+function playLocalNotifySound() {
+  const file = notifySoundPath();
+  if (!file) return;
+  try {
+    const { execFile } = require('node:child_process');
+    if (process.platform === 'darwin') {
+      execFile('afplay', ['-v', '1.0', file], () => {});
+      return;
+    }
+    if (process.platform === 'win32') {
+      const ps = `Add-Type -AssemblyName PresentationCore; $p=New-Object System.Windows.Media.MediaPlayer; $p.Open([uri]'${file.replace(/'/g, "''")}'); $p.Volume=1; $p.Play(); Start-Sleep -Milliseconds 4500`;
+      execFile('powershell.exe', ['-NoProfile', '-Command', ps], () => {});
+    }
+  } catch (err) {
+    warn('local sound failed:', err?.message || err);
+  }
+}
+
+async function showOsNotification(handlers, payload) {
   if (!Notification.isSupported()) return null;
 
   try {
-    const n = new Notification({
-      title: payload.title,
+    const icon = await resolveNotificationIcon(payload.imageUrl);
+    /** @type {Electron.NotificationConstructorOptions} */
+    const opts = {
+      title: payload.title || 'Astro CS Panel',
       body: payload.body || undefined,
-      silent: false,
-    });
+      // We play our own MP3 via afplay / MediaPlayer for reliable volume.
+      silent: true,
+      icon: icon || undefined,
+    };
+
+    const n = new Notification(opts);
+    playLocalNotifySound();
 
     n.on('click', () => {
       handlers.showMainWindow?.();
@@ -155,7 +297,7 @@ function handleIncoming(handlers, { notification, persistentId }) {
   if (persistentId) appendPersistentId(persistentId);
 
   const payload = parsePushPayload(notification);
-  log('notification', payload.title, payload.body || '');
+  log('notification', payload.title, payload.body ? `(body ${payload.body.length} chars)` : '');
 
   if (isSosClear(payload)) {
     handlers.getSosMonitor?.()?.forceClear?.();
@@ -166,7 +308,7 @@ function handleIncoming(handlers, { notification, persistentId }) {
     return;
   }
 
-  showOsNotification(handlers, payload);
+  void showOsNotification(handlers, payload);
   handlers.broadcastToPanels?.('gcalc:push-notification', payload);
   handlers.onNotification?.(payload);
 }

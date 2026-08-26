@@ -288,6 +288,20 @@ export function LudoDetailsModal({
       setOtpVerifying(false);
     }
   };
+  const beginRtpUpdate = () => {
+    setMessage(null);
+    const rtp = Number(rtpValue);
+    if (!selectedRtpGameId) {
+      setMessage({ text: 'Select a game from the list', error: true });
+      return;
+    }
+    if (!rtpValue.trim() || !Number.isFinite(rtp) || rtp < 0) {
+      setMessage({ text: 'Enter a valid RTP value', error: true });
+      return;
+    }
+    setConfirmRtp(true);
+  };
+
   const busy = loading || rtpLoading || rtpListLoading || otpSending || otpVerifying;
   const handleClose = () => {
     if (busy) return;
@@ -307,6 +321,7 @@ export function LudoDetailsModal({
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.sheetContent}
+            style={styles.sheetScroll}
           >
             {updateOpen && (
               <>
@@ -465,20 +480,6 @@ export function LudoDetailsModal({
                       <Text style={styles.confirmText}>
                         Set RTP of {selectedRtpGameId} to {rtpValue}?
                       </Text>
-                      <View style={styles.btnRow}>
-                        <Button
-                          title="Cancel"
-                          variant="outline"
-                          onPress={() => setConfirmRtp(false)}
-                          style={styles.smallBtn}
-                        />
-                        <Button
-                          title="Confirm"
-                          onPress={() => void beginRtpOtpVerification()}
-                          loading={otpSending}
-                          style={styles.smallBtn}
-                        />
-                      </View>
                     </View>
                   ) : otpPending ? (
                     <View style={styles.confirmRow}>
@@ -494,52 +495,8 @@ export function LudoDetailsModal({
                         keyboardType="number-pad"
                         style={styles.input}
                       />
-                      <View style={styles.btnRow}>
-                        <Button
-                          title="Cancel"
-                          variant="outline"
-                          onPress={() => {
-                            setOtpPending(false);
-                            setOtp('');
-                          }}
-                          style={styles.smallBtn}
-                        />
-                        <Button
-                          title="Resend"
-                          variant="outline"
-                          onPress={() => void sendRtpOtp()}
-                          disabled={otpSending || otpVerifying}
-                          style={styles.smallBtn}
-                        />
-                        <Button
-                          title={otpVerifying ? 'Verifying…' : 'Verify & Update'}
-                          onPress={() => void verifyRtpOtpAndUpdate()}
-                          loading={otpVerifying || rtpLoading}
-                          disabled={!otpSent || otp.trim().length !== 4}
-                          style={styles.smallBtn}
-                        />
-                      </View>
                     </View>
-                  ) : (
-                    <Button
-                      title="Update RTP"
-                      onPress={() => {
-                        setMessage(null);
-                        const rtp = Number(rtpValue);
-                        if (!selectedRtpGameId) {
-                          setMessage({ text: 'Select a game from the list', error: true });
-                          return;
-                        }
-                        if (!rtpValue.trim() || !Number.isFinite(rtp) || rtp < 0) {
-                          setMessage({ text: 'Enter a valid RTP value', error: true });
-                          return;
-                        }
-                        setConfirmRtp(true);
-                      }}
-                      disabled={rtpLoading || rtpListLoading || otpPending || !selectedRtpGameId}
-                      style={styles.smallBtn}
-                    />
-                  )}
+                  ) : null}
                 </View>
               </>
             )}
@@ -549,18 +506,71 @@ export function LudoDetailsModal({
                 {message.text}
               </Text>
             ) : null}
-
-            <View style={styles.footer}>
-              {busy ? <ActivityIndicator size="small" color={colors.primary} /> : null}
-              <Button
-                title="Close"
-                variant="outline"
-                onPress={handleClose}
-                disabled={busy}
-                style={styles.smallBtn}
-              />
-            </View>
           </ScrollView>
+
+          <View style={styles.footerBar}>
+            {busy ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+            <Button
+              title="Close"
+              variant="outline"
+              onPress={handleClose}
+              disabled={busy}
+              style={styles.footerBtn}
+            />
+            {rtpOpen && confirmRtp ? (
+              <>
+                <Button
+                  title="Cancel"
+                  variant="outline"
+                  onPress={() => setConfirmRtp(false)}
+                  disabled={otpSending || otpVerifying || rtpLoading}
+                  style={styles.footerBtn}
+                />
+                <Button
+                  title="Confirm"
+                  onPress={() => void beginRtpOtpVerification()}
+                  loading={otpSending}
+                  style={styles.footerBtn}
+                />
+              </>
+            ) : null}
+            {rtpOpen && otpPending ? (
+              <>
+                <Button
+                  title="Cancel OTP"
+                  variant="outline"
+                  onPress={() => {
+                    setOtpPending(false);
+                    setOtp('');
+                  }}
+                  disabled={otpVerifying || rtpLoading}
+                  style={styles.footerBtn}
+                />
+                <Button
+                  title="Resend OTP"
+                  variant="outline"
+                  onPress={() => void sendRtpOtp()}
+                  disabled={otpSending || otpVerifying || rtpLoading}
+                  style={styles.footerBtn}
+                />
+                <Button
+                  title={otpVerifying ? 'Verifying…' : 'Verify & Update'}
+                  onPress={() => void verifyRtpOtpAndUpdate()}
+                  loading={otpVerifying || rtpLoading}
+                  disabled={!otpSent || otp.trim().length !== 4}
+                  style={styles.footerBtn}
+                />
+              </>
+            ) : null}
+            {rtpOpen && !confirmRtp && !otpPending ? (
+              <Button
+                title="Update RTP"
+                onPress={beginRtpUpdate}
+                disabled={rtpLoading || rtpListLoading || !selectedRtpGameId}
+                style={styles.footerBtn}
+              />
+            ) : null}
+          </View>
         </View>
       </View>
     </Modal>
@@ -580,7 +590,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     maxHeight: '85%',
+    overflow: 'hidden',
   },
+  sheetScroll: { flexGrow: 0, flexShrink: 1 },
   sheetContent: { padding: spacing(4) },
   title: { color: colors.foreground, fontSize: 17, fontWeight: '800' },
   rtpHeaderRow: {
@@ -668,11 +680,17 @@ const styles = StyleSheet.create({
   message: { marginTop: spacing(1), fontSize: 12, fontWeight: '600' },
   msgError: { color: colors.destructive },
   msgOk: { color: colors.success },
-  footer: {
+  footerBar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: spacing(2),
-    marginTop: spacing(3),
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(3),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
+  footerBtn: { height: 40 },
 });

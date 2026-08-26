@@ -17,7 +17,11 @@ const AUTH_STORAGE_KEYS = [
   'blocked_user_ids_cache',
 ] as const;
 
-const AUTH_SESSION_KEYS = ['last_panel_path'] as const;
+const AUTH_SESSION_KEYS = [
+  'last_panel_path',
+  'llm_chat_messages',
+  'llm_chat_open',
+] as const;
 
 let logoutInFlight = false;
 let expiredHandler: ((reason: string) => void) | null = null;
@@ -55,7 +59,8 @@ export function isJwtExpired(token: string | null | undefined): boolean {
 }
 
 export function isAuthExpiredStatus(status?: number): boolean {
-  return status === 401 || status === 403;
+  // Only 401 forces session expiry. Bare 403 is often WAF/VPN IP blocks.
+  return status === 401;
 }
 
 /**

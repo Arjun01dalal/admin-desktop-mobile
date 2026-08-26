@@ -11,6 +11,8 @@ export {
 export {
   extractTokenBlacklistPayload,
   isAuthFailureMessage,
+  isNetworkForbiddenMessage,
+  networkForbiddenUserMessage,
   parseTokenBlacklistStatus,
   type SessionStatus,
   type TokenBlacklistPayload,

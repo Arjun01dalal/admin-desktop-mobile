@@ -538,6 +538,7 @@ async function uploadDiallerData(payload = {}, token = null) {
 
 const MAX_BANNER_VIDEO_BYTES = 50 * 1024 * 1024;
 const BANNER_VIDEO_TYPES = new Set(['tutorialVideo', 'howToDepositVideo']);
+const MAX_LLM_VOICE_BYTES = 10 * 1024 * 1024;
 
 async function uploadBannerVideo(payload = {}, token = null) {
   const { videoBase64, fileName, videoType, mimeType } = payload;
@@ -615,6 +616,97 @@ async function uploadBannerVideo(payload = {}, token = null) {
 }
 
 /**
+ * Admin LLM voice — multipart /llm-chat/send-voice (audio + encrypted history).
+ * Renderer sends audioBase64; main encrypts history and posts FormData.
+ */
+async function uploadLlmVoice(payload = {}, token = null) {
+  const { audioBase64, mimeType, fileName, history } = payload;
+  if (!audioBase64) {
+    return { ok: false, message: 'No audio captured' };
+  }
+  const safeToken = sanitizeToken(token);
+  if (!safeToken) {
+    return { ok: false, message: 'Auth token missing. Please login again.' };
+  }
+
+  try {
+    const raw = String(audioBase64).includes(',')
+      ? String(audioBase64).split(',').pop()
+      : String(audioBase64);
+    const buffer = Buffer.from(raw, 'base64');
+    if (!buffer.length) {
+      return { ok: false, message: 'No audio captured' };
+    }
+    if (buffer.length > MAX_LLM_VOICE_BYTES) {
+      return { ok: false, message: 'Voice recording exceeds 10MB limit' };
+    }
+
+    const mime = String(mimeType || 'audio/webm').slice(0, 80);
+    const ext = mime.includes('ogg')
+      ? 'ogg'
+      : mime.includes('mp4') || mime.includes('m4a')
+        ? 'm4a'
+        : 'webm';
+    const safeName = String(fileName || `voice.${ext}`)
+      .replace(/[^A-Za-z0-9._-]/g, '_')
+      .slice(0, 120);
+
+    const form = new FormData();
+    form.append('audio', new Blob([buffer], { type: mime }), safeName);
+    form.append(
+      'token',
+      encrypt({ history: Array.isArray(history) ? history : [] }),
+    );
+
+    const response = await apiClient('llmChat.sendVoice').post(
+      '/llm-chat/send-voice',
+      form,
+      {
+        headers: {
+          Authorization: `Bearer ${safeToken}`,
+        },
+        maxBodyLength: Infinity,
+        timeout: 180000,
+        metadata: { action: 'llmChat.sendVoice', start: Date.now() },
+      },
+    );
+
+    let data = response.data;
+    if (data?.data != null && typeof data.data === 'string') {
+      try {
+        data = { ...data, data: decrypt(data.data) };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err?.message || 'Decrypt failed',
+          status: response.status,
+        };
+      }
+    }
+
+    const payloadOut =
+      data?.data?.payload ?? data?.data ?? data?.payload ?? data;
+
+    return {
+      ok: true,
+      success: data?.success !== false,
+      message: typeof data?.message === 'string' ? data.message : undefined,
+      data: payloadOut,
+      status: response.status,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to send voice message',
+      status: error?.response?.status,
+    };
+  }
+}
+
+/**
  * @param {string} action - registry key
  * @param {object} payload
  * @param {string|null} token - Bearer token
@@ -668,6 +760,9 @@ async function execute(action, payload = {}, token = null) {
     }
     if (action === 'ops.bannersUploadVideo') {
       return uploadBannerVideo(safePayload, safeToken);
+    }
+    if (action === 'llmChat.sendVoice') {
+      return uploadLlmVoice(safePayload, safeToken);
     }
     return { ok: false, message: `Unhandled local action: ${action}` };
   }

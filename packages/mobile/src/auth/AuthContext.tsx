@@ -11,6 +11,7 @@ import { secureApi, setAuthFailureHandler } from '../api/client';
 import { eraseSessionSecrets, eraseToken, persistToken, persistUser } from '../lib/secureStorage';
 import { appStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
+import { clearLlmChatStorage } from '@astro/shared';
 import { registerSosPush } from '../push/sosPush';
 import { registerSubAdminFcmToken } from './registerFcmToken';
 import { resetTokenValidationThrottle } from './sessionCheck';
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    clearLlmChatStorage(appStorage);
     appStorage.removeItem('token');
     appStorage.removeItem('user');
     await eraseSessionSecrets();

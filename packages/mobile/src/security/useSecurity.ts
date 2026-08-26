@@ -36,7 +36,11 @@ export function useSecurity(): SecurityStatus {
   const { threats: raspThreats } = useRaspThreats();
   // Preview: do not hard-block on freeRASP integrity (sideload false positives).
   const threats = raspThreats.filter(
-    (t) => t !== 'appIntegrity' && t !== 'unofficialStore' && t !== 'systemVPN',
+    (t) =>
+      t !== 'appIntegrity' &&
+      t !== 'unofficialStore' &&
+      // VPN must not lock the panel — staff often work over VPN.
+      t !== 'systemVPN',
   );
 
   const blocked = threats.some((t) => BLOCKING.includes(t));

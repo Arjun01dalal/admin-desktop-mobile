@@ -60,6 +60,8 @@ export type IpLocationResult = {
 export type PushNotificationPayload = {
   title?: string;
   body?: string;
+  /** HTTPS image from FCM notification/data (shown in OS + in-app toast). */
+  imageUrl?: string;
   data?: Record<string, string>;
   fcmMessageId?: string;
   receivedAt?: string;

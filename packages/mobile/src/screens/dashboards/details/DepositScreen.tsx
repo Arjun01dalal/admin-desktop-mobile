@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
@@ -723,8 +724,20 @@ export function DepositScreen() {
               <Text style={styles.cardName} numberOfLines={1}>
                 {display(r.userName)}
               </Text>
-              <View style={[styles.statusPill, badge ? { backgroundColor: badge } : null]}>
-                <Text style={styles.statusPillText}>{display(r.status)}</Text>
+              <View style={styles.statusRow}>
+                <View style={[styles.statusPill, badge ? { backgroundColor: badge } : null]}>
+                  <Text style={styles.statusPillText}>{display(r.status)}</Text>
+                </View>
+                {canApprove ? (
+                  <TouchableOpacity
+                    style={styles.approveIconBtn}
+                    onPress={() => openSettle(r)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    accessibilityLabel="Approve deposit"
+                  >
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#16a34a" />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
             <Text style={styles.cardAmount}>₹ {formatIN(r.amount)}</Text>
@@ -758,39 +771,25 @@ export function DepositScreen() {
               </View>
               <View style={styles.cardCell}>
                 <Text style={styles.cardLabel}>App</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(appCodeForName(r.clientName) || r.clientName)}
-                </Text>
+                <View style={styles.appRow}>
+                  <Text style={[styles.cardValue, styles.appValue]} numberOfLines={1}>
+                    {display(appCodeForName(r.clientName) || r.clientName)}
+                  </Text>
+                  {pending || canApprove ? (
+                    <TouchableOpacity
+                      style={styles.secondaryChip}
+                      onPress={() => {
+                        setSecName('');
+                        setSecRow(r);
+                      }}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <Text style={styles.secondaryChipText}>+ Secondary</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
             </View>
-            {canApprove ? (
-              <View style={styles.cardBtnRow}>
-                <TouchableOpacity style={styles.approveBtn} onPress={() => openSettle(r)}>
-                  <Text style={styles.approveBtnText}>Approve</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  onPress={() => {
-                    setSecName('');
-                    setSecRow(r);
-                  }}
-                >
-                  <Text style={styles.secondaryBtnText}>+ Secondary Name</Text>
-                </TouchableOpacity>
-              </View>
-            ) : pending ? (
-              <View style={styles.cardBtnRow}>
-                <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  onPress={() => {
-                    setSecName('');
-                    setSecRow(r);
-                  }}
-                >
-                  <Text style={styles.secondaryBtnText}>+ Secondary Name</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
             {canShowCheckAction(r, canPencil) ? (
               <View style={styles.cardBtnRow}>
                 {r.checkBy ? (
@@ -1076,63 +1075,79 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing(3.5),
-    marginTop: spacing(3),
+    padding: spacing(2.5),
+    marginTop: spacing(2),
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardName: { color: colors.foreground, fontSize: 15, fontWeight: '700', flex: 1, marginRight: spacing(2) },
+  cardName: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, marginRight: spacing(2) },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), flexShrink: 0 },
   statusPill: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: 999,
-    paddingHorizontal: spacing(2.5),
-    paddingVertical: spacing(1),
+    paddingHorizontal: spacing(2),
+    paddingVertical: 3,
   },
-  statusPillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  cardAmount: { color: colors.foreground, fontSize: 18, fontWeight: '800', marginTop: spacing(1.5) },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(3), marginTop: spacing(2.5) },
-  cardCell: { minWidth: '28%', flexGrow: 1 },
-  cardLabel: { color: colors.muted, fontSize: 10, fontWeight: '600', textTransform: 'uppercase' },
-  cardValue: { color: colors.foreground, fontSize: 13, marginTop: 2 },
-  cardEmpName: { color: colors.muted, fontSize: 11, fontWeight: '500', marginTop: 2 },
-  cardBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
-  approveBtn: {
-    backgroundColor: '#16a34a',
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
+  statusPillText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  approveIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
-    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(22,163,74,0.12)',
   },
-  approveBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  secondaryBtn: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
+  cardAmount: { color: colors.foreground, fontSize: 16, fontWeight: '800', marginTop: spacing(1) },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(1.5) },
+  cardCell: { minWidth: '45%', flexGrow: 1, maxWidth: '48%' },
+  cardLabel: { color: colors.muted, fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
+  cardValue: { color: colors.foreground, fontSize: 12, marginTop: 1 },
+  cardEmpName: { color: colors.muted, fontSize: 10, fontWeight: '500', marginTop: 1 },
+  appRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(1),
+    marginTop: 1,
+  },
+  appValue: { flex: 1, minWidth: 0, marginTop: 0 },
+  secondaryChip: {
+    flexShrink: 0,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: spacing(2.5),
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+  },
+  secondaryChipText: { color: colors.foreground, fontSize: 10, fontWeight: '700' },
+  cardBtnRow: { flexDirection: 'row', gap: spacing(1.5), marginTop: spacing(2) },
+  approveBtn: {
+    backgroundColor: '#16a34a',
+    borderRadius: radius.sm,
+    paddingVertical: spacing(1.75),
     alignItems: 'center',
     flex: 1,
   },
-  secondaryBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  approveBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   checkBtn: {
     backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
+    borderRadius: radius.sm,
+    paddingVertical: spacing(1.75),
     alignItems: 'center',
     flex: 1,
   },
-  checkBtnText: { color: colors.primaryForeground, fontSize: 13, fontWeight: '700' },
+  checkBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
   checkDone: {
     flex: 1,
     color: '#16a34a',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    paddingVertical: spacing(2),
+    paddingVertical: spacing(1.5),
   },
   checkHint: {
     color: '#d97706',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    marginTop: spacing(2),
+    marginTop: spacing(1.25),
   },
   btnDisabled: { opacity: 0.5 },
   modalBackdrop: {
@@ -1208,7 +1223,7 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
   modalSubmitBtn: { flex: 1 },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(2), textAlign: 'center' },
+  cardHint: { color: colors.muted, fontSize: 9, marginTop: spacing(1.25), textAlign: 'center' },
   pager: {
     flexDirection: 'row',
     alignItems: 'center',

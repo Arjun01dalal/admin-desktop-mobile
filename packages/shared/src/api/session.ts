@@ -10,15 +10,19 @@ export type TokenBlacklistPayload = {
 /**
  * True when an API status/message indicates the bearer session is dead
  * (blacklisted, superseded by a newer login, expired, etc.).
+ *
+ * Note: bare HTTP 403 is often CDN/WAF/VPN IP blocking — not a dead JWT.
+ * Only treat 403 as auth failure when the body clearly says so.
  */
 export function isAuthFailureMessage(
   status: number | undefined,
   message?: string | null,
 ): boolean {
-  if (status === 401 || status === 403) return true;
-  const m = String(message || '').toLowerCase();
-  if (!m) return false;
-  return (
+  const m = String(message || '').toLowerCase().trim();
+
+  if (status === 401) return true;
+
+  const authHints =
     m.includes('blacklist') ||
     m.includes('token expired') ||
     m.includes('invalid token') ||
@@ -30,8 +34,36 @@ export function isAuthFailureMessage(
     m.includes('please login again') ||
     m.includes('please log in again') ||
     m.includes('token not found') ||
-    m.includes('no token')
-  );
+    m.includes('no token') ||
+    (m.includes('access denied') && m.includes('token')) ||
+    (m.includes('forbidden') && (m.includes('token') || m.includes('auth')));
+
+  if (status === 403) {
+    return Boolean(m) && authHints;
+  }
+
+  if (!m) return false;
+  return authHints;
+}
+
+/** True when a 403 looks like network / WAF / VPN blocking rather than auth. */
+export function isNetworkForbiddenMessage(
+  status: number | undefined,
+  message?: string | null,
+): boolean {
+  if (status !== 403) return false;
+  if (isAuthFailureMessage(status, message)) return false;
+  return true;
+}
+
+export function networkForbiddenUserMessage(
+  message?: string | null,
+): string {
+  const raw = String(message || '').trim();
+  if (raw && !/^request failed/i.test(raw) && !/^forbidden$/i.test(raw)) {
+    return raw;
+  }
+  return 'Request blocked (HTTP 403). If you are on a VPN, try another server or turn VPN off — or ask admin to allow this network.';
 }
 
 /**

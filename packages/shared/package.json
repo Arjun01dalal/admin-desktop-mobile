@@ -24,7 +24,8 @@
     "./ludoRtp": "./src/ludoRtp.ts",
     "./walletOtp": "./src/walletOtp.ts",
     "./subAdminFcm": "./src/subAdminFcm.ts",
-    "./depositWithdrawalReport": "./src/depositWithdrawalReport.ts"
+    "./depositWithdrawalReport": "./src/depositWithdrawalReport.ts",
+    "./llmChat": "./src/llmChat.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
