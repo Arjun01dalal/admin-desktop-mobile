@@ -186,6 +186,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  'game.userStatsByGame': {
+    method: 'POST',
+    path: '/Qtech/user-stats-by-game',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
 
   // Call Logs — keep encrypt flags aligned with backend (plain SubAdmin dialer APIs)
   'callLogs.getDialerData': {

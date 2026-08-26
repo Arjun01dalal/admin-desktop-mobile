@@ -24,6 +24,17 @@ export const ApiActions = {
     send: 'llmChat.send',
     sendVoice: 'llmChat.sendVoice',
   },
+  casinoTopup: {
+    get: 'casinoTopup.get',
+    qtechRemaining: 'casinoTopup.qtechRemaining',
+    addQtech: 'casinoTopup.addQtech',
+    addBetconstruct: 'casinoTopup.addBetconstruct',
+  },
+  game: {
+    wcoStats: 'game.wcoStats',
+    qtechStats: 'game.qtechStats',
+    userStatsByGame: 'game.userStatsByGame',
+  },
 } as const;
 
 export type AuthAction = (typeof ApiActions.auth)[keyof typeof ApiActions.auth];

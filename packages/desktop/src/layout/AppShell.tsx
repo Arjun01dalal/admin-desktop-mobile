@@ -187,6 +187,7 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
     }
     if (paths.includes('/game-activity')) {
       paths.push('/game-activity/details');
+      paths.push('/game-activity/user-stats');
     }
     if (paths.includes('/player-activity')) {
       paths.push('/player-activity/details');

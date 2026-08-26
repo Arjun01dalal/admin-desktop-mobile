@@ -236,156 +236,25 @@ export function displayToppedUpAt(item: TopupRecord): string {
   return String(item.toppedUpAtIst || item.createdAt || item.toppedUpAt || '—');
 }
 
-export type RemainingBreakdownRow = {
-  _id?: string;
-  id?: string;
-  provider?: string;
-  providerName?: string;
-  game?: string;
-  gameName?: string;
-  name?: string;
-  gameId?: string | number;
-  game_id?: string | number;
-  tableId?: string | number;
-  code?: string;
-  ggrUsd?: number;
-  ggr?: number;
-  amountUsd?: number;
-  amount?: number;
-  ggrInr?: number;
-  amountInr?: number;
-  inr?: number;
-  consumedUsd?: number;
-  betAmount?: number;
-  turnover?: number;
-  [key: string]: unknown;
-};
-
-export type QtechRemainingSummary = {
-  remainingUsd: number | null;
-  toppedUpUsd: number | null;
-  consumedUsd: number | null;
-  currency: string;
-  usdToInr: number | null;
-  feeInr: number | null;
-  ggrUsd: number | null;
-  ggrInr: number | null;
-  rangeStart: string;
-  rangeEnd: string;
-  toppedUpAt: string;
-  toppedUpAtIst: string;
-  byGame: RemainingBreakdownRow[];
-  byProvider: RemainingBreakdownRow[];
-  unmatchedGamesCount: number | null;
-};
-
-export function emptyRemainingSummary(): QtechRemainingSummary {
-  return {
-    remainingUsd: null,
-    toppedUpUsd: null,
-    consumedUsd: null,
-    currency: 'USD',
-    usdToInr: null,
-    feeInr: null,
-    ggrUsd: null,
-    ggrInr: null,
-    rangeStart: '',
-    rangeEnd: '',
-    toppedUpAt: '',
-    toppedUpAtIst: '',
-    byGame: [],
-    byProvider: [],
-    unmatchedGamesCount: null,
-  };
-}
-
-export function formatMoney(value: number | null | undefined, digits = 2): string {
-  if (value == null || !Number.isFinite(Number(value))) return '—';
-  return Number(value).toLocaleString(undefined, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
-export function parseQtechRemaining(decrypted: unknown): QtechRemainingSummary {
-  const root = resolveRootPayload(decrypted) ?? decrypted;
-  let payload: Record<string, unknown> = {};
-  if (root && typeof root === 'object' && !Array.isArray(root)) {
-    const obj = root as Record<string, unknown>;
-    if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
-      payload = obj.payload as Record<string, unknown>;
-    } else if (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
-      payload = obj.data as Record<string, unknown>;
-    } else {
-      payload = obj;
-    }
-  }
-  const range =
-    payload.range && typeof payload.range === 'object' && !Array.isArray(payload.range)
-      ? (payload.range as Record<string, unknown>)
-      : {};
-
-  return {
-    remainingUsd:
-      toNumber(payload.remainingUsd) ?? toNumber(payload.remainingBalance),
-    toppedUpUsd:
-      toNumber(payload.toppedUpUsd) ?? toNumber(payload.toppedUpBalance),
-    consumedUsd:
-      toNumber(payload.consumedUsd) ?? toNumber(payload.consumedBalance),
-    currency: String(payload.currency || 'USD'),
-    usdToInr: toNumber(payload.usdToInr) ?? toNumber(payload.usdInr),
-    feeInr: toNumber(payload.feeInr) ?? toNumber(payload.fee),
-    ggrUsd: toNumber(payload.ggrUsd) ?? toNumber(payload.ggr),
-    ggrInr: toNumber(payload.ggrInr),
-    rangeStart: String(range.start || ''),
-    rangeEnd: String(range.end || ''),
-    toppedUpAt: String(payload.toppedUpAt || ''),
-    toppedUpAtIst: String(payload.toppedUpAtIst || ''),
-    byGame: Array.isArray(payload.byGame)
-      ? (payload.byGame as RemainingBreakdownRow[])
-      : [],
-    byProvider: Array.isArray(payload.byProvider)
-      ? (payload.byProvider as RemainingBreakdownRow[])
-      : [],
-    unmatchedGamesCount: toNumber(payload.unmatchedGamesCount),
-  };
-}
-
-export function remainingRowLabel(
-  item: RemainingBreakdownRow,
-  mode: 'provider' | 'game',
-): string {
-  if (mode === 'provider') {
-    return String(
-      item.provider || item.providerName || item.name || '—',
-    );
-  }
-  return String(item.game || item.gameName || item.name || item.provider || '—');
-}
-
-export function remainingRowCode(item: RemainingBreakdownRow): string {
-  return String(item.gameId || item.game_id || item.tableId || item.code || '—');
-}
-
-export function remainingRowGgrUsd(item: RemainingBreakdownRow): string {
-  return formatMoney(
-    toNumber(item.ggrUsd) ??
-      toNumber(item.ggr) ??
-      toNumber(item.amountUsd) ??
-      toNumber(item.amount),
-  );
-}
-
-export function remainingRowGgrInr(item: RemainingBreakdownRow): string {
-  return formatMoney(
-    toNumber(item.ggrInr) ?? toNumber(item.amountInr) ?? toNumber(item.inr),
-  );
-}
-
-export function remainingRowConsumed(item: RemainingBreakdownRow): string {
-  return formatMoney(
-    toNumber(item.consumedUsd) ??
-      toNumber(item.betAmount) ??
-      toNumber(item.turnover),
-  );
-}
+// Remaining balance parsers / form helpers — shared with mobile.
+export {
+  type RemainingBreakdownRow,
+  type QtechRemainingSummary,
+  type RemainingFormState,
+  type RemainingFormErrors,
+  type RemainingSubmitPayload,
+  emptyRemainingSummary,
+  emptyRemainingForm,
+  emptyRemainingFormErrors,
+  buildRemainingSubmitPayload,
+  formatMoney,
+  parseQtechRemaining,
+  mergeRemainingAfterSubmit,
+  remainingRowLabel,
+  remainingRowCode,
+  remainingRowGgrUsd,
+  remainingRowGgrInr,
+  remainingRowConsumed,
+  formatRemainingDateIst,
+  formatRemainingTimeIst,
+} from '@astro/shared/casinoTopup';

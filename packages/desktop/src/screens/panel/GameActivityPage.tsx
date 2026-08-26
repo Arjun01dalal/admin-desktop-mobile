@@ -78,10 +78,10 @@ export function GameActivityPage() {
   const openProvider = useCallback(
     (item: ActivityRow) => {
       navigate('/game-activity/details', {
-        state: { data: item, isQtech },
+        state: { data: item, isQtech, startDate, endDate },
       });
     },
-    [navigate, isQtech],
+    [navigate, isQtech, startDate, endDate],
   );
 
   const columns = useMemo<CommonTableColumn<ActivityRow>[]>(() => {

@@ -9,6 +9,7 @@ export function getBackPath(pathname: string): string | null {
     return '/users';
   }
   if (pathname.startsWith('/player-activity/details')) return '/player-activity';
+  if (pathname.startsWith('/game-activity/user-stats')) return '/game-activity/details';
   if (pathname.startsWith('/game-activity/details')) return '/game-activity';
   if (
     pathname === '/falconRateManagement' ||

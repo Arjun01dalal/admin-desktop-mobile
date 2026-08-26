@@ -36,6 +36,7 @@ import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { openPanelTarget } from '../../../navigation/panelDetail';
 
 function fmt(n: number): string {
   return floorNum(n).toLocaleString('en-IN');
@@ -93,11 +94,18 @@ export function GameActivityScreen() {
 
   const openProvider = useCallback(
     (row: ActivityRow) => {
-      navigation.navigate('/game-activity/details', {
-        row: JSON.stringify(row),
-        isQtech: isQtech ? '1' : '',
-        startDate,
-        endDate,
+      openPanelTarget(navigation, {
+        href: '/game-activity/details',
+        state: {
+          // Prefer compact keys — full `games[]` can be huge and get dropped by RN params.
+          providerId: row.providerId != null ? String(row.providerId) : '',
+          providerName: providerLabel(row),
+          isQtech: isQtech ? '1' : '0',
+          startDate,
+          endDate,
+          // Keep row as fallback when compact match fails after fetch.
+          row: JSON.stringify(row),
+        },
       });
     },
     [navigation, isQtech, startDate, endDate],
@@ -274,12 +282,12 @@ export function GameActivityScreen() {
               key={`row-${index}-${String(row.providerId || providerLabel(row) || '')}`}
               style={styles.card}
               activeOpacity={0.75}
-              onPress={() => setSelected(row)}
-              onLongPress={() => openProvider(row)}
+              onPress={() => openProvider(row)}
+              onLongPress={() => setSelected(row)}
             >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
+                <Text style={[styles.cardTitle, styles.cardTitleLink]} numberOfLines={1}>
                   {providerLabel(row)}
                 </Text>
                 <Text style={styles.cardSplitRight}>{gameCount(row)} games</Text>
@@ -294,7 +302,7 @@ export function GameActivityScreen() {
                 <Text style={styles.cardSplitLeft}>Win: {fmt(getMetric(row, 'winAmount'))}</Text>
                 <Text style={styles.cardSplitRight}>RTP: {String(getMetric(row, 'rtp'))}</Text>
               </View>
-              <Text style={styles.cardHint}>Tap for details · Long-press for games</Text>
+              <Text style={styles.cardHint}>Tap for games · Long-press for summary</Text>
             </TouchableOpacity>
           );
         })}
@@ -315,6 +323,20 @@ export function GameActivityScreen() {
             : []
         }
         onClose={() => setSelected(null)}
+        actions={
+          selected
+            ? [
+                {
+                  label: 'View Games',
+                  tone: 'primary',
+                  onPress: () => {
+                    openProvider(selected);
+                    setSelected(null);
+                  },
+                },
+              ]
+            : undefined
+        }
       />
     </ScrollView>
   );
@@ -380,6 +402,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flex: 1,
     minWidth: 0,
+  },
+  cardTitleLink: {
+    color: colors.primary,
+    textDecorationLine: 'underline',
   },
   cardCheck: {
     width: 28,

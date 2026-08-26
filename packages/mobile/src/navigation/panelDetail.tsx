@@ -14,6 +14,7 @@ import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersSc
 import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
 import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/PlayerActivityDetailsScreen';
 import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameActivityDetailsScreen';
+import { GameUserStatsScreen } from '../screens/dashboards/details/GameUserStatsScreen';
 import { BetConstructGamesListScreen } from '../screens/dashboards/details/BetConstructGamesListScreen';
 import { LudoUserGgrScreen } from '../screens/dashboards/details/LudoUserGgrScreen';
 import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
@@ -123,6 +124,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     Component: GameActivityDetailsScreen as PanelDetailRoute['Component'],
   },
   {
+    path: '/game-activity/user-stats',
+    title: 'Game User Stats',
+    Component: GameUserStatsScreen as PanelDetailRoute['Component'],
+  },
+  {
     path: '/betConstructGamesList',
     title: 'BetConstruct Details',
     Component: BetConstructGamesListScreen as PanelDetailRoute['Component'],
@@ -192,12 +198,31 @@ export function mergeTargetParams(target: PanelDetailTarget): PanelDetailParams 
 /**
  * Open the mobile detail screen matching a card target.
  * Returns false when the href has no mobile screen (card stays inert).
+ * Walks up to a parent navigator when the current one cannot open the route
+ * (drawer screens → root stack detail routes).
  */
 export function openPanelTarget(
-  navigation: { navigate: (name: string, params?: PanelDetailParams) => void },
+  navigation: {
+    navigate: (name: string, params?: PanelDetailParams) => void;
+    getParent?: () => unknown;
+  },
   target: PanelDetailTarget,
 ): boolean {
   if (!target.href || !ROUTES_BY_PATH.has(target.href)) return false;
-  navigation.navigate(target.href, mergeTargetParams(target));
+  const params = mergeTargetParams(target);
+
+  type NavNode = {
+    navigate: (name: string, params?: PanelDetailParams) => void;
+    getParent?: () => unknown;
+  };
+
+  let nav: NavNode | null = navigation;
+  let root: NavNode = navigation;
+  while (nav) {
+    root = nav;
+    const parent = nav.getParent?.();
+    nav = parent && typeof parent === 'object' ? (parent as NavNode) : null;
+  }
+  root.navigate(target.href, params);
   return true;
 }

@@ -32,6 +32,7 @@ export const SECURE_ACTIONS = [
   'player.qtechStats',
   'game.wcoStats',
   'game.qtechStats',
+  'game.userStatsByGame',
   'callLogs.getDialerData',
   'callLogs.botStatusSummary',
   'callLogs.updateCallData',

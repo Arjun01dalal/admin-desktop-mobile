@@ -27,8 +27,12 @@ import {
   PROVIDER_CONFIG,
   displayToppedUpAt,
   emptyForm,
+  emptyRemainingForm,
+  emptyRemainingFormErrors,
   emptyRemainingSummary,
+  buildRemainingSubmitPayload,
   formatMoney,
+  mergeRemainingAfterSubmit,
   parseBothProviders,
   parseQtechRemaining,
   remainingRowCode,
@@ -42,6 +46,8 @@ import {
   type ProviderState,
   type QtechRemainingSummary,
   type RemainingBreakdownRow,
+  type RemainingFormErrors,
+  type RemainingFormState,
   type TopupRecord,
 } from '@/screens/panel/casinoTopup/helpers';
 import { useRevealCodes } from '@/context/useRevealCodes';
@@ -118,6 +124,13 @@ export function CasinoTopupBalancePage() {
     toppedUpAtIst: false,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [remainingModalOpen, setRemainingModalOpen] = useState(false);
+  const [remainingForm, setRemainingForm] = useState<RemainingFormState>(
+    emptyRemainingForm,
+  );
+  const [remainingFormErrors, setRemainingFormErrors] =
+    useState<RemainingFormErrors>(emptyRemainingFormErrors);
+  const [remainingSubmitting, setRemainingSubmitting] = useState(false);
 
   const loadBalances = useCallback(async () => {
     setPageLoading(true);
@@ -195,6 +208,47 @@ export function CasinoTopupBalancePage() {
     setAddOpen(false);
     setForm(emptyForm(''));
     setFormErrors({ amount: false, toppedUpAtIst: false });
+  };
+
+  const openRemainingModal = () => {
+    setRemainingForm(emptyRemainingForm());
+    setRemainingFormErrors(emptyRemainingFormErrors());
+    setRemainingModalOpen(true);
+  };
+
+  const closeRemainingModal = () => {
+    setRemainingModalOpen(false);
+    setRemainingForm(emptyRemainingForm());
+    setRemainingFormErrors(emptyRemainingFormErrors());
+  };
+
+  const handleSubmitRemainingBalance = async () => {
+    const built = buildRemainingSubmitPayload(remainingForm);
+    if (!built.ok) {
+      setRemainingFormErrors(built.errors);
+      toast.error('Please fill required fields');
+      return;
+    }
+
+    setRemainingSubmitting(true);
+    try {
+      const res = await secureApi('casinoTopup.qtechRemaining', {
+        amount: built.payload.amount,
+        date: built.payload.date,
+        time: built.payload.time,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to submit remaining balance');
+        return;
+      }
+      toast.success('Remaining balance submitted successfully');
+      closeRemainingModal();
+      setQtechRemaining(mergeRemainingAfterSubmit(res.data, built.payload));
+      // Refresh full breakdown in case submit response is minimal.
+      void loadQtechRemaining();
+    } finally {
+      setRemainingSubmitting(false);
+    }
   };
 
   const handleAdd = async () => {
@@ -398,6 +452,14 @@ export function CasinoTopupBalancePage() {
               sx={orangeBtnSx}
             >
               History
+            </Button>
+            <Button
+              startIcon={<AddIcon />}
+              onClick={openRemainingModal}
+              disabled={remainingSubmitting || qtechRemainingLoading}
+              sx={orangeBtnSx}
+            >
+              Remaining Balance
             </Button>
             <Button
               startIcon={<AddIcon />}
@@ -627,6 +689,83 @@ export function CasinoTopupBalancePage() {
             sx={orangeBtnSx}
           >
             {submitting ? <CircularProgress size={18} color="inherit" /> : 'Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={remainingModalOpen}
+        onClose={closeRemainingModal}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Submit Remaining Balance</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <TextField
+              fullWidth
+              size="small"
+              type="number"
+              label="Amount *"
+              placeholder="e.g. 850.25"
+              value={remainingForm.amount}
+              error={remainingFormErrors.amount}
+              helperText={remainingFormErrors.amount ? 'Amount is required' : ''}
+              onChange={(e) => {
+                setRemainingForm((prev) => ({ ...prev, amount: e.target.value }));
+                setRemainingFormErrors((prev) => ({ ...prev, amount: false }));
+              }}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Date *"
+              placeholder="e.g. 24-08-2026"
+              value={remainingForm.date}
+              error={remainingFormErrors.date}
+              helperText={
+                remainingFormErrors.date
+                  ? 'Date is required'
+                  : 'Format: DD-MM-YYYY (IST)'
+              }
+              onChange={(e) => {
+                setRemainingForm((prev) => ({ ...prev, date: e.target.value }));
+                setRemainingFormErrors((prev) => ({ ...prev, date: false }));
+              }}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Time *"
+              placeholder="e.g. 05:44 p.m."
+              value={remainingForm.time}
+              error={remainingFormErrors.time}
+              helperText={
+                remainingFormErrors.time
+                  ? 'Time is required'
+                  : 'Format: hh:mm a.m./p.m. (IST)'
+              }
+              onChange={(e) => {
+                setRemainingForm((prev) => ({ ...prev, time: e.target.value }));
+                setRemainingFormErrors((prev) => ({ ...prev, time: false }));
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeRemainingModal} disabled={remainingSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleSubmitRemainingBalance()}
+            disabled={remainingSubmitting}
+            sx={orangeBtnSx}
+          >
+            {remainingSubmitting ? (
+              <CircularProgress size={18} color="inherit" />
+            ) : (
+              'Submit'
+            )}
           </Button>
         </DialogActions>
       </Dialog>

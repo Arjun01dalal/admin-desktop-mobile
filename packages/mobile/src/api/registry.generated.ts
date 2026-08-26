@@ -40,6 +40,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'player.qtechStats': {"method":"POST","path":"/Qtech/rtp-summary-by-user","encryptRequest":false,"decryptResponse":true},
   'game.wcoStats': {"method":"POST","path":"/User/wco-provider-game-stats","encryptRequest":true,"decryptResponse":true},
   'game.qtechStats': {"method":"POST","path":"/Qtech/rtp-summary","encryptRequest":false,"decryptResponse":true},
+  'game.userStatsByGame': {"method":"POST","path":"/Qtech/user-stats-by-game","encryptRequest":false,"decryptResponse":true},
   'callLogs.getDialerData': {"method":"POST","path":"/SubAdmin/get-dialer-data","encryptRequest":false,"decryptResponse":false},
   'callLogs.botStatusSummary': {"method":"POST","path":"/SubAdmin/bot-call-status-summary","encryptRequest":false,"decryptResponse":false},
   'callLogs.updateCallData': {"method":"POST","path":"/SubAdmin/update-call-data","encryptRequest":false,"decryptResponse":false},

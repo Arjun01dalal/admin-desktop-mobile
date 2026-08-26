@@ -42,6 +42,10 @@ const GameActivityDetailsPage = lazyNamed(
   () => import('@/screens/panel/GameActivityDetailsPage'),
   'GameActivityDetailsPage',
 );
+const GameUserStatsPage = lazyNamed(
+  () => import('@/screens/panel/GameUserStatsPage'),
+  'GameUserStatsPage',
+);
 const CallLogsPage = lazyNamed(() => import('@/screens/panel/CallLogsPage'), 'CallLogsPage');
 const DialerPushDataPage = lazyNamed(
   () => import('@/screens/panel/DialerPushDataPage'),
@@ -386,6 +390,7 @@ export {
   PlayerActivityDetailsPage,
   GameActivityPage,
   GameActivityDetailsPage,
+  GameUserStatsPage,
   CallLogsPage,
   DialerPushDataPage,
   NewRegistersPage,

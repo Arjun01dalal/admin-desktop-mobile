@@ -435,6 +435,7 @@ export const PANEL_PATHS = new Set<string>([
   "/caller-responsibility/details",
   "/player-activity/details",
   "/game-activity/details",
+  "/game-activity/user-stats",
   "/coins-removal/details",
   "/coin-reports/report",
   "/customer-allotted",

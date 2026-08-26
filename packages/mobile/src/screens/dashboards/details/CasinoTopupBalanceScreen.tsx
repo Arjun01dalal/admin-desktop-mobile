@@ -22,6 +22,24 @@ import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { secureApi } from '../../../api/client';
 import { hasPermission, canAccessNavItem } from '../../../auth/permissions';
 import { NAV_ITEMS } from '../../../navigation/navItems';
+import {
+  type RemainingBreakdownRow,
+  type QtechRemainingSummary,
+  type RemainingFormState,
+  type RemainingFormErrors,
+  emptyRemainingSummary,
+  emptyRemainingForm,
+  emptyRemainingFormErrors,
+  buildRemainingSubmitPayload,
+  formatMoney,
+  parseQtechRemaining,
+  mergeRemainingAfterSubmit,
+  remainingRowLabel,
+  remainingRowCode,
+  remainingRowGgrUsd,
+  remainingRowGgrInr,
+  remainingRowConsumed,
+} from '@astro/shared/casinoTopup';
 
 type ProviderKey = 'qtech' | 'betconstruct';
 
@@ -43,48 +61,6 @@ type ProviderState = {
   loading: boolean;
 };
 
-type RemainingBreakdownRow = {
-  _id?: string;
-  id?: string;
-  provider?: string;
-  providerName?: string;
-  name?: string;
-  game?: string;
-  gameName?: string;
-  gameId?: string;
-  game_id?: string;
-  tableId?: string;
-  code?: string;
-  ggrUsd?: number;
-  ggr?: number;
-  amountUsd?: number;
-  amount?: number;
-  ggrInr?: number;
-  amountInr?: number;
-  inr?: number;
-  consumedUsd?: number;
-  betAmount?: number;
-  turnover?: number;
-  [key: string]: unknown;
-};
-
-type QtechRemainingSummary = {
-  remainingUsd: number | null;
-  toppedUpUsd: number | null;
-  consumedUsd: number | null;
-  currency: string;
-  usdToInr: number | null;
-  feeInr: number | null;
-  ggrUsd: number | null;
-  ggrInr: number | null;
-  rangeStart: string;
-  rangeEnd: string;
-  toppedUpAtIst: string;
-  byGame: RemainingBreakdownRow[];
-  byProvider: RemainingBreakdownRow[];
-  unmatchedGamesCount: number | null;
-};
-
 const PROVIDER_CONFIG: Record<ProviderKey, { title: string; defaultNote: string }> = {
   qtech: { title: 'Qtech', defaultNote: 'Qtech wallet top-up' },
   betconstruct: { title: 'Betconstruct', defaultNote: 'Betconstruct wallet top-up' },
@@ -101,14 +77,6 @@ function toNumber(value: unknown): number | null {
   if (value == null || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function formatMoney(value: number | null | undefined, digits = 2): string {
-  if (value == null || !Number.isFinite(Number(value))) return '—';
-  return Number(value).toLocaleString(undefined, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
 }
 
 function currentIstDateTime(): string {
@@ -144,25 +112,6 @@ function recordTimestamp(item: TopupRecord): number {
 
 function emptyProvider(): Omit<ProviderState, 'loading'> {
   return { records: [], balance: null, currency: 'USD' };
-}
-
-function emptyRemainingSummary(): QtechRemainingSummary {
-  return {
-    remainingUsd: null,
-    toppedUpUsd: null,
-    consumedUsd: null,
-    currency: 'USD',
-    usdToInr: null,
-    feeInr: null,
-    ggrUsd: null,
-    ggrInr: null,
-    rangeStart: '',
-    rangeEnd: '',
-    toppedUpAtIst: '',
-    byGame: [],
-    byProvider: [],
-    unmatchedGamesCount: null,
-  };
 }
 
 function parseTopupDocument(doc: unknown): Omit<ProviderState, 'loading'> {
@@ -273,74 +222,6 @@ function parseBothProviders(
   return result;
 }
 
-function parseQtechRemaining(decrypted: unknown): QtechRemainingSummary {
-  const root = resolveRootPayload(decrypted) ?? decrypted;
-  let payload: Record<string, unknown> = {};
-  if (root && typeof root === 'object' && !Array.isArray(root)) {
-    const obj = root as Record<string, unknown>;
-    if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
-      payload = obj.payload as Record<string, unknown>;
-    } else if (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) {
-      payload = obj.data as Record<string, unknown>;
-    } else {
-      payload = obj;
-    }
-  }
-  const range =
-    payload.range && typeof payload.range === 'object' && !Array.isArray(payload.range)
-      ? (payload.range as Record<string, unknown>)
-      : {};
-
-  return {
-    remainingUsd:
-      toNumber(payload.remainingUsd) ?? toNumber(payload.remainingBalance),
-    toppedUpUsd:
-      toNumber(payload.toppedUpUsd) ?? toNumber(payload.toppedUpBalance),
-    consumedUsd:
-      toNumber(payload.consumedUsd) ?? toNumber(payload.consumedBalance),
-    currency: String(payload.currency || 'USD'),
-    usdToInr: toNumber(payload.usdToInr) ?? toNumber(payload.usdInr),
-    feeInr: toNumber(payload.feeInr) ?? toNumber(payload.fee),
-    ggrUsd: toNumber(payload.ggrUsd) ?? toNumber(payload.ggr),
-    ggrInr: toNumber(payload.ggrInr),
-    rangeStart: String(range.start || ''),
-    rangeEnd: String(range.end || ''),
-    toppedUpAtIst: String(payload.toppedUpAtIst || ''),
-    byGame: Array.isArray(payload.byGame) ? (payload.byGame as RemainingBreakdownRow[]) : [],
-    byProvider: Array.isArray(payload.byProvider)
-      ? (payload.byProvider as RemainingBreakdownRow[])
-      : [],
-    unmatchedGamesCount: toNumber(payload.unmatchedGamesCount),
-  };
-}
-
-function remainingRowLabel(item: RemainingBreakdownRow, mode: 'provider' | 'game'): string {
-  if (mode === 'provider') {
-    return String(item.provider || item.providerName || item.name || '—');
-  }
-  return String(item.game || item.gameName || item.name || item.provider || '—');
-}
-
-function remainingRowCode(item: RemainingBreakdownRow): string {
-  return String(item.gameId || item.game_id || item.tableId || item.code || '—');
-}
-
-function remainingRowGgrUsd(item: RemainingBreakdownRow): string {
-  return formatMoney(
-    toNumber(item.ggrUsd) ?? toNumber(item.ggr) ?? toNumber(item.amountUsd) ?? toNumber(item.amount),
-  );
-}
-
-function remainingRowGgrInr(item: RemainingBreakdownRow): string {
-  return formatMoney(toNumber(item.ggrInr) ?? toNumber(item.amountInr) ?? toNumber(item.inr));
-}
-
-function remainingRowConsumed(item: RemainingBreakdownRow): string {
-  return formatMoney(
-    toNumber(item.consumedUsd) ?? toNumber(item.betAmount) ?? toNumber(item.turnover),
-  );
-}
-
 const emptyProviders = (): Record<ProviderKey, ProviderState> => ({
   qtech: { records: [], balance: null, currency: 'USD', loading: false },
   betconstruct: { records: [], balance: null, currency: 'USD', loading: false },
@@ -376,6 +257,12 @@ export function CasinoTopupBalanceScreen() {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formMsg, setFormMsg] = useState('');
+  const [remainingOpen, setRemainingOpen] = useState(false);
+  const [remainingForm, setRemainingForm] = useState<RemainingFormState>(emptyRemainingForm);
+  const [remainingFormErrors, setRemainingFormErrors] =
+    useState<RemainingFormErrors>(emptyRemainingFormErrors);
+  const [remainingSubmitting, setRemainingSubmitting] = useState(false);
+  const [remainingMsg, setRemainingMsg] = useState('');
   const genRef = useRef(0);
 
   const loadBalances = useCallback(async () => {
@@ -461,6 +348,45 @@ export function CasinoTopupBalanceScreen() {
     setAddOpen(false);
     setFormMsg('');
   }, []);
+
+  const openRemainingModal = useCallback(() => {
+    setRemainingForm(emptyRemainingForm());
+    setRemainingFormErrors(emptyRemainingFormErrors());
+    setRemainingMsg('');
+    setRemainingOpen(true);
+  }, []);
+
+  const closeRemainingModal = useCallback(() => {
+    setRemainingOpen(false);
+    setRemainingMsg('');
+  }, []);
+
+  const submitRemaining = useCallback(async () => {
+    const built = buildRemainingSubmitPayload(remainingForm);
+    if (!built.ok) {
+      setRemainingFormErrors(built.errors);
+      setRemainingMsg('Please fill required fields');
+      return;
+    }
+    setRemainingSubmitting(true);
+    setRemainingMsg('');
+    try {
+      const res = await secureApi<unknown>('casinoTopup.qtechRemaining', {
+        amount: built.payload.amount,
+        date: built.payload.date,
+        time: built.payload.time,
+      });
+      if (!res.ok) {
+        setRemainingMsg(res.message || 'Failed to submit remaining balance');
+        return;
+      }
+      setRemaining(mergeRemainingAfterSubmit(res.data, built.payload));
+      setRemainingOpen(false);
+      void loadRemaining();
+    } finally {
+      setRemainingSubmitting(false);
+    }
+  }, [remainingForm, loadRemaining]);
 
   const submitAdd = useCallback(async () => {
     const amountNum = Number(amount);
@@ -558,6 +484,13 @@ export function CasinoTopupBalanceScreen() {
             }}
           >
             <Text style={styles.actionBtnText}>History</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={openRemainingModal}
+            disabled={remainingSubmitting || remainingLoading}
+          >
+            <Text style={styles.actionBtnText}>Remaining Balance</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => openAdd()}>
             <Text style={styles.actionBtnText}>+ Add</Text>
@@ -777,6 +710,79 @@ export function CasinoTopupBalanceScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={remainingOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={closeRemainingModal}
+      >
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={closeRemainingModal}>
+            <View style={styles.backdropTouch} />
+          </TouchableWithoutFeedback>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Submit Remaining Balance</Text>
+              <TouchableOpacity onPress={closeRemainingModal}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.fieldLabel}>Amount *</Text>
+              <TextInput
+                style={[styles.input, remainingFormErrors.amount && styles.inputError]}
+                value={remainingForm.amount}
+                onChangeText={(v) => {
+                  setRemainingForm((prev) => ({ ...prev, amount: v }));
+                  setRemainingFormErrors((prev) => ({ ...prev, amount: false }));
+                }}
+                keyboardType="decimal-pad"
+                placeholder="e.g. 850.25"
+                placeholderTextColor={colors.muted}
+              />
+              <Text style={styles.fieldLabel}>Date *</Text>
+              <TextInput
+                style={[styles.input, remainingFormErrors.date && styles.inputError]}
+                value={remainingForm.date}
+                onChangeText={(v) => {
+                  setRemainingForm((prev) => ({ ...prev, date: v }));
+                  setRemainingFormErrors((prev) => ({ ...prev, date: false }));
+                }}
+                placeholder="e.g. 24-08-2026"
+                placeholderTextColor={colors.muted}
+              />
+              <Text style={styles.fieldLabel}>Time *</Text>
+              <TextInput
+                style={[styles.input, remainingFormErrors.time && styles.inputError]}
+                value={remainingForm.time}
+                onChangeText={(v) => {
+                  setRemainingForm((prev) => ({ ...prev, time: v }));
+                  setRemainingFormErrors((prev) => ({ ...prev, time: false }));
+                }}
+                placeholder="e.g. 05:44 p.m."
+                placeholderTextColor={colors.muted}
+              />
+              {remainingMsg ? <Text style={styles.modalMsg}>{remainingMsg}</Text> : null}
+              <TouchableOpacity
+                style={[styles.submitBtn, remainingSubmitting && styles.btnDisabled]}
+                disabled={remainingSubmitting}
+                onPress={() => void submitRemaining()}
+              >
+                <Text style={styles.submitBtnText}>
+                  {remainingSubmitting ? 'Submitting…' : 'Submit'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -953,6 +959,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2),
     paddingHorizontal: spacing(3),
     fontSize: 14,
+  },
+  inputError: {
+    borderColor: colors.destructive,
   },
   inputMultiline: { minHeight: 64, textAlignVertical: 'top' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(2), marginBottom: spacing(1) },
