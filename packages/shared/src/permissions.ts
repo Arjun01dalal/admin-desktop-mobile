@@ -25,6 +25,7 @@ export type PermissionUser = {
 export type PermissionStorage = {
   getRoleId?: () => string | null | undefined;
   getRoleName?: () => string | null | undefined;
+  getItem?: (key: string) => string | null | undefined;
 };
 
 /** Permission strings assigned to a Role_ID on the backend (login `Responsibilities`). */
@@ -224,11 +225,7 @@ const DASHBOARD_USER_IDS = new Set([
   '673dda1a7f3d4038f7c2d7ab',
 ]);
 
-const DASHBOARD_MOBILES = new Set([
-  '9536952171',
-  '9536952170',
-  '9990099909',
-]);
+const DASHBOARD_MOBILES = new Set(['9536952171', '9536952170', '9990099909']);
 
 /** Hard menu allowlists by Role_ID — when set, only these nav ids can appear
  *  (plus any item whose Responsibility is granted — see canAccessNavItem). */
@@ -353,8 +350,7 @@ export function deriveRoleNameFromLogin(user: PermissionUser): string {
 
 export function getResponsibilities(user: PermissionUser | null = null): string[] {
   const raw =
-    user?.Responsibilities ??
-    (user as { responsibilities?: unknown } | null)?.responsibilities;
+    user?.Responsibilities ?? (user as { responsibilities?: unknown } | null)?.responsibilities;
 
   if (!Array.isArray(raw)) return [];
   return raw
@@ -363,8 +359,7 @@ export function getResponsibilities(user: PermissionUser | null = null): string[
       if (item && typeof item === 'object') {
         const obj = item as Record<string, unknown>;
         // Prefer Enum (Permissions.*) over display Name.
-        const named =
-          obj.Enum ?? obj.enum ?? obj.name ?? obj.Name ?? obj.key ?? obj.Key;
+        const named = obj.Enum ?? obj.enum ?? obj.name ?? obj.Name ?? obj.key ?? obj.Key;
         if (named != null && String(named).trim()) return String(named).trim();
       }
       return '';
@@ -381,18 +376,8 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'State wise Registration',
     'State Wise Registration',
   ],
-  bot_performance: [
-    'bot_performance',
-    'botPerformance',
-    'Bot Performance',
-    'Bot_Performance',
-  ],
-  bot_data_upload: [
-    'bot_data_upload',
-    'botData',
-    'Bot Data',
-    'bot_data',
-  ],
+  bot_performance: ['bot_performance', 'botPerformance', 'Bot Performance', 'Bot_Performance'],
+  bot_data_upload: ['bot_data_upload', 'botData', 'Bot Data', 'bot_data'],
   house_game: [
     'house_game',
     'house_games',
@@ -413,12 +398,7 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'Call_Logs',
     'Call Logs',
   ],
-  update_ludo_bets: [
-    'update_ludo_bets',
-    'Update_Ludo_Bets',
-    'update_ludo_bet',
-    'Update Ludo Bets',
-  ],
+  update_ludo_bets: ['update_ludo_bets', 'Update_Ludo_Bets', 'update_ludo_bet', 'Update Ludo Bets'],
   show_wining_btn: [
     'show_wining_btn',
     'show_winning_btn',
@@ -444,12 +424,7 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     // Same audience as Deposit — unlock when View_Deposits is granted.
     'View_Deposits',
   ],
-  casino_switch: [
-    'casino_switch',
-    'Casino_Switch',
-    'Casino Switch',
-    'View_Games',
-  ],
+  casino_switch: ['casino_switch', 'Casino_Switch', 'Casino Switch', 'View_Games'],
   show_whatsapp_messages: [
     'show_whatsapp_messages',
     'Show_Whatsapp_Messages',
@@ -492,12 +467,7 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'mid_limits',
     'View_Mid_Limits',
   ],
-  Edit_MID_Limits: [
-    'Edit_MID_Limits',
-    'Edit MID Limits',
-    'edit_mid_limits',
-    'Add_PayIn_Account',
-  ],
+  Edit_MID_Limits: ['Edit_MID_Limits', 'Edit MID Limits', 'edit_mid_limits', 'Add_PayIn_Account'],
 };
 
 function normalizeResponsibility(value: string): string {
@@ -692,11 +662,7 @@ export function canAccessNavItem(
     return false;
   }
 
-  if (
-    item.id === 'dashboard' ||
-    item.id === 'vipDashboard' ||
-    item.id === 'combinedDashboard'
-  ) {
+  if (item.id === 'dashboard' || item.id === 'vipDashboard' || item.id === 'combinedDashboard') {
     if (!canAccessDashboard(user, storage)) return false;
   }
 
@@ -742,9 +708,7 @@ export function buildSosEnablePayload(
     }
     payload.targetCallerId = targetCallerId;
   } else if (type === 'office-based') {
-    const location = String(
-      user?.officeLocation || user?.location || '',
-    ).trim();
+    const location = String(user?.officeLocation || user?.location || '').trim();
     if (!location) {
       return { ok: false, message: 'Office location is required for office-based SOS' };
     }
@@ -789,11 +753,39 @@ export function canShowUniqueDepositEmpCode(
   user: PermissionUser | null = null,
   storage?: PermissionStorage | null,
 ): boolean {
-  const mobile = String(
-    user?.mobile || storage?.getItem?.('mobile') || '',
-  ).trim();
+  const mobile = String(user?.mobile || storage?.getItem?.('mobile') || '').trim();
   if (UNIQUE_DEPOSIT_EMPCODE_MOBILES.has(mobile)) return true;
   return isSosExemptRole(user, storage);
+}
+
+/** Caller Allotment — edit emp code (admin-panel-domains: full_access / full access / dev_full_access). */
+const CALLER_ALLOTMENT_EMPCODE_ROLE_IDS = new Set([
+  '64f710d9a2ab78980020c5fb', // full_access
+  '6a33c137a6558491e0d20464', // dev_full_access
+]);
+
+const CALLER_ALLOTMENT_EMPCODE_ROLE_NAMES = new Set([
+  'full_access',
+  'full access',
+  'fullaccess',
+  'dev_full_access',
+  'dev full access',
+  'devfullaccess',
+]);
+
+export function canUpdateCallerAllotmentEmpCode(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  const roleId = getRoleId(user, storage);
+  if (roleId && CALLER_ALLOTMENT_EMPCODE_ROLE_IDS.has(roleId)) return true;
+
+  for (const candidate of collectRoleNameCandidates(user, storage)) {
+    if (roleNameVariants(candidate).some((v) => CALLER_ALLOTMENT_EMPCODE_ROLE_NAMES.has(v))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Gather every place the app may store the active role name. */
@@ -824,12 +816,7 @@ function collectRoleNameCandidates(
   return Array.from(new Set(out));
 }
 
-export function isPathAllowed(
-  pathname: string,
-  allowedPaths: readonly string[],
-): boolean {
+export function isPathAllowed(pathname: string, allowedPaths: readonly string[]): boolean {
   if (pathname === '/welcome' || pathname === '/') return true;
-  return allowedPaths.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+  return allowedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }

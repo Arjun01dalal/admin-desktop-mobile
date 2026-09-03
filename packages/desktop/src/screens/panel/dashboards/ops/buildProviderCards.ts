@@ -192,7 +192,7 @@ export function buildProviderCards(
   const cards: ProviderCardModel[] = [
     {
       id: 'totalProviders',
-      title: 'Ashwini Details',
+      title: 'Total Providers Detail',
       filters: ['Ashwini'],
       showOnVip: true,
       loading,

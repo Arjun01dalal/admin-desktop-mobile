@@ -1,10 +1,5 @@
 /** Call Logs status filter options. */
-export const CALL_STATUS_OPTIONS = [
-  'All',
-  'completed',
-  'no-answer',
-  'Not Received',
-] as const;
+export const CALL_STATUS_OPTIONS = ['All', 'completed', 'no-answer', 'Not Received'] as const;
 
 export const BOT_STATUS_KEYS = [
   'no-answer',

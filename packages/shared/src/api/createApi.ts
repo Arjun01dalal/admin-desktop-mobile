@@ -16,27 +16,21 @@ export function createAstroApi(transport: ApiTransport) {
       transport.call<T>(action, payload),
 
     auth: {
-      getSosFlag: () =>
-        transport.call<SosFlagPayload>(ApiActions.auth.getSosFlag, {}),
+      getSosFlag: () => transport.call<SosFlagPayload>(ApiActions.auth.getSosFlag, {}),
 
       /** Parsed helper — same logic on every client. */
       async getSosEnabled(): Promise<boolean> {
-        const res = await transport.call<SosFlagPayload>(
-          ApiActions.auth.getSosFlag,
-          {},
-        );
+        const res = await transport.call<SosFlagPayload>(ApiActions.auth.getSosFlag, {});
         if (!res.ok) return false;
         return isSosFlagEnabled(res.data);
       },
 
-      getAllSosBlocks: () =>
-        transport.call(ApiActions.auth.getAllSosBlocks, {}),
+      getAllSosBlocks: () => transport.call(ApiActions.auth.getAllSosBlocks, {}),
 
       checkTokenBlacklisted: (userId: string) =>
         transport.call(ApiActions.auth.checkTokenBlacklisted, { _id: userId }),
 
-      getAllBlockedUserIds: () =>
-        transport.call(ApiActions.auth.getAllBlockedUserIds, {}),
+      getAllBlockedUserIds: () => transport.call(ApiActions.auth.getAllBlockedUserIds, {}),
     },
 
     users: {
@@ -57,11 +51,5 @@ export function createAstroApi(transport: ApiTransport) {
 
 export type AstroApi = ReturnType<typeof createAstroApi>;
 
-export {
-  ApiActions,
-  asPaged,
-  unpackPayload,
-  getSosBlock,
-  isSosFlagEnabled,
-};
+export { ApiActions, asPaged, unpackPayload, getSosBlock, isSosFlagEnabled };
 export type { ApiResult, ApiTransport, SosFlagPayload };

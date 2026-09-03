@@ -20,14 +20,16 @@ export function asList<T = unknown>(data: unknown): T[] {
   return [];
 }
 
-export function asPaged<T = unknown>(data: unknown): {
+export function asPaged<T = unknown>(
+  data: unknown,
+): {
   rows: T[];
   totalPages: number;
   total: number;
 } {
   if (data && typeof data === 'object' && !Array.isArray(data)) {
     const obj = data as Record<string, unknown>;
-    const rows = asList<T>(obj.items ? obj : obj.payload ?? obj);
+    const rows = asList<T>(obj.items ? obj : (obj.payload ?? obj));
     const nested =
       obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
         ? (obj.payload as Record<string, unknown>)

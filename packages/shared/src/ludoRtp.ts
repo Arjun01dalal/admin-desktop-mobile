@@ -24,9 +24,7 @@ export function parseLudoRtpList(data: unknown): LudoRtpRow[] {
 
   for (const key of ['items', 'games', 'rtp', 'rows'] as const) {
     if (Array.isArray(obj[key])) {
-      return (obj[key] as unknown[])
-        .map(normalizeLudoRtpRow)
-        .filter((row) => row.gameId);
+      return (obj[key] as unknown[]).map(normalizeLudoRtpRow).filter((row) => row.gameId);
     }
   }
 
@@ -36,7 +34,10 @@ export function parseLudoRtpList(data: unknown): LudoRtpRow[] {
     entries.length &&
     entries.every(([, value]) => typeof value === 'number' || typeof value === 'string')
   ) {
-    return entries.map(([gameId, rtp]) => ({ gameId, rtp }));
+    return entries.map(([gameId, rtp]) => ({
+      gameId,
+      rtp: typeof rtp === 'number' || typeof rtp === 'string' ? rtp : String(rtp),
+    }));
   }
 
   return [];
@@ -47,9 +48,7 @@ function normalizeLudoRtpRow(item: unknown): LudoRtpRow {
     return { gameId: '', rtp: '' };
   }
   const row = item as Record<string, unknown>;
-  const gameId = String(
-    row.gameId ?? row.game_id ?? row.id ?? row._id ?? row.game ?? '',
-  ).trim();
+  const gameId = String(row.gameId ?? row.game_id ?? row.id ?? row._id ?? row.game ?? '').trim();
   const rtp = row.rtp ?? row.RTP ?? row.value ?? row.rtpValue ?? '';
   const gameNameRaw = row.gameName ?? row.name ?? row.game_name;
   return {

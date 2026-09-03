@@ -270,6 +270,7 @@ export const HOUSE_GAME_ID_OPTIONS = [
 // ---------------------------------------------------------------------------
 export const COMMON_UI_MAP = [
   // —— Nav / page titles ——
+  { original: 'Total Providers Detail', jyotish: 'Ashwini Details' },
   { original: 'Bonus Wallet Fund Requests', jyotish: 'Varadan Wallet Fund Requests' },
   { original: 'Bonus Wallet Requests', jyotish: 'Varadan Wallet Requests' },
   { original: 'Bonus Wallet Table', jyotish: 'Varadan Wallet Table' },

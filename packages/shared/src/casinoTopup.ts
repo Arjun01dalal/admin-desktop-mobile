@@ -136,9 +136,7 @@ export function emptyRemainingFormErrors(): RemainingFormErrors {
  */
 export function buildRemainingSubmitPayload(
   form: RemainingFormState,
-):
-  | { ok: true; payload: RemainingSubmitPayload }
-  | { ok: false; errors: RemainingFormErrors } {
+): { ok: true; payload: RemainingSubmitPayload } | { ok: false; errors: RemainingFormErrors } {
   const amount = Number(form.amount);
   const amountError = !String(form.amount).trim() || !Number.isFinite(amount);
   const dateError = !form.date.trim();
@@ -214,10 +212,8 @@ export function parseQtechRemaining(decrypted: unknown): QtechRemainingSummary {
       toNumber(payload.remainingUsd) ??
       toNumber(payload.remainingBalance) ??
       toNumber(payload.amount),
-    toppedUpUsd:
-      toNumber(payload.toppedUpUsd) ?? toNumber(payload.toppedUpBalance),
-    consumedUsd:
-      toNumber(payload.consumedUsd) ?? toNumber(payload.consumedBalance),
+    toppedUpUsd: toNumber(payload.toppedUpUsd) ?? toNumber(payload.toppedUpBalance),
+    consumedUsd: toNumber(payload.consumedUsd) ?? toNumber(payload.consumedBalance),
     currency: String(payload.currency || 'USD'),
     usdToInr: toNumber(payload.usdToInr) ?? toNumber(payload.usdInr),
     feeInr: toNumber(payload.feeInr) ?? toNumber(payload.fee),
@@ -227,9 +223,7 @@ export function parseQtechRemaining(decrypted: unknown): QtechRemainingSummary {
     rangeEnd: String(range.end || ''),
     toppedUpAt: String(payload.toppedUpAt || ''),
     toppedUpAtIst: String(payload.toppedUpAtIst || dateTimeLabel),
-    byGame: Array.isArray(payload.byGame)
-      ? (payload.byGame as RemainingBreakdownRow[])
-      : [],
+    byGame: Array.isArray(payload.byGame) ? (payload.byGame as RemainingBreakdownRow[]) : [],
     byProvider: Array.isArray(payload.byProvider)
       ? (payload.byProvider as RemainingBreakdownRow[])
       : [],
@@ -266,10 +260,7 @@ export function mergeRemainingAfterSubmit(
   };
 }
 
-export function remainingRowLabel(
-  item: RemainingBreakdownRow,
-  mode: 'provider' | 'game',
-): string {
+export function remainingRowLabel(item: RemainingBreakdownRow, mode: 'provider' | 'game'): string {
   if (mode === 'provider') {
     return String(item.provider || item.providerName || item.name || '—');
   }
@@ -290,15 +281,11 @@ export function remainingRowGgrUsd(item: RemainingBreakdownRow): string {
 }
 
 export function remainingRowGgrInr(item: RemainingBreakdownRow): string {
-  return formatMoney(
-    toNumber(item.ggrInr) ?? toNumber(item.amountInr) ?? toNumber(item.inr),
-  );
+  return formatMoney(toNumber(item.ggrInr) ?? toNumber(item.amountInr) ?? toNumber(item.inr));
 }
 
 export function remainingRowConsumed(item: RemainingBreakdownRow): string {
   return formatMoney(
-    toNumber(item.consumedUsd) ??
-      toNumber(item.betAmount) ??
-      toNumber(item.turnover),
+    toNumber(item.consumedUsd) ?? toNumber(item.betAmount) ?? toNumber(item.turnover),
   );
 }

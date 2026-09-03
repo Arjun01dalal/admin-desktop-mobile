@@ -14,15 +14,9 @@ export const CALLER_ROLE_IDS = new Set([
   '694c2f99a8b2fd753572f671',
 ]);
 
-export const FULL_ALLOTMENT_ROLE_IDS = new Set([
-  '68c29196001c4b3d02b1aa32',
-]);
+export const FULL_ALLOTMENT_ROLE_IDS = new Set(['68c29196001c4b3d02b1aa32']);
 
-export const OFFICE_LOCATIONS = [
-  'Dubai',
-  'Nagpur',
-  'Nagpur/Dubai',
-] as const;
+export const OFFICE_LOCATIONS = ['Dubai', 'Nagpur', 'Nagpur/Dubai'] as const;
 
 export const RESP_TOTAL_DEPOSIT = 'Caller_Allotment_Total_Deposit';
 export const RESP_SHOW_MOBILE = 'show_mobile';

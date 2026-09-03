@@ -14,11 +14,10 @@ export type TokenBlacklistPayload = {
  * Note: bare HTTP 403 is often CDN/WAF/VPN IP blocking — not a dead JWT.
  * Only treat 403 as auth failure when the body clearly says so.
  */
-export function isAuthFailureMessage(
-  status: number | undefined,
-  message?: string | null,
-): boolean {
-  const m = String(message || '').toLowerCase().trim();
+export function isAuthFailureMessage(status: number | undefined, message?: string | null): boolean {
+  const m = String(message || '')
+    .toLowerCase()
+    .trim();
 
   if (status === 401) return true;
 
@@ -56,9 +55,7 @@ export function isNetworkForbiddenMessage(
   return true;
 }
 
-export function networkForbiddenUserMessage(
-  message?: string | null,
-): string {
+export function networkForbiddenUserMessage(message?: string | null): string {
   const raw = String(message || '').trim();
   if (raw && !/^request failed/i.test(raw) && !/^forbidden$/i.test(raw)) {
     return raw;
@@ -70,9 +67,7 @@ export function networkForbiddenUserMessage(
  * Pull `{ isBlacklisted, hasToken }` out of common API envelope shapes.
  * Matches laxminarayan `checkSession` nesting.
  */
-export function extractTokenBlacklistPayload(
-  data: unknown,
-): TokenBlacklistPayload {
+export function extractTokenBlacklistPayload(data: unknown): TokenBlacklistPayload {
   if (!data || typeof data !== 'object') return {};
 
   const candidates: unknown[] = [data];
@@ -89,12 +84,8 @@ export function extractTokenBlacklistPayload(
     const row = c as Record<string, unknown>;
     if ('isBlacklisted' in row || 'hasToken' in row) {
       return {
-        isBlacklisted:
-          typeof row.isBlacklisted === 'boolean'
-            ? row.isBlacklisted
-            : undefined,
-        hasToken:
-          typeof row.hasToken === 'boolean' ? row.hasToken : undefined,
+        isBlacklisted: typeof row.isBlacklisted === 'boolean' ? row.isBlacklisted : undefined,
+        hasToken: typeof row.hasToken === 'boolean' ? row.hasToken : undefined,
       };
     }
   }

@@ -19,9 +19,7 @@ export type ItemsPerPageOption = (typeof ITEMS_PER_PAGE_OPTIONS)[number];
 export const DEFAULT_ITEMS_PER_PAGE = 10;
 
 /** Numeric form of {@link ITEMS_PER_PAGE_OPTIONS} for RN pickers. */
-export const ITEMS_PER_PAGE_NUMBERS = ITEMS_PER_PAGE_OPTIONS.map((n) =>
-  Number(n),
-) as number[];
+export const ITEMS_PER_PAGE_NUMBERS = ITEMS_PER_PAGE_OPTIONS.map((n) => Number(n)) as number[];
 
 /**
  * Subset of shared page sizes (keeps shared order).

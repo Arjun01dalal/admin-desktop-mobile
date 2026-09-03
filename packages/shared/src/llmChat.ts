@@ -34,9 +34,7 @@ export const LLM_CHAT_HISTORY_KEY = 'llm_chat_messages';
 export const LLM_CHAT_OPEN_KEY = 'llm_chat_open';
 export const LLM_CHAT_MAX_HISTORY = 12;
 
-export function clearLlmChatStorage(storage: {
-  removeItem: (key: string) => void;
-}): void {
+export function clearLlmChatStorage(storage: { removeItem: (key: string) => void }): void {
   storage.removeItem(LLM_CHAT_HISTORY_KEY);
   storage.removeItem(LLM_CHAT_OPEN_KEY);
 }
@@ -90,10 +88,7 @@ export function rowsFromLlmPayload(
   }
 }
 
-export function looksLikeUsersTable(
-  rows: Record<string, unknown>[],
-  collection?: string,
-): boolean {
+export function looksLikeUsersTable(rows: Record<string, unknown>[], collection?: string): boolean {
   if (collection === 'users') return true;
   if (collection && collection !== 'users') return false;
   const first = rows[0];
@@ -143,13 +138,10 @@ export function normalizeDialerLeads(payload: unknown): LlmDialerLead[] {
     .map((item: unknown) => {
       if (!item || typeof item !== 'object') return null;
       const row = item as Record<string, unknown>;
-      const phone =
-        row.phone_number || row.mobile || row.userMobile || row.phone || row.mobileNo;
+      const phone = row.phone_number || row.mobile || row.userMobile || row.phone || row.mobileNo;
       if (!phone) return null;
       return {
-        first_name: String(
-          row.first_name || row.name || row.userName || row.fullName || '',
-        ),
+        first_name: String(row.first_name || row.name || row.userName || row.fullName || ''),
         phone_number: String(phone),
         city: String(row.city || ''),
         state: String(row.state || ''),

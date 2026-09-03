@@ -8,12 +8,7 @@ export const QTECH_USER_STATS_PROVIDER = 'Qtech' as const;
 export type GameUserStatRow = Record<string, unknown>;
 
 export type GameUserStatsSortKey =
-  | 'betAmount'
-  | 'betCount'
-  | 'winAmount'
-  | 'winCount'
-  | 'rtp'
-  | 'ggr';
+  'betAmount' | 'betCount' | 'winAmount' | 'winCount' | 'rtp' | 'ggr';
 
 export type GameUserStatsSortConfig = {
   key: GameUserStatsSortKey;
@@ -238,7 +233,7 @@ export function sortGameUserStats(
 }
 
 export function summarizeGameUserStats(data: GameUserStatRow[]): GameUserStatsSummary {
-  return data.reduce(
+  return data.reduce<GameUserStatsSummary>(
     (acc, item) => {
       acc.bet += gameUserStatBet(item);
       acc.win += gameUserStatWin(item);

@@ -43,11 +43,7 @@ export const BLOCK_STATUS_OPTIONS = [
 export const DEFAULT_EMP_CODE = '001';
 
 /** Mobiles allowed to edit user empCode. */
-export const SHOW_EDIT_EMP_CODE = [
-  '9373114572',
-  '9561139951',
-  '9806010101',
-] as const;
+export const SHOW_EDIT_EMP_CODE = ['9373114572', '9561139951', '9806010101'] as const;
 
 /**
  * Block/unblock OTP target (laxminarayan Users sendOTP).

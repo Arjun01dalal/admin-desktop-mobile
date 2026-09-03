@@ -53,9 +53,7 @@ export const BOT_DATA_BOT_IDS = [
 export type BotDataBotId = (typeof BOT_DATA_BOT_IDS)[number];
 
 /** Bot IDs 1–150 (Call Logs / dialler pickers). */
-export const BOT_ID_RANGE_OPTIONS = Array.from({ length: 150 }, (_, i) =>
-  String(i + 1),
-);
+export const BOT_ID_RANGE_OPTIONS = Array.from({ length: 150 }, (_, i) => String(i + 1));
 
 /** Play-in filter codes used on Bot Data / New Registers / Users. */
 export const PLAY_IN_CODES = ['C', 'E', 'S'] as const;

@@ -89,22 +89,6 @@ const LIMIT_LIST_KEYS = [
 
 const WRAPPER_KEYS = ['payload', 'data', 'result', 'response'] as const;
 
-const META_KEYS = new Set([
-  'success',
-  'message',
-  'payload',
-  'data',
-  'status',
-  'error',
-  'items',
-  'limits',
-  'rows',
-  'list',
-  'results',
-  'midLimits',
-  'records',
-]);
-
 const OBJECT_MAP_SKIP_KEYS = new Set([
   ...WRAPPER_KEYS,
   'updatedBy',
@@ -285,9 +269,7 @@ export function parseMidLimits(data: unknown): Map<string, MidLimitRecord> {
           ...existing,
           ...record,
           limit:
-            record.limit != null && Number.isFinite(record.limit)
-              ? record.limit
-              : existing.limit,
+            record.limit != null && Number.isFinite(record.limit) ? record.limit : existing.limit,
         }
       : record;
     map.set(String(merged.mid), merged);
@@ -377,7 +359,10 @@ function indexMidOptions(options: MidOption[]): Map<string, MidOption> {
   return index;
 }
 
-function gatewayLabelForOption(option: MidOption | undefined, fallbackMid: string): string | undefined {
+function gatewayLabelForOption(
+  option: MidOption | undefined,
+  fallbackMid: string,
+): string | undefined {
   const label = String(
     option?.paymentGatewayName || option?.name || option?.midName || option?.mid || fallbackMid,
   ).trim();
@@ -495,19 +480,17 @@ export async function collectMidLimitsMap(
   return map;
 }
 
-export function applyMidLimitUpsert(
-  rows: MidLimitRow[],
-  record: MidLimitRecord,
-): MidLimitRow[] {
-  const target = String(record.mid || '').trim().toLowerCase();
+export function applyMidLimitUpsert(rows: MidLimitRow[], record: MidLimitRecord): MidLimitRow[] {
+  const target = String(record.mid || '')
+    .trim()
+    .toLowerCase();
   if (!target) return rows;
 
   return rows.map((row) => {
     if (row.mid.trim().toLowerCase() !== target) return row;
     return {
       ...row,
-      limit:
-        record.limit != null && Number.isFinite(record.limit) ? record.limit : row.limit,
+      limit: record.limit != null && Number.isFinite(record.limit) ? record.limit : row.limit,
       updatedBy: record.updatedBy ?? row.updatedBy,
       updatedOn: record.updatedOn || record.updatedAt || row.updatedOn,
     };
@@ -565,9 +548,7 @@ export function parseRecipientsConfig(data: unknown): RecipientsConfig {
         : body;
 
   const telegramChatIds = Array.isArray(source.telegramChatIds)
-    ? source.telegramChatIds
-        .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id))
+    ? source.telegramChatIds.map((id) => Number(id)).filter((id) => Number.isFinite(id))
     : [];
 
   const subAdminIds = Array.isArray(source.subAdminIds)
@@ -660,9 +641,7 @@ export function getSubAdminTelegramLabel(sub: SubAdminOption): string {
 }
 
 /** Numeric chat ID or username (e.g. TRIGNOWALTZ) saved on the sub-admin profile. */
-export function getSubAdminTelegramRecipientId(
-  sub: SubAdminOption,
-): string | number | null {
+export function getSubAdminTelegramRecipientId(sub: SubAdminOption): string | number | null {
   const raw = getSubAdminTelegramLabel(sub);
   if (!raw) return null;
 
@@ -730,8 +709,7 @@ export function mergeSavedRecipientSelection(
 }
 
 export function mergeMidLimitRows(midData: unknown, limitsData: unknown): MidLimitRow[] {
-  const limitsMap =
-    limitsData instanceof Map ? limitsData : parseMidLimits(limitsData);
+  const limitsMap = limitsData instanceof Map ? limitsData : parseMidLimits(limitsData);
   const options = parseMidOptions(midData);
   const byAlias = indexMidOptions(options);
   const rows = new Map<string, MidLimitRow>();
@@ -744,10 +722,7 @@ export function mergeMidLimitRows(midData: unknown, limitsData: unknown): MidLim
     const prev = rows.get(key);
     rows.set(key, {
       mid: prev?.mid || String(option?.mid || trimmed).trim(),
-      gatewayName:
-        patch.gatewayName ??
-        prev?.gatewayName ??
-        gatewayLabelForOption(option, trimmed),
+      gatewayName: patch.gatewayName ?? prev?.gatewayName ?? gatewayLabelForOption(option, trimmed),
       limit:
         patch.limit != null && Number.isFinite(Number(patch.limit))
           ? Number(patch.limit)
@@ -789,10 +764,7 @@ export function filterMidLimitRows(rows: MidLimitRow[], search: string): MidLimi
   });
 }
 
-export function filterSubAdminOptions(
-  options: SubAdminOption[],
-  search: string,
-): SubAdminOption[] {
+export function filterSubAdminOptions(options: SubAdminOption[], search: string): SubAdminOption[] {
   const q = search.trim().toLowerCase();
   if (!q) return options;
   return options.filter((sub) => {
@@ -800,12 +772,7 @@ export function filterSubAdminOptions(
     const empCode = String(sub.empCode || '').toLowerCase();
     const telegram = getSubAdminTelegramLabel(sub).toLowerCase();
     const id = String(sub._id || '').toLowerCase();
-    return (
-      name.includes(q) ||
-      empCode.includes(q) ||
-      telegram.includes(q) ||
-      id.includes(q)
-    );
+    return name.includes(q) || empCode.includes(q) || telegram.includes(q) || id.includes(q);
   });
 }
 
@@ -821,9 +788,7 @@ export function formatMidLimitAmount(value: number | undefined | null): string {
 }
 
 /** Gateway column label — falls back to MID when getAllMidOld returns names only. */
-export function midLimitGatewayLabel(
-  row: Pick<MidLimitRow, 'mid' | 'gatewayName'>,
-): string {
+export function midLimitGatewayLabel(row: Pick<MidLimitRow, 'mid' | 'gatewayName'>): string {
   return String(row.gatewayName || row.mid || '').trim();
 }
 

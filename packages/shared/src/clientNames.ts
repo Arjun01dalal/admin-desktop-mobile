@@ -57,13 +57,15 @@ const CLIENT_ALIASES: Record<string, ClientName> = {
 };
 
 function normalizeClientToken(value: string): string {
-  return value
-    .toUpperCase()
-    .replace(/[\s_-]+/g, '')
-    // ksGames_new / sgGames_new → KS / SG (strip Games+new together first)
-    .replace(/GAMESNEW$/i, '')
-    .replace(/GAMES$/i, '')
-    .replace(/NEW$/i, '');
+  return (
+    value
+      .toUpperCase()
+      .replace(/[\s_-]+/g, '')
+      // ksGames_new / sgGames_new → KS / SG (strip Games+new together first)
+      .replace(/GAMESNEW$/i, '')
+      .replace(/GAMES$/i, '')
+      .replace(/NEW$/i, '')
+  );
 }
 
 /** Resolve App Name / clientName / URL key to its two-digit code. */

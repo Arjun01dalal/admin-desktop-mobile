@@ -16,11 +16,7 @@ type RoleGroupLike = {
   subAdmins?: SubAdminLike[];
 };
 
-function addExtensionKeys(
-  map: Record<string, string>,
-  rawExt: unknown,
-  displayName: string,
-): void {
+function addExtensionKeys(map: Record<string, string>, rawExt: unknown, displayName: string): void {
   if (!displayName) return;
   const ids = Array.isArray(rawExt)
     ? rawExt
@@ -42,15 +38,11 @@ function addExtensionKeys(
 }
 
 /** Build extension / dialer id → caller display name from subadmins-by-role. */
-export function buildExtensionAssigneeMap(
-  byRole: RoleGroupLike[] = [],
-): Record<string, string> {
+export function buildExtensionAssigneeMap(byRole: RoleGroupLike[] = []): Record<string, string> {
   const map: Record<string, string> = {};
   for (const role of byRole) {
     for (const admin of role?.subAdmins || []) {
-      const displayName = String(
-        admin?.realName || admin?.name || admin?.empCode || '',
-      ).trim();
+      const displayName = String(admin?.realName || admin?.name || admin?.empCode || '').trim();
       if (!displayName) continue;
       addExtensionKeys(map, admin?.extensionId, displayName);
       addExtensionKeys(map, admin?.extensionNo, displayName);
@@ -74,22 +66,19 @@ function findCampaignMatch(key: string): CampaignItem | undefined {
   const lowerKey = key.toLowerCase();
   return CAMPAIGN_LIST.find((item) => {
     const id = String(item.id).trim().toLowerCase();
-    const name = String(item.name || '').trim().toLowerCase();
+    const name = String(item.name || '')
+      .trim()
+      .toLowerCase();
     return id === lowerKey || name === lowerKey;
   });
 }
 
-function lookupAssignee(
-  campaignKey: string,
-  extensionAssigneeMap: Record<string, string>,
-): string {
+function lookupAssignee(campaignKey: string, extensionAssigneeMap: Record<string, string>): string {
   const key = String(campaignKey || '').trim();
   if (!key) return '';
   return (
     extensionAssigneeMap[key] ||
-    (key.includes('_')
-      ? extensionAssigneeMap[key.split('_').pop() || ''] || ''
-      : '') ||
+    (key.includes('_') ? extensionAssigneeMap[key.split('_').pop() || ''] || '' : '') ||
     ''
   );
 }
@@ -109,9 +98,7 @@ export function dialerCampaignLabel(
   const match = findCampaignMatch(key);
 
   if (assigneeFromExt) {
-    const campaignPart = match
-      ? `${match.id.trim()} (${match.name})`
-      : key;
+    const campaignPart = match ? `${match.id.trim()} (${match.name})` : key;
     return `${campaignPart} — Assigned: ${assigneeFromExt}`;
   }
 

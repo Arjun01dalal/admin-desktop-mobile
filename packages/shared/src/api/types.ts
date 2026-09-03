@@ -17,10 +17,7 @@ export type ApiResult<T = unknown> = {
  * Never put secrets or Electron APIs in shared — only this interface shape.
  */
 export type ApiTransport = {
-  call<T = unknown>(
-    action: string,
-    payload?: Record<string, unknown>,
-  ): Promise<ApiResult<T>>;
+  call<T = unknown>(action: string, payload?: Record<string, unknown>): Promise<ApiResult<T>>;
 };
 
 export function apiFailed(res: Pick<ApiResult, 'ok' | 'success'>): boolean {

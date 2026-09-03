@@ -56,6 +56,8 @@ const COMPILE = [
   'siteBrowserView.cjs',
   'autoUpdateSetup.cjs',
   'ipcRegistry.cjs',
+  'ipcBoundary.cjs',
+  'securityPolicy.cjs',
   'siteAuth.cjs',
   'fcmToken.cjs',
   'fcmListener.cjs',
@@ -72,6 +74,32 @@ const COPY_PLAIN = [
   'sos-alert.html',
   'assets/danger.webm',
 ];
+
+function listSourceCjs(dir, prefix = '') {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const out = [];
+  for (const entry of entries) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      out.push(...listSourceCjs(path.join(dir, entry.name), rel));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith('.cjs')) out.push(rel);
+  }
+  return out;
+}
+
+function assertAllModulesPackaged() {
+  const shipped = new Set([...COMPILE, ...COPY_PLAIN]);
+  const missing = listSourceCjs(SRC).filter((rel) => !shipped.has(rel));
+  if (missing.length) {
+    console.error(
+      'compile-bytecode: electron modules missing from COMPILE/COPY_PLAIN:\n  ' +
+        missing.join('\n  '),
+    );
+    process.exit(1);
+  }
+}
 
 // `--node` compiles with the local Node.js instead of Electron. Only for
 // smoke-testing the pipeline (e.g. on Replit); NEVER use it for real builds —
@@ -96,6 +124,8 @@ async function main() {
     );
     process.exit(1);
   }
+
+  assertAllModulesPackaged();
 
   fs.rmSync(OUT, { recursive: true, force: true });
   fs.mkdirSync(path.join(OUT, 'secure'), { recursive: true });

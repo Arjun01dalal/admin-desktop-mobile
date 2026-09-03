@@ -85,9 +85,7 @@ export const buildEmpCodeNameMap = (
     for (const admin of role?.subAdmins || []) {
       const code = String(admin?.empCode || '').trim();
       if (!code) continue;
-      const name = String(
-        admin?.name || admin?.realName || admin?.userName || '',
-      ).trim();
+      const name = String(admin?.name || admin?.realName || admin?.userName || '').trim();
       if (name) map[code] = name;
     }
   }

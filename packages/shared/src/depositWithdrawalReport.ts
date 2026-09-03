@@ -59,8 +59,7 @@ function pickNumber(...values: unknown[]): number | undefined {
 }
 
 function normalizeMidAmountRows(data: unknown, kind: MidAmountKind = 'deposit'): MidAmountRow[] {
-  const amountKeys =
-    kind === 'deposit' ? DEPOSIT_AMOUNT_KEYS : WITHDRAWAL_AMOUNT_KEYS;
+  const amountKeys = kind === 'deposit' ? DEPOSIT_AMOUNT_KEYS : WITHDRAWAL_AMOUNT_KEYS;
   const countKeys = kind === 'deposit' ? DEPOSIT_COUNT_KEYS : WITHDRAWAL_COUNT_KEYS;
 
   const pickAmount = (row: Record<string, unknown>, scalar?: unknown) =>
@@ -351,7 +350,15 @@ export function mergeMidReportWithCatalog(
   reportRows: MergedMidReportRow[],
 ): MergedMidReportRow[] {
   const byKey = new Map(
-    reportRows.map((row) => [String(row.mid || '').trim().toLowerCase(), row] as const),
+    reportRows.map(
+      (row) =>
+        [
+          String(row.mid || '')
+            .trim()
+            .toLowerCase(),
+          row,
+        ] as const,
+    ),
   );
   const seen = new Set<string>();
   const merged: MergedMidReportRow[] = [];
@@ -366,7 +373,9 @@ export function mergeMidReportWithCatalog(
   }
 
   for (const row of reportRows) {
-    const key = String(row.mid || '').trim().toLowerCase();
+    const key = String(row.mid || '')
+      .trim()
+      .toLowerCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);
     merged.push(row);
@@ -378,10 +387,7 @@ export function mergeMidReportWithCatalog(
 const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
 
 /** Prefer Mongo userId for depositList.report — matches Deposit List filter.userId. */
-export function resolveWithdrawalReportUserId(row: {
-  userId?: unknown;
-  dp_id?: unknown;
-}): string {
+export function resolveWithdrawalReportUserId(row: { userId?: unknown; dp_id?: unknown }): string {
   const candidates = [row.userId, row.dp_id]
     .map((value) => String(value || '').trim())
     .filter(Boolean);
@@ -394,7 +400,9 @@ export function resolveWithdrawalReportUserId(row: {
 
 /** MID report icon — active workflow rows only. */
 export function showWithdrawalMidReport(status?: string): boolean {
-  const normalized = String(status || '').trim().toUpperCase();
+  const normalized = String(status || '')
+    .trim()
+    .toUpperCase();
   return (
     normalized === 'PENDING' ||
     normalized === 'IN PROGRESS' ||
