@@ -35,6 +35,7 @@ export type GameCardState = {
   onPlutusChange: (value: string) => void;
   onLudoUpdate?: () => void;
   onLudoUpdateRtp?: () => void;
+  onLudoPlayerWiseRtp?: () => void;
 };
 
 export type ProviderNavContext = {
@@ -362,6 +363,10 @@ export function buildProviderCards(
         {
           label: 'Update RTP',
           onClick: () => games?.onLudoUpdateRtp?.(),
+        },
+        {
+          label: 'Player Wise RTP',
+          onClick: () => games?.onLudoPlayerWiseRtp?.(),
         },
       ],
       rows: [

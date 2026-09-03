@@ -16,6 +16,7 @@ export function getBackPath(pathname: string): string | null {
     pathname === '/exchangeRateManagement' ||
     pathname === '/activeUserData' ||
     pathname === '/betConstructGamesList' ||
+    pathname === '/ludo-player-wise-rtp' ||
     pathname === '/falcon-rate-management' ||
     pathname === '/exchange-rate-management' ||
     pathname === '/liveMatchTotal' ||

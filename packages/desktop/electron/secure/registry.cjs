@@ -705,6 +705,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'depositProviders.removeMidArray': {
+    method: 'POST',
+    path: '/payinAccounts/remove-mid-array',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'depositProviders.updateUpiArray': {
     method: 'POST',
     path: '/payinAccounts/update-upiArray',
@@ -1487,6 +1493,19 @@ module.exports = {
   'dashboard.ludoRtpGet': {
     method: 'GET',
     path: '/Ludo/admin/rtp',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
+  // Player-wise RTP (admin-panel-domains LudoPlayerWiseRtp)
+  'dashboard.ludoPlayerRtpUsers': {
+    method: 'GET',
+    path: '/Ludo/admin/rtp/users',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dashboard.ludoPlayerRtpUsersSet': {
+    method: 'POST',
+    path: '/Ludo/admin/rtp/users',
     encryptRequest: false,
     decryptResponse: false,
   },

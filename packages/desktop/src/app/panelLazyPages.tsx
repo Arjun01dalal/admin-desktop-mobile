@@ -311,6 +311,10 @@ const BetConstructGamesListPage = lazyNamed(
   () => import('@/screens/panel/dashboards/BetConstructGamesListPage'),
   'BetConstructGamesListPage',
 );
+const LudoPlayerWiseRtpPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/LudoPlayerWiseRtpPage'),
+  'LudoPlayerWiseRtpPage',
+);
 const LiveMatchTotalLaxmiPage = lazyNamed(
   () => import('@/screens/panel/dashboards/LiveMatchTotalPage'),
   'LiveMatchTotalLaxmiPage',
@@ -442,6 +446,7 @@ export {
   ExchangeRateManagementPage,
   ActiveUserDataPage,
   BetConstructGamesListPage,
+  LudoPlayerWiseRtpPage,
   LiveMatchTotalLaxmiPage,
   LiveMatchTotalMasterPage,
   LiveMatchTotalBothPage,

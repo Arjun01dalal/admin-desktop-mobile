@@ -16,6 +16,7 @@ const LOADERS: Record<string, Loader> = {
   '/exchangeRateManagement': () => import('@/screens/panel/dashboards/ExchangeRateManagementPage'),
   '/activeUserData': () => import('@/screens/panel/dashboards/ActiveUserDataPage'),
   '/betConstructGamesList': () => import('@/screens/panel/dashboards/BetConstructGamesListPage'),
+  '/ludo-player-wise-rtp': () => import('@/screens/panel/dashboards/LudoPlayerWiseRtpPage'),
   '/liveMatchTotal': () => import('@/screens/panel/dashboards/LiveMatchTotalPage'),
   '/masterLiveMatchTotal': () => import('@/screens/panel/dashboards/LiveMatchTotalPage'),
   '/bothLiveMatchTotal': () => import('@/screens/panel/dashboards/LiveMatchTotalPage'),

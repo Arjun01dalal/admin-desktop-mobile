@@ -104,6 +104,7 @@ import {
   ExchangeRateManagementPage,
   ActiveUserDataPage,
   BetConstructGamesListPage,
+  LudoPlayerWiseRtpPage,
   LiveMatchTotalLaxmiPage,
   LiveMatchTotalMasterPage,
   LiveMatchTotalBothPage,
@@ -141,6 +142,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/exchangeRateManagement" element={<ExchangeRateManagementPage />} />
             <Route path="/activeUserData" element={<ActiveUserDataPage />} />
             <Route path="/betConstructGamesList" element={<BetConstructGamesListPage />} />
+            <Route path="/ludo-player-wise-rtp" element={<LudoPlayerWiseRtpPage />} />
             <Route path="/liveMatchTotal" element={<LiveMatchTotalLaxmiPage />} />
             <Route path="/masterLiveMatchTotal" element={<LiveMatchTotalMasterPage />} />
             <Route path="/bothLiveMatchTotal" element={<LiveMatchTotalBothPage />} />

@@ -689,9 +689,12 @@ export function DepositProvidersPage() {
                 label="MID"
                 placeholder="Add Mid"
                 arrayAction="depositProviders.updateMidArray"
+                removeAction="depositProviders.removeMidArray"
                 arrayKey="midArray"
                 selectedKey="mid"
                 onRefresh={() => void load()}
+                userId={user?._id}
+                userName={user?.name}
               />
             );
           }

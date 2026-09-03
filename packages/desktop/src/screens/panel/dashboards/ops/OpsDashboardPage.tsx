@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, Box } from '@mui/material';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { todayIST } from '@/utils/dates';
@@ -50,6 +51,7 @@ export function OpsDashboardPage({ mode }: Props) {
   const [selectedPlutus, setSelectedPlutus] = useState('All');
   const [ludoModalOpen, setLudoModalOpen] = useState(false);
   const [ludoModalAction, setLudoModalAction] = useState<LudoModalAction>(null);
+  const navigate = useNavigate();
 
   const appOptions = mode === 'vip' ? VIP_CLIENT_NAMES : (CLIENT_NAMES as readonly string[]);
 
@@ -88,6 +90,14 @@ export function OpsDashboardPage({ mode }: Props) {
             setLudoModalAction('rtp');
             setLudoModalOpen(true);
           },
+          onLudoPlayerWiseRtp: () => {
+            navigate('/ludo-player-wise-rtp', {
+              state: {
+                gameId: selectedLudoGame,
+                gameOptions: bundle?.ludoGameOptions ?? [],
+              },
+            });
+          },
         },
         {
           startDate: filters.applied.startDate,
@@ -99,6 +109,7 @@ export function OpsDashboardPage({ mode }: Props) {
       mode,
       bundle,
       loading,
+      navigate,
       selectedLudoGame,
       selectedIndianDiva,
       selectedPlutus,
