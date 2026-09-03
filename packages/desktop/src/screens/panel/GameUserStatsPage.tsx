@@ -49,20 +49,9 @@ type LocationState = {
   endDate?: string;
 };
 
-function MetricCard({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color: string;
-}) {
+function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <Paper
-      variant="outlined"
-      sx={{ p: 2, height: '100%', bgcolor: 'background.paper' }}
-    >
+    <Paper variant="outlined" sx={{ p: 2, height: '100%', bgcolor: 'background.paper' }}>
       <Typography variant="caption" color="text.secondary">
         {label}
       </Typography>
@@ -137,9 +126,7 @@ export function GameUserStatsPage() {
       const userId = gameUserStatUserId(item);
       if (userId === '—') return;
       const userName = gameUserStatUserName(item);
-      navigate(
-        `/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(userName)}`,
-      );
+      navigate(`/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(userName)}`);
     },
     [navigate],
   );
@@ -238,10 +225,7 @@ export function GameUserStatsPage() {
         render: (row) => {
           const ggr = gameUserStatGgr(row);
           return (
-            <Box
-              component="span"
-              sx={{ color: ggr < 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}
-            >
+            <Box component="span" sx={{ color: ggr < 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
               {formatGameUserStatNumber(ggr)}
             </Box>
           );

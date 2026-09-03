@@ -88,13 +88,7 @@ export function KycToolbar({
           <Button
             variant="outlined"
             color="warning"
-            startIcon={
-              loading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={onRefresh}
             disabled={loading}
           >

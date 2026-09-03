@@ -243,19 +243,12 @@ export function SocialMediaPage() {
           Social Media
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center">
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openAdd}
-            sx={orangeBtnSx}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd} sx={orangeBtnSx}>
             Add
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{
@@ -287,7 +280,12 @@ export function SocialMediaPage() {
         />
       </TablePanel>
 
-      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={addOpen}
+        onClose={() => !submitting && setAddOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <form onSubmit={handleCreate}>
           <DialogTitle>Add Social Media</DialogTitle>
           <DialogContent>
@@ -320,7 +318,12 @@ export function SocialMediaPage() {
         </form>
       </Dialog>
 
-      <Dialog open={editOpen} onClose={() => !submitting && setEditOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={editOpen}
+        onClose={() => !submitting && setEditOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <form onSubmit={handleUpdate}>
           <DialogTitle>Edit Social Media</DialogTitle>
           <DialogContent>
@@ -353,7 +356,12 @@ export function SocialMediaPage() {
         </form>
       </Dialog>
 
-      <Dialog open={deleteOpen} onClose={() => !submitting && setDeleteOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={deleteOpen}
+        onClose={() => !submitting && setDeleteOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <DialogTitle>Are you sure?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">

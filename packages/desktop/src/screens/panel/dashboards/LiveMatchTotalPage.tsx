@@ -69,9 +69,7 @@ const TITLES: Record<LiveMatchVariant, string> = {
 type Props = { variant?: LiveMatchVariant };
 
 function getBg(index: number) {
-  return index % 2 === 0
-    ? 'radial-gradient(#1d4665,#1b262e)'
-    : 'radial-gradient(#90101a,#4e070c)';
+  return index % 2 === 0 ? 'radial-gradient(#1d4665,#1b262e)' : 'radial-gradient(#90101a,#4e070c)';
 }
 
 function buildRunnerUI(input: unknown): Array<{
@@ -98,8 +96,7 @@ function buildRunnerUI(input: unknown): Array<{
     if (runners.length === 0) {
       return { eventName: m.eventName, data: [], code: m.code };
     }
-    const get = (i: number, type: 'back' | 'lay') =>
-      build(runners?.[i]?.[`${type}Prices`]?.[0]);
+    const get = (i: number, type: 'back' | 'lay') => build(runners?.[i]?.[`${type}Prices`]?.[0]);
 
     const data =
       runners.length >= 3
@@ -125,7 +122,9 @@ function buildRunnerUI(input: unknown): Array<{
 }
 
 function normalizeMarketName(name: unknown): string {
-  return String(name || '').toLowerCase().trim();
+  return String(name || '')
+    .toLowerCase()
+    .trim();
 }
 
 function mergeLaxmiMarketBooks(
@@ -149,10 +148,7 @@ function mergeLaxmiMarketBooks(
     return map;
   };
 
-  const addInto = (
-    target: Record<string, number>,
-    source: Record<string, number>,
-  ) => {
+  const addInto = (target: Record<string, number>, source: Record<string, number>) => {
     Object.entries(source).forEach(([runner, pl]) => {
       const existingKey = Object.keys(target).find(
         (key) => normalizeMarketName(key) === normalizeMarketName(runner),
@@ -165,9 +161,7 @@ function mergeLaxmiMarketBooks(
     });
   };
 
-  const withoutToss = markets.filter(
-    (market) => normalizeMarketName(market.marketName) !== 'toss',
-  );
+  const withoutToss = markets.filter((market) => normalizeMarketName(market.marketName) !== 'toss');
   const finalBook = withoutToss.find(
     (market) => normalizeMarketName(market.marketName) === 'final book',
   );
@@ -177,11 +171,7 @@ function mergeLaxmiMarketBooks(
   });
   const others = withoutToss.filter((market) => {
     const name = normalizeMarketName(market.marketName);
-    return (
-      name !== 'final book' &&
-      name !== 'match odds' &&
-      !name.endsWith('match odds')
-    );
+    return name !== 'final book' && name !== 'match odds' && !name.endsWith('match odds');
   });
 
   const marketList: MarketBook[] = [];
@@ -241,9 +231,7 @@ function formatDataForUI(data: unknown, variant: LiveMatchVariant): MatchRow[] {
     };
 
     if (variant === 'laxmi') {
-      const marketBooks = (row.markets || []).filter(
-        (market) => market.marketType === 'MARKET',
-      );
+      const marketBooks = (row.markets || []).filter((market) => market.marketType === 'MARKET');
       result.marketList = mergeLaxmiMarketBooks(marketBooks);
       const preferred = result.marketList[0];
       if (preferred) {
@@ -289,14 +277,11 @@ function mergeFinalData(
   return finalRes.map((match) => {
     const found = matches.find(
       (m) =>
-        String(m.eventName || '').toLowerCase() ===
-        String(match.matchName || '').toLowerCase(),
+        String(m.eventName || '').toLowerCase() === String(match.matchName || '').toLowerCase(),
     );
     return {
       ...match,
-      oddsTeams:
-        found?.data ||
-        Array(6).fill({ price: '-', size: '-' }) as OddsCell[],
+      oddsTeams: found?.data || (Array(6).fill({ price: '-', size: '-' }) as OddsCell[]),
       code: found?.code,
     };
   });
@@ -311,9 +296,7 @@ function groupBySport(data: MatchRow[]): Record<string, MatchRow[]> {
   }, {});
 }
 
-function sortSports(
-  grouped: Record<string, MatchRow[]>,
-): Array<[string, MatchRow[]]> {
+function sortSports(grouped: Record<string, MatchRow[]>): Array<[string, MatchRow[]]> {
   return Object.entries(grouped).sort(([a], [b]) => {
     const A = a.toLowerCase();
     const B = b.toLowerCase();
@@ -325,10 +308,7 @@ function sortSports(
   });
 }
 
-function getClosestKey(
-  data: Record<string, number>,
-  result: unknown,
-): number | null {
+function getClosestKey(data: Record<string, number>, result: unknown): number | null {
   if (result === '' || result == null) return null;
   const keys = Object.keys(data).map(Number);
   if (Object.prototype.hasOwnProperty.call(data, String(result))) {
@@ -336,9 +316,7 @@ function getClosestKey(
   }
   if (keys.length === 0) return null;
   return keys.reduce((prev, curr) =>
-    Math.abs(curr - Number(result)) < Math.abs(prev - Number(result))
-      ? curr
-      : prev,
+    Math.abs(curr - Number(result)) < Math.abs(prev - Number(result)) ? curr : prev,
   );
 }
 
@@ -376,9 +354,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [groupedData, setGroupedData] = useState<Array<[string, MatchRow[]]>>(
-    [],
-  );
+  const [groupedData, setGroupedData] = useState<Array<[string, MatchRow[]]>>([]);
   const [openIndex, setOpenIndex] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [streamId, setStreamId] = useState('');
@@ -456,9 +432,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       let oddsForMerge = matches;
       if (variant === 'master') {
         const normalize = (value: string) => value.toLowerCase().trim();
-        const bookMatchSet = new Set(
-          finalBook.map((item) => normalize(item.matchName)),
-        );
+        const bookMatchSet = new Set(finalBook.map((item) => normalize(item.matchName)));
         const filteredMatches = matches.filter((match) =>
           bookMatchSet.has(normalize(String(match.eventName || ''))),
         );
@@ -467,9 +441,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
             ? finalBook
             : finalBook.filter((book) =>
                 filteredMatches.some(
-                  (match) =>
-                    normalize(String(match.eventName || '')) ===
-                    normalize(book.matchName),
+                  (match) => normalize(String(match.eventName || '')) === normalize(book.matchName),
                 ),
               );
         oddsForMerge = matches.length === 0 ? [] : filteredMatches;
@@ -488,9 +460,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       }
 
       const stableSorted = [...merged].sort(
-        (a, b) =>
-          orderRef.current.indexOf(a.matchName) -
-          orderRef.current.indexOf(b.matchName),
+        (a, b) => orderRef.current.indexOf(a.matchName) - orderRef.current.indexOf(b.matchName),
       );
 
       if (variant === 'master') {
@@ -528,7 +498,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
     return () => {
       mounted = false;
     };
-  }, [fetchAllData]);
+  }, [fetchAllData, variant]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
@@ -707,12 +677,8 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                                       fontSize: 11,
                                     }}
                                   >
-                                    <div style={{ fontWeight: 'bold' }}>
-                                      {item?.price ?? '-'}
-                                    </div>
-                                    <div style={{ fontSize: 9 }}>
-                                      {item?.size ?? '-'}
-                                    </div>
+                                    <div style={{ fontWeight: 'bold' }}>{item?.price ?? '-'}</div>
+                                    <div style={{ fontSize: 9 }}>{item?.size ?? '-'}</div>
                                   </Box>
                                 ));
                               return (
@@ -742,9 +708,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                               mb={2}
                               sx={{
                                 p: match.marketList?.length ? 1 : 0,
-                                bgcolor: match.marketList?.length
-                                  ? 'action.hover'
-                                  : 'transparent',
+                                bgcolor: match.marketList?.length ? 'action.hover' : 'transparent',
                                 borderRadius: 1,
                               }}
                             >
@@ -755,29 +719,26 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                                     : ''
                                 }`}
                               </Typography>
-                              {Object.entries(market.data || {}).map(
-                                ([team, value]) => (
-                                  <Box
-                                    key={team}
-                                    sx={{
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      fontSize: 15,
+                              {Object.entries(market.data || {}).map(([team, value]) => (
+                                <Box
+                                  key={team}
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: 15,
+                                  }}
+                                >
+                                  <span>{team}</span>
+                                  <span
+                                    style={{
+                                      color: Number(value) < 0 ? '#d32f2f' : '#2e7d32',
+                                      fontWeight: 'bold',
                                     }}
                                   >
-                                    <span>{team}</span>
-                                    <span
-                                      style={{
-                                        color:
-                                          Number(value) < 0 ? '#d32f2f' : '#2e7d32',
-                                        fontWeight: 'bold',
-                                      }}
-                                    >
-                                      {Number(value).toFixed(2)}
-                                    </span>
-                                  </Box>
-                                ),
-                              )}
+                                    {Number(value).toFixed(2)}
+                                  </span>
+                                </Box>
+                              ))}
                             </Box>
                           ))}
 
@@ -788,33 +749,26 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                               const m = name.match(/\d+/);
                               return m ? parseInt(m[0], 10) : null;
                             };
-                            const sortedFancyList = [...fancyList].sort(
-                              (a, b) => {
-                                const aName =
-                                  a?.marketName?.toLowerCase() || '';
-                                const bName =
-                                  b?.marketName?.toLowerCase() || '';
-                                const aNum = getOverNumber(aName);
-                                const bNum = getOverNumber(bName);
-                                const isAValid =
-                                  aName.includes('over run') &&
-                                  aNum != null &&
-                                  priorityOrder.includes(aNum);
-                                const isBValid =
-                                  bName.includes('over run') &&
-                                  bNum != null &&
-                                  priorityOrder.includes(bNum);
-                                if (isAValid && isBValid && aNum != null && bNum != null) {
-                                  return (
-                                    priorityOrder.indexOf(aNum) -
-                                    priorityOrder.indexOf(bNum)
-                                  );
-                                }
-                                if (isAValid) return -1;
-                                if (isBValid) return 1;
-                                return 0;
-                              },
-                            );
+                            const sortedFancyList = [...fancyList].sort((a, b) => {
+                              const aName = a?.marketName?.toLowerCase() || '';
+                              const bName = b?.marketName?.toLowerCase() || '';
+                              const aNum = getOverNumber(aName);
+                              const bNum = getOverNumber(bName);
+                              const isAValid =
+                                aName.includes('over run') &&
+                                aNum != null &&
+                                priorityOrder.includes(aNum);
+                              const isBValid =
+                                bName.includes('over run') &&
+                                bNum != null &&
+                                priorityOrder.includes(bNum);
+                              if (isAValid && isBValid && aNum != null && bNum != null) {
+                                return priorityOrder.indexOf(aNum) - priorityOrder.indexOf(bNum);
+                              }
+                              if (isAValid) return -1;
+                              if (isBValid) return 1;
+                              return 0;
+                            });
                             const visibleList = showAll
                               ? sortedFancyList
                               : sortedFancyList.slice(0, 7);
@@ -823,10 +777,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                               <>
                                 {visibleList.map((f, i) => {
                                   const uniqueIndex = `${index}-${i}`;
-                                  const selectedKey = getClosestKey(
-                                    f?.data || {},
-                                    f?.result,
-                                  );
+                                  const selectedKey = getClosestKey(f?.data || {}, f?.result);
                                   return (
                                     <Box
                                       key={f?.marketName || uniqueIndex}
@@ -849,68 +800,53 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
                                         }}
                                         onClick={() =>
                                           setOpenIndex(
-                                            openIndex === uniqueIndex
-                                              ? null
-                                              : uniqueIndex,
+                                            openIndex === uniqueIndex ? null : uniqueIndex,
                                           )
                                         }
                                       >
                                         {`${f?.marketName} (${toDisplayText('Bet Size')}:- ${f?.betSize})`}
-                                        <span>
-                                          {openIndex === uniqueIndex ? '▲' : '▼'}
-                                        </span>
+                                        <span>{openIndex === uniqueIndex ? '▲' : '▼'}</span>
                                       </Typography>
                                       <Collapse
                                         in={openIndex === uniqueIndex}
                                         timeout="auto"
                                         unmountOnExit
                                       >
-                                        {Object.entries(f?.data || {}).map(
-                                          ([key, val]) => {
-                                            const isActive =
-                                              Number(key) === selectedKey;
-                                            return (
-                                              <Box
-                                                key={key}
-                                                sx={{
-                                                  display: 'flex',
-                                                  justifyContent:
-                                                    'space-between',
-                                                  fontSize: 14,
-                                                  py: 0.3,
-                                                  px: 1,
-                                                  borderRadius: 1,
-                                                  backgroundColor: isActive
-                                                    ? 'rgba(255,192,203,0.25)'
-                                                    : 'transparent',
+                                        {Object.entries(f?.data || {}).map(([key, val]) => {
+                                          const isActive = Number(key) === selectedKey;
+                                          return (
+                                            <Box
+                                              key={key}
+                                              sx={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                fontSize: 14,
+                                                py: 0.3,
+                                                px: 1,
+                                                borderRadius: 1,
+                                                backgroundColor: isActive
+                                                  ? 'rgba(255,192,203,0.25)'
+                                                  : 'transparent',
+                                              }}
+                                            >
+                                              <span
+                                                style={{
+                                                  fontWeight: isActive ? 600 : 400,
                                                 }}
                                               >
-                                                <span
-                                                  style={{
-                                                    fontWeight: isActive
-                                                      ? 600
-                                                      : 400,
-                                                  }}
-                                                >
-                                                  {key}
-                                                </span>
-                                                <span
-                                                  style={{
-                                                    color:
-                                                      Number(val) < 0
-                                                        ? '#d32f2f'
-                                                        : '#2e7d32',
-                                                    fontWeight: isActive
-                                                      ? 700
-                                                      : 500,
-                                                  }}
-                                                >
-                                                  {Number(val).toFixed(2)}
-                                                </span>
-                                              </Box>
-                                            );
-                                          },
-                                        )}
+                                                {key}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  color: Number(val) < 0 ? '#d32f2f' : '#2e7d32',
+                                                  fontWeight: isActive ? 700 : 500,
+                                                }}
+                                              >
+                                                {Number(val).toFixed(2)}
+                                              </span>
+                                            </Box>
+                                          );
+                                        })}
                                       </Collapse>
                                     </Box>
                                   );
@@ -947,11 +883,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         </Grid>
       )}
 
-      <LiveStreamModal
-        open={streamOpen}
-        onClose={() => setStreamOpen(false)}
-        streamId={streamId}
-      />
+      <LiveStreamModal open={streamOpen} onClose={() => setStreamOpen(false)} streamId={streamId} />
     </Box>
   );
 }

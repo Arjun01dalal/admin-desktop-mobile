@@ -20,12 +20,7 @@ import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
-import {
-  formatAmount,
-  formatDisplayDate,
-  formatDisplayTime,
-  todayIST,
-} from '@/utils/dates';
+import { formatAmount, formatDisplayDate, formatDisplayTime, todayIST } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
 import { saveWorkbook } from '@/utils/downloadSheet';
@@ -107,13 +102,7 @@ const EMPTY_FILTERS: ColumnFilters = {
   gatewayId: '',
 };
 
-const PAGE_SIZE_OPTIONS = [
-  ...ITEMS_PER_PAGE_OPTIONS,
-  '1000',
-  '5000',
-  '10000',
-  '20000',
-] as const;
+const PAGE_SIZE_OPTIONS = [...ITEMS_PER_PAGE_OPTIONS, '1000', '5000', '10000', '20000'] as const;
 
 const orangeBtnSx = {
   bgcolor: '#ff9f0a',
@@ -242,8 +231,7 @@ export function DepositApprovedReportPage() {
     if (!isScanner) return;
     setScannerLoading(true);
     try {
-      const gateway =
-        gateways.find((g) => g._id === query.filters.gatewayId) || selectedGateway;
+      const gateway = gateways.find((g) => g._id === query.filters.gatewayId) || selectedGateway;
       const payload: Record<string, unknown> = {};
       if (gateway?.name) payload.paymentGatewayName = gateway.name;
       if (gateway?.mid != null && gateway.mid !== '') payload.mid = gateway.mid;
@@ -287,8 +275,7 @@ export function DepositApprovedReportPage() {
   ]);
 
   const loadApprovedSum = useCallback(async () => {
-    const gateway =
-      gateways.find((g) => g._id === query.filters.gatewayId) || selectedGateway;
+    const gateway = gateways.find((g) => g._id === query.filters.gatewayId) || selectedGateway;
     const mid = gateway?.mid;
     if (mid == null || mid === '') {
       setApprovedSum(0);
@@ -297,9 +284,7 @@ export function DepositApprovedReportPage() {
 
     setSumLoading(true);
     try {
-      const start = query.allData
-        ? todayIST()
-        : query.startDate || todayIST();
+      const start = query.allData ? todayIST() : query.startDate || todayIST();
       const end = query.allData ? todayIST() : query.endDate || todayIST();
       const payload: Record<string, unknown> = {
         depositType: requestType,
@@ -385,16 +370,13 @@ export function DepositApprovedReportPage() {
     [],
   );
 
-  const onDraftChange =
-    (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
-      setDraftField(key)(e.target.value);
+  const onDraftChange = (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
+    setDraftField(key)(e.target.value);
 
   const openUserReport = useCallback(
     (userId?: string, userName?: string) => {
       if (!userId) return;
-      navigate(
-        `/users/report/${userId}/${encodeURIComponent(userName || '')}`,
-      );
+      navigate(`/users/report/${userId}/${encodeURIComponent(userName || '')}`);
     },
     [navigate],
   );
@@ -703,9 +685,7 @@ export function DepositApprovedReportPage() {
         id: 'givenBy',
         label: 'Given By',
         render: (row) =>
-          display(
-            typeof row.updatedBy === 'object' ? row.updatedBy?.name : row.updatedBy,
-          ),
+          display(typeof row.updatedBy === 'object' ? row.updatedBy?.name : row.updatedBy),
       },
       {
         id: 'reason',
@@ -891,13 +871,7 @@ export function DepositApprovedReportPage() {
         </Box>
       </CollapsibleFilterPanel>
 
-      <Stack
-        direction="row"
-        spacing={1}
-        alignItems="center"
-        mb={1.5}
-        sx={{ flexShrink: 0 }}
-      >
+      <Stack direction="row" spacing={1} alignItems="center" mb={1.5} sx={{ flexShrink: 0 }}>
         <Chip
           label={
             selectedGateway?.mid

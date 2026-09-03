@@ -11,28 +11,45 @@ import { floorNum, toNum } from './ops/mergeMetrics';
 import { useDashboardFilters } from './ops/useDashboardFilters';
 import type { ProviderCardModel } from './ops/types';
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function firstRow(value: unknown): Record<string, unknown> {
-  if (Array.isArray(value) && value[0] && typeof value[0] === 'object') {
-    return value[0] as Record<string, unknown>;
-  }
-  return asRecord(value);
-}
-
 function row(label: string, value: unknown) {
   return { label, value: floorNum(value) };
 }
 
+type MetricValue = number | string | null;
+type ProviderMetrics = {
+  totalBetAmount?: MetricValue;
+  totalWinAmount?: MetricValue;
+  commissionAmount?: MetricValue;
+  totalBets?: MetricValue;
+  totalWins?: MetricValue;
+  netRTP?: MetricValue;
+  payin?: MetricValue;
+  payout?: MetricValue;
+  TotalGGR?: MetricValue;
+  totalGGR?: MetricValue;
+  CommissionAmount?: MetricValue;
+  final_ggr?: MetricValue;
+  finalGgr?: MetricValue;
+  sattaMatkaTotalBetAmount?: MetricValue;
+  sattaMatkaTotalBetCount?: MetricValue;
+  sattaMatkaTotalBetPendingAmount?: MetricValue;
+  sattaMatkaTotalBetWinAmount?: MetricValue;
+  sattaMatkaGGR?: MetricValue;
+  totalVolume?: MetricValue;
+  totalClientWin?: MetricValue;
+  totalClient?: MetricValue;
+  totalWinLossWithoutCommission?: MetricValue;
+  totalCommission?: MetricValue;
+  finalWinLoss?: MetricValue;
+};
+
+type MasterResponse = ProviderMetrics | ProviderMetrics[];
+
 type MasterBundle = {
-  wco: Record<string, unknown>;
-  falcon: Record<string, unknown>;
-  satta: Record<string, unknown>;
-  masterAaa: Record<string, unknown>;
+  wco: ProviderMetrics;
+  falcon: ProviderMetrics;
+  satta: ProviderMetrics;
+  masterAaa: ProviderMetrics;
 };
 
 /**
@@ -53,7 +70,7 @@ export function MasterDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const base: Record<string, unknown> = {
+      const base: { startDate: string; endDate: string; clientName?: string } = {
         startDate: filters.applied.startDate || todayIST(),
         endDate: filters.applied.endDate || todayIST(),
       };
@@ -66,10 +83,10 @@ export function MasterDashboardPage() {
       };
 
       const [wco, falcon, satta, masterAaa] = await Promise.all([
-        secureApi('dashboard.masterWco', base),
-        secureApi('dashboard.masterFalcon', base),
-        secureApi('dashboard.masterSatta', base),
-        secureApi('dashboard.masterAaaZehnPl', datesOnly),
+        secureApi<MasterResponse>('dashboard.masterWco', base),
+        secureApi<MasterResponse>('dashboard.masterFalcon', base),
+        secureApi<MasterResponse>('dashboard.masterSatta', base),
+        secureApi<MasterResponse>('dashboard.masterAaaZehnPl', datesOnly),
       ]);
 
       if (!isCurrent(gen)) return;
@@ -82,10 +99,12 @@ export function MasterDashboardPage() {
       }
 
       setBundle({
-        wco: firstRow(wco.ok ? wco.data : null),
-        falcon: asRecord(falcon.ok ? falcon.data : null),
-        satta: asRecord(satta.ok ? satta.data : null),
-        masterAaa: asRecord(masterAaa.ok ? masterAaa.data : null),
+        wco: Array.isArray(wco.data) ? (wco.data[0] ?? {}) : (wco.data ?? {}),
+        falcon: Array.isArray(falcon.data) ? (falcon.data[0] ?? {}) : (falcon.data ?? {}),
+        satta: Array.isArray(satta.data) ? (satta.data[0] ?? {}) : (satta.data ?? {}),
+        masterAaa: Array.isArray(masterAaa.data)
+          ? (masterAaa.data[0] ?? {})
+          : (masterAaa.data ?? {}),
       });
     } catch (err) {
       if (!isCurrent(gen)) return;
@@ -113,8 +132,10 @@ export function MasterDashboardPage() {
 
   const startDate = filters.applied.startDate || todayIST();
   const endDate = filters.applied.endDate || todayIST();
-  const rateSearch = (type: string) =>
-    `?${new URLSearchParams({ startDate, endDate, type }).toString()}`;
+  const rateSearch = useCallback(
+    (type: string) => `?${new URLSearchParams({ startDate, endDate, type }).toString()}`,
+    [startDate, endDate],
+  );
   const aaaSearch = `?${new URLSearchParams({ startDate, endDate }).toString()}`;
 
   const cards = useMemo<ProviderCardModel[]>(() => {
@@ -144,9 +165,7 @@ export function MasterDashboardPage() {
           row('Total Wins', wco.totalWins),
           {
             label: 'Net RTP',
-            value: Number.isFinite(toNum(wco.netRTP))
-              ? toNum(wco.netRTP).toFixed(2)
-              : 0,
+            value: Number.isFinite(toNum(wco.netRTP)) ? toNum(wco.netRTP).toFixed(2) : 0,
           },
         ],
       },
@@ -163,10 +182,7 @@ export function MasterDashboardPage() {
           row('Total Win Amount', falcon.payout),
           row('GGR', falcon.TotalGGR ?? falcon.totalGGR),
           row('Commission', falcon.CommissionAmount),
-          row(
-            'GGR - Upline + Commission',
-            falcon.final_ggr ?? falcon.finalGgr,
-          ),
+          row('GGR - Upline + Commission', falcon.final_ggr ?? falcon.finalGgr),
         ],
       },
       {
@@ -181,10 +197,7 @@ export function MasterDashboardPage() {
           row('Total Bet Amount', masterAaa.totalVolume),
           row('Total Win', masterAaa.totalClientWin),
           row('Total Active Users', masterAaa.totalClient),
-          row(
-            'GGR (Without commission)',
-            masterAaa.totalWinLossWithoutCommission,
-          ),
+          row('GGR (Without commission)', masterAaa.totalWinLossWithoutCommission),
           row('Commission', masterAaa.totalCommission),
           row('Gross GGR', masterAaa.finalWinLoss),
         ],
@@ -199,16 +212,13 @@ export function MasterDashboardPage() {
         rows: [
           row('Total Bet Amount', satta.sattaMatkaTotalBetAmount),
           row('Total Bet Count', satta.sattaMatkaTotalBetCount),
-          row(
-            'Total Bet Pending Amount',
-            satta.sattaMatkaTotalBetPendingAmount,
-          ),
+          row('Total Bet Pending Amount', satta.sattaMatkaTotalBetPendingAmount),
           row('Total Win Amount', satta.sattaMatkaTotalBetWinAmount),
           row('GGR', satta.sattaMatkaGGR),
         ],
       },
     ];
-  }, [aaaSearch, bundle, endDate, loading, startDate]);
+  }, [aaaSearch, bundle, endDate, loading, rateSearch, startDate]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>

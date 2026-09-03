@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
@@ -70,13 +62,13 @@ function formatFundRows(payload: unknown): FundRow[] {
 export function FundsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = getSessionUser();
+  // getSessionUser() parses localStorage each call → new object every render.
+  // Putting that in `load` deps retriggers the effect forever (loading spinner loop).
+  const user = useMemo(() => getSessionUser(), []);
   const canShowTotal = hasPermission(Permissions.show_gateway_and_total);
   const canEditAccess = canShowFundEditBtn(user?.mobile);
 
-  const initial = readFundsDates(
-    location.state as { startDate?: string; endDate?: string } | null,
-  );
+  const initial = readFundsDates(location.state as { startDate?: string; endDate?: string } | null);
   const [startDate, setStartDate] = useState(initial.startDate);
   const [endDate, setEndDate] = useState(initial.endDate);
   const [loading, setLoading] = useState(false);
@@ -84,6 +76,11 @@ export function FundsPage() {
   const [totalDeposit, setTotalDeposit] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<FundsEditTarget | null>(null);
+
+  const gatewaysKey = useMemo(() => {
+    const gateways = Array.isArray(user?.gateway) ? (user!.gateway as string[]) : [];
+    return gateways.join('|');
+  }, [user]);
 
   const load = useCallback(
     async (from = startDate, to = endDate) => {
@@ -113,9 +110,7 @@ export function FundsPage() {
           const canShowGateway =
             hasPermission(Permissions.show_gateway_and_total) ||
             hasPermission(Permissions.show_gateway_only);
-          const gateways = Array.isArray(user?.gateway)
-            ? (user!.gateway as string[])
-            : [];
+          const gateways = gatewaysKey ? gatewaysKey.split('|') : [];
 
           let filtered = formatted;
           if (gateways.length > 0) {
@@ -134,7 +129,7 @@ export function FundsPage() {
         setLoading(false);
       }
     },
-    [startDate, endDate, user],
+    [startDate, endDate, gatewaysKey],
   );
 
   useLayoutEffect(() => {
@@ -151,7 +146,9 @@ export function FundsPage() {
       location.state as { startDate?: string; endDate?: string } | null,
     );
     void load(restored.startDate, restored.endDate);
-  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Only re-fetch when route identity or load inputs change — not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- location.state read via location.key
+  }, [location.key, load]);
 
   const openMid = useCallback(
     (row: FundRow) => {
@@ -260,13 +257,7 @@ export function FundsPage() {
         summary={`${startDate} → ${endDate}`}
         headerActions={
           <Button
-            startIcon={
-              loading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={(event) => {
               event.stopPropagation();
               void load();
@@ -285,59 +276,59 @@ export function FundsPage() {
           alignItems="center"
           sx={{ '& > *': { flexShrink: 0 } }}
         >
-        <TextField
-          fullWidth={false}
-          size="small"
-          type="date"
-          label="From Date"
-          InputLabelProps={{ shrink: true }}
-          value={startDate}
-          onChange={(e) => {
-            setStartDate(e.target.value);
-            saveFundsDates(e.target.value, endDate);
-          }}
-          sx={{ width: 160 }}
-        />
-        <TextField
-          fullWidth={false}
-          size="small"
-          type="date"
-          label="To Date"
-          InputLabelProps={{ shrink: true }}
-          value={endDate}
-          onChange={(e) => {
-            setEndDate(e.target.value);
-            saveFundsDates(startDate, e.target.value);
-          }}
-          sx={{ width: 160 }}
-        />
-        <Button
-          onClick={() => {
-            saveFundsDates(startDate, endDate);
-            void load(startDate, endDate);
-          }}
-          sx={orangeBtnSx}
-        >
-          Apply
-        </Button>
-        <Button onClick={() => navigate('/funds/mid-groups')} sx={orangeBtnSx}>
-          MID Groups
-        </Button>
-        {canShowTotal && (
-          <Paper
-            elevation={0}
-            sx={{
-              px: 2,
-              py: 1,
-              bgcolor: 'background.paper',
-              border: '1px solid rgba(255,255,255,0.12)',
+          <TextField
+            fullWidth={false}
+            size="small"
+            type="date"
+            label="From Date"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              saveFundsDates(e.target.value, endDate);
             }}
+            sx={{ width: 160 }}
+          />
+          <TextField
+            fullWidth={false}
+            size="small"
+            type="date"
+            label="To Date"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              saveFundsDates(startDate, e.target.value);
+            }}
+            sx={{ width: 160 }}
+          />
+          <Button
+            onClick={() => {
+              saveFundsDates(startDate, endDate);
+              void load(startDate, endDate);
+            }}
+            sx={orangeBtnSx}
           >
-            <Typography fontWeight={700} whiteSpace="nowrap">
-              Total Deposits: ₹ {roundAmt(totalDeposit)}
-            </Typography>
-          </Paper>
-        )}
+            Apply
+          </Button>
+          <Button onClick={() => navigate('/funds/mid-groups')} sx={orangeBtnSx}>
+            MID Groups
+          </Button>
+          {canShowTotal && (
+            <Paper
+              elevation={0}
+              sx={{
+                px: 2,
+                py: 1,
+                bgcolor: 'background.paper',
+                border: '1px solid rgba(255,255,255,0.12)',
+              }}
+            >
+              <Typography fontWeight={700} whiteSpace="nowrap">
+                Total Deposits: ₹ {roundAmt(totalDeposit)}
+              </Typography>
+            </Paper>
+          )}
         </Stack>
       </CollapsibleFilterPanel>
 

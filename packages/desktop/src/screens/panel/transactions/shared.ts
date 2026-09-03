@@ -133,9 +133,7 @@ export const WITHDRAWAL_STATUSES = [
 
 /** Shared sizes + fund/deposit drill-down extras. */
 export const PAGE_SIZE_OPTIONS = [
-  ...ITEMS_PER_PAGE_OPTIONS.filter((n) =>
-    ['10', '20', '25', '50', '75', '100', '500'].includes(n),
-  ),
+  ...ITEMS_PER_PAGE_OPTIONS.filter((n) => ['10', '20', '25', '50', '75', '100', '500'].includes(n)),
   '300',
   '1000',
   '5000',
@@ -220,6 +218,10 @@ export type FundRequestCoinSummary = {
     totalexchangeCreditCount?: number;
     totalexchangeDebit?: number;
     totalexchangeDebitCount?: number;
+    totalsattaMatkaCredit?: number;
+    totalsattaMatkaCreditCount?: number;
+    totalsattaMatkaDebit?: number;
+    totalsattaMatkaDebitCount?: number;
     totalscannerDepositAmount?: number;
     totalscannerDepositCount?: number;
   };
@@ -265,18 +267,22 @@ export function statLabel(prefix: string, count?: number, amount?: number): stri
   return `${toDisplayText(prefix)} (${count ?? 0}) : ${amount ?? 0}`;
 }
 
-/** Map flat WithdrawalData (+ nested bucket fallback) into FundSummaryBucket. */
+/**
+ * Map flat `WithdrawalData` into a KPI bucket.
+ * Fund Request (admin-panel-domains) uses only WithdrawalData — do not fall back to
+ * Deposit-page nested buckets (totalApprovedWithdrawalData etc.), which differ.
+ */
 export function withdrawalBucket(
   summary: DepositFundSummary,
   flatCountKey: keyof NonNullable<DepositFundSummary['WithdrawalData']>,
   flatAmountKey: keyof NonNullable<DepositFundSummary['WithdrawalData']>,
-  nested?: FundSummaryBucket,
+  _nested?: FundSummaryBucket,
 ): FundSummaryBucket {
   const w = summary.WithdrawalData;
-  const count = Number(w?.[flatCountKey] ?? nested?.count ?? 0);
-  const totalAmount = Number(w?.[flatAmountKey] ?? nested?.totalAmount ?? 0);
+  const count = Number(w?.[flatCountKey] ?? 0);
+  const rawAmount = Number(w?.[flatAmountKey] ?? 0);
   return {
     count: Number.isFinite(count) ? count : 0,
-    totalAmount: Number.isFinite(totalAmount) ? totalAmount : 0,
+    totalAmount: Number.isFinite(rawAmount) ? Math.round(rawAmount) : 0,
   };
 }

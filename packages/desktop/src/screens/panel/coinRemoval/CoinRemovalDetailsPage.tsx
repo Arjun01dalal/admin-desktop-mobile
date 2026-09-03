@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import {
-  Box,
-  CircularProgress,
-  Pagination,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, CircularProgress, Pagination, Stack, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -46,20 +40,19 @@ export function CoinRemovalDetailsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = DEFAULT_ITEMS_PER_PAGE;
 
-  const load = useCallback(async (pageNo = 1) => {
-    if (!user?._id) return;
-    // Prefer nested docs from the list response when present.
-    if (hasSeededDocs) {
-      setRows(seededDocs);
-      setTotalPages(1);
-      return;
-    }
+  const load = useCallback(
+    async (pageNo = 1) => {
+      if (!user?._id) return;
+      // Prefer nested docs from the list response when present.
+      if (hasSeededDocs) {
+        setRows(seededDocs);
+        setTotalPages(1);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const res = await secureApi<CoinRemovalTxnListResponse>(
-        'users.getTransactionHistory',
-        {
+      setLoading(true);
+      try {
+        const res = await secureApi<CoinRemovalTxnListResponse>('users.getTransactionHistory', {
           itemsPerPage,
           pageNo,
           startDate,
@@ -71,30 +64,24 @@ export function CoinRemovalDetailsPage() {
             userId: user._id,
             tag: 'debit',
           },
-        },
-      );
+        });
 
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to load coin removal details');
-        setRows([]);
-        setTotalPages(1);
-        return;
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to load coin removal details');
+          setRows([]);
+          setTotalPages(1);
+          return;
+        }
+
+        const data = res.data || {};
+        setRows(data.items || []);
+        setTotalPages(Math.max(1, data.totalPages ?? 1));
+      } finally {
+        setLoading(false);
       }
-
-      const data = res.data || {};
-      setRows(data.items || []);
-      setTotalPages(Math.max(1, data.totalPages ?? 1));
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    user?._id,
-    startDate,
-    endDate,
-    itemsPerPage,
-    hasSeededDocs,
-    seededDocs,
-  ]);
+    },
+    [user?._id, startDate, endDate, itemsPerPage, hasSeededDocs, seededDocs],
+  );
 
   useEffect(() => {
     if (!user?._id) return;
@@ -117,8 +104,7 @@ export function CoinRemovalDetailsPage() {
       {
         id: 'userId',
         label: 'User Id',
-        render: (row) =>
-          row.userId ? <CopyText value={String(row.userId)} /> : '—',
+        render: (row) => (row.userId ? <CopyText value={String(row.userId)} /> : '—'),
       },
       {
         id: 'balance',
@@ -213,7 +199,6 @@ export function CoinRemovalDetailsPage() {
           maxHeight="100%"
         />
       </TablePanel>
-
     </Box>
   );
 }

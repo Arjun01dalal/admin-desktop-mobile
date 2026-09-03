@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Button,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
@@ -97,7 +91,13 @@ export function ArrayFieldEditor({
 
       const res = await secureApi('depositProviders.updateBonusAndClients', {
         _id: rowId,
-        cityNotAllowed: { cities: trimmed.split(',').map((s) => s.trim()).filter(Boolean), action: 'add' },
+        cityNotAllowed: {
+          cities: trimmed
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+          action: 'add',
+        },
         updatedBy: { userId, userName },
       });
       if (!res.ok) {
@@ -114,7 +114,10 @@ export function ArrayFieldEditor({
 
   return (
     <Stack spacing={0.5} alignItems="stretch" sx={{ minWidth: 150, maxWidth: 200, py: 0.25 }}>
-      <Typography variant="caption" sx={{ fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.2 }}>
+      <Typography
+        variant="caption"
+        sx={{ fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.2 }}
+      >
         {label}
       </Typography>
       {list.length > 0 && selectedKey !== 'city' && (
@@ -171,7 +174,13 @@ export function ArrayFieldEditor({
             '& .MuiInputBase-input': { py: 0.5 },
           }}
         />
-        <Button size="small" variant="contained" disabled={busy} onClick={() => void handleAdd()} sx={orangeBtnSx}>
+        <Button
+          size="small"
+          variant="contained"
+          disabled={busy}
+          onClick={() => void handleAdd()}
+          sx={orangeBtnSx}
+        >
           ADD
         </Button>
       </Stack>

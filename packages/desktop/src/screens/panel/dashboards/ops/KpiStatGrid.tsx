@@ -35,11 +35,7 @@ export function KpiStatGrid({ items }: Props) {
         return (
           <Paper
             key={item.id}
-            onClick={
-              clickable
-                ? () => navigate(item.href!, { state: item.state })
-                : undefined
-            }
+            onClick={clickable ? () => navigate(item.href!, { state: item.state }) : undefined}
             sx={{
               p: 2,
               bgcolor: 'background.paper',
@@ -73,9 +69,7 @@ export function KpiStatGrid({ items }: Props) {
                   sx={{ fontVariantNumeric: 'tabular-nums' }}
                 >
                   {item.prefix}
-                  {typeof item.value === 'number'
-                    ? item.value.toLocaleString('en-IN')
-                    : item.value}
+                  {typeof item.value === 'number' ? item.value.toLocaleString('en-IN') : item.value}
                 </Typography>
               )}
             </Box>

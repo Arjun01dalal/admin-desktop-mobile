@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
@@ -152,13 +144,7 @@ export function BonusWalletFundRequestPage() {
           border: '1px solid rgba(255,255,255,0.08)',
         }}
       >
-        <Stack
-          direction="row"
-          spacing={1.25}
-          alignItems="flex-end"
-          flexWrap="wrap"
-          useFlexGap
-        >
+        <Stack direction="row" spacing={1.25} alignItems="flex-end" flexWrap="wrap" useFlexGap>
           <TextField
             size="small"
             type="date"
@@ -233,12 +219,7 @@ export function BonusWalletFundRequestPage() {
           }}
         >
           {cards.map((card) => (
-            <Paper
-              key={card.id}
-              elevation={0}
-              onClick={() => goToTable(card.type)}
-              sx={kpiCardSx}
-            >
+            <Paper key={card.id} elevation={0} onClick={() => goToTable(card.type)} sx={kpiCardSx}>
               <Typography
                 variant="caption"
                 color="text.secondary"

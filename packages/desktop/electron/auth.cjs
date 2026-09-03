@@ -57,16 +57,7 @@ async function getAddress({ lat, lng, token }) {
 }
 
 async function verifyOtp(payload) {
-  const {
-    mobile,
-    otp,
-    state,
-    city,
-    lat,
-    long,
-    address,
-    token,
-  } = payload;
+  const { mobile, otp, state, city, lat, long, address, token } = payload;
 
   const response = await client().post(
     '/SubAdmin/verify-otp',

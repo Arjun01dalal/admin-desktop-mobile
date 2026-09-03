@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { CallLogRow } from './types';
 
 type CallLogsSelectionValue = {
@@ -53,12 +46,9 @@ export function CallLogsSelectionProvider({
 
   const value = useMemo<CallLogsSelectionValue>(() => {
     const selectable = calls.map((c) => String(c.call_sid || '')).filter(Boolean);
-    const allSelected =
-      selectable.length > 0 && selectedSids.size === selectable.length;
+    const allSelected = selectable.length > 0 && selectedSids.size === selectable.length;
     const indeterminate = selectedSids.size > 0 && !allSelected;
-    const selectedRows = calls.filter((c) =>
-      selectedSids.has(String(c.call_sid || '')),
-    );
+    const selectedRows = calls.filter((c) => selectedSids.has(String(c.call_sid || '')));
     return {
       selectedSids,
       allSelected,
@@ -71,18 +61,14 @@ export function CallLogsSelectionProvider({
   }, [calls, selectedSids, toggleRow, toggleAll, clearSelection]);
 
   return (
-    <CallLogsSelectionContext.Provider value={value}>
-      {children}
-    </CallLogsSelectionContext.Provider>
+    <CallLogsSelectionContext.Provider value={value}>{children}</CallLogsSelectionContext.Provider>
   );
 }
 
 export function useCallLogsSelection() {
   const ctx = useContext(CallLogsSelectionContext);
   if (!ctx) {
-    throw new Error(
-      'useCallLogsSelection must be used inside CallLogsSelectionProvider',
-    );
+    throw new Error('useCallLogsSelection must be used inside CallLogsSelectionProvider');
   }
   return ctx;
 }

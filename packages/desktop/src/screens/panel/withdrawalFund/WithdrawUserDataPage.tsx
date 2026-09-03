@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -17,14 +17,14 @@ import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { hasPermission } from '@/auth/permissions';
-import {
-  formatAmount,
-  formatDisplayDate,
-  formatDisplayTime,
-  getStoredUser,
-} from '@/utils/dates';
+import { formatAmount, formatDisplayDate, formatDisplayTime, getStoredUser } from '@/utils/dates';
 import { display } from '@/screens/panel/shared';
-import { orangeBtnSx, actionBtnSx, chipSx, toolbarBoxSx } from '@/screens/panel/transactions/shared';
+import {
+  orangeBtnSx,
+  actionBtnSx,
+  chipSx,
+  toolbarBoxSx,
+} from '@/screens/panel/transactions/shared';
 import { pickDocList, type WithdrawalDoc } from './types';
 
 type LocationState = {
@@ -70,7 +70,7 @@ function istDateTime(utcDate?: string): string {
 /** Agent / MID withdrawal list (old WithdrawUserData columns). */
 export function WithdrawUserDataPage() {
   const location = useLocation();
-  const state = (location.state || {}) as LocationState;
+  const state = useMemo(() => (location.state || {}) as LocationState, [location.state]);
   const admin = getStoredUser<{ serverId?: string | number }>();
   const canShowMobile = hasPermission('show_mobile');
 
@@ -103,37 +103,39 @@ export function WithdrawUserDataPage() {
     (state.type === 'filterRecord' ? String(state.key || 'Records') : 'Withdrawal User Data');
 
   const totalAmt = state.totalAmount ?? state.totalApprovedAmount ?? 0;
-  const providerLabel =
-    state.mid || state.providerName || state.name || display(state.record?.mid);
+  const providerLabel = state.mid || state.providerName || state.name || display(state.record?.mid);
 
-  const dialerCall = async (item: WithdrawalDoc) => {
-    try {
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId: 'WDL1',
-        listId: '990001',
-        listName: 'Withdrawal Campaign1',
-        serverId: admin?.serverId,
-        leads: [
-          {
-            first_name: item?.name || item?.accountHolderName || item?.userName,
-            phone_number: item?.mobile || item?.userMobile,
-            city: item?.city,
-            state: item?.state,
-            email: item?.clientName,
-            comments: item?.clientName,
-            province: item?._id,
-          },
-        ],
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'API request failed');
-        return;
+  const dialerCall = useCallback(
+    async (item: WithdrawalDoc) => {
+      try {
+        const res = await secureApi('callLogs.externalDialerBatch', {
+          campaignId: 'WDL1',
+          listId: '990001',
+          listName: 'Withdrawal Campaign1',
+          serverId: admin?.serverId,
+          leads: [
+            {
+              first_name: item?.name || item?.accountHolderName || item?.userName,
+              phone_number: item?.mobile || item?.userMobile,
+              city: item?.city,
+              state: item?.state,
+              email: item?.clientName,
+              comments: item?.clientName,
+              province: item?._id,
+            },
+          ],
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'API request failed');
+          return;
+        }
+        toast.success(res.message || 'Data sent successfully');
+      } catch {
+        toast.error('API request failed');
       }
-      toast.success(res.message || 'Data sent successfully');
-    } catch {
-      toast.error('API request failed');
-    }
-  };
+    },
+    [admin?.serverId],
+  );
 
   const columns = useMemo<CommonTableColumn<WithdrawalDoc>[]>(
     () => [
@@ -297,7 +299,7 @@ export function WithdrawUserDataPage() {
         },
       },
     ],
-    [canShowMobile, admin?.serverId],
+    [canShowMobile, dialerCall],
   );
 
   return (

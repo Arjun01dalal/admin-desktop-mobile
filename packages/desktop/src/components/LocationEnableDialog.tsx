@@ -19,13 +19,7 @@ type Props = {
   onOpenSettings: () => void;
 };
 
-export function LocationEnableDialog({
-  open,
-  loading,
-  error,
-  onEnable,
-  onOpenSettings,
-}: Props) {
+export function LocationEnableDialog({ open, loading, error, onEnable, onOpenSettings }: Props) {
   return (
     <Dialog
       open={open}
@@ -69,9 +63,9 @@ export function LocationEnableDialog({
 
       <DialogContent>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)', mb: 1.5 }}>
-          We could not determine your location (GPS and network both failed).
-          Turn on Location Services and check your internet — this alert will close
-          automatically once location is available.
+          We could not determine your location (GPS and network both failed). Turn on Location
+          Services and check your internet — this alert will close automatically once location is
+          available.
         </Typography>
         {error && (
           <Typography variant="caption" color="error" display="block">

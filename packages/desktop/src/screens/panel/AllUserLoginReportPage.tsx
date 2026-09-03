@@ -20,10 +20,7 @@ import {
   useAllUserLoginQuery,
   type AllUserLoginFilters,
 } from './allUserLoginReport/useAllUserLoginQuery';
-import {
-  getActionStats,
-  type AllUserLoginRow,
-} from './allUserLoginReport/types';
+import { getActionStats, type AllUserLoginRow } from './allUserLoginReport/types';
 
 const EMPTY_FILTERS: AllUserLoginFilters = {
   name: '',
@@ -37,10 +34,8 @@ export function AllUserLoginReportPage() {
   const [endDate, setEndDate] = useState(todayIST);
   const [page, setPage] = useState(1);
   const itemsPerPage = 25;
-  const [draftFilters, setDraftFilters] =
-    useState<AllUserLoginFilters>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] =
-    useState<AllUserLoginFilters>(EMPTY_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<AllUserLoginFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<AllUserLoginFilters>(EMPTY_FILTERS);
 
   const { rows, total, loading, load } = useAllUserLoginQuery(
     page,
@@ -59,9 +54,10 @@ export function AllUserLoginReportPage() {
   }, [draftFilters, load]);
 
   const applyDates = useCallback(() => {
+    setAppliedFilters(draftFilters);
     setPage(1);
-    void load(1, appliedFilters);
-  }, [load, appliedFilters]);
+    void load(1, draftFilters);
+  }, [draftFilters, load]);
 
   const columns = useMemo<CommonTableColumn<AllUserLoginRow>[]>(
     () => [
@@ -76,9 +72,7 @@ export function AllUserLoginReportPage() {
         filter: (
           <TableSearchBar
             value={draftFilters.name}
-            onChange={(e) =>
-              setDraftFilters((prev) => ({ ...prev, name: e.target.value }))
-            }
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, name: e.target.value }))}
             onSearch={search}
             placeholder="Search name"
           />
@@ -91,9 +85,7 @@ export function AllUserLoginReportPage() {
         filter: (
           <TableSearchBar
             value={draftFilters.realName}
-            onChange={(e) =>
-              setDraftFilters((prev) => ({ ...prev, realName: e.target.value }))
-            }
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, realName: e.target.value }))}
             onSearch={search}
             placeholder="Search real name"
           />
@@ -124,15 +116,12 @@ export function AllUserLoginReportPage() {
         filter: (
           <TableSearchBar
             value={draftFilters.mobile}
-            onChange={(e) =>
-              setDraftFilters((prev) => ({ ...prev, mobile: e.target.value }))
-            }
+            onChange={(e) => setDraftFilters((prev) => ({ ...prev, mobile: e.target.value }))}
             onSearch={search}
             placeholder="Search mobile"
           />
         ),
-        render: (row) =>
-          canShowMobile ? row.mobile || '—' : '*********',
+        render: (row) => (canShowMobile ? row.mobile || '—' : '*********'),
       },
       {
         id: 'logoutCount',
@@ -148,8 +137,7 @@ export function AllUserLoginReportPage() {
         id: 'lastLogin',
         label: 'Last Login Time',
         render: (row) => {
-          const ts = getActionStats(row.actionHistory, 'login').lastItem
-            ?.timestamp;
+          const ts = getActionStats(row.actionHistory, 'login').lastItem?.timestamp;
           if (!ts) return '—';
           return `${formatDisplayDate(ts)}-${formatDisplayTime(ts)}`;
         },
@@ -158,8 +146,7 @@ export function AllUserLoginReportPage() {
         id: 'lastLogout',
         label: 'Last Logout Time',
         render: (row) => {
-          const ts = getActionStats(row.actionHistory, 'logout').lastItem
-            ?.timestamp;
+          const ts = getActionStats(row.actionHistory, 'logout').lastItem?.timestamp;
           if (!ts) return '—';
           return `${formatDisplayDate(ts)}-${formatDisplayTime(ts)}`;
         },
@@ -208,9 +195,7 @@ export function AllUserLoginReportPage() {
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load(page, appliedFilters)}
             disabled={loading}
             sx={{ fontWeight: 700 }}

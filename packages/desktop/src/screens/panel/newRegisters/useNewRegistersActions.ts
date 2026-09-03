@@ -114,16 +114,7 @@ export function useNewRegistersActions(
     } finally {
       setActionBusyId('');
     }
-  }, [
-    admin?.mobile,
-    blockNextStatus,
-    blockTarget,
-    closeBlockDialog,
-    load,
-    otp,
-    page,
-    remark,
-  ]);
+  }, [admin?.mobile, blockNextStatus, blockTarget, closeBlockDialog, load, otp, page, remark]);
 
   const addComment = useCallback(
     async (userId: string, comment: string) => {
@@ -163,9 +154,7 @@ export function useNewRegistersActions(
       }
 
       const campaign = CAMPAIGN_LIST.find(
-        (c) =>
-          c.id.trim() === selectedCampaignId ||
-          c.name.trim() === selectedCampaignId,
+        (c) => c.id.trim() === selectedCampaignId || c.name.trim() === selectedCampaignId,
       ) ?? {
         id: selectedCampaignId,
         name: selectedCampaignId,
@@ -198,15 +187,11 @@ export function useNewRegistersActions(
         }
 
         const listId =
-          res.data &&
-          typeof res.data === 'object' &&
-          'list_id' in res.data
+          res.data && typeof res.data === 'object' && 'list_id' in res.data
             ? String((res.data as { list_id?: string | number }).list_id ?? '')
             : '';
         const inserted =
-          res.data &&
-          typeof res.data === 'object' &&
-          'inserted' in res.data
+          res.data && typeof res.data === 'object' && 'inserted' in res.data
             ? Number((res.data as { inserted?: number }).inserted)
             : leads.length;
 

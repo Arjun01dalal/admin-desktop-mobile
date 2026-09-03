@@ -146,78 +146,77 @@ export function CasinoSwitchPage() {
     }
   };
 
-  const columns = useMemo<CommonTableColumn<CasinoSwitchRow>[]>(
-    () => {
-      const cols: CommonTableColumn<CasinoSwitchRow>[] = [
-        {
-          id: 'index',
-          label: '#',
-          width: 64,
-          render: (_row, index) => index + 1,
-        },
-        {
-          id: 'provider',
-          label: 'Casino Provider',
-          render: (row) => display(row.casinoActiveProvider),
-        },
-        {
-          id: 'startAmount',
-          label: 'Start Amount',
-          render: (row) => (row.startAmount !== undefined ? row.startAmount : '—'),
-        },
-        {
-          id: 'endAmount',
-          label: 'End Amount',
-          render: (row) => (row.endAmount !== undefined ? row.endAmount : '—'),
-        },
-        {
-          id: 'percent',
-          label: 'Percent',
-          render: (row) => (row.percent !== undefined ? row.percent : '—'),
-        },
-        {
-          id: 'status',
-          label: 'Status',
-          render: (row) => (
-            <Switch
-              size="small"
-              checked={Boolean(row.status)}
-              disabled={togglingId === row._id}
-              onChange={(_e, checked) => void handleToggleStatus(row, checked)}
-              color="warning"
-            />
-          ),
-        },
-      ];
-      if (canDelete) {
-        cols.push({
-          id: 'action',
-          label: 'Action',
-          width: 80,
-          render: (row) => (
-            <IconButton
-              size="small"
-              aria-label="Delete"
-              onClick={() => {
-                setDeleteId(row._id);
-                setDeleteOpen(true);
-              }}
-              sx={{ color: '#ef5350' }}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          ),
-        });
-      }
-      return cols;
-    },
-    [canDelete, togglingId, handleToggleStatus],
-  );
+  const columns = useMemo<CommonTableColumn<CasinoSwitchRow>[]>(() => {
+    const cols: CommonTableColumn<CasinoSwitchRow>[] = [
+      {
+        id: 'index',
+        label: '#',
+        width: 64,
+        render: (_row, index) => index + 1,
+      },
+      {
+        id: 'provider',
+        label: 'Casino Provider',
+        render: (row) => display(row.casinoActiveProvider),
+      },
+      {
+        id: 'startAmount',
+        label: 'Start Amount',
+        render: (row) => (row.startAmount !== undefined ? row.startAmount : '—'),
+      },
+      {
+        id: 'endAmount',
+        label: 'End Amount',
+        render: (row) => (row.endAmount !== undefined ? row.endAmount : '—'),
+      },
+      {
+        id: 'percent',
+        label: 'Percent',
+        render: (row) => (row.percent !== undefined ? row.percent : '—'),
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        render: (row) => (
+          <Switch
+            size="small"
+            checked={Boolean(row.status)}
+            disabled={togglingId === row._id}
+            onChange={(_e, checked) => void handleToggleStatus(row, checked)}
+            color="warning"
+          />
+        ),
+      },
+    ];
+    if (canDelete) {
+      cols.push({
+        id: 'action',
+        label: 'Action',
+        width: 80,
+        render: (row) => (
+          <IconButton
+            size="small"
+            aria-label="Delete"
+            onClick={() => {
+              setDeleteId(row._id);
+              setDeleteOpen(true);
+            }}
+            sx={{ color: '#ef5350' }}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        ),
+      });
+    }
+    return cols;
+  }, [canDelete, togglingId, handleToggleStatus]);
 
   if (!canUse) {
     return (
       <Box sx={{ px: 1.5, py: 2 }}>
-        <Typography color="text.secondary">You do not have permission to view this page.</Typography>
+        <Typography color="text.secondary">
+          You do not have permission to view this page.
+        </Typography>
       </Box>
     );
   }
@@ -249,9 +248,7 @@ export function CasinoSwitchPage() {
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{
@@ -284,7 +281,12 @@ export function CasinoSwitchPage() {
         />
       </TablePanel>
 
-      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={addOpen}
+        onClose={() => !submitting && setAddOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <Box component="form" onSubmit={(e) => void handleCreate(e)}>
           <DialogTitle>{toDisplayText('Add Casino Provider')}</DialogTitle>
           <DialogContent>
@@ -311,7 +313,12 @@ export function CasinoSwitchPage() {
         </Box>
       </Dialog>
 
-      <Dialog open={deleteOpen} onClose={() => !submitting && setDeleteOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={deleteOpen}
+        onClose={() => !submitting && setDeleteOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <DialogTitle>Are You Sure?</DialogTitle>
         <DialogContent>
           Do you want to delete this {toDisplayText('casino')} provider?

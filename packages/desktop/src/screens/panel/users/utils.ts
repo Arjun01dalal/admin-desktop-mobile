@@ -104,10 +104,7 @@ export function isDefaultEmpCode(code: unknown): boolean {
 }
 
 /** Default list: only login empCode (laxminarayan filterListByLoginEmpCode). */
-export function filterListByLoginEmpCode(
-  rows: UserRow[],
-  loginEmpCode?: string,
-): UserRow[] {
+export function filterListByLoginEmpCode(rows: UserRow[], loginEmpCode?: string): UserRow[] {
   const mine = trimCode(loginEmpCode);
   if (!mine) return rows;
   return rows.filter((row) => {
@@ -170,9 +167,7 @@ export function filterSearchByEmpCode(
 ): UserRow[] {
   const mine = trimCode(loginEmpCode);
   if (resolved.allowOwnAndDefault && mine) {
-    return rows.filter(
-      (row) => empCodesExact(row.empCode, mine) || isDefaultEmpCode(row.empCode),
-    );
+    return rows.filter((row) => empCodesExact(row.empCode, mine) || isDefaultEmpCode(row.empCode));
   }
   if (resolved.matchDefault) {
     return rows.filter((row) => isDefaultEmpCode(row.empCode));
@@ -190,18 +185,18 @@ export function hasOtherUserSearch(
 ): boolean {
   return Boolean(
     filters.name.trim() ||
-      filters.dpId.trim() ||
-      filters.mobile.trim() ||
-      filters.accountNumber.trim() ||
-      filters.aadhaarNumber.trim() ||
-      filters.email.trim() ||
-      filters.city.trim() ||
-      filters.state.trim() ||
-      filters.states.length > 0 ||
-      filters.deviceType.trim() ||
-      filters.blockStatus ||
-      clientName ||
-      playedIn,
+    filters.dpId.trim() ||
+    filters.mobile.trim() ||
+    filters.accountNumber.trim() ||
+    filters.aadhaarNumber.trim() ||
+    filters.email.trim() ||
+    filters.city.trim() ||
+    filters.state.trim() ||
+    filters.states.length > 0 ||
+    filters.deviceType.trim() ||
+    filters.blockStatus ||
+    clientName ||
+    playedIn,
   );
 }
 
@@ -272,14 +267,39 @@ export function buildUserFilter(
     return filter;
   }
 
-  // Active_User / Todays_Active: limited filter keys (laxminarayan getActiveUser)
-  if (type === 'Active_User' || type === 'Todays_Active') {
-    const filter: Record<string, unknown> = { uniqueUser };
+  // Active_User: no uniqueUser key (admin-panel-domains getActiveUser leaves it unset)
+  if (type === 'Active_User') {
+    const filter: Record<string, unknown> = {};
     if (filters.name.trim()) filter.name = filters.name.trim();
+    if (filters.dpId.trim()) filter._id = filters.dpId.trim();
     if (filters.mobile.trim()) filter.mobile = filters.mobile.trim();
+    if (filters.accountNumber.trim()) filter.accountNumber = filters.accountNumber.trim();
+    if (filters.aadhaarNumber.trim()) filter.aadhaarNumber = filters.aadhaarNumber.trim();
+    if (filters.email.trim()) filter.email = filters.email.trim();
     if (filters.city.trim()) filter.city = filters.city.trim();
     if (filters.states.length > 0) filter.state = filters.states;
     else if (filters.state.trim()) filter.state = filters.state.trim();
+    if (filters.deviceType.trim()) filter.deviceType = filters.deviceType.trim();
+    if (filters.empCode.trim()) filter.empCode = filters.empCode.trim();
+    if (clientName) filter.clientName = clientName;
+    if (playedIn) filter.played = playedIn;
+    return filter;
+  }
+
+  // Todays_Active: laxminarayan onSearchNewActiveUsers / get-active-customers
+  if (type === 'Todays_Active') {
+    const filter: Record<string, unknown> = { uniqueUser };
+    if (filters.name.trim()) filter.name = filters.name.trim();
+    if (filters.dpId.trim()) filter._id = filters.dpId.trim();
+    if (filters.mobile.trim()) filter.mobile = filters.mobile.trim();
+    if (filters.accountNumber.trim()) filter.accountNumber = filters.accountNumber.trim();
+    if (filters.aadhaarNumber.trim()) filter.aadhaarNumber = filters.aadhaarNumber.trim();
+    if (filters.email.trim()) filter.email = filters.email.trim();
+    if (filters.city.trim()) filter.city = filters.city.trim();
+    if (filters.states.length > 0) filter.state = filters.states;
+    else if (filters.state.trim()) filter.state = filters.state.trim();
+    if (filters.deviceType.trim()) filter.deviceType = filters.deviceType.trim();
+    if (filters.empCode.trim()) filter.empCode = filters.empCode.trim();
     if (clientName) filter.clientName = clientName;
     if (playedIn) filter.played = playedIn;
     return filter;
@@ -372,7 +392,7 @@ export function buildPayloadForType(
   const app = allottedApps ? { app: allottedApps } : {};
 
   // Match Users.tsx: build appWithState from login user, optionally scoped to selected app.
-  let stateWiseFilter: Record<string, string[]> = {};
+  const stateWiseFilter: Record<string, string[]> = {};
   if (appWithState && typeof appWithState === 'object') {
     if (selectedClientName && Array.isArray(appWithState[selectedClientName])) {
       stateWiseFilter[selectedClientName] = [...appWithState[selectedClientName]];
@@ -383,9 +403,7 @@ export function buildPayloadForType(
     }
   }
   const withAppState =
-    Object.keys(stateWiseFilter).length > 0
-      ? { appWithState: stateWiseFilter }
-      : {};
+    Object.keys(stateWiseFilter).length > 0 ? { appWithState: stateWiseFilter } : {};
 
   switch (type) {
     case 'Sub_Admin': {
@@ -486,13 +504,8 @@ export function unpackUsers(data: unknown) {
   else if (Array.isArray(obj.users)) rows = obj.users as UserRow[];
   else rows = asList<UserRow>(nested);
 
-  const total = Number(
-    nested.total ?? nested.count ?? obj.total ?? obj.count ?? rows.length,
-  );
-  const totalPages = Math.max(
-    1,
-    Number(nested.totalPages ?? obj.totalPages ?? 1) || 1,
-  );
+  const total = Number(nested.total ?? nested.count ?? obj.total ?? obj.count ?? rows.length);
+  const totalPages = Math.max(1, Number(nested.totalPages ?? obj.totalPages ?? 1) || 1);
 
   return {
     rows,
@@ -614,8 +627,7 @@ export function pickUserBankName(row: UserRow): string {
     row.user_bank_name,
     row.accountHolderName,
     row.bankHolderName,
-    (row.bankDetails as { bankName?: unknown; name?: unknown } | undefined)
-      ?.bankName,
+    (row.bankDetails as { bankName?: unknown; name?: unknown } | undefined)?.bankName,
     (row.bankDetails as { name?: unknown } | undefined)?.name,
   );
   const text = raw == null ? '' : String(raw).trim();
@@ -623,13 +635,7 @@ export function pickUserBankName(row: UserRow): string {
 }
 
 export function pickPlayIn(row: UserRow): string {
-  const raw = firstDefined(
-    row.played,
-    row.playIn,
-    row.play_in,
-    row.PlayIn,
-    row.playedGames,
-  );
+  const raw = firstDefined(row.played, row.playIn, row.play_in, row.PlayIn, row.playedGames);
   return playInLabel(raw);
 }
 
@@ -646,12 +652,7 @@ export function pickAccountNumber(row: UserRow): string {
 }
 
 export function pickAadharNumber(row: UserRow): string {
-  const raw = firstDefined(
-    row.aadhaarNumber,
-    row.aadharNumber,
-    row.aadhar,
-    row.aadhaar,
-  );
+  const raw = firstDefined(row.aadhaarNumber, row.aadharNumber, row.aadhar, row.aadhaar);
   const text = raw == null ? '' : String(raw).trim();
   return text || '-';
 }

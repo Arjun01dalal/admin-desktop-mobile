@@ -2,6 +2,25 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const ACTION_RE = /^[a-zA-Z][a-zA-Z0-9._-]{1,80}$/;
 
+function isTrustedPanelOrigin(rawUrl) {
+  try {
+    const url = new URL(String(rawUrl || ''));
+    const hasNoCredentials = !url.username && !url.password;
+    if (url.protocol === 'app:' && url.hostname === 'localhost' && !url.port && hasNoCredentials) {
+      return true;
+    }
+    return (
+      process.env.ELECTRON_DEV === '1' &&
+      url.protocol === 'http:' &&
+      url.hostname === '127.0.0.1' &&
+      url.port === '5173' &&
+      hasNoCredentials
+    );
+  } catch {
+    return false;
+  }
+}
+
 function safeInvoke(channel, payload) {
   return ipcRenderer.invoke(channel, payload);
 }
@@ -14,7 +33,7 @@ function readPackageVersion() {
   }
 }
 
-contextBridge.exposeInMainWorld('gcalc', {
+const panelBridge = {
   version: readPackageVersion(),
   getAppVersion: () => safeInvoke('app:get-version'),
 
@@ -196,4 +215,10 @@ contextBridge.exposeInMainWorld('gcalc', {
       ipcRenderer.removeListener('secure:dev-http-log', handler);
     };
   },
-});
+};
+
+// A preload can run before navigation policy callbacks complete. Do not
+// expose privileged capabilities unless this document is the panel origin.
+if (isTrustedPanelOrigin(window.location.href)) {
+  contextBridge.exposeInMainWorld('gcalc', panelBridge);
+}

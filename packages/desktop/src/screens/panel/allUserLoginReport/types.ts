@@ -18,10 +18,7 @@ export type AllUserLoginResponse = {
   total?: number;
 };
 
-export function getActionStats(
-  actionHistory: ActionHistoryItem[] = [],
-  actionType: string,
-) {
+export function getActionStats(actionHistory: ActionHistoryItem[] = [], actionType: string) {
   const filtered = actionHistory.filter((item) => item?.action === actionType);
   return {
     count: filtered.length,

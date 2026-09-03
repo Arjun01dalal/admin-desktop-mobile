@@ -158,10 +158,7 @@ const CasinoSwitchPage = lazyNamed(
   () => import('@/screens/panel/CasinoSwitchPage'),
   'CasinoSwitchPage',
 );
-const TopGamesPage = lazyNamed(
-  () => import('@/screens/panel/TopGamesPage'),
-  'TopGamesPage',
-);
+const TopGamesPage = lazyNamed(() => import('@/screens/panel/TopGamesPage'), 'TopGamesPage');
 const DepositListPage = lazyNamed(
   () => import('@/screens/panel/DepositListPage'),
   'DepositListPage',
@@ -170,30 +167,12 @@ const DepositListUserWisePage = lazyNamed(
   () => import('@/screens/panel/DepositListUserWisePage'),
   'DepositListUserWisePage',
 );
-const FundsPage = lazyNamed(
-  () => import('@/screens/panel/FundsPage'),
-  'FundsPage',
-);
-const FundsMidPage = lazyNamed(
-  () => import('@/screens/panel/FundsMidPage'),
-  'FundsMidPage',
-);
-const MidGroupsPage = lazyNamed(
-  () => import('@/screens/panel/MidGroupsPage'),
-  'MidGroupsPage',
-);
-const MidLimitsPage = lazyNamed(
-  () => import('@/screens/panel/MidLimitsPage'),
-  'MidLimitsPage',
-);
-const FundsPayinPage = lazyNamed(
-  () => import('@/screens/panel/FundsPayinPage'),
-  'FundsPayinPage',
-);
-const WhatsappPage = lazyNamed(
-  () => import('@/screens/panel/WhatsappPage'),
-  'WhatsappPage',
-);
+const FundsPage = lazyNamed(() => import('@/screens/panel/FundsPage'), 'FundsPage');
+const FundsMidPage = lazyNamed(() => import('@/screens/panel/FundsMidPage'), 'FundsMidPage');
+const MidGroupsPage = lazyNamed(() => import('@/screens/panel/MidGroupsPage'), 'MidGroupsPage');
+const MidLimitsPage = lazyNamed(() => import('@/screens/panel/MidLimitsPage'), 'MidLimitsPage');
+const FundsPayinPage = lazyNamed(() => import('@/screens/panel/FundsPayinPage'), 'FundsPayinPage');
+const WhatsappPage = lazyNamed(() => import('@/screens/panel/WhatsappPage'), 'WhatsappPage');
 const CasinoTopupBalancePage = lazyNamed(
   () => import('@/screens/panel/CasinoTopupBalancePage'),
   'CasinoTopupBalancePage',
@@ -218,18 +197,12 @@ const UniqueDepositPendingPage = lazyNamed(
   () => import('@/screens/panel/UniqueDepositPendingPage'),
   'UniqueDepositPendingPage',
 );
-const DepositPage = lazyNamed(
-  () => import('@/screens/panel/DepositPage'),
-  'DepositPage',
-);
+const DepositPage = lazyNamed(() => import('@/screens/panel/DepositPage'), 'DepositPage');
 const StateWiseDepositPage = lazyNamed(
   () => import('@/screens/panel/StateWiseDepositPage'),
   'StateWiseDepositPage',
 );
-const WithdrawalPage = lazyNamed(
-  () => import('@/screens/panel/WithdrawalPage'),
-  'WithdrawalPage',
-);
+const WithdrawalPage = lazyNamed(() => import('@/screens/panel/WithdrawalPage'), 'WithdrawalPage');
 const WithdrawalFundPage = lazyNamed(
   () => import('@/screens/panel/withdrawalFund'),
   'WithdrawalFundPage',
@@ -242,10 +215,11 @@ const FundRequestPage = lazyNamed(
   () => import('@/screens/panel/FundRequestPage'),
   'FundRequestPage',
 );
-const PercentagePage = lazyNamed(
-  () => import('@/screens/panel/PercentagePage'),
-  'PercentagePage',
+const FundRequestCoinTablePage = lazyNamed(
+  () => import('@/screens/panel/FundRequestCoinTablePage'),
+  'FundRequestCoinTablePage',
 );
+const PercentagePage = lazyNamed(() => import('@/screens/panel/PercentagePage'), 'PercentagePage');
 const FeedbackPage = lazyNamed(() => import('@/screens/panel/FeedbackPage'), 'FeedbackPage');
 const BannersPage = lazyNamed(() => import('@/screens/panel/BannersPage'), 'BannersPage');
 const DumpUsersPage = lazyNamed(() => import('@/screens/panel/DumpUsersPage'), 'DumpUsersPage');
@@ -299,10 +273,7 @@ const UsersKycPage = lazyNamed(() => import('@/screens/panel/UsersKycPage'), 'Us
 const KycListPage = lazyNamed(() => import('@/screens/panel/KycListPage'), 'KycListPage');
 const MobileAppPage = lazyNamed(() => import('@/screens/panel/MobileAppPage'), 'MobileAppPage');
 
-const DashboardPage = lazyNamed(
-  () => import('@/screens/panel/dashboards/pages'),
-  'DashboardPage',
-);
+const DashboardPage = lazyNamed(() => import('@/screens/panel/dashboards/pages'), 'DashboardPage');
 const VipDashboardPage = lazyNamed(
   () => import('@/screens/panel/dashboards/pages'),
   'VipDashboardPage',
@@ -315,10 +286,7 @@ const RiskDashboardPage = lazyNamed(
   () => import('@/screens/panel/dashboards/pages'),
   'RiskDashboardPage',
 );
-const AnalyticsPage = lazyNamed(
-  () => import('@/screens/panel/dashboards/pages'),
-  'AnalyticsPage',
-);
+const AnalyticsPage = lazyNamed(() => import('@/screens/panel/dashboards/pages'), 'AnalyticsPage');
 const MasterFlowPage = lazyNamed(
   () => import('@/screens/panel/dashboards/pages'),
   'MasterFlowPage',
@@ -375,7 +343,6 @@ const RegisteredUsersAppPage = lazyNamed(
   () => import('@/screens/panel/dashboards/DashboardUsersListPage'),
   'RegisteredUsersAppPage',
 );
-
 
 export {
   WelcomePage,
@@ -443,6 +410,7 @@ export {
   WithdrawalFundPage,
   WithdrawUserDataPage,
   FundRequestPage,
+  FundRequestCoinTablePage,
   PercentagePage,
   FeedbackPage,
   BannersPage,

@@ -335,11 +335,7 @@ export function useCallLogsColumns({
           filter: null,
           cellSx: { maxWidth: 120 },
           render: (row) =>
-            String(
-              row.commented_by ||
-                (row as { commentedBy?: unknown }).commentedBy ||
-                '-',
-            ),
+            String(row.commented_by || (row as { commentedBy?: unknown }).commentedBy || '-'),
         },
         {
           id: 'deletedBy',
@@ -348,24 +344,15 @@ export function useCallLogsColumns({
           filter: null,
           cellSx: { whiteSpace: 'normal', maxWidth: 130 },
           render: (row) => {
-            const by = String(
-              row.deleted_by ||
-                (row as { deletedBy?: unknown }).deletedBy ||
-                '-',
-            );
-            const at =
-              row.deleted_at || (row as { deletedAt?: unknown }).deletedAt;
+            const by = String(row.deleted_by || (row as { deletedBy?: unknown }).deletedBy || '-');
+            const at = row.deleted_at || (row as { deletedAt?: unknown }).deletedAt;
             return (
               <Box>
                 <Typography variant="body2" component="span">
                   {by}
                 </Typography>
                 {at ? (
-                  <Typography
-                    variant="caption"
-                    display="block"
-                    color="text.secondary"
-                  >
+                  <Typography variant="caption" display="block" color="text.secondary">
                     {new Date(String(at)).toLocaleString()}
                   </Typography>
                 ) : null}

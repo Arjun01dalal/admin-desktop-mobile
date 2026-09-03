@@ -68,15 +68,7 @@ const emptyProviders = (): Record<ProviderKey, ProviderState> => ({
   betconstruct: { records: [], balance: null, currency: 'USD', loading: false },
 });
 
-function MetricCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: string;
-}) {
+function MetricCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <Paper
       elevation={0}
@@ -91,11 +83,7 @@ function MetricCard({
       <Typography color="text.secondary" fontSize={12}>
         {label}
       </Typography>
-      <Typography
-        fontWeight={700}
-        fontSize={20}
-        sx={{ mt: 0.5, color: accent || 'text.primary' }}
-      >
+      <Typography fontWeight={700} fontSize={20} sx={{ mt: 0.5, color: accent || 'text.primary' }}>
         {value}
       </Typography>
     </Paper>
@@ -108,12 +96,10 @@ export function CasinoTopupBalancePage() {
     id: 'casinoTopup',
     permission: Permissions.view_casino_balance,
   });
-  const [providers, setProviders] =
-    useState<Record<ProviderKey, ProviderState>>(emptyProviders);
+  const [providers, setProviders] = useState<Record<ProviderKey, ProviderState>>(emptyProviders);
   const [pageLoading, setPageLoading] = useState(false);
-  const [qtechRemaining, setQtechRemaining] = useState<QtechRemainingSummary>(
-    emptyRemainingSummary(),
-  );
+  const [qtechRemaining, setQtechRemaining] =
+    useState<QtechRemainingSummary>(emptyRemainingSummary());
   const [qtechRemainingLoading, setQtechRemainingLoading] = useState(false);
   const [remainingTab, setRemainingTab] = useState<'provider' | 'game'>('provider');
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -125,9 +111,7 @@ export function CasinoTopupBalancePage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [remainingModalOpen, setRemainingModalOpen] = useState(false);
-  const [remainingForm, setRemainingForm] = useState<RemainingFormState>(
-    emptyRemainingForm,
-  );
+  const [remainingForm, setRemainingForm] = useState<RemainingFormState>(emptyRemainingForm);
   const [remainingFormErrors, setRemainingFormErrors] =
     useState<RemainingFormErrors>(emptyRemainingFormErrors);
   const [remainingSubmitting, setRemainingSubmitting] = useState(false);
@@ -154,11 +138,7 @@ export function CasinoTopupBalancePage() {
         betconstruct: { ...parsed.betconstruct, loading: false },
       });
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : 'Failed to load casino top-up balance',
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to load casino top-up balance');
       setProviders((prev) => ({
         qtech: { ...prev.qtech, loading: false },
         betconstruct: { ...prev.betconstruct, loading: false },
@@ -179,11 +159,7 @@ export function CasinoTopupBalancePage() {
       }
       setQtechRemaining(parseQtechRemaining(res.data));
     } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : 'Failed to load Qtech remaining balance',
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to load Qtech remaining balance');
       setQtechRemaining(emptyRemainingSummary());
     } finally {
       setQtechRemainingLoading(false);
@@ -293,8 +269,7 @@ export function CasinoTopupBalancePage() {
       {
         id: 'amount',
         label: 'Amount',
-        render: (row) =>
-          row.amount != null ? Number(row.amount).toLocaleString() : '—',
+        render: (row) => (row.amount != null ? Number(row.amount).toLocaleString() : '—'),
       },
       {
         id: 'currency',
@@ -423,9 +398,7 @@ export function CasinoTopupBalancePage() {
             </Typography>
             <Typography color="text.secondary" fontSize={13}>
               From /Qtech/topup-balance-remaining
-              {qtechRemaining.toppedUpAtIst
-                ? ` • Topped up: ${qtechRemaining.toppedUpAtIst}`
-                : ''}
+              {qtechRemaining.toppedUpAtIst ? ` • Topped up: ${qtechRemaining.toppedUpAtIst}` : ''}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -461,11 +434,7 @@ export function CasinoTopupBalancePage() {
             >
               Remaining Balance
             </Button>
-            <Button
-              startIcon={<AddIcon />}
-              onClick={() => openAddPopup()}
-              sx={orangeBtnSx}
-            >
+            <Button startIcon={<AddIcon />} onClick={() => openAddPopup()} sx={orangeBtnSx}>
               Add
             </Button>
           </Stack>
@@ -505,10 +474,7 @@ export function CasinoTopupBalancePage() {
                 accent="#fbbf24"
               />
               <MetricCard label="Currency" value={qtechRemaining.currency || 'USD'} />
-              <MetricCard
-                label="USD → INR"
-                value={formatMoney(qtechRemaining.usdToInr, 2)}
-              />
+              <MetricCard label="USD → INR" value={formatMoney(qtechRemaining.usdToInr, 2)} />
               <MetricCard label="Fee (INR)" value={formatMoney(qtechRemaining.feeInr)} />
               <MetricCard label="GGR (USD)" value={formatMoney(qtechRemaining.ggrUsd)} />
               <MetricCard label="GGR (INR)" value={formatMoney(qtechRemaining.ggrInr)} />
@@ -529,9 +495,7 @@ export function CasinoTopupBalancePage() {
                   ? new Date(qtechRemaining.rangeStart).toLocaleString()
                   : '—'}{' '}
                 →{' '}
-                {qtechRemaining.rangeEnd
-                  ? new Date(qtechRemaining.rangeEnd).toLocaleString()
-                  : '—'}
+                {qtechRemaining.rangeEnd ? new Date(qtechRemaining.rangeEnd).toLocaleString() : '—'}
               </Typography>
             )}
 
@@ -566,9 +530,7 @@ export function CasinoTopupBalancePage() {
               <CommonTable
                 columns={remainingColumns}
                 rows={remainingRows}
-                getRowKey={(row, i) =>
-                  String(row._id || row.id || row.gameId || row.provider || i)
-                }
+                getRowKey={(row, i) => String(row._id || row.id || row.gameId || row.provider || i)}
                 loading={qtechRemainingLoading && remainingRows.length === 0}
                 emptyMessage="No data found"
                 stickyHeader
@@ -604,9 +566,7 @@ export function CasinoTopupBalancePage() {
       </Dialog>
 
       <Dialog open={addOpen} onClose={closeAddPopup} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Add {toDisplayText(PROVIDER_CONFIG.qtech.title)} Top-up
-        </DialogTitle>
+        <DialogTitle>Add {toDisplayText(PROVIDER_CONFIG.qtech.title)} Top-up</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <TextField
@@ -629,9 +589,7 @@ export function CasinoTopupBalancePage() {
               size="small"
               label="Currency *"
               value={form.currency}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, currency: e.target.value }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
               sx={{ width: '100%' }}
             >
               {CURRENCY_OPTIONS.map((c) => (
@@ -673,9 +631,7 @@ export function CasinoTopupBalancePage() {
               label="Note"
               placeholder="Optional note"
               value={form.note}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, note: e.target.value }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, note: e.target.value }))}
             />
           </Stack>
         </DialogContent>
@@ -683,22 +639,13 @@ export function CasinoTopupBalancePage() {
           <Button onClick={closeAddPopup} disabled={submitting}>
             Cancel
           </Button>
-          <Button
-            onClick={() => void handleAdd()}
-            disabled={submitting}
-            sx={orangeBtnSx}
-          >
+          <Button onClick={() => void handleAdd()} disabled={submitting} sx={orangeBtnSx}>
             {submitting ? <CircularProgress size={18} color="inherit" /> : 'Submit'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={remainingModalOpen}
-        onClose={closeRemainingModal}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={remainingModalOpen} onClose={closeRemainingModal} maxWidth="sm" fullWidth>
         <DialogTitle>Submit Remaining Balance</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
@@ -724,9 +671,7 @@ export function CasinoTopupBalancePage() {
               value={remainingForm.date}
               error={remainingFormErrors.date}
               helperText={
-                remainingFormErrors.date
-                  ? 'Date is required'
-                  : 'Format: DD-MM-YYYY (IST)'
+                remainingFormErrors.date ? 'Date is required' : 'Format: DD-MM-YYYY (IST)'
               }
               onChange={(e) => {
                 setRemainingForm((prev) => ({ ...prev, date: e.target.value }));
@@ -741,9 +686,7 @@ export function CasinoTopupBalancePage() {
               value={remainingForm.time}
               error={remainingFormErrors.time}
               helperText={
-                remainingFormErrors.time
-                  ? 'Time is required'
-                  : 'Format: hh:mm a.m./p.m. (IST)'
+                remainingFormErrors.time ? 'Time is required' : 'Format: hh:mm a.m./p.m. (IST)'
               }
               onChange={(e) => {
                 setRemainingForm((prev) => ({ ...prev, time: e.target.value }));
@@ -761,11 +704,7 @@ export function CasinoTopupBalancePage() {
             disabled={remainingSubmitting}
             sx={orangeBtnSx}
           >
-            {remainingSubmitting ? (
-              <CircularProgress size={18} color="inherit" />
-            ) : (
-              'Submit'
-            )}
+            {remainingSubmitting ? <CircularProgress size={18} color="inherit" /> : 'Submit'}
           </Button>
         </DialogActions>
       </Dialog>

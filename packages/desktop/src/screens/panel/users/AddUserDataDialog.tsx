@@ -12,8 +12,8 @@ import {
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
-import * as XLSX from 'xlsx';
 import { secureApi } from '@/api/secureClient';
+import { readSpreadsheetRows } from '@/utils/spreadsheet';
 
 type Props = {
   open: boolean;
@@ -62,15 +62,8 @@ export function AddUserDataDialog({ open, uploader, onClose }: Props) {
     const name = file.name.toLowerCase();
     setFileName(file.name);
     try {
-      if (
-        name.endsWith('.xlsx') ||
-        name.endsWith('.xls') ||
-        name.endsWith('.csv')
-      ) {
-        const buf = await file.arrayBuffer();
-        const workbook = XLSX.read(buf, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+      if (name.endsWith('.xlsx') || name.endsWith('.csv')) {
+        const rows = await readSpreadsheetRows(file);
         const keys = ['mobile', 'phone', 'contact', 'number', 'numbers'];
         const result: string[] = [];
         rows.forEach((row) => {
@@ -87,7 +80,7 @@ export function AddUserDataDialog({ open, uploader, onClose }: Props) {
         toast.success(`${unique.length} numbers extracted`);
         return;
       }
-      toast.error('Upload .xlsx / .xls / .csv');
+      toast.error('Upload .xlsx or .csv');
     } catch {
       toast.error('Failed to parse file');
     }
@@ -143,7 +136,7 @@ export function AddUserDataDialog({ open, uploader, onClose }: Props) {
               <input
                 hidden
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.csv"
                 onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
               />
             </Button>
@@ -157,12 +150,7 @@ export function AddUserDataDialog({ open, uploader, onClose }: Props) {
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-        <Button
-          variant="outlined"
-          onClick={handleClose}
-          disabled={loading}
-          sx={{ minWidth: 100 }}
-        >
+        <Button variant="outlined" onClick={handleClose} disabled={loading} sx={{ minWidth: 100 }}>
           Cancel
         </Button>
         <Button

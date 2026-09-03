@@ -18,10 +18,7 @@ type GeoHint = {
  * Fire-and-forget sheet download audit — mirrors Laxmi OtpModal `sendSheetData`.
  * Call before/while triggering any Excel export.
  */
-export function logSheetDownload(
-  filter: SheetDownloadFilter,
-  geo?: GeoHint,
-): void {
+export function logSheetDownload(filter: SheetDownloadFilter, geo?: GeoHint): void {
   const user = getStoredUser<{ _id?: string; name?: string }>();
   void secureApi('reports.sheetDownloadAuditCreate', {
     downloadedBy: {

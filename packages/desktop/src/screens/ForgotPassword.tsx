@@ -1,12 +1,5 @@
 import { FormEvent, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Stack, TextField, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-toastify';
 import { AstroLogo } from '@/components/AstroLogo';
@@ -148,8 +141,7 @@ export function ForgotPassword({ onBack }: Props) {
         ? `Enter OTP sent to ${email}`
         : 'Choose a new password';
 
-  const onSubmit =
-    step === 'email' ? sendOtp : step === 'otp' ? verifyOtp : resetPassword;
+  const onSubmit = step === 'email' ? sendOtp : step === 'otp' ? verifyOtp : resetPassword;
 
   return (
     <Box sx={{ ...shellSx(isDark), position: 'relative' }}>

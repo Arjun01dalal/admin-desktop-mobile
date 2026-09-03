@@ -49,14 +49,37 @@ type SummaryFlag = {
   types?: string[];
 };
 
+type CallAnalysis = {
+  summary?: unknown;
+  transcript?: string;
+  next_best_action?: unknown;
+  threat?: SummaryFlag;
+  priority?: SummaryFlag;
+  human_intervention?: SummaryFlag;
+  satisfaction?: SummaryFlag;
+  frustration?: SummaryFlag;
+  nuisance?: SummaryFlag;
+  repeated_complaint?: SummaryFlag;
+  pii_details?: SummaryFlag;
+};
+
 type CallSummaryData = {
   status?: string;
   message?: string;
   call_sid?: string;
   data?: {
     transcript?: string;
-    analysis?: Record<string, unknown>;
-    [key: string]: unknown;
+    analysis?: CallAnalysis;
+    summary?: unknown;
+    next_best_action?: unknown;
+    threat?: SummaryFlag;
+    priority?: SummaryFlag;
+    human_intervention?: SummaryFlag;
+    satisfaction?: SummaryFlag;
+    frustration?: SummaryFlag;
+    nuisance?: SummaryFlag;
+    repeated_complaint?: SummaryFlag;
+    pii_details?: SummaryFlag;
   };
 };
 
@@ -143,7 +166,13 @@ function metricTone(
   value: unknown,
 ): 'default' | 'success' | 'warning' | 'error' | 'info' {
   const text = String(value ?? '').toLowerCase();
-  if (value === true || text === 'true' || text === 'yes' || text === 'high' || text === 'critical') {
+  if (
+    value === true ||
+    text === 'true' ||
+    text === 'yes' ||
+    text === 'high' ||
+    text === 'critical'
+  ) {
     if (title === 'Satisfaction') return 'success';
     return 'error';
   }
@@ -160,15 +189,15 @@ function buildSummaryView(summaryData: CallSummaryData | null): SummaryView {
     return { summary: '', transcript: '', nextAction: '', metrics: [] };
   }
 
-  const data = raw as Record<string, unknown>;
-  const threat = data.threat as SummaryFlag | undefined;
-  const priority = data.priority as SummaryFlag | undefined;
-  const humanIntervention = data.human_intervention as SummaryFlag | undefined;
-  const satisfaction = data.satisfaction as SummaryFlag | undefined;
-  const frustration = data.frustration as SummaryFlag | undefined;
-  const nuisance = data.nuisance as SummaryFlag | undefined;
-  const repeatedComplaint = data.repeated_complaint as SummaryFlag | undefined;
-  const piiDetails = data.pii_details as SummaryFlag | undefined;
+  const data = raw as CallAnalysis;
+  const threat = data.threat;
+  const priority = data.priority;
+  const humanIntervention = data.human_intervention;
+  const satisfaction = data.satisfaction;
+  const frustration = data.frustration;
+  const nuisance = data.nuisance;
+  const repeatedComplaint = data.repeated_complaint;
+  const piiDetails = data.pii_details;
 
   return {
     summary: asText(data.summary),
@@ -199,13 +228,7 @@ function buildSummaryView(summaryData: CallSummaryData | null): SummaryView {
   };
 }
 
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Paper
       elevation={0}
@@ -247,10 +270,7 @@ export function IncomingBotCallPage() {
   const [summaryCall, setSummaryCall] = useState<IncomingCall | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
-  const buildPayload = useCallback(
-    () => ({ since: startOfDayUtc(sinceDate) }),
-    [sinceDate],
-  );
+  const buildPayload = useCallback(() => ({ since: startOfDayUtc(sinceDate) }), [sinceDate]);
 
   const unpack = useCallback((res: { data?: unknown }) => {
     const data = res.data as { calls?: IncomingCall[] } | undefined;
@@ -278,9 +298,27 @@ export function IncomingBotCallPage() {
     const toQ = appliedTo.toLowerCase();
     const sidQ = appliedSid.toLowerCase();
     return rows.filter((call) => {
-      if (fromQ && !String(call.from || '').toLowerCase().includes(fromQ)) return false;
-      if (toQ && !String(call.to || '').toLowerCase().includes(toQ)) return false;
-      if (sidQ && !String(call.sid || '').toLowerCase().includes(sidQ)) return false;
+      if (
+        fromQ &&
+        !String(call.from || '')
+          .toLowerCase()
+          .includes(fromQ)
+      )
+        return false;
+      if (
+        toQ &&
+        !String(call.to || '')
+          .toLowerCase()
+          .includes(toQ)
+      )
+        return false;
+      if (
+        sidQ &&
+        !String(call.sid || '')
+          .toLowerCase()
+          .includes(sidQ)
+      )
+        return false;
       return true;
     });
   }, [rows, appliedFrom, appliedTo, appliedSid]);
@@ -447,24 +485,21 @@ export function IncomingBotCallPage() {
       </Stack>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={filteredRows}
-        loading={loading}
-        getRowKey={(row) => row.sid}
-        emptyMessage="No incoming calls found"
-        virtualize={false}
-        stickyHeader
-        dense
-        minWidth={1100}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={filteredRows}
+          loading={loading}
+          getRowKey={(row) => row.sid}
+          emptyMessage="No incoming calls found"
+          virtualize={false}
+          stickyHeader
+          dense
+          minWidth={1100}
+          maxHeight="100%"
+        />
       </TablePanel>
 
-      <RecordingPlayerDialog
-        url={recordingUrl}
-        onClose={() => setRecordingUrl(null)}
-      />
+      <RecordingPlayerDialog url={recordingUrl} onClose={() => setRecordingUrl(null)} />
 
       <Dialog
         open={summaryOpen}

@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Chip, CircularProgress, Stack, TextField, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
@@ -15,11 +7,7 @@ import { getStoredUser, todayIST, formatAmount } from '@/utils/dates';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
-import {
-  orangeBtnSx,
-  fieldSx,
-  unpackPayload,
-} from '@/screens/panel/transactions/shared';
+import { orangeBtnSx, fieldSx, unpackPayload } from '@/screens/panel/transactions/shared';
 
 type StateRow = {
   state: string;
@@ -65,9 +53,7 @@ function extractDepositBody(data: unknown): {
       const depositTotals = Array.isArray(obj.depositTotals)
         ? (obj.depositTotals[0] as Bucket)
         : {};
-      const coinTotals = Array.isArray(obj.coinTotals)
-        ? (obj.coinTotals[0] as Bucket)
-        : {};
+      const coinTotals = Array.isArray(obj.coinTotals) ? (obj.coinTotals[0] as Bucket) : {};
       return {
         result: asBucketMap(obj.result),
         coinResult: asBucketMap(obj.coinResult),
@@ -86,11 +72,9 @@ function extractDepositBody(data: unknown): {
     result: asBucketMap(fallback.result),
     coinResult: asBucketMap(fallback.coinResult),
     depositTotals: Array.isArray(fallback.depositTotals)
-      ? ((fallback.depositTotals[0] as Bucket) || {})
+      ? (fallback.depositTotals[0] as Bucket) || {}
       : {},
-    coinTotals: Array.isArray(fallback.coinTotals)
-      ? ((fallback.coinTotals[0] as Bucket) || {})
-      : {},
+    coinTotals: Array.isArray(fallback.coinTotals) ? (fallback.coinTotals[0] as Bucket) || {} : {},
   };
 }
 
@@ -156,17 +140,13 @@ export function StateWiseDepositPage() {
       coinMap: Record<string, Bucket>,
       playingMap: Record<string, number>,
     ) => {
-      const keys = new Set([
-        ...Object.keys(depositMap),
-        ...Object.keys(coinMap),
-      ]);
+      const keys = new Set([...Object.keys(depositMap), ...Object.keys(coinMap)]);
       let combined: StateRow[] = Array.from(keys).map((key) => {
         const d = depositMap[key];
         const c = coinMap[key];
         return {
           state: key,
-          totalAmount:
-            (Number(d?.totalAmount ?? 0) || 0) + (Number(c?.totalAmount ?? 0) || 0),
+          totalAmount: (Number(d?.totalAmount ?? 0) || 0) + (Number(c?.totalAmount ?? 0) || 0),
           count: (Number(d?.count ?? 0) || 0) + (Number(c?.count ?? 0) || 0),
           playing: playingMap[key] || 0,
         };
@@ -275,17 +255,8 @@ export function StateWiseDepositPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <CollapsibleFilterPanel
-        title="State Wise Deposit"
-        summary={`${startDate} → ${endDate}`}
-      >
-        <Stack
-          direction="row"
-          spacing={1.25}
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-        >
+      <CollapsibleFilterPanel title="State Wise Deposit" summary={`${startDate} → ${endDate}`}>
+        <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             size="small"
             type="date"
@@ -314,9 +285,7 @@ export function StateWiseDepositPage() {
           </Button>
           <Button
             variant="contained"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             disabled={loading}
             onClick={() => void load()}
             sx={orangeBtnSx}

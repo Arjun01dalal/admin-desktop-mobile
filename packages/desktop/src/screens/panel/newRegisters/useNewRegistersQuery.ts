@@ -41,7 +41,10 @@ function resolveAppFilter(
 ): string | string[] | undefined {
   const raw = clientName || allotedApps;
   if (Array.isArray(raw)) {
-    const apps = raw.map(String).map((s) => s.trim()).filter(Boolean);
+    const apps = raw
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean);
     return apps.length ? apps : undefined;
   }
   if (typeof raw === 'string' && raw.trim()) return raw.trim();
@@ -131,9 +134,7 @@ export function useNewRegistersQuery(
           payload?: UsersListResponse;
         };
         const nested =
-          data.payload &&
-          typeof data.payload === 'object' &&
-          !Array.isArray(data.payload)
+          data.payload && typeof data.payload === 'object' && !Array.isArray(data.payload)
             ? data.payload
             : data;
         let list: UserRow[] = Array.isArray(res.data)
@@ -161,19 +162,14 @@ export function useNewRegistersQuery(
 
         if (columnFilters.showEmptyRecord) {
           list = list.filter(
-            (row) =>
-              !row.activeUser &&
-              !(row as { lastActivity?: unknown }).lastActivity,
+            (row) => !row.activeUser && !(row as { lastActivity?: unknown }).lastActivity,
           );
         }
 
         // accessibleStates client filter (reference parity)
-        const states =
-          admin?.accessibleStates?.map((s) => String(s).toLowerCase()) ?? [];
+        const states = admin?.accessibleStates?.map((s) => String(s).toLowerCase()) ?? [];
         if (states.length > 0) {
-          list = list.filter((item) =>
-            states.includes(String(item?.state || '').toLowerCase()),
-          );
+          list = list.filter((item) => states.includes(String(item?.state || '').toLowerCase()));
         }
 
         // Empty userComesFrom last — same as Laxmi NewRegisterUsers.
@@ -185,9 +181,7 @@ export function useNewRegistersQuery(
           return valA.localeCompare(valB);
         });
 
-        const apiTotal = Number(
-          nested.total ?? nested.count ?? data.total ?? data.count ?? 0,
-        );
+        const apiTotal = Number(nested.total ?? nested.count ?? data.total ?? data.count ?? 0);
         startTransition(() => {
           setRows(list);
           setTotal(apiTotal || list.length);

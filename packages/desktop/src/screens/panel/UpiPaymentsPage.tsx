@@ -27,12 +27,7 @@ import { appCodeForName } from '@/constants/clientNames';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { maskMobile } from '@/screens/panel/shared';
-import {
-  formatDisplayDate,
-  formatDisplayTime,
-  getStoredUser,
-  todayIST,
-} from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime, getStoredUser, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 
 type Gateway = {
@@ -572,17 +567,8 @@ export function UpiPaymentsPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <CollapsibleFilterPanel
-        title="UPI Payments"
-        summary={`${startDate} → ${endDate}`}
-      >
-        <Stack
-          direction="row"
-          spacing={1.5}
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-        >
+      <CollapsibleFilterPanel title="UPI Payments" summary={`${startDate} → ${endDate}`}>
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             type="date"
             label="From Date"
@@ -613,13 +599,7 @@ export function UpiPaymentsPage() {
           <Button
             variant="outlined"
             color="warning"
-            startIcon={
-              loading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void reloadAll()}
             disabled={loading}
             sx={{ fontWeight: 700, flexShrink: 0 }}
@@ -674,7 +654,9 @@ export function UpiPaymentsPage() {
             <Typography variant="h6" fontWeight={700} mb={1}>
               Transaction Notifications
             </Typography>
-            <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <Box
+              sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}
+            >
               <CommonTable
                 columns={notifColumns}
                 rows={notifRows}
@@ -707,7 +689,9 @@ export function UpiPaymentsPage() {
             <Typography variant="h6" fontWeight={700} mb={1}>
               Transaction Requests
             </Typography>
-            <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <Box
+              sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}
+            >
               <CommonTable
                 columns={reqColumns}
                 rows={reqRows}
@@ -848,11 +832,7 @@ export function UpiPaymentsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setNotifStatusOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            color="warning"
-            onClick={() => void submitNotifStatus()}
-          >
+          <Button variant="contained" color="warning" onClick={() => void submitNotifStatus()}>
             Update
           </Button>
         </DialogActions>

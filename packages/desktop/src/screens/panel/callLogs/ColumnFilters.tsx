@@ -1,10 +1,6 @@
 import { MenuItem, TextField } from '@mui/material';
 import { TableSearchBar } from '@/components/TableSearchBar';
-import {
-  BOT_ID_OPTIONS,
-  CALL_STATUS_OPTIONS,
-  COMMENT_FILTER_OPTIONS,
-} from './constants';
+import { BOT_ID_OPTIONS, CALL_STATUS_OPTIONS, COMMENT_FILTER_OPTIONS } from './constants';
 import { useCallLogsFilters } from './FiltersContext';
 
 export function DpIdFilter() {

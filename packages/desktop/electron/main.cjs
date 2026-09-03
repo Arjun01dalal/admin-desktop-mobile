@@ -1,4 +1,14 @@
-const { app, BrowserWindow, session, protocol, screen, Tray, Menu, nativeImage, Notification } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  session,
+  protocol,
+  screen,
+  Tray,
+  Menu,
+  nativeImage,
+  Notification,
+} = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { useViteDevServer } = require('./config.cjs');
@@ -9,13 +19,16 @@ const { startSosMonitor } = require('./sosMonitor.cjs');
 const { startPushClient } = require('./pushService.cjs');
 const panelWindows = require('./panelWindows.cjs');
 const deepLink = require('./deepLink.cjs');
+const {
+  getPanelNavigationAction,
+  isTrustedPanelOrigin: isTrustedOrigin,
+} = require('./securityPolicy.cjs');
 
 const ctx = require('./ctx.cjs');
 require('./recordingProtocol.cjs');
 require('./siteBrowserView.cjs');
 require('./autoUpdateSetup.cjs');
 require('./ipcRegistry.cjs');
-
 
 installMainErrorMonitor();
 
@@ -39,7 +52,6 @@ app.on('open-url', (event, url) => {
   event.preventDefault();
   handleDeepLink(url);
 });
-
 
 // Optional: improves Chromium network geolocation on some platforms.
 if (process.env.GOOGLE_API_KEY) {
@@ -89,20 +101,21 @@ let sosMonitor = null;
 let pushClient = null;
 let fcmListener = null;
 
-function tokenStorePath() {
-  return path.join(app.getPath('userData'), 'session.token');
-}
-
 function loadPersistedToken() {
   return tokenVault.readToken();
 }
 
 function persistToken(token) {
   try {
-    tokenVault.writeToken(token || '');
+    return tokenVault.writeToken(token || '');
   } catch (err) {
     console.warn('[token] could not persist token:', err?.message || err);
     reportError('main:persistToken', err);
+    return {
+      ok: false,
+      encrypted: false,
+      message: 'OS secure storage is unavailable; token was not persisted',
+    };
   }
 }
 
@@ -241,8 +254,7 @@ function createTray() {
 }
 
 function enableGeolocationPermissions() {
-  const allowGeo = (permission) =>
-    permission === 'geolocation' || permission === 'location';
+  const allowGeo = (permission) => permission === 'geolocation' || permission === 'location';
 
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     callback(allowGeo(permission));
@@ -251,9 +263,9 @@ function enableGeolocationPermissions() {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowGeo(permission));
 }
 
-/** Packaged builds: no DevTools / inspector for end users. Unpackaged (dev / local electron) allows them. */
+/** DevTools / inspector are disabled for all builds, including local development. */
 function allowDevTools() {
-  return !app.isPackaged;
+  return false;
 }
 
 /**
@@ -336,6 +348,9 @@ function isDevtoolsShortcut(input) {
   return false;
 }
 
+const isTrustedPanelOrigin = (rawUrl) =>
+  isTrustedOrigin(rawUrl, { allowDevServer: useViteDevServer });
+
 function hardenWebContents(wc) {
   if (!wc || wc.isDestroyed()) return;
 
@@ -383,7 +398,9 @@ function hardenWebContents(wc) {
       template.push({ role: 'copy' });
     }
     if (!template.length) return;
-    Menu.buildFromTemplate(template).popup({ window: BrowserWindow.fromWebContents(wc) || undefined });
+    Menu.buildFromTemplate(template).popup({
+      window: BrowserWindow.fromWebContents(wc) || undefined,
+    });
   });
 
   wc.on('devtools-opened', () => {
@@ -398,13 +415,36 @@ function hardenWebContents(wc) {
 
   // Block cleartext HTTP navigations (Vite localhost still allowed in dev).
   wc.on('will-navigate', (event, url) => {
-    if (deepLink.parseDeepLink(url)) {
+    // Site BrowserViews have their own strict astrotalk.vip navigation policy.
+    if (panelWindows.getPanelBySiteContents(wc)) return;
+    const navigationAction = getPanelNavigationAction(url, {
+      allowDevServer: useViteDevServer,
+      isDeepLink: deepLink.parseDeepLink,
+    });
+    if (navigationAction === 'deep-link') {
       event.preventDefault();
       handleDeepLink(url);
       return;
     }
+    if (navigationAction === 'block') {
+      console.warn('[origin-lock] blocked panel navigation:', url);
+      event.preventDefault();
+      return;
+    }
     if (isBlockedCleartext(url, { allowLocalHttp: true })) {
       console.warn('[https-only] blocked navigation:', url);
+      event.preventDefault();
+    }
+  });
+
+  wc.on('will-redirect', (event, url) => {
+    if (panelWindows.getPanelBySiteContents(wc)) return;
+    const navigationAction = getPanelNavigationAction(url, {
+      allowDevServer: useViteDevServer,
+      isDeepLink: deepLink.parseDeepLink,
+    });
+    if (navigationAction !== 'allow') {
+      console.warn('[origin-lock] blocked panel redirect:', url);
       event.preventDefault();
     }
   });
@@ -492,15 +532,6 @@ function createWindow(opts = {}) {
       // ignore
     }
     win.show();
-    // Local unpackaged runs: open DevTools so debugging does not depend on shortcuts alone.
-    if (allowDevTools() && useViteDevServer) {
-      try {
-        win.webContents.openDevTools({ mode: 'detach' });
-        console.log('[dev] DevTools opened (Cmd+Option+I / Ctrl+Shift+I / F12 to toggle)');
-      } catch {
-        // ignore
-      }
-    }
   });
 
   win.on('resize', () => {
@@ -614,10 +645,10 @@ function setDockIcon() {
   }
 }
 
-
 // Wire shared ctx for extracted modules (call-time resolution).
 ctx.gotSingleInstanceLock = gotSingleInstanceLock;
 ctx.allowDevTools = allowDevTools;
+ctx.isTrustedPanelOrigin = isTrustedPanelOrigin;
 ctx.hardenWebContents = hardenWebContents;
 ctx.applyPortraitSize = applyPortraitSize;
 ctx.applyBrowserSize = applyBrowserSize;
@@ -633,36 +664,49 @@ ctx.createWindow = createWindow;
 ctx.showMainWindow = showMainWindow;
 Object.defineProperty(ctx, 'isQuitting', {
   get: () => isQuitting,
-  set: (v) => { isQuitting = Boolean(v); },
+  set: (v) => {
+    isQuitting = Boolean(v);
+  },
 });
 Object.defineProperty(ctx, 'trayHintShown', {
   get: () => trayHintShown,
-  set: (v) => { trayHintShown = Boolean(v); },
+  set: (v) => {
+    trayHintShown = Boolean(v);
+  },
 });
 Object.defineProperty(ctx, 'cachedAuthToken', {
   get: () => cachedAuthToken,
-  set: (v) => { cachedAuthToken = v; },
+  set: (v) => {
+    cachedAuthToken = v;
+  },
 });
 Object.defineProperty(ctx, 'sosMonitor', {
   get: () => sosMonitor,
-  set: (v) => { sosMonitor = v; },
+  set: (v) => {
+    sosMonitor = v;
+  },
 });
 Object.defineProperty(ctx, 'pushClient', {
   get: () => pushClient,
-  set: (v) => { pushClient = v; },
+  set: (v) => {
+    pushClient = v;
+  },
 });
 Object.defineProperty(ctx, 'blockSiteForUpdate', {
   get: () => blockSiteForUpdate,
-  set: (v) => { blockSiteForUpdate = Boolean(v); },
+  set: (v) => {
+    blockSiteForUpdate = Boolean(v);
+  },
 });
 Object.defineProperty(ctx, 'lastUpdateEvent', {
   get: () => lastUpdateEvent,
-  set: (v) => { lastUpdateEvent = v; },
+  set: (v) => {
+    lastUpdateEvent = v;
+  },
 });
 
 let blockSiteForUpdate = false;
 let lastUpdateEvent = null;
-
 
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
@@ -718,9 +762,7 @@ app.whenReady().then(() => {
 
   // Launched at login / as hidden — stay in tray for SOS only.
   const loginSettings =
-    typeof app.getLoginItemSettings === 'function'
-      ? app.getLoginItemSettings()
-      : {};
+    typeof app.getLoginItemSettings === 'function' ? app.getLoginItemSettings() : {};
   const startHidden =
     Boolean(loginSettings.wasOpenedAsHidden) ||
     process.argv.includes('--hidden') ||
@@ -759,8 +801,7 @@ app.whenReady().then(() => {
   try {
     const { startFcmListener } = require('./fcmListener.cjs');
     fcmListener = startFcmListener({
-      broadcastToPanels: (channel, payload) =>
-        panelWindows.broadcastToPanels(channel, payload),
+      broadcastToPanels: (channel, payload) => panelWindows.broadcastToPanels(channel, payload),
       showMainWindow: () => showMainWindow(),
       getSosMonitor: () => sosMonitor,
     });

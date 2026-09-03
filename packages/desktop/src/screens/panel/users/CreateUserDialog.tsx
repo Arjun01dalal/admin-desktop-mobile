@@ -125,17 +125,13 @@ export function CreateUserDialog({ open, mode, onClose, onCreated }: Props) {
       const payload = Object.fromEntries(
         Object.entries(raw).filter(([, v]) => String(v).trim() !== ''),
       );
-      const res = await secureApi(
-        isAdmin ? 'users.createSubAdmin' : 'users.create',
-        payload,
-      );
+      const res = await secureApi(isAdmin ? 'users.createSubAdmin' : 'users.create', payload);
       if (!res.ok) {
         toast.error(res.message || `Failed to create ${isAdmin ? 'admin' : 'user'}`);
         return;
       }
       toast.success(
-        res.message ||
-          (isAdmin ? 'Admin created successfully' : 'User created successfully'),
+        res.message || (isAdmin ? 'Admin created successfully' : 'User created successfully'),
       );
       handleClose();
       onCreated?.();
@@ -179,9 +175,7 @@ export function CreateUserDialog({ open, mode, onClose, onCreated }: Props) {
               error={Boolean(errors.mobile)}
               helperText={errors.mobile}
               inputProps={{ inputMode: 'numeric', maxLength: 10 }}
-              onChange={(e) =>
-                setField('mobile', e.target.value.replace(/\D/g, '').slice(0, 10))
-              }
+              onChange={(e) => setField('mobile', e.target.value.replace(/\D/g, '').slice(0, 10))}
             />
             <TextField
               fullWidth
@@ -253,12 +247,7 @@ export function CreateUserDialog({ open, mode, onClose, onCreated }: Props) {
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-        <Button
-          variant="outlined"
-          onClick={handleClose}
-          disabled={loading}
-          sx={{ minWidth: 100 }}
-        >
+        <Button variant="outlined" onClick={handleClose} disabled={loading} sx={{ minWidth: 100 }}>
           Cancel
         </Button>
         <Button

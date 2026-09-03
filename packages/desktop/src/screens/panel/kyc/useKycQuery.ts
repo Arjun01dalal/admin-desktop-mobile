@@ -1,21 +1,10 @@
-import {
-  startTransition,
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useState,
-} from 'react';
+import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { dateTime } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE } from '@/utils/pagination';
-import {
-  apiFailed,
-  EMPTY_KYC_FILTERS,
-  type KycFilters,
-  type KycRow,
-} from './types';
+import { apiFailed, EMPTY_KYC_FILTERS, type KycFilters, type KycRow } from './types';
 
 export function useKycQuery() {
   const [startDate, setStartDate] = useState('');
@@ -95,7 +84,18 @@ export function useKycQuery() {
         if (isCurrent(gen)) setLoading(false);
       }
     },
-    [page, pageSize, startDate, endDate, appClientName, appliedFilters, next, begin, end, isCurrent],
+    [
+      page,
+      pageSize,
+      startDate,
+      endDate,
+      appClientName,
+      appliedFilters,
+      next,
+      begin,
+      end,
+      isCurrent,
+    ],
   );
 
   useEffect(() => {
@@ -114,9 +114,10 @@ export function useKycQuery() {
       toast.error('Please select to date');
       return;
     }
+    setAppliedFilters(draftFilters);
     setPage(1);
-    void load(1);
-  }, [load, startDate, endDate]);
+    void load(1, draftFilters);
+  }, [load, startDate, endDate, draftFilters]);
 
   const search = useCallback(() => {
     setAppliedFilters(draftFilters);

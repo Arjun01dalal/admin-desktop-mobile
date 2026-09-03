@@ -40,10 +40,7 @@ import {
   normalizePhone,
   sortChats,
 } from '@/screens/panel/whatsapp/helpers';
-import type {
-  GroupedChats,
-  WhatsappMessage,
-} from '@/screens/panel/whatsapp/types';
+import type { GroupedChats, WhatsappMessage } from '@/screens/panel/whatsapp/types';
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -139,10 +136,7 @@ export function WhatsappPage() {
     };
   }, [fetchWhatsappData]);
 
-  const chatSummaries = useMemo(
-    () => (records ? buildChatSummaries(records) : []),
-    [records],
-  );
+  const chatSummaries = useMemo(() => (records ? buildChatSummaries(records) : []), [records]);
 
   const filteredChats = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -205,14 +199,7 @@ export function WhatsappPage() {
     } finally {
       setSending(false);
     }
-  }, [
-    fetchWhatsappData,
-    image,
-    message,
-    selectedUser,
-    sending,
-    scrollMessagesToBottom,
-  ]);
+  }, [fetchWhatsappData, image, message, selectedUser, sending, scrollMessagesToBottom]);
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -259,16 +246,12 @@ export function WhatsappPage() {
               mb: caption ? 0.75 : 0,
             }}
           />
-          {caption ? (
-            <Typography sx={{ fontSize: 14 }}>{caption}</Typography>
-          ) : null}
+          {caption ? <Typography sx={{ fontSize: 14 }}>{caption}</Typography> : null}
         </>
       );
     }
     if (msg.description) {
-      return (
-        <Typography sx={{ fontSize: 14 }}>{msg.description}</Typography>
-      );
+      return <Typography sx={{ fontSize: 14 }}>{msg.description}</Typography>;
     }
     return null;
   };
@@ -361,10 +344,7 @@ export function WhatsappPage() {
               </IconButton>
             </Paper>
           </Box>
-          <List
-            dense
-            sx={{ overflow: 'auto', flex: 1, minHeight: 0, py: 0 }}
-          >
+          <List dense sx={{ overflow: 'auto', flex: 1, minHeight: 0, py: 0 }}>
             {filteredChats.length === 0 ? (
               <Typography
                 color="text.secondary"
@@ -387,26 +367,14 @@ export function WhatsappPage() {
                   <Avatar name={profileName} />
                   <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Stack direction="row" justifyContent="space-between" gap={1}>
-                      <Typography
-                        fontWeight={600}
-                        fontSize={14}
-                        noWrap
-                      >
+                      <Typography fontWeight={600} fontSize={14} noWrap>
                         {profileName}
                       </Typography>
-                      <Typography
-                        fontSize={11}
-                        color="text.secondary"
-                        whiteSpace="nowrap"
-                      >
+                      <Typography fontSize={11} color="text.secondary" whiteSpace="nowrap">
                         {formatListTime(timestamp)}
                       </Typography>
                     </Stack>
-                    <Typography
-                      fontSize={12}
-                      color="text.secondary"
-                      noWrap
-                    >
+                    <Typography fontSize={12} color="text.secondary" noWrap>
                       {preview}
                     </Typography>
                   </Box>
@@ -510,12 +478,7 @@ export function WhatsappPage() {
                         }}
                       >
                         {renderMessageContent(msg)}
-                        <Typography
-                          fontSize={10}
-                          color="text.secondary"
-                          textAlign="right"
-                          mt={0.5}
-                        >
+                        <Typography fontSize={10} color="text.secondary" textAlign="right" mt={0.5}>
                           {formatMessageTime(msg.timestamp)}
                         </Typography>
                       </Box>
@@ -537,10 +500,7 @@ export function WhatsappPage() {
                   zIndex: 2,
                 }}
               >
-                <IconButton
-                  size="small"
-                  onClick={() => fileInputRef.current?.click()}
-                >
+                <IconButton size="small" onClick={() => fileInputRef.current?.click()}>
                   <AttachFileIcon fontSize="small" />
                 </IconButton>
                 <input
@@ -618,8 +578,7 @@ export function WhatsappPage() {
                   WhatsApp Web
                 </Typography>
                 <Typography fontSize={14}>
-                  Select a chat from the list to view messages and delivery
-                  status.
+                  Select a chat from the list to view messages and delivery status.
                 </Typography>
               </Box>
             </Box>

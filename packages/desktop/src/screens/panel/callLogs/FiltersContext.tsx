@@ -19,9 +19,7 @@ export type CallLogsFiltersValue = {
   onPageReset: () => void;
 };
 
-const { Provider, useFilters } = createTableFiltersContext<CallLogsFiltersValue>(
-  'CallLogsFilters',
-);
+const { Provider, useFilters } = createTableFiltersContext<CallLogsFiltersValue>('CallLogsFilters');
 
 export const CallLogsFiltersProvider = Provider;
 export const useCallLogsFilters = useFilters;

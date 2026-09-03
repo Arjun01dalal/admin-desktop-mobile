@@ -2,19 +2,43 @@ import { useCallback, useEffect, useState } from 'react';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
+import { todayIST } from '@/utils/dates';
 import { parseLudoGameOptions, parseLudoGameStats } from './gameMetrics';
-import { providerWiseActive } from './mergeMetrics';
-import type {
-  DashboardFilters,
-  DashboardMode,
-  OpsDashboardBundle,
-  SelectOption,
-} from './types';
+import { providerWiseActive, normalizeProviderMetrics, pickNum } from './mergeMetrics';
+import type { DashboardFilters, DashboardMode, OpsDashboardBundle, SelectOption } from './types';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+/** Dig dashboard summary if secure unwrap left a nested `payload` / `data`. */
+function unwrapDashboardSummary(raw: unknown): Record<string, unknown> {
+  const keys = [
+    'totalBalanceOfUsers',
+    'totalBonusBalanceOfUsers',
+    'totalRegisterUsers',
+    'totalActiveUsers',
+    'totalActiveUsersApp',
+  ] as const;
+  const candidates: Record<string, unknown>[] = [];
+  const root = asRecord(raw);
+  candidates.push(root);
+  for (const nestKey of ['payload', 'data', 'result']) {
+    const nested = asRecord(root[nestKey]);
+    if (Object.keys(nested).length) {
+      candidates.push(nested);
+      for (const nestKey2 of ['payload', 'data']) {
+        const deeper = asRecord(nested[nestKey2]);
+        if (Object.keys(deeper).length) candidates.push(deeper);
+      }
+    }
+  }
+  for (const candidate of candidates) {
+    if (keys.some((k) => k in candidate)) return candidate;
+  }
+  return root;
 }
 
 function datePayload(filters: DashboardFilters) {
@@ -39,6 +63,9 @@ const EMPTY: OpsDashboardBundle = {
   depositCount: {},
   depositWithdrawal: {},
   activeCustomers: {},
+  todaysActiveCount: 0,
+  nonPerformingUserCount: 0,
+  prevDayBalance: 0,
   qtech: {},
   wco: null,
   falcon: {},
@@ -58,10 +85,7 @@ const EMPTY: OpsDashboardBundle = {
  * Loads all ops-dashboard APIs in parallel.
  * Shared by Dashboard / VIP / Combined — mode only changes which UI cards show.
  */
-export function useOpsDashboardData(
-  mode: DashboardMode,
-  filters: DashboardFilters,
-) {
+export function useOpsDashboardData(mode: DashboardMode, filters: DashboardFilters) {
   const [bundle, setBundle] = useState<OpsDashboardBundle | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,16 +114,15 @@ export function useOpsDashboardData(
       const base = datePayload(filters);
       const vipSubset = mode === 'vip';
 
+      const activeFilter = filters.appClientName
+        ? { clientName: filters.appClientName }
+        : {};
+
       const tasks: Array<Promise<[string, unknown]>> = [
         fetchAction('dashboard.summary', base).then((d) => ['summary', d]),
-        fetchAction('dashboard.depositCount', base).then((d) => [
-          'depositCount',
-          d,
-        ]),
-        fetchAction('profitLoss.depositWithdrawal', base).then((d) => [
-          'depositWithdrawal',
-          d,
-        ]),
+        fetchAction('dashboard.depositCount', base).then((d) => ['depositCount', d]),
+        fetchAction('profitLoss.depositWithdrawal', base).then((d) => ['depositWithdrawal', d]),
+        // Provider card active counts (categorywise)
         fetchAction('dashboard.activeCustomersCategory', {
           startDate: filters.startDate,
           endDate: filters.endDate,
@@ -107,12 +130,8 @@ export function useOpsDashboardData(
           pageNo: 1,
           activeUserStart: filters.startDate,
           activeUserEnd: filters.endDate,
-          filter: filters.appClientName
-            ? { clientName: filters.appClientName }
-            : {},
-          ...(filters.appClientName
-            ? { app: [filters.appClientName] }
-            : {}),
+          filter: activeFilter,
+          ...(filters.appClientName ? { app: [filters.appClientName] } : {}),
         }).then((d) => ['activeCustomers', d]),
         fetchAction('dashboard.qtech', base).then((d) => ['qtech', d]),
         fetchAction('dashboard.wco', base).then((d) => ['wco', d]),
@@ -121,30 +140,56 @@ export function useOpsDashboardData(
         fetchAction('dashboard.satta', base).then((d) => ['satta', d]),
       ];
 
+      // Main dashboard KPIs only (laxminarayan Dashboard cards)
+      if (mode === 'main') {
+        // Laxmi nonPerformStart/End start empty — initial call has NO dates (all-time).
+        // Dates are only set after the user changes the date pickers. Match that:
+        // omit dates when filter is the default today→today range.
+        const today = todayIST();
+        const nonPerformUsesDates =
+          Boolean(filters.startDate && filters.endDate) &&
+          (filters.startDate !== today || filters.endDate !== today);
+
+        tasks.push(
+          fetchAction('dashboard.activeCustomers', {
+            pageNo: 1,
+            itemsPerPage: 10,
+            filter: activeFilter,
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+          }).then((d) => ['todaysActive', d]),
+          fetchAction('dashboard.nonPerformingUser', {
+            pageNo: 1,
+            itemPerPage: 10,
+            filter: {},
+            ...(nonPerformUsesDates
+              ? { startDate: filters.startDate, endDate: filters.endDate }
+              : {}),
+          }).then((d) => ['nonPerforming', d]),
+        );
+        // Laxmi getUserBalPrevDay — only when viewing a past start date
+        if (filters.startDate && filters.startDate !== today) {
+          tasks.push(
+            fetchAction('analytics.userBalance', { date: filters.startDate }).then((d) => [
+              'prevDayBalance',
+              d,
+            ]),
+          );
+        }
+      }
+
       if (!vipSubset) {
         tasks.push(
-          fetchAction('dashboard.betConstruct', base).then((d) => [
-            'betConstruct',
-            d,
-          ]),
-          fetchAction('dashboard.sportBook', base).then((d) => [
-            'sportBook',
-            d,
-          ]),
+          fetchAction('dashboard.betConstruct', base).then((d) => ['betConstruct', d]),
+          fetchAction('dashboard.sportBook', base).then((d) => ['sportBook', d]),
           fetchAction('dashboard.plutus', base).then((d) => ['plutus', d]),
-          fetchAction('dashboard.indianDiva', base).then((d) => [
-            'indianDiva',
-            d,
-          ]),
+          fetchAction('dashboard.indianDiva', base).then((d) => ['indianDiva', d]),
           fetchAction('dashboard.ludo', {
             startDate: filters.startDate,
             endDate: filters.endDate,
             filter: {},
           }).then((d) => ['ludo', d]),
-          fetchAction('dashboard.ludoGameIds', {}).then((d) => [
-            'ludoGameIds',
-            d,
-          ]),
+          fetchAction('dashboard.ludoGameIds', {}).then((d) => ['ludoGameIds', d]),
         );
       }
 
@@ -158,10 +203,7 @@ export function useOpsDashboardData(
 
       if (mode === 'main') {
         tasks.push(
-          fetchAction('dashboard.activeExchangeGet', {}).then((d) => [
-            'activeExchange',
-            d,
-          ]),
+          fetchAction('dashboard.activeExchangeGet', {}).then((d) => ['activeExchange', d]),
         );
       }
 
@@ -184,19 +226,30 @@ export function useOpsDashboardData(
           nextBundle.ludo = asRecord(value);
         } else if (key === 'qtech') {
           nextBundle.qtech = asRecord(value);
+        } else if (key === 'summary') {
+          nextBundle.summary = unwrapDashboardSummary(value);
         } else if (
-          key === 'summary' ||
           key === 'depositCount' ||
           key === 'depositWithdrawal' ||
-          key === 'falcon' ||
-          key === 'jetfair' ||
-          key === 'satta' ||
-          key === 'betConstruct' ||
-          key === 'sportBook'
+          key === 'satta'
         ) {
           nextBundle[key] = asRecord(value);
+        } else if (
+          key === 'falcon' ||
+          key === 'jetfair' ||
+          key === 'sportBook' ||
+          key === 'betConstruct'
+        ) {
+          nextBundle[key] = normalizeProviderMetrics(value);
         } else if (key === 'activeCustomers') {
           nextBundle.activeCustomers = providerWiseActive(value);
+        } else if (key === 'todaysActive') {
+          nextBundle.todaysActiveCount = pickNum(value, ['count']);
+        } else if (key === 'nonPerforming') {
+          nextBundle.nonPerformingUserCount = pickNum(value, ['total']);
+        } else if (key === 'prevDayBalance') {
+          // Laxmi reads payload.balance; some envelopes also expose totalBalance.
+          nextBundle.prevDayBalance = pickNum(value, ['balance', 'totalBalance']);
         }
       }
 
@@ -256,9 +309,7 @@ export function useOpsDashboardData(
 
   const reloadActiveExchange = useCallback(async () => {
     const data = await fetchAction('dashboard.activeExchangeGet', {});
-    setBundle((prev) =>
-      prev ? { ...prev, activeExchange: asRecord(data) } : prev,
-    );
+    setBundle((prev) => (prev ? { ...prev, activeExchange: asRecord(data) } : prev));
   }, []);
 
   useEffect(() => {

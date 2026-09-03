@@ -1,24 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import {
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Stack,
-  TextField,
-} from '@mui/material';
+import { Box, Button, Chip, CircularProgress, Stack, TextField } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getRoleName, isSosExemptRole } from '@/auth/permissions';
 import { getStoredUser, todayIST } from '@/utils/dates';
-import {
-  orangeBtnSx,
-  fieldSx,
-  chipSx,
-  unpackPayload,
-} from '@/screens/panel/transactions/shared';
+import { orangeBtnSx, fieldSx, chipSx, unpackPayload } from '@/screens/panel/transactions/shared';
 import { NestedFundTable } from './NestedFundTable';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { SheetUploadDialog } from './SheetUploadDialog';
@@ -293,10 +281,7 @@ export function WithdrawalFundPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <CollapsibleFilterPanel
-        title="Withdrawal Fund"
-        summary={`${startDate} → ${endDate}`}
-      >
+      <CollapsibleFilterPanel title="Withdrawal Fund" summary={`${startDate} → ${endDate}`}>
         <Stack direction="row" spacing={1.25} alignItems="flex-end" flexWrap="wrap" useFlexGap>
           <TextField
             size="small"
@@ -327,13 +312,7 @@ export function WithdrawalFundPage() {
           <Button
             variant="outlined"
             color="warning"
-            startIcon={
-              loading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             disabled={loading}
             onClick={() => void load()}
           >

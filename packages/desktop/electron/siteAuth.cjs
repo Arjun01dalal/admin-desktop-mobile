@@ -83,8 +83,16 @@ function pickAccessToken(data) {
 /** Same check astrotalk.vip uses for #external_login before opening TabLayout (home). */
 async function assertAstrologerProfileToken(accessToken) {
   const token = String(accessToken || '').trim();
-  if (!token || token.length > 8192 || token.trim() !== token || /[\s\u0000-\u001F\u007F]/.test(token)) {
-    return { ok: false, message: 'External login token missing or malformed. Please sign in again.' };
+  if (
+    !token ||
+    token.length > 8192 ||
+    token.trim() !== token ||
+    /[\s\u0000-\u001F\u007F]/.test(token)
+  ) {
+    return {
+      ok: false,
+      message: 'External login token missing or malformed. Please sign in again.',
+    };
   }
   try {
     const response = await client().get('/api/astrologer/profile', {

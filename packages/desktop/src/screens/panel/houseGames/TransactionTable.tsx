@@ -26,7 +26,6 @@ import { TABLE_COLUMNS, type FiltersState } from './constants';
 import type { HouseGameTransaction } from './types';
 import { formatDateTime, getIsBotValue, getPlayerIdentity } from './utils';
 import { houseGameIdLabel, toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
-import { useRevealCodes } from '@/context/useRevealCodes';
 import { canAccessNavItem, hasPermission, Permissions } from '@/auth/permissions';
 
 type Props = {
@@ -56,17 +55,14 @@ const TransactionTable = ({
 }: Props) => {
   const rowOffset = (currentPage - 1) * itemsPerPage;
   const deferredData = useDeferredValue(data);
-  const { active: revealActive } = useRevealCodes();
   const canOpenHouseGames = canAccessNavItem({
     id: 'houseGames',
     permission: Permissions.house_game,
   });
   // Laxmi: update_ludo_bets for pencil; also allow page-access / full_access.
-  const canUpdateBets =
-    hasPermission(Permissions.update_ludo_bets) || canOpenHouseGames;
+  const canUpdateBets = hasPermission(Permissions.update_ludo_bets) || canOpenHouseGames;
   // Laxmi: show_wining_btn for trophy (world-cup) icon.
-  const canUpdateWinningPoint =
-    hasPermission(Permissions.show_wining_btn) || canOpenHouseGames;
+  const canUpdateWinningPoint = hasPermission(Permissions.show_wining_btn) || canOpenHouseGames;
 
   const columns = useMemo<CommonTableColumn<HouseGameTransaction>[]>(
     () => [
@@ -210,12 +206,10 @@ const TransactionTable = ({
         label: toDisplayText(TABLE_COLUMNS[17]),
         filter: null,
         render: (item) =>
-          formatDateTime(
-            String(item?.createdAt ?? item?.createdOn ?? item?.updatedAt ?? ''),
-          ),
+          formatDateTime(String(item?.createdAt ?? item?.createdOn ?? item?.updatedAt ?? '')),
       },
     ],
-    [canUpdateBets, canUpdateWinningPoint, onEdit, onUpdateWinningPoint, rowOffset, revealActive],
+    [canUpdateBets, canUpdateWinningPoint, onEdit, onUpdateWinningPoint, rowOffset],
   );
 
   const gameIdOptions = useMemo(() => {

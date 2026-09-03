@@ -23,16 +23,11 @@ function buildUpiUrl({ pa, pn, am, tn, tr }: Props): string {
 
 /** UPI payment QR — matches old Withdrawal UPIQR.tsx */
 export function UpiQr({ pa, pn, am, tn, tr, size = 160 }: Props) {
-  const upiUrl = useMemo(
-    () => buildUpiUrl({ pa, pn, am, tn, tr }),
-    [pa, pn, am, tn, tr],
-  );
+  const upiUrl = useMemo(() => buildUpiUrl({ pa, pn, am, tn, tr }), [pa, pn, am, tn, tr]);
 
   if (!pa) {
     return null;
   }
 
-  return (
-    <QRCodeCanvas id="upi-qr-canvas" value={upiUrl} size={size} includeMargin />
-  );
+  return <QRCodeCanvas id="upi-qr-canvas" value={upiUrl} size={size} includeMargin />;
 }

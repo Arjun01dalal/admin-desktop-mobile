@@ -1,10 +1,4 @@
-import {
-  Box,
-  Grid,
-  IconButton,
-  Modal,
-  Typography,
-} from '@mui/material';
+import { Box, Grid, IconButton, Modal, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { toDisplayText } from './ops/jyotishMapping';
 
@@ -36,12 +30,7 @@ export function LiveStreamModal({ open, onClose, streamId }: Props) {
           p: 2,
         }}
       >
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={1}
-        >
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
           <Typography fontWeight="bold">{toDisplayText('Live Match')}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />

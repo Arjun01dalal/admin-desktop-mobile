@@ -1040,7 +1040,8 @@ module.exports = {
     method: 'POST',
     path: '/User/update-dump',
     encryptRequest: true,
-    decryptResponse: true,
+    // Ack-only response — skip decrypt (avoids main-process stall on empty/plain payloads).
+    decryptResponse: false,
   },
   'ops.playerRtpQtech': {
     method: 'POST',
@@ -1174,6 +1175,12 @@ module.exports = {
   'ops.removeCallerHead': {
     method: 'POST',
     path: '/SubAdmin/remove-caller-head',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'ops.assignSubadminEmpcode': {
+    method: 'POST',
+    path: '/SubAdmin/assign-subadmin-empcode',
     encryptRequest: true,
     decryptResponse: true,
   },
@@ -1430,8 +1437,10 @@ module.exports = {
     encryptRequest: false,
     // Laxmi safeDecrypts response.data.data before reading payload.
     decryptResponse: true,
-    // The vking gateway rejects the call without this fixed second-factor header.
-    headers: { xcheck: 'Bearer 7291d69f36328f9b9650f6a019fe4dbd0ec2bbecb508' },
+    // Laxmi Dashboard.getSBGGR — required by vking (env XCHECK_HEADER overrides).
+    headers: {
+      xcheck: 'Bearer 7291d69f36328f9b9650f6a019fe4dbd0ec2bbecb508',
+    },
   },
   'dashboard.plutus': {
     method: 'POST',
@@ -2258,6 +2267,12 @@ module.exports = {
   'fundRequests.coin': {
     method: 'POST',
     path: '/SubAdmin/fund-request-coin',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'fundRequests.coinDetail': {
+    method: 'POST',
+    path: '/coin/detail',
     encryptRequest: true,
     decryptResponse: true,
   },

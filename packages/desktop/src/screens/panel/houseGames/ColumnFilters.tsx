@@ -1,13 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { useMemo } from 'react';
-import {
-  Checkbox,
-  FormControlLabel,
-  IconButton,
-  MenuItem,
-  Stack,
-  TextField,
-} from '@mui/material';
+import { Checkbox, FormControlLabel, IconButton, MenuItem, Stack, TextField } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { SELECT_FILTER_FIELDS, type FiltersState } from './constants';
@@ -42,9 +35,7 @@ function TextFilter({
       value={String(filters[field] ?? '')}
       placeholder={placeholder}
       width={width}
-      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-        onFilterChange(field, e.target.value)
-      }
+      onChange={(e: ChangeEvent<HTMLInputElement>) => onFilterChange(field, e.target.value)}
       onSearch={onSearch}
     />
   );
@@ -73,8 +64,7 @@ export function OperatorIdFilter() {
 }
 export function GameIdFilter() {
   useRevealCodes();
-  const { filters, onFilterChange, onSearch, gameIdOptions } =
-    useHouseGamesFilters();
+  const { filters, onFilterChange, onSearch, gameIdOptions } = useHouseGamesFilters();
   const options = useMemo(() => {
     const seen = new Set<string>();
     const list: string[] = [];

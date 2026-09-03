@@ -21,10 +21,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import {
-  formatCategoryLabel,
-  unpackCatalogGames,
-} from '@/screens/panel/topGames/helpers';
+import { formatCategoryLabel, unpackCatalogGames } from '@/screens/panel/topGames/helpers';
 import type { CatalogGame } from '@/screens/panel/topGames/types';
 import { replaceS3WithCloudfront } from '@/utils/cdnUrl';
 
@@ -39,12 +36,7 @@ type Props = {
   onOpenChange?: (open: boolean) => void;
 };
 
-const BASE_PROVIDERS = [
-  'Plutus-Gaming',
-  'In House Games',
-  'Qtech',
-  'betConstruct',
-];
+const BASE_PROVIDERS = ['Plutus-Gaming', 'In House Games', 'Qtech', 'betConstruct'];
 
 const MANUAL_OPTION = '__manual__';
 
@@ -139,9 +131,7 @@ function ProviderField({
           onSelect(e.target.value);
         }}
       >
-        <MenuItem value="">
-          {loading ? 'Loading…' : 'Select provider'}
-        </MenuItem>
+        <MenuItem value="">{loading ? 'Loading…' : 'Select provider'}</MenuItem>
         {options.map((provider) => (
           <MenuItem key={provider} value={provider}>
             {provider}
@@ -187,12 +177,10 @@ export function AddTopGamePanel({
   );
 
   const providerOptions = useMemo(() => {
-    const fromCatalog = catalogGames
-      .map((game) => game.providerName)
-      .filter(Boolean);
-    return Array.from(
-      new Set([...BASE_PROVIDERS, ...existingProviders, ...fromCatalog]),
-    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    const fromCatalog = catalogGames.map((game) => game.providerName).filter(Boolean);
+    return Array.from(new Set([...BASE_PROVIDERS, ...existingProviders, ...fromCatalog])).sort(
+      (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }),
+    );
   }, [catalogGames, existingProviders]);
 
   useEffect(() => {
@@ -229,10 +217,7 @@ export function AddTopGamePanel({
     return position;
   };
 
-  const requireFields = (
-    values: Record<string, string>,
-    labels: Record<string, string>,
-  ) => {
+  const requireFields = (values: Record<string, string>, labels: Record<string, string>) => {
     const missing = Object.keys(labels).find((key) => !values[key]?.trim());
     if (missing) throw new Error(`${labels[missing]} is required`);
   };
@@ -309,9 +294,7 @@ export function AddTopGamePanel({
         toast.success('Game added successfully');
         await onAdded();
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : 'Failed to add game',
-        );
+        toast.error(error instanceof Error ? error.message : 'Failed to add game');
       } finally {
         setSubmitting(false);
       }
@@ -320,17 +303,10 @@ export function AddTopGamePanel({
     [mode, catalog, manual, objectCategory, objectPosition, gameObject, onAdded],
   );
 
-  const categorySelect = (
-    value: string,
-    onChange: (value: string) => void,
-  ) => (
+  const categorySelect = (value: string, onChange: (value: string) => void) => (
     <FormControl size="small" fullWidth>
       <InputLabel>Category</InputLabel>
-      <Select
-        label="Category"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
+      <Select label="Category" value={value} onChange={(e) => onChange(e.target.value)}>
         <MenuItem value="">Select category</MenuItem>
         {categoryOptions.map((category) => (
           <MenuItem key={category} value={category}>
@@ -414,8 +390,7 @@ export function AddTopGamePanel({
           {mode === 'catalog' ? (
             <Stack spacing={1.5}>
               <Typography variant="body2" color="text.secondary">
-                Select the provider from the list (or enter it manually), then
-                type the Game ID.
+                Select the provider from the list (or enter it manually), then type the Game ID.
               </Typography>
               <Box
                 sx={{
@@ -434,9 +409,7 @@ export function AddTopGamePanel({
                   manual={manualEntry.catalogProvider}
                   options={providerOptions}
                   loading={catalogLoading}
-                  onSelect={(providerName) =>
-                    setCatalog((prev) => ({ ...prev, providerName }))
-                  }
+                  onSelect={(providerName) => setCatalog((prev) => ({ ...prev, providerName }))}
                   onManualChange={(providerName) =>
                     setCatalog((prev) => ({ ...prev, providerName }))
                   }
@@ -452,9 +425,7 @@ export function AddTopGamePanel({
                   label="Game ID"
                   size="small"
                   value={catalog.gameId}
-                  onChange={(e) =>
-                    setCatalog((prev) => ({ ...prev, gameId: e.target.value }))
-                  }
+                  onChange={(e) => setCatalog((prev) => ({ ...prev, gameId: e.target.value }))}
                   placeholder="EVO-monopoly"
                 />
                 {categorySelect(catalog.category, (category) =>
@@ -480,8 +451,8 @@ export function AddTopGamePanel({
           {mode === 'manual' ? (
             <Stack spacing={1.5}>
               <Typography variant="body2" color="text.secondary">
-                Select or enter the provider, type the Game ID, and fill the
-                remaining details with an image URL.
+                Select or enter the provider, type the Game ID, and fill the remaining details with
+                an image URL.
               </Typography>
               <Box
                 sx={{
@@ -500,9 +471,7 @@ export function AddTopGamePanel({
                   manual={manualEntry.manualProvider}
                   options={providerOptions}
                   loading={catalogLoading}
-                  onSelect={(providerName) =>
-                    setManual((prev) => ({ ...prev, providerName }))
-                  }
+                  onSelect={(providerName) => setManual((prev) => ({ ...prev, providerName }))}
                   onManualChange={(providerName) =>
                     setManual((prev) => ({ ...prev, providerName }))
                   }
@@ -518,18 +487,14 @@ export function AddTopGamePanel({
                   label="Game ID"
                   size="small"
                   value={manual.gameId}
-                  onChange={(e) =>
-                    setManual((prev) => ({ ...prev, gameId: e.target.value }))
-                  }
+                  onChange={(e) => setManual((prev) => ({ ...prev, gameId: e.target.value }))}
                   placeholder="EVO-monopoly"
                 />
                 <TextField
                   label="Game Name"
                   size="small"
                   value={manual.gameName}
-                  onChange={(e) =>
-                    setManual((prev) => ({ ...prev, gameName: e.target.value }))
-                  }
+                  onChange={(e) => setManual((prev) => ({ ...prev, gameName: e.target.value }))}
                   placeholder="Monopoly"
                 />
                 {categorySelect(manual.category, (category) =>
@@ -588,8 +553,7 @@ export function AddTopGamePanel({
           {mode === 'object' ? (
             <Stack spacing={1.5}>
               <Typography variant="body2" color="text.secondary">
-                Paste the complete game JSON object. It must include a{' '}
-                <code>gameId</code>.
+                Paste the complete game JSON object. It must include a <code>gameId</code>.
               </Typography>
               <Box
                 sx={{
@@ -633,13 +597,7 @@ export function AddTopGamePanel({
               type="submit"
               variant="contained"
               disabled={submitting}
-              startIcon={
-                submitting ? (
-                  <CircularProgress size={16} color="inherit" />
-                ) : (
-                  <AddIcon />
-                )
-              }
+              startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
               sx={orangeBtnSx}
             >
               {submitting ? 'Adding…' : 'Add Game'}

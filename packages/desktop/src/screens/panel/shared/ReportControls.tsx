@@ -157,12 +157,7 @@ export function ReportPager({ page, totalPages, onChange, disabled, total }: Pag
       ) : (
         <span />
       )}
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        onChange={onChange}
-        disabled={disabled}
-      />
+      <Pagination page={page} totalPages={totalPages} onChange={onChange} disabled={disabled} />
     </div>
   );
 }

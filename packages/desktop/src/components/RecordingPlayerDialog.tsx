@@ -17,14 +17,8 @@ type RecordingPlayerDialogProps = {
   onClose: () => void;
 };
 
-export function RecordingPlayerDialog({
-  url,
-  onClose,
-}: RecordingPlayerDialogProps) {
-  const streamUrl = useMemo(
-    () => (url ? window.gcalc?.recordingUrl(url) || '' : ''),
-    [url],
-  );
+export function RecordingPlayerDialog({ url, onClose }: RecordingPlayerDialogProps) {
+  const streamUrl = useMemo(() => (url ? window.gcalc?.recordingUrl(url) || '' : ''), [url]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 

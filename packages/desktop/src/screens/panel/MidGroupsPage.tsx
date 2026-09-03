@@ -134,11 +134,7 @@ export function MidGroupsPage() {
     }
     setAddGroupOpen(false);
     setNewGroupName('');
-    void runMutation(
-      'funds.midGroupsAddGroup',
-      { group, mids: [] },
-      `Group "${group}" added`,
-    );
+    void runMutation('funds.midGroupsAddGroup', { group, mids: [] }, `Group "${group}" added`);
   };
 
   return (
@@ -187,11 +183,7 @@ export function MidGroupsPage() {
           >
             Refresh
           </Button>
-          <Button
-            startIcon={<AddIcon />}
-            onClick={() => setAddGroupOpen(true)}
-            sx={orangeBtnSx}
-          >
+          <Button startIcon={<AddIcon />} onClick={() => setAddGroupOpen(true)} sx={orangeBtnSx}>
             Add Group
           </Button>
         </Stack>
@@ -424,12 +416,14 @@ export function MidGroupsPage() {
                     variant="outlined"
                     disabled={busy}
                     onClick={() =>
-                      openConfirm(`Remove group "${groupName}" and all its MIDs?`, () =>
-                        void runMutation(
-                          'funds.midGroupsRemoveGroup',
-                          { group: groupName },
-                          `Group "${groupName}" removed`,
-                        ),
+                      openConfirm(
+                        `Remove group "${groupName}" and all its MIDs?`,
+                        () =>
+                          void runMutation(
+                            'funds.midGroupsRemoveGroup',
+                            { group: groupName },
+                            `Group "${groupName}" removed`,
+                          ),
                       )
                     }
                   >
@@ -516,12 +510,14 @@ export function MidGroupsPage() {
                       disabled={busy || !selected}
                       onClick={() => {
                         if (!selected) return;
-                        openConfirm(`Remove MID "${selected}" from ${groupName}?`, () =>
-                          void runMutation(
-                            'funds.midGroupsRemoveMid',
-                            { group: groupName, mids: [selected] },
-                            `MID removed from ${groupName}`,
-                          ),
+                        openConfirm(
+                          `Remove MID "${selected}" from ${groupName}?`,
+                          () =>
+                            void runMutation(
+                              'funds.midGroupsRemoveMid',
+                              { group: groupName, mids: [selected] },
+                              `MID removed from ${groupName}`,
+                            ),
                         );
                       }}
                     >
@@ -566,11 +562,7 @@ export function MidGroupsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => confirmAction?.()}
-          >
+          <Button color="error" variant="contained" onClick={() => confirmAction?.()}>
             Confirm
           </Button>
         </DialogActions>

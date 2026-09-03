@@ -8,6 +8,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useEffect, useState } from 'react';
 import type { RoleOption, SubAdminEditType } from './usersHelpers';
 import type { UserRow } from './utils';
 
@@ -28,11 +29,10 @@ type BlockProps = {
 
 type DumpProps = {
   target: UserRow | null;
-  reason: string;
-  setReason: (v: string) => void;
   actionBusyId: string;
   close: () => void;
-  confirm: () => void;
+  /** Called with trimmed reason; returns whether dump succeeded. */
+  confirm: (reason: string) => Promise<boolean>;
   maxRemark: number;
 };
 
@@ -86,25 +86,78 @@ type Props = {
   blockCaller: BlockCallerProps;
 };
 
-export function UsersDialogs({
-  block,
-  dump,
-  subEdit,
-  role,
-  realName,
-  blockCaller,
-}: Props) {
+/** Local reason state — avoids re-rendering the heavy Users table on every keystroke. */
+function DumpConfirmDialog({ dump }: { dump: DumpProps }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const open = Boolean(dump.target);
+  const busy = submitting || dump.actionBusyId === dump.target?._id;
+
+  useEffect(() => {
+    if (open) {
+      setReason('');
+      setSubmitting(false);
+    }
+  }, [open, dump.target?._id]);
+
+  const handleConfirm = async () => {
+    const trimmed = reason.trim();
+    if (!trimmed) return;
+    setSubmitting(true);
+    try {
+      const ok = await dump.confirm(trimmed);
+      if (!ok) setSubmitting(false);
+    } catch {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={() => !busy && dump.close()}
+      disableScrollLock
+      keepMounted={false}
+    >
+      <DialogTitle>Confirm</DialogTitle>
+      <DialogContent>
+        <Typography sx={{ mb: 1.5 }}>Are you sure you want to dump this user?</Typography>
+        <TextField
+          autoFocus
+          fullWidth
+          label="Reason"
+          variant="outlined"
+          value={reason}
+          onChange={(e) => setReason(e.target.value.slice(0, dump.maxRemark))}
+          inputProps={{ maxLength: dump.maxRemark }}
+          disabled={busy}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button color="secondary" onClick={dump.close} disabled={busy}>
+          No
+        </Button>
+        <Button
+          variant="contained"
+          color="error"
+          disabled={busy || !reason.trim()}
+          onClick={() => void handleConfirm()}
+        >
+          {busy ? '…' : 'Yes'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+export function UsersDialogs({ block, dump, subEdit, role, realName, blockCaller }: Props) {
   return (
     <>
       <Dialog open={Boolean(block.target)} onClose={block.close}>
-        <DialogTitle>
-          {block.nextStatus ? 'Block' : 'Unblock'} user
-        </DialogTitle>
+        <DialogTitle>{block.nextStatus ? 'Block' : 'Unblock'} user</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {block.otpSending
-              ? 'Sending OTP to SuperAdmin…'
-              : 'Enter OTP and remark to continue.'}
+            {block.otpSending ? 'Sending OTP to SuperAdmin…' : 'Enter OTP and remark to continue.'}
           </Typography>
           <TextField
             autoFocus
@@ -112,9 +165,7 @@ export function UsersDialogs({
             required
             label="Please enter OTP"
             value={block.otp}
-            onChange={(e) =>
-              block.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))
-            }
+            onChange={(e) => block.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
             inputMode="numeric"
             sx={{ mb: 2 }}
           />
@@ -146,36 +197,7 @@ export function UsersDialogs({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(dump.target)} onClose={dump.close}>
-        <DialogTitle>Confirm</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ mb: 1.5 }}>
-            Are you sure you want to dump this user?
-          </Typography>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Reason"
-            variant="outlined"
-            value={dump.reason}
-            onChange={(e) => dump.setReason(e.target.value.slice(0, dump.maxRemark))}
-            inputProps={{ maxLength: dump.maxRemark }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button color="secondary" onClick={dump.close}>
-            No
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            disabled={dump.actionBusyId === dump.target?._id}
-            onClick={() => void dump.confirm()}
-          >
-            Yes
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DumpConfirmDialog dump={dump} />
 
       <Dialog
         open={Boolean(subEdit.edit)}
@@ -305,9 +327,7 @@ export function UsersDialogs({
         fullWidth
         maxWidth="xs"
       >
-        <DialogTitle>
-          {blockCaller.next ? 'Block Caller' : 'Un Block Caller'}
-        </DialogTitle>
+        <DialogTitle>{blockCaller.next ? 'Block Caller' : 'Un Block Caller'}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -315,9 +335,7 @@ export function UsersDialogs({
             size="small"
             label="OTP"
             value={blockCaller.otp}
-            onChange={(e) =>
-              blockCaller.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))
-            }
+            onChange={(e) => blockCaller.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
             sx={{ mt: 1, mb: 2 }}
           />
           <TextField
@@ -325,9 +343,7 @@ export function UsersDialogs({
             size="small"
             label="Remark"
             value={blockCaller.remark}
-            onChange={(e) =>
-              blockCaller.setRemark(e.target.value.slice(0, blockCaller.maxRemark))
-            }
+            onChange={(e) => blockCaller.setRemark(e.target.value.slice(0, blockCaller.maxRemark))}
           />
         </DialogContent>
         <DialogActions>

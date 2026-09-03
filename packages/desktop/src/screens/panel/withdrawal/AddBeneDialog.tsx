@@ -78,9 +78,7 @@ export function AddBeneDialog({
 
   const toggle = (bank: string) => {
     if (existingSet.has(normalize(bank))) return;
-    setSelected((prev) =>
-      prev.includes(bank) ? prev.filter((b) => b !== bank) : [...prev, bank],
-    );
+    setSelected((prev) => (prev.includes(bank) ? prev.filter((b) => b !== bank) : [...prev, bank]));
   };
 
   const removeFromMasterList = async (bank: string) => {

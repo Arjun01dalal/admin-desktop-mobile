@@ -317,9 +317,7 @@ export function DumpUsersPage() {
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={(event) => {
               event.stopPropagation();
               void load();

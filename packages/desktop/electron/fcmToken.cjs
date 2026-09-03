@@ -7,7 +7,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { app } = require('electron');
+const { app, safeStorage } = require('electron');
 const { optionalEnv } = require('./config.cjs');
 
 /** Defaults from packages/mobile/google-services.json (astro-admin-panel). */
@@ -45,23 +45,59 @@ function credentialsPath() {
   return path.join(app.getPath('userData'), 'astro-fcm-credentials.json');
 }
 
+function encryptionAvailable() {
+  try {
+    return Boolean(safeStorage?.isEncryptionAvailable?.());
+  } catch {
+    return false;
+  }
+}
+
+function removeStoredFile() {
+  try {
+    fs.rmSync(credentialsPath(), { force: true });
+  } catch {
+    // ignore cleanup failures
+  }
+}
+
 function readStored() {
   try {
-    const raw = fs.readFileSync(credentialsPath(), 'utf8');
-    const parsed = JSON.parse(raw);
+    if (!encryptionAvailable()) {
+      // Do not leave an encrypted or legacy plaintext credential file behind
+      // when the OS keychain is unavailable.
+      removeStoredFile();
+      return null;
+    }
+    const raw = fs.readFileSync(credentialsPath());
+    const parsed = JSON.parse(safeStorage.decryptString(raw));
     const token = String(parsed?.fcm?.token || '').trim();
     if (token) return { token, credentials: parsed };
   } catch {
-    // missing / corrupt
+    // Missing, corrupt, or legacy plaintext state is not trusted.
+    removeStoredFile();
   }
   return null;
 }
 
 function writeStored(credentials) {
   try {
-    fs.writeFileSync(credentialsPath(), JSON.stringify(credentials, null, 2), 'utf8');
+    if (!encryptionAvailable()) {
+      removeStoredFile();
+      return false;
+    }
+    const encrypted = safeStorage.encryptString(JSON.stringify(credentials));
+    fs.writeFileSync(credentialsPath(), encrypted, { mode: 0o600 });
+    try {
+      fs.chmodSync(credentialsPath(), 0o600);
+    } catch {
+      // ignore platform/filesystem permission limitations
+    }
+    return true;
   } catch (err) {
     console.warn('[fcm] failed to persist credentials:', err?.message || err);
+    removeStoredFile();
+    return false;
   }
 }
 
@@ -160,10 +196,7 @@ async function getFcmToken(opts = {}) {
       console.log('[fcm] registered token length=', token.length);
       return { ok: true, fcmToken: token };
     } catch (error) {
-      const message =
-        error?.message ||
-        String(error) ||
-        'Failed to register FCM token';
+      const message = error?.message || String(error) || 'Failed to register FCM token';
       console.warn('[fcm] registration failed:', message);
       return { ok: false, message };
     } finally {

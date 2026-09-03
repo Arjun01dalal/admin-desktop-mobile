@@ -31,7 +31,6 @@ type Props = {
   onSubmit: () => void;
 };
 
-
 /** QR approve dialog — show UPI QR, pick gateway/mid, approve with reason "By UPI ID". */
 export function QrApproveDialog({
   open,
@@ -47,9 +46,7 @@ export function QrApproveDialog({
   onSubmit,
 }: Props) {
   const gateways = Array.from(new Set([...MANUAL_GATEWAYS, ...payoutGateways]));
-  const note = row
-    ? `Note:${sendToBankName(row)}`
-    : '';
+  const note = row ? `Note:${sendToBankName(row)}` : '';
 
   return (
     <Dialog
@@ -71,12 +68,7 @@ export function QrApproveDialog({
                 display: 'inline-flex',
               }}
             >
-              <UpiQr
-                pa={row.upiId}
-                am={row.amount}
-                tn={note}
-                tr={`ORD-${Date.now()}`}
-              />
+              <UpiQr pa={row.upiId} am={row.amount} tn={note} tr={`ORD-${Date.now()}`} />
             </Box>
           ) : (
             <Typography color="warning.main" variant="body2">

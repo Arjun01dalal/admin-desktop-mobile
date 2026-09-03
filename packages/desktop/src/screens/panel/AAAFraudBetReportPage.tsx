@@ -83,20 +83,14 @@ export function AAAFraudBetReportPage() {
     const dynamic = columnsKeys.map((col) => ({
       id: col,
       label: formatColumnLabel(col),
-      render: (row: Record<string, unknown>) =>
-        renderAaaCell(col, row?.[col], setPreviewImage),
+      render: (row: Record<string, unknown>) => renderAaaCell(col, row?.[col], setPreviewImage),
     }));
     return [sr, ...dynamic];
   }, [columnsKeys]);
 
   return (
     <Box sx={{ p: 2 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
-      >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h6" fontWeight={700}>
           AAA Fraud Bet Report
         </Typography>
@@ -148,9 +142,7 @@ export function AAAFraudBetReportPage() {
           onChange={(_e, v) => setStatus(v || 'All')}
           onInputChange={(_e, v) => setStatus(v)}
           sx={{ width: 160 }}
-          renderInput={(params) => (
-            <TextField {...params} label="Status" size="small" />
-          )}
+          renderInput={(params) => <TextField {...params} label="Status" size="small" />}
         />
         <Autocomplete
           freeSolo
@@ -159,9 +151,7 @@ export function AAAFraudBetReportPage() {
           onChange={(_e, v) => setLimit(v || '10')}
           onInputChange={(_e, v) => setLimit(v)}
           sx={{ width: 120 }}
-          renderInput={(params) => (
-            <TextField {...params} label="Limit" size="small" />
-          )}
+          renderInput={(params) => <TextField {...params} label="Limit" size="small" />}
         />
         <Button size="small" variant="contained" onClick={() => void load()} sx={orangeBtnSx}>
           Apply
@@ -169,16 +159,14 @@ export function AAAFraudBetReportPage() {
       </Stack>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        getRowKey={(row, index) =>
-          String(row._id || row.id || row.userId || index)
-        }
-        emptyMessage="No fraud bets found for the selected filters."
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          getRowKey={(row, index) => String(row._id || row.id || row.userId || index)}
+          emptyMessage="No fraud bets found for the selected filters."
+          maxHeight="100%"
+        />
       </TablePanel>
 
       <Dialog open={Boolean(previewImage)} onClose={() => setPreviewImage(null)} maxWidth="md">

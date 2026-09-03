@@ -21,11 +21,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { UserReportTablePanel } from './UserReportTablePanel';
-import {
-  formatAmount,
-  formatDisplayDate,
-  formatDisplayTime,
-} from '@/utils/dates';
+import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
 import { ItemsPerPageField } from './historyFilters';
@@ -179,10 +175,10 @@ export function GameHistoryTab({ userId }: Props) {
     void load();
   }, [load]);
 
-  const search = () => {
+  const search = useCallback(() => {
     if (page !== 1) setPage(1);
     else void load();
-  };
+  }, [load, page]);
 
   const settle = async () => {
     if (!settleId) return;
@@ -401,19 +397,13 @@ export function GameHistoryTab({ userId }: Props) {
       status,
       transactionId,
       winningPoint,
+      search,
     ],
   );
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={1.25}
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        mb={1.5}
-      >
+      <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap mb={1.5}>
         <ItemsPerPageField
           value={itemsPerPage}
           onChange={(v) => {

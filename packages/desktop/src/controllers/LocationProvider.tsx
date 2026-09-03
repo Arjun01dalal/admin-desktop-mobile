@@ -76,8 +76,7 @@ function tryOsLocation(timeoutMs = 5000): Promise<Coords> {
         }
         reject({
           kind: 'timeout',
-          message:
-            'Device GPS timed out (common in Electron). Using network location instead…',
+          message: 'Device GPS timed out (common in Electron). Using network location instead…',
         });
       },
       {
@@ -143,18 +142,21 @@ export function LocationProvider({ children }: Props) {
     hadLocationRef.current = false;
   }, []);
 
-  const markSuccess = useCallback((next: Coords, nextSource: LocationSource, nextAddress?: AddressInfo | null) => {
-    setCoords(next);
-    setSource(nextSource);
-    if (nextAddress) setAddress(nextAddress);
-    setDialogOpen(false);
-    setError(null);
+  const markSuccess = useCallback(
+    (next: Coords, nextSource: LocationSource, nextAddress?: AddressInfo | null) => {
+      setCoords(next);
+      setSource(nextSource);
+      if (nextAddress) setAddress(nextAddress);
+      setDialogOpen(false);
+      setError(null);
 
-    if (!hadLocationRef.current) {
-      toast.success('Location fetch successfully');
-      hadLocationRef.current = true;
-    }
-  }, []);
+      if (!hadLocationRef.current) {
+        toast.success('Location fetch successfully');
+        hadLocationRef.current = true;
+      }
+    },
+    [],
+  );
 
   const requestLocation = useCallback(
     async (options?: { force?: boolean }) => {
@@ -197,8 +199,7 @@ export function LocationProvider({ children }: Props) {
           }
 
           // 2) Network location via geoip-lite (main process) — no OS GPS popup needed
-          const { coords: netCoords, address: netAddress } =
-            await tryNetworkLocation();
+          const { coords: netCoords, address: netAddress } = await tryNetworkLocation();
           markSuccess(netCoords, 'network', netAddress);
           return netCoords;
         } catch (err) {
@@ -225,7 +226,7 @@ export function LocationProvider({ children }: Props) {
       inflightRef.current = run;
       return run;
     },
-    [blockForLocationOff, markSuccess],
+    [markSuccess],
   );
 
   const openLocationSettings = useCallback(() => {
@@ -286,15 +287,13 @@ export function LocationProvider({ children }: Props) {
 
         // GPS denied/unavailable — verify network still works before blocking.
         try {
-          const { coords: netCoords, address: netAddress } =
-            await tryNetworkLocation();
+          const { coords: netCoords, address: netAddress } = await tryNetworkLocation();
           if (cancelled) return;
           markSuccess(netCoords, 'network', netAddress);
         } catch {
           if (cancelled) return;
           blockForLocationOff(
-            failure.message ||
-              'Location is unavailable. Check Location Services and internet.',
+            failure.message || 'Location is unavailable. Check Location Services and internet.',
           );
         }
       }

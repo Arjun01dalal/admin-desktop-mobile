@@ -25,8 +25,13 @@ export function SheetDownloadReportPage() {
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [selectedMid, setSelectedMid] = useState('');
 
-  const { rows, totalPages, total, loading, gateways, load } =
-    useSheetDownloadQuery(page, itemsPerPage, startDate, endDate, selectedMid);
+  const { rows, totalPages, total, loading, gateways, load } = useSheetDownloadQuery(
+    page,
+    itemsPerPage,
+    startDate,
+    endDate,
+    selectedMid,
+  );
   const deferredRows = useDeferredValue(rows);
 
   const applyFilters = useCallback(() => {
@@ -158,16 +163,18 @@ export function SheetDownloadReportPage() {
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load(page)}
             disabled={loading}
             sx={{ fontWeight: 700, flexShrink: 0 }}
           >
             Refresh
           </Button>
-          <Typography fontWeight={700} color="text.secondary" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <Typography
+            fontWeight={700}
+            color="text.secondary"
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
             Total Record : {total}
           </Typography>
         </Stack>

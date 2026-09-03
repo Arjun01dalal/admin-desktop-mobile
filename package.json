@@ -20,8 +20,17 @@
     "desktop:release:mac": "npm run release:mac -w @astro/desktop",
     "desktop:release:all": "npm run release:all -w @astro/desktop",
     "sos-push": "npm run sos-push -w @astro/desktop",
+    "typecheck": "npm run desktop:typecheck && npm run mobile:typecheck && npm run shared:typecheck",
+    "desktop:typecheck": "npm run typecheck -w @astro/desktop",
+    "desktop:lint": "npm run lint -w @astro/desktop",
     "mobile:start": "npm run start -w @astro/mobile",
-    "shared:typecheck": "npm run typecheck -w @astro/shared"
+    "mobile:typecheck": "npm run typecheck -w @astro/mobile",
+    "mobile:lint": "npm run lint -w @astro/mobile",
+    "shared:typecheck": "npm run typecheck -w @astro/shared",
+    "shared:lint": "npm run lint -w @astro/shared",
+    "lint": "npm run desktop:lint && npm run mobile:lint && npm run shared:lint",
+    "format": "prettier --write eslint.config.mjs .prettierrc.json package.json \"packages/*/package.json\" \"packages/desktop/src/**/*.{ts,tsx}\" \"packages/desktop/electron/**/*.cjs\" \"packages/desktop/scripts/**/*.cjs\" \"packages/mobile/src/**/*.{ts,tsx}\" \"packages/mobile/scripts/**/*.cjs\" \"packages/shared/src/**/*.ts\"",
+    "format:check": "prettier --check eslint.config.mjs .prettierrc.json package.json \"packages/*/package.json\" \"packages/desktop/src/**/*.{ts,tsx}\" \"packages/desktop/electron/**/*.cjs\" \"packages/desktop/scripts/**/*.cjs\" \"packages/mobile/src/**/*.{ts,tsx}\" \"packages/mobile/scripts/**/*.cjs\" \"packages/shared/src/**/*.ts\""
   },
   "overrides": {
     "tar": "^7.4.3"
@@ -33,5 +42,16 @@
   "optionalDependencies": {
     "@esbuild/darwin-arm64": "^0.28.2",
     "@rollup/rollup-darwin-arm64": "^4.62.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "typescript-eslint": "^8.68.0"
   }
 }

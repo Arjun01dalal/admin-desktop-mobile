@@ -43,8 +43,7 @@ type GatewayRow = {
   [key: string]: unknown;
 };
 
-const getRowId = (item: WhatsappMidRow) =>
-  String(item._id || item.id || '').trim();
+const getRowId = (item: WhatsappMidRow) => String(item._id || item.id || '').trim();
 
 const dedupe = (values: Array<string | undefined | null>) =>
   Array.from(new Set(values.filter((value): value is string => !!value)));
@@ -103,16 +102,9 @@ export function WhatsappMidPage() {
     const res = await secureApi<unknown>('depositProviders.list', {});
     if (!res.ok) return;
     const providers = asList<GatewayRow>(res.data).filter(isWhatsappGateway);
-    setGatewayNameOptions(
-      dedupe(providers.map((g) => g.name || g.displayName)),
-    );
+    setGatewayNameOptions(dedupe(providers.map((g) => g.name || g.displayName)));
     setGatewayMidOptions(
-      dedupe(
-        providers.flatMap((g) => [
-          g.mid,
-          ...(Array.isArray(g.midArray) ? g.midArray : []),
-        ]),
-      ),
+      dedupe(providers.flatMap((g) => [g.mid, ...(Array.isArray(g.midArray) ? g.midArray : [])])),
     );
   }, []);
 
@@ -137,20 +129,37 @@ export function WhatsappMidPage() {
 
   const availablePositions = useMemo(() => {
     const taken = name
-      ? rows
-          .filter((item) => (item.name || '') === name)
-          .map((item) => Number(item.position))
+      ? rows.filter((item) => (item.name || '') === name).map((item) => Number(item.position))
       : [];
-    return Array.from({ length: 15 }, (_, i) => i + 1).filter(
-      (pos) => !taken.includes(pos),
-    );
+    return Array.from({ length: 15 }, (_, i) => i + 1).filter((pos) => !taken.includes(pos));
   }, [rows, name]);
 
   const sortedRows = useMemo(
     () =>
-      [...rows].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+      [...rows].sort((a, b) => {
+        const byName = (a.name || '').localeCompare(b.name || '');
+        if (byName !== 0) return byName;
+        return (Number(a.position) || 0) - (Number(b.position) || 0);
+      }),
     [rows],
   );
+
+  /** Group rows under each Name (same as mobile / Laxmi web rowSpan grouping). */
+  const groupedByName = useMemo(() => {
+    const groups: { name: string; items: WhatsappMidRow[] }[] = [];
+    const map = new Map<string, WhatsappMidRow[]>();
+    for (const row of sortedRows) {
+      const key = String(row.name || '').trim() || 'Untitled';
+      const list = map.get(key);
+      if (list) list.push(row);
+      else {
+        const next = [row];
+        map.set(key, next);
+        groups.push({ name: key, items: next });
+      }
+    }
+    return groups;
+  }, [sortedRows]);
 
   const handleStatus = async (row: WhatsappMidRow, checked: boolean) => {
     const rowId = getRowId(row);
@@ -165,9 +174,7 @@ export function WhatsappMidPage() {
     }
     setRows((prev) =>
       prev.map((item) =>
-        getRowId(item) === rowId
-          ? { ...item, isCurrentlyActive: checked }
-          : item,
+        getRowId(item) === rowId ? { ...item, isCurrentlyActive: checked } : item,
       ),
     );
   };
@@ -240,11 +247,6 @@ export function WhatsappMidPage() {
   const columns: CommonTableColumn<WhatsappMidRow>[] = useMemo(
     () => [
       {
-        id: 'name',
-        label: 'Name',
-        render: (row) => display(row.name),
-      },
-      {
         id: 'mid',
         label: 'MID',
         render: (row) => display(row.mid),
@@ -293,18 +295,13 @@ export function WhatsappMidPage() {
       },
     ],
     // handleStatus closes over setRows; stable enough for table
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [],
   );
 
   return (
     <Box sx={{ p: 2 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
-      >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h6" fontWeight={700}>
           Set Whatsapp Mid
         </Typography>
@@ -332,13 +329,97 @@ export function WhatsappMidPage() {
       </Stack>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={sortedRows}
-        loading={loading}
-        getRowKey={(row) => getRowId(row) || String(row.mid || Math.random())}
-        maxHeight="100%"
-      />
+        {loading && rows.length === 0 ? (
+          <CommonTable
+            columns={columns}
+            rows={[]}
+            loading
+            emptyMessage="Loading…"
+            maxHeight="100%"
+          />
+        ) : groupedByName.length === 0 ? (
+          <CommonTable
+            columns={columns}
+            rows={[]}
+            loading={false}
+            emptyMessage="No WhatsApp MIDs found"
+            maxHeight="100%"
+          />
+        ) : (
+          <Box
+            sx={{
+              height: '100%',
+              overflow: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              pr: 0.5,
+            }}
+          >
+            {groupedByName.map((group) => (
+              <Box key={group.name} sx={{ flexShrink: 0 }}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1.5}
+                  sx={{
+                    mb: 1,
+                    px: 1.5,
+                    py: 1,
+                    borderRadius: 1,
+                    bgcolor: 'rgba(255, 159, 10, 0.12)',
+                    border: '1px solid rgba(255, 159, 10, 0.35)',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 4,
+                      alignSelf: 'stretch',
+                      borderRadius: 1,
+                      bgcolor: '#ff9f0a',
+                    }}
+                  />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'text.secondary', letterSpacing: 0.6, fontWeight: 600 }}
+                    >
+                      NAME
+                    </Typography>
+                    <Typography variant="subtitle1" fontWeight={700} noWrap>
+                      {group.name}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      minWidth: 28,
+                      height: 28,
+                      px: 1,
+                      borderRadius: 999,
+                      bgcolor: '#ff9f0a',
+                      color: '#1a1200',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: 13,
+                    }}
+                  >
+                    {group.items.length}
+                  </Box>
+                </Stack>
+                <CommonTable
+                  columns={columns}
+                  rows={group.items}
+                  loading={false}
+                  virtualize={false}
+                  getRowKey={(row) => getRowId(row) || String(row.mid || Math.random())}
+                  paper
+                />
+              </Box>
+            ))}
+          </Box>
+        )}
       </TablePanel>
 
       <Dialog
@@ -426,9 +507,7 @@ export function WhatsappMidPage() {
                   setMidError('');
                 }}
               >
-                {manualMidEntry
-                  ? 'Choose from list instead'
-                  : 'Enter MID manually'}
+                {manualMidEntry ? 'Choose from list instead' : 'Enter MID manually'}
               </Typography>
 
               <TextField

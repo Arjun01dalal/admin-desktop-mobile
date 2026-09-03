@@ -19,11 +19,7 @@ import UpdateBetStatusModal from './houseGames/UpdateBetStatusModal';
 import UpdateWinningPointModal from './houseGames/UpdateWinningPointModal';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { useRevealCodes } from '@/context/useRevealCodes';
-import {
-  INITIAL_FILTERS,
-  ITEMS_PER_PAGE_OPTIONS,
-  type FiltersState,
-} from './houseGames/constants';
+import { INITIAL_FILTERS, ITEMS_PER_PAGE_OPTIONS, type FiltersState } from './houseGames/constants';
 import { useHouseGamesQuery } from './houseGames/useHouseGamesQuery';
 import type { HouseGameTransaction } from './houseGames/types';
 
@@ -39,19 +35,11 @@ export function HouseGamesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showWinningPointModal, setShowWinningPointModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<HouseGameTransaction | null>(
-    null,
-  );
+  const [selectedItem, setSelectedItem] = useState<HouseGameTransaction | null>(null);
   const [filters, setFilters] = useState<FiltersState>(INITIAL_FILTERS);
 
-  const {
-    dataArr,
-    totalCount,
-    totalAmount,
-    totalPages,
-    loader,
-    getTransactions,
-  } = useHouseGamesQuery(filters, startDate, endDate, itemsPerPage, currentPage);
+  const { dataArr, totalCount, totalAmount, totalPages, loader, getTransactions } =
+    useHouseGamesQuery(filters, startDate, endDate, itemsPerPage, currentPage);
 
   const handleSearch = useCallback(() => {
     setCurrentPage(1);
@@ -62,12 +50,9 @@ export function HouseGamesPage() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const updateCheckboxFilter = useCallback(
-    (key: 'isBot' | 'human', checked: boolean) => {
-      setFilters((prev) => ({ ...prev, [key]: checked }));
-    },
-    [],
-  );
+  const updateCheckboxFilter = useCallback((key: 'isBot' | 'human', checked: boolean) => {
+    setFilters((prev) => ({ ...prev, [key]: checked }));
+  }, []);
 
   const onEdit = useCallback((item: HouseGameTransaction) => {
     setSelectedItem(item);
@@ -91,17 +76,8 @@ export function HouseGamesPage() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="flex-start"
-        spacing={1.5}
-        sx={{ mb: 1.5 }}
-      >
-        <Typography
-          variant="h5"
-          fontWeight={700}
-          sx={{ flexShrink: 0, lineHeight: '46px', mb: 0 }}
-        >
+      <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ mb: 1.5 }}>
+        <Typography variant="h5" fontWeight={700} sx={{ flexShrink: 0, lineHeight: '46px', mb: 0 }}>
           {toDisplayText('House Krida')}
         </Typography>
         <Box sx={{ flex: 1, minWidth: 0 }}>

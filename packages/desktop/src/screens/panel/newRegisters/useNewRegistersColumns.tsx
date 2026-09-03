@@ -27,11 +27,7 @@ import {
   StateFilter,
   UserComesFromFilter,
 } from './ColumnFilters';
-import type {
-  RegistrationCallLog,
-  RegistrationComment,
-  UserRow,
-} from './types';
+import type { RegistrationCallLog, RegistrationComment, UserRow } from './types';
 import {
   nestedDpId,
   nestedName,
@@ -70,7 +66,6 @@ const iconActionSx = {
   border: '1px solid',
   borderRadius: 1,
 } as const;
-
 
 function AadharAddressCell({ row }: { row: UserRow }) {
   const addr = (row.aadharAddress ||
@@ -134,8 +129,7 @@ const CALLER_HIDDEN_COLUMN_IDS = new Set([
 ]);
 
 export function registrationComments(row: UserRow): RegistrationComment[] {
-  const raw =
-    row.newRegistrationComments || row.registrationComments || row.comments || [];
+  const raw = row.newRegistrationComments || row.registrationComments || row.comments || [];
   return Array.isArray(raw) ? raw : [];
 }
 
@@ -556,12 +550,7 @@ export function useNewRegistersColumns({
         render: (row) => {
           const count = registrationComments(row).length;
           return (
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="center"
-              spacing={0.35}
-            >
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.35}>
               <Tooltip title="Add Comment">
                 <IconButton
                   size="small"
@@ -626,15 +615,9 @@ export function useNewRegistersColumns({
           const logs = registrationCallLogs(row);
           const count = logs.length;
           const latest = count > 0 ? logs[count - 1] : null;
-          const lastLabel =
-            count > 0 ? `Last: ${latest?.who?.userName || '-'}` : 'No calls yet';
+          const lastLabel = count > 0 ? `Last: ${latest?.who?.userName || '-'}` : 'No calls yet';
           return (
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="center"
-              spacing={0.4}
-            >
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.4}>
               <Typography
                 variant="caption"
                 color="text.secondary"

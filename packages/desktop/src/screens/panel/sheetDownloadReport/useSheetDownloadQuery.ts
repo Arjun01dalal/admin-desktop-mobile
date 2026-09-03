@@ -3,11 +3,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { todayIST } from '@/utils/dates';
-import type {
-  PaymentGatewayMid,
-  SheetDownloadListResponse,
-  SheetDownloadRow,
-} from './types';
+import type { PaymentGatewayMid, SheetDownloadListResponse, SheetDownloadRow } from './types';
 
 export function useSheetDownloadQuery(
   page: number,
@@ -24,16 +20,13 @@ export function useSheetDownloadQuery(
   const { next, isCurrent, begin, end } = useRequestGeneration();
 
   const loadGateways = useCallback(async () => {
-    const res = await secureApi<
-      PaymentGatewayMid[] | { payload?: PaymentGatewayMid[] }
-    >('reports.getAllMidOld', {});
+    const res = await secureApi<PaymentGatewayMid[] | { payload?: PaymentGatewayMid[] }>(
+      'reports.getAllMidOld',
+      {},
+    );
     if (!res.ok) return;
     const raw = res.data;
-    const list = Array.isArray(raw)
-      ? raw
-      : Array.isArray(raw?.payload)
-        ? raw.payload
-        : [];
+    const list = Array.isArray(raw) ? raw : Array.isArray(raw?.payload) ? raw.payload : [];
     setGateways(list);
   }, []);
 
@@ -43,16 +36,13 @@ export function useSheetDownloadQuery(
       begin();
       setLoading(true);
       try {
-        const res = await secureApi<SheetDownloadListResponse>(
-          'reports.sheetDownloadAudit',
-          {
-            startDate: startDate || todayIST(),
-            endDate: endDate || todayIST(),
-            itemsPerPage,
-            pageNo,
-            filter: { mid: mid || undefined },
-          },
-        );
+        const res = await secureApi<SheetDownloadListResponse>('reports.sheetDownloadAudit', {
+          startDate: startDate || todayIST(),
+          endDate: endDate || todayIST(),
+          itemsPerPage,
+          pageNo,
+          filter: { mid: mid || undefined },
+        });
 
         if (!isCurrent(gen)) return;
 

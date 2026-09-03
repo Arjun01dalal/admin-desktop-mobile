@@ -63,10 +63,7 @@ export function Pagination({
   const items = getPaginationItems(current, pages, siblingCount);
 
   return (
-    <nav
-      aria-label="Pagination"
-      className={cn('inline-flex items-center gap-1', className)}
-    >
+    <nav aria-label="Pagination" className={cn('inline-flex items-center gap-1', className)}>
       <button
         type="button"
         className={cn(

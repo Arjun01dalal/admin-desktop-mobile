@@ -1,9 +1,6 @@
 import type { ReactNode } from 'react';
 import { Box, type SxProps, type Theme } from '@mui/material';
-import {
-  useFitTableHeight,
-  type FitTableHeightOptions,
-} from '@/hooks/useFitTableHeight';
+import { useFitTableHeight, type FitTableHeightOptions } from '@/hooks/useFitTableHeight';
 
 type Props = FitTableHeightOptions & {
   /** Table markup. Pass `maxHeight="100%"` to CommonTable so it fills the frame. */

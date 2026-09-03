@@ -10,12 +10,5 @@ export {
   ReportPager,
 } from './ReportControls';
 export { ReportDialog } from './ReportDialog';
-export {
-  useReportQuery,
-  asList,
-  asPaged,
-  maskMobile,
-  display,
-  displayRaw,
-} from './useReportQuery';
+export { useReportQuery, asList, asPaged, maskMobile, display, displayRaw } from './useReportQuery';
 export { CLIENT_NAMES, CLIENT_NAME_OPTIONS } from './clientNames';

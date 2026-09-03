@@ -36,4 +36,10 @@ export { useDashboardFilters } from './useDashboardFilters';
 export { useOpsDashboardData } from './useOpsDashboardData';
 export { buildKpiItems } from './buildKpiItems';
 export { buildProviderCards } from './buildProviderCards';
-export { mergeNumericObjects, floorNum, toNum, activeCount, providerWiseActive } from './mergeMetrics';
+export {
+  mergeNumericObjects,
+  floorNum,
+  toNum,
+  activeCount,
+  providerWiseActive,
+} from './mergeMetrics';

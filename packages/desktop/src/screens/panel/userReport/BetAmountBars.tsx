@@ -64,10 +64,7 @@ export function BetAmountBars({ data, collapsible = true }: Props) {
   const body = (
     <Box sx={{ px: 1, pb: 1, pt: 0.25, borderTop: '1px solid #eef1f4' }}>
       {data.length === 0 ? (
-        <Typography
-          color="text.secondary"
-          sx={{ py: 2, fontSize: 12, textAlign: 'center' }}
-        >
+        <Typography color="text.secondary" sx={{ py: 2, fontSize: 12, textAlign: 'center' }}>
           No bet data
         </Typography>
       ) : (
@@ -231,10 +228,7 @@ export function BetAmountBars({ data, collapsible = true }: Props) {
                     <Typography noWrap sx={{ fontSize: 10, color: '#667085' }}>
                       {item.name} · {share}%
                     </Typography>
-                    <Typography
-                      noWrap
-                      sx={{ fontSize: 12, fontWeight: 700, color: '#111827' }}
-                    >
+                    <Typography noWrap sx={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>
                       {formatLabel(amt)}
                     </Typography>
                   </Box>
@@ -300,9 +294,7 @@ export function BetAmountBars({ data, collapsible = true }: Props) {
         {collapsible ? (
           <IconButton
             size="small"
-            aria-label={
-              open ? 'Collapse bet amount overview' : 'Expand bet amount overview'
-            }
+            aria-label={open ? 'Collapse bet amount overview' : 'Expand bet amount overview'}
             onClick={(e) => {
               e.stopPropagation();
               setOpen((v) => !v);

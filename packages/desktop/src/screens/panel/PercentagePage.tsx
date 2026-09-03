@@ -252,19 +252,12 @@ export function PercentagePage() {
           Percentage
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center">
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openAdd}
-            sx={orangeBtnSx}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd} sx={orangeBtnSx}>
             Add
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{
@@ -296,7 +289,12 @@ export function PercentagePage() {
         />
       </TablePanel>
 
-      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={addOpen}
+        onClose={() => !submitting && setAddOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <form onSubmit={submitForm}>
           <DialogTitle>Add Percentage</DialogTitle>
           <DialogContent>
@@ -354,7 +352,12 @@ export function PercentagePage() {
         </form>
       </Dialog>
 
-      <Dialog open={editOpen} onClose={() => !submitting && setEditOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={editOpen}
+        onClose={() => !submitting && setEditOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <form onSubmit={submitForm}>
           <DialogTitle>Edit Percentage</DialogTitle>
           <DialogContent>

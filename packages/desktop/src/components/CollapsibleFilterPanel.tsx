@@ -90,9 +90,7 @@ export function CollapsibleFilterPanel({
             {title}
           </Typography>
           {!open && summary ? (
-            <Box sx={{ color: 'text.secondary', fontSize: 12, minWidth: 0 }}>
-              {summary}
-            </Box>
+            <Box sx={{ color: 'text.secondary', fontSize: 12, minWidth: 0 }}>{summary}</Box>
           ) : null}
         </Stack>
 
@@ -106,11 +104,7 @@ export function CollapsibleFilterPanel({
               toggle();
             }}
           >
-            {open ? (
-              <ExpandLessIcon fontSize="small" />
-            ) : (
-              <ExpandMoreIcon fontSize="small" />
-            )}
+            {open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
           </IconButton>
         </Stack>
       </Stack>

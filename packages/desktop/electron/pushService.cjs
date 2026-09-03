@@ -23,9 +23,7 @@ function getPushConfig() {
     topic,
     server,
     // https:// → wss:// only (never cleartext ws://)
-    wsUrl: topic
-      ? `${server.replace(/^https:/i, 'wss:')}/${encodeURIComponent(topic)}/ws`
-      : '',
+    wsUrl: topic ? `${server.replace(/^https:/i, 'wss:')}/${encodeURIComponent(topic)}/ws` : '',
     publishUrl: topic ? `${server}/${encodeURIComponent(topic)}` : '',
   };
 }
@@ -40,7 +38,15 @@ function startPushClient(handlers = {}) {
   const cfg = getPushConfig();
   if (!cfg.enabled) {
     console.log('[push] disabled — set SOS_PUSH_TOPIC in .env to enable');
-    return { stop() {}, publishSos() { return Promise.resolve(false); }, publishClear() { return Promise.resolve(false); } };
+    return {
+      stop() {},
+      publishSos() {
+        return Promise.resolve(false);
+      },
+      publishClear() {
+        return Promise.resolve(false);
+      },
+    };
   }
 
   let ws = null;
@@ -72,17 +78,17 @@ function startPushClient(handlers = {}) {
     const tags = Array.isArray(msg.tags) ? msg.tags.join(',') : String(msg.tags || '');
     const combined = `${title} ${bodyLower} ${tags}`;
 
-    if (/\bSOS_CLEAR\b/i.test(combined) || combined.includes('sos cleared') || combined.includes('sos_clear')) {
+    if (
+      /\bSOS_CLEAR\b/i.test(combined) ||
+      combined.includes('sos cleared') ||
+      combined.includes('sos_clear')
+    ) {
       log('received SOS clear');
       handlers.onSosCleared?.();
       return;
     }
 
-    if (
-      combined.includes('sos') ||
-      tags.includes('siren') ||
-      tags.includes('rotating_light')
-    ) {
+    if (combined.includes('sos') || tags.includes('siren') || tags.includes('rotating_light')) {
       const typeMatch = body.match(/\btype=([^\s]+)/i);
       const locMatch = body.match(/\blocation=(.+?)(?:\s+blockedByName=|\s*::|\s*$)/i);
       const byMatch = body.match(/\bblockedByName=(.+?)(?:\s*::|\s*$)/i);

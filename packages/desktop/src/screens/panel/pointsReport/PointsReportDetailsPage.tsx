@@ -78,8 +78,7 @@ export function PointsReportDetailsPage() {
       {
         id: 'time',
         label: 'Time',
-        render: (row) =>
-          row.createdOn ? formatDisplayDate(row.createdOn) : '—',
+        render: (row) => (row.createdOn ? formatDisplayDate(row.createdOn) : '—'),
       },
     ],
     [canShowMobile],

@@ -48,9 +48,7 @@ export const PROVIDER_FILTER_META: ReadonlyArray<{
   original: string;
 }> = FILTER_BY_MAP.map((m) => ({ name: m.jyotish, original: m.original }));
 
-export const PROVIDER_FILTERS: ProviderFilter[] = FILTER_BY_MAP.map(
-  (m) => m.jyotish,
-);
+export const PROVIDER_FILTERS: ProviderFilter[] = FILTER_BY_MAP.map((m) => m.jyotish);
 
 export function providerDetailsTitle(name: ProviderFilter): string {
   return `${name} Details`;
@@ -96,11 +94,18 @@ const METRIC_ALIASES: Record<string, string> = {
   Winning: 'Jaya',
   'Total Bet Amount': 'Rashi',
   'Total Active Users': 'Jiva',
+  'Total Played Player': 'Jiva',
+  'Total Played Players': 'Jiva',
   'Total Exchange Players': 'Jiva',
+  'Total Exchange Player': 'Jiva',
   'Total RollBack': 'Nivritti',
+  'Total Roll Back Amount': 'Nivritti',
+  'Total Roll Back': 'Nivritti',
   'Roll Back': 'Nivritti',
   Rollback: 'Nivritti',
   'Rollback Count': 'Nivritti Count',
+  'GGR+Commission': 'Labha',
+  'GGR + Commission': 'Labha',
   RTP: 'Bhava',
   'Update RTP': 'Update Bhava',
   'Players RTP': 'Players Bhava',
@@ -203,7 +208,8 @@ export const PROFIT_LOSS_COLUMN_MAP = [
 // ---------------------------------------------------------------------------
 export const HOUSE_GAMES_MAP = [
   { original: 'House Games', jyotish: 'House Krida' },
-  { original: 'Total Count', jyotish: 'Total' },
+  // Avoid jyotish "Total" — reverse map would rewrite every "Total …" KPI label to "Total Count …".
+  { original: 'Total Count', jyotish: 'Kul Sankhya' },
   { original: 'Game ID', jyotish: 'Krida' },
   { original: 'Operator ID', jyotish: 'Niyanta' },
   { original: 'Winning Point', jyotish: 'Jaya Point' },
@@ -285,6 +291,7 @@ export const COMMON_UI_MAP = [
   { original: 'Player RTP', jyotish: 'Player Bhava' },
   { original: 'Total Casino Deposit', jyotish: 'Total Chandra Deposit' },
   { original: 'Total Jetfair Deposit', jyotish: 'Total Jyeshtha Deposit' },
+  { original: 'Total Satta Matka Deposit', jyotish: 'Total Shatabhisha Deposit' },
   { original: 'Free Points Bonus', jyotish: 'Free Points Varadan' },
   { original: 'Remove Bonus Coins', jyotish: 'Remove Varadan Coins' },
   { original: 'Add Bonus Coins', jyotish: 'Add Varadan Coins' },
@@ -434,16 +441,10 @@ function buildPairs(): {
   add(NAV_MAP.masterData.original, NAV_MAP.masterData.jyotish);
   add(NAV_MAP.liveMatchTotal.original, NAV_MAP.liveMatchTotal.jyotish);
   for (const m of RISK_NAV_MAP) add(m.original, m.jyotish);
-  add(
-    RISK_CARD_TITLES.masterAaaBook.original,
-    RISK_CARD_TITLES.masterAaaBook.jyotish,
-  );
+  add(RISK_CARD_TITLES.masterAaaBook.original, RISK_CARD_TITLES.masterAaaBook.jyotish);
   for (const m of ACTIVE_EXCHANGE_MAP) add(m.original, m.jyotish);
   add(KPI_MAP.totalWithdrawal.original, KPI_MAP.totalWithdrawal.jyotish);
-  add(
-    KPI_MAP.totalPendingWithdrawal.original,
-    KPI_MAP.totalPendingWithdrawal.jyotish,
-  );
+  add(KPI_MAP.totalPendingWithdrawal.original, KPI_MAP.totalPendingWithdrawal.jyotish);
   for (const m of PROFIT_LOSS_COLUMN_MAP) add(m.original, m.jyotish);
   for (const m of HOUSE_GAMES_MAP) add(m.original, m.jyotish);
   for (const m of HOUSE_GAME_ID_MAP) add(m.original, m.jyotish);
@@ -469,25 +470,19 @@ function buildPairs(): {
   const uniqReverse: Array<[string, string]> = [];
   // Prefer Filter-By originals when multiple originals share one Jyotish
   // (e.g. WCO over WACS for Vakra — WAC/WACS is the same WCO provider).
-  const filterOriginals = new Set(
-    FILTER_BY_MAP.map((m) => m.original.toLowerCase()),
-  );
+  const filterOriginals = new Set(FILTER_BY_MAP.map((m) => m.original.toLowerCase()));
   const reverseBuckets = new Map<string, string[]>();
   for (const [o, j] of uniqForward) {
     const list = reverseBuckets.get(j) ?? [];
     list.push(o);
     reverseBuckets.set(j, list);
   }
-  const sortedJyotish = [...reverseBuckets.keys()].sort(
-    (a, b) => b.length - a.length,
-  );
+  const sortedJyotish = [...reverseBuckets.keys()].sort((a, b) => b.length - a.length);
   for (const j of sortedJyotish) {
     if (seenJ.has(j)) continue;
     seenJ.add(j);
     const originals = reverseBuckets.get(j) ?? [];
-    const preferred =
-      originals.find((o) => filterOriginals.has(o.toLowerCase())) ??
-      originals[0];
+    const preferred = originals.find((o) => filterOriginals.has(o.toLowerCase())) ?? originals[0];
     if (preferred) uniqReverse.push([j, preferred]);
   }
 
@@ -507,10 +502,7 @@ function compilePairs(pairs: Array<[string, string]>): CompiledPair[] {
     .filter(([from]) => Boolean(from))
     .map(([from, to]) => ({
       // Recreate RegExp per use via .source — keep one template with gi flags.
-      pattern: new RegExp(
-        `(?<![A-Za-z0-9])${escapeRegExp(from)}(?![A-Za-z0-9])`,
-        'gi',
-      ),
+      pattern: new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(from)}(?![A-Za-z0-9])`, 'gi'),
       to,
     }));
 }
@@ -546,7 +538,7 @@ function skipMapping(raw: string): boolean {
   if (/^\+?\d{8,15}$/.test(t)) return true;
   if (/^[a-f0-9]{24}$/i.test(t)) return true;
   if (/^\d{4}-\d{2}-\d{2}/.test(t)) return true;
-  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(t)) return true;
+  if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}/.test(t)) return true;
   if (t.includes('@')) return true;
   // No letters → nothing to map
   if (!/[A-Za-z]/.test(t)) return true;

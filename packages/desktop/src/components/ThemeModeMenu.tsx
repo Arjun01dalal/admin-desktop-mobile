@@ -1,20 +1,10 @@
 import { useState, type MouseEvent } from 'react';
-import {
-  IconButton,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Tooltip,
-} from '@mui/material';
+import { IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Tooltip } from '@mui/material';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import CheckIcon from '@mui/icons-material/Check';
-import {
-  useColorMode,
-  type ColorModePreference,
-} from '@/context/ColorModeContext';
+import { useColorMode, type ColorModePreference } from '@/context/ColorModeContext';
 
 const OPTIONS: {
   value: ColorModePreference;
@@ -42,10 +32,7 @@ export function ThemeModeMenu() {
 
   return (
     <>
-      <Tooltip
-        title={`Theme: ${preference} (${resolved})`}
-        enterDelay={400}
-      >
+      <Tooltip title={`Theme: ${preference} (${resolved})`} enterDelay={400}>
         <IconButton
           size="small"
           color="inherit"

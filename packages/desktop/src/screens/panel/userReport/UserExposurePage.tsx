@@ -20,21 +20,10 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { UserReportTablePanel } from './UserReportTablePanel';
-import {
-  formatAmount,
-  formatDisplayDate,
-  formatDisplayTime,
-  getStoredUser,
-} from '@/utils/dates';
+import { formatAmount, formatDisplayDate, formatDisplayTime, getStoredUser } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
-type ProviderKey =
-  | 'SattaMatka'
-  | 'Falcon'
-  | 'Jetfair'
-  | 'WCO'
-  | 'AAAExchange'
-  | 'PlutusGaming';
+type ProviderKey = 'SattaMatka' | 'Falcon' | 'Jetfair' | 'WCO' | 'AAAExchange' | 'PlutusGaming';
 
 type ExposureNavState = {
   userId?: string;
@@ -316,14 +305,7 @@ function cellValue(row: Row, col: ColDef, opts?: { srNo?: number }): string {
   return String(raw);
 }
 
-const PLUTUS_SKIP_KEYS = new Set([
-  'txnState',
-  'age',
-  'rawPayload',
-  '__v',
-  '_v',
-  '_id',
-]);
+const PLUTUS_SKIP_KEYS = new Set(['txnState', 'age', 'rawPayload', '__v', '_v', '_id']);
 
 const PLUTUS_DATE_KEYS = new Set([
   'createdOn',
@@ -436,56 +418,57 @@ export function UserExposurePage() {
     void loadLists();
   }, [userId, loadLists, navigate]);
 
-  const onProviderChange = async (next: string) => {
-    setProvider(next);
-    setPlutusPage(1);
-    setEditOpen(false);
-    setEditRow(null);
-    if (next !== 'WCO' && next !== 'AAA Exchange' && next !== 'Plutus Gaming') {
-      return;
-    }
+  const onProviderChange = useCallback(
+    async (next: string) => {
+      setProvider(next);
+      setPlutusPage(1);
+      setEditOpen(false);
+      setEditRow(null);
+      if (next !== 'WCO' && next !== 'AAA Exchange' && next !== 'Plutus Gaming') {
+        return;
+      }
 
-    setLoading(true);
-    try {
-      if (next === 'Plutus Gaming') {
-        if (!userId) {
-          toast.error('User id missing for Plutus Gaming request');
+      setLoading(true);
+      try {
+        if (next === 'Plutus Gaming') {
+          if (!userId) {
+            toast.error('User id missing for Plutus Gaming request');
+            return;
+          }
+          const res = await secureApi('userReport.plutusPendingBets', {
+            userId,
+            itemsPerPage: 100,
+            pageNo: 1,
+          });
+          if (!res.ok) {
+            toast.error(res.message || 'Failed to load Plutus Gaming');
+            return;
+          }
+          setDataMap((prev) => ({
+            ...prev,
+            PlutusGaming: unpackPendingList(res.data),
+          }));
           return;
         }
-        const res = await secureApi('userReport.plutusPendingBets', {
-          userId,
-          itemsPerPage: 100,
-          pageNo: 1,
-        });
+
+        const action =
+          next === 'WCO' ? 'userReport.wcoPendingBet' : 'userReport.exchangePendingBet';
+        const res = await secureApi(action, { userId });
         if (!res.ok) {
-          toast.error(res.message || 'Failed to load Plutus Gaming');
+          toast.error(res.message || `Failed to load ${next}`);
           return;
         }
+        const key: ProviderKey = next === 'WCO' ? 'WCO' : 'AAAExchange';
         setDataMap((prev) => ({
           ...prev,
-          PlutusGaming: unpackPendingList(res.data),
+          [key]: unpackPendingList(res.data),
         }));
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      const action =
-        next === 'WCO'
-          ? 'userReport.wcoPendingBet'
-          : 'userReport.exchangePendingBet';
-      const res = await secureApi(action, { userId });
-      if (!res.ok) {
-        toast.error(res.message || `Failed to load ${next}`);
-        return;
-      }
-      const key: ProviderKey = next === 'WCO' ? 'WCO' : 'AAAExchange';
-      setDataMap((prev) => ({
-        ...prev,
-        [key]: unpackPendingList(res.data),
-      }));
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [userId],
+  );
 
   const reloadCurrentProvider = useCallback(async () => {
     if (provider === 'Plutus Gaming' || provider === 'WCO' || provider === 'AAA Exchange') {
@@ -493,14 +476,12 @@ export function UserExposurePage() {
       return;
     }
     await loadLists();
-  }, [provider, loadLists]);
+  }, [provider, loadLists, onProviderChange]);
 
-  const providerKey =
-    PROVIDERS.find((p) => p.value === provider)?.key || 'SattaMatka';
+  const providerKey = PROVIDERS.find((p) => p.value === provider)?.key || 'SattaMatka';
   const isPlutus = provider === 'Plutus Gaming';
   const statusOptions = statusOptionsFor(providerKey);
-  const showWinningField =
-    provider === 'WCO' && (editStatus === 'W' || editStatus === 'R');
+  const showWinningField = provider === 'WCO' && (editStatus === 'W' || editStatus === 'R');
   const showAmountField = provider === 'SattaMatka' && editStatus === 'w';
 
   const openEdit = useCallback(
@@ -594,14 +575,9 @@ export function UserExposurePage() {
   ]);
 
   const allRows = dataMap[providerKey] || [];
-  const totalPages = isPlutus
-    ? Math.max(1, Math.ceil(allRows.length / plutusItemsPerPage))
-    : 1;
+  const totalPages = isPlutus ? Math.max(1, Math.ceil(allRows.length / plutusItemsPerPage)) : 1;
   const rows = isPlutus
-    ? allRows.slice(
-        (plutusPage - 1) * plutusItemsPerPage,
-        plutusPage * plutusItemsPerPage,
-      )
+    ? allRows.slice((plutusPage - 1) * plutusItemsPerPage, plutusPage * plutusItemsPerPage)
     : allRows;
   const colDefs = isPlutus ? buildPlutusColumns(allRows) : TABLE_COLS[providerKey];
 
@@ -611,9 +587,7 @@ export function UserExposurePage() {
       label: col.label,
       render: (r, index) =>
         cellValue(r, col, {
-          srNo: isPlutus
-            ? (plutusPage - 1) * plutusItemsPerPage + index + 1
-            : undefined,
+          srNo: isPlutus ? (plutusPage - 1) * plutusItemsPerPage + index + 1 : undefined,
         }),
     }));
     if (isPlutus) return dataCols;
@@ -714,9 +688,7 @@ export function UserExposurePage() {
           <CommonTable
             columns={columns}
             rows={rows}
-            getRowKey={(r, i) =>
-              String(r._id || r.transactionId || r.TransactionID || i)
-            }
+            getRowKey={(r, i) => String(r._id || r.transactionId || r.TransactionID || i)}
             loading={loading}
             emptyMessage="No data found"
             minWidth={isPlutus ? 1800 : 1400}
@@ -726,12 +698,7 @@ export function UserExposurePage() {
         </UserReportTablePanel>
       )}
 
-      <Dialog
-        open={editOpen}
-        onClose={() => !saving && setEditOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
+      <Dialog open={editOpen} onClose={() => !saving && setEditOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 800 }}>
           {['WCO', 'AAA Exchange'].includes(provider)
             ? `Update ${toDisplayText(provider)}`

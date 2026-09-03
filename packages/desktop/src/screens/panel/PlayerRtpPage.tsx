@@ -1,4 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -23,13 +24,7 @@ import { display } from './shared';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
-type RtpType =
-  | 'Qtech'
-  | 'WCO'
-  | 'Satta Matka'
-  | 'Falcon'
-  | 'Exchange'
-  | 'AAA Exchange';
+type RtpType = 'Qtech' | 'WCO' | 'Satta Matka' | 'Falcon' | 'Exchange' | 'AAA Exchange';
 
 type QtechGame = {
   gameId?: string;
@@ -270,8 +265,12 @@ export function PlayerRtpPage() {
   }, [draftUserId, draftGameId]);
 
   const applyDates = useCallback(() => {
+    flushSync(() => {
+      setUserId(draftUserId.trim());
+      setGameId(draftGameId.trim());
+    });
     void load();
-  }, [load]);
+  }, [draftUserId, draftGameId, load]);
 
   const qtechColumns = useMemo<CommonTableColumn<QtechRow>[]>(
     () => [
@@ -468,9 +467,7 @@ export function PlayerRtpPage() {
             {fromUserReport ? <BackButton to="/users" /> : null}
             <Button
               variant="outlined"
-              startIcon={
-                loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-              }
+              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
               onClick={() => void load()}
               disabled={loading}
               sx={{

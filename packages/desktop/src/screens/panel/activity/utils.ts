@@ -36,8 +36,7 @@ export function getMetric(item: ActivityRow, key: SortKey | string): number {
     case 'rtp':
       return Number(item.rtp ?? totals.rtp ?? 0);
     case 'ggr': {
-      const hasFlat =
-        item.totalBetAmount != null || item.totalWinAmount != null;
+      const hasFlat = item.totalBetAmount != null || item.totalWinAmount != null;
       if (hasFlat) {
         return Number(item.totalBetAmount ?? 0) - Number(item.totalWinAmount ?? 0);
       }
@@ -84,9 +83,7 @@ export function winCount(item: ActivityRow): number {
 }
 
 export function rollbackCount(item: ActivityRow): number {
-  return Number(
-    item.rollbackCount ?? totalsOf(item).rollbackCount ?? 0,
-  );
+  return Number(item.rollbackCount ?? totalsOf(item).rollbackCount ?? 0);
 }
 
 export function formatMetric(value: number): string | number {
@@ -108,10 +105,7 @@ export function normalizeActivityList(payload: unknown): ActivityRow[] {
   return [];
 }
 
-export function sortActivityRows(
-  rows: ActivityRow[],
-  sort: SortConfig | null,
-): ActivityRow[] {
+export function sortActivityRows(rows: ActivityRow[], sort: SortConfig | null): ActivityRow[] {
   if (!sort) return rows;
   const { key, direction } = sort;
   return [...rows].sort((a, b) => {
@@ -121,10 +115,7 @@ export function sortActivityRows(
   });
 }
 
-export function nextSortConfig(
-  prev: SortConfig | null,
-  key: SortKey,
-): SortConfig {
+export function nextSortConfig(prev: SortConfig | null, key: SortKey): SortConfig {
   if (prev?.key === key) {
     return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
   }

@@ -21,12 +21,7 @@ type Props = {
   onSuccess: () => void;
 };
 
-export default function UpdateBetStatusModal({
-  isOpen,
-  onClose,
-  selectedItem,
-  onSuccess,
-}: Props) {
+export default function UpdateBetStatusModal({ isOpen, onClose, selectedItem, onSuccess }: Props) {
   useRevealCodes();
   const [status, setStatus] = useState('');
   const [winningAmount, setWinningAmount] = useState('');
@@ -35,9 +30,7 @@ export default function UpdateBetStatusModal({
   useEffect(() => {
     if (isOpen && selectedItem) {
       setStatus(String(selectedItem?.status ?? ''));
-      setWinningAmount(
-        String(selectedItem?.winningAmount ?? selectedItem?.amount ?? ''),
-      );
+      setWinningAmount(String(selectedItem?.winningAmount ?? selectedItem?.amount ?? ''));
     }
   }, [isOpen, selectedItem]);
 

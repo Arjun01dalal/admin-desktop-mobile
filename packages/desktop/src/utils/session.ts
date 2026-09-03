@@ -17,18 +17,12 @@ const AUTH_STORAGE_KEYS = [
   'blocked_user_ids_cache',
 ] as const;
 
-const AUTH_SESSION_KEYS = [
-  'last_panel_path',
-  'llm_chat_messages',
-  'llm_chat_open',
-] as const;
+const AUTH_SESSION_KEYS = ['last_panel_path', 'llm_chat_messages', 'llm_chat_open'] as const;
 
 let logoutInFlight = false;
 let expiredHandler: ((reason: string) => void) | null = null;
 
-export function setSessionExpiredHandler(
-  handler: ((reason: string) => void) | null,
-): void {
+export function setSessionExpiredHandler(handler: ((reason: string) => void) | null): void {
   expiredHandler = handler;
 }
 
@@ -67,9 +61,7 @@ export function isAuthExpiredStatus(status?: number): boolean {
  * Clears all auth data and asks App to return to the ThirdEye site.
  * Safe to call many times — only the first trigger runs.
  */
-export function notifySessionExpired(
-  reason = 'Session expired. Please login again.',
-): void {
+export function notifySessionExpired(reason = 'Session expired. Please login again.'): void {
   if (logoutInFlight) return;
   logoutInFlight = true;
 
@@ -82,9 +74,7 @@ export function notifySessionExpired(
   }
 
   try {
-    window.dispatchEvent(
-      new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { reason } }),
-    );
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { reason } }));
   } catch {
     // ignore
   }

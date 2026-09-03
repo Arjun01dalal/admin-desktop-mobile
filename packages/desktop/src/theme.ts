@@ -148,11 +148,10 @@ function formFieldOverrides(calendarIcon: string, isDark: boolean) {
                 backgroundSize: '18px 18px',
               },
             },
-          '& input[type="date"], & input[type="time"], & input[type="datetime-local"]':
-            {
-              position: 'relative',
-              colorScheme: 'light',
-            },
+          '& input[type="date"], & input[type="time"], & input[type="datetime-local"]': {
+            position: 'relative',
+            colorScheme: 'light',
+          },
           '& input[type="date"]::-webkit-calendar-picker-indicator, & input[type="time"]::-webkit-calendar-picker-indicator, & input[type="datetime-local"]::-webkit-calendar-picker-indicator':
             {
               cursor: 'pointer',

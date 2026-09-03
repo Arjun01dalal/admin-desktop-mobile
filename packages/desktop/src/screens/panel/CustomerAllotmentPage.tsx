@@ -275,9 +275,7 @@ export function CustomerAllotmentPage() {
         if (!isCurrent(gen)) return;
 
         if (!res.ok || res.success === false) {
-          const msg =
-            res.message ||
-            'Failed to load customer allotment (get-all-customerSupport)';
+          const msg = res.message || 'Failed to load customer allotment (get-all-customerSupport)';
           console.error('[CustomerAllotment] customers API failed', {
             message: res.message,
             status: res.status,
@@ -304,10 +302,7 @@ export function CustomerAllotmentPage() {
         // Load deposit stats after the list succeeds (never block / toast on failure).
         void loadDeposits(safePage, size);
       } catch (err) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : 'Failed to load customer allotment';
+        const msg = err instanceof Error ? err.message : 'Failed to load customer allotment';
         console.error('[CustomerAllotment] unexpected error', err);
         setError(msg);
         toast.error(msg);
@@ -631,9 +626,7 @@ export function CustomerAllotmentPage() {
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={(event) => {
               event.stopPropagation();
               void loadCustomers(page);
@@ -765,7 +758,14 @@ export function CustomerAllotmentPage() {
           Caller Report{reportTarget?.name ? ` — ${reportTarget.name}` : ''}
         </DialogTitle>
         <DialogContent>
-          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap pt={1}>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            pt={1}
+          >
             <TextField
               type="date"
               label="From Date"
@@ -825,8 +825,7 @@ export function CustomerAllotmentPage() {
                   {depositLabel(reportData.depositData?.depositData)}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Scanner deposit:</strong>{' '}
-                  {depositLabel(reportData.depositData?.coinData)}
+                  <strong>Scanner deposit:</strong> {depositLabel(reportData.depositData?.coinData)}
                 </Typography>
               </Stack>
               <Box
@@ -840,12 +839,12 @@ export function CustomerAllotmentPage() {
                   ['Handle Call', reportData.handleCall],
                   ['Incoming Missed', reportData.incomingMissedCall],
                   ['Outgoing Missed', reportData.outgoingMissedCall],
-                  [
-                    'Spent Call Time',
-                    `${((reportData.spentCallTime || 0) / 60).toFixed(2)} min`,
-                  ],
+                  ['Spent Call Time', `${((reportData.spentCallTime || 0) / 60).toFixed(2)} min`],
                 ].map(([label, value]) => (
-                  <Paper key={String(label)} sx={{ p: 1.5, bgcolor: '#121218', textAlign: 'center' }}>
+                  <Paper
+                    key={String(label)}
+                    sx={{ p: 1.5, bgcolor: '#121218', textAlign: 'center' }}
+                  >
                     <Typography variant="caption" color="text.secondary">
                       {label}
                     </Typography>

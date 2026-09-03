@@ -17,12 +17,7 @@ import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, formatDisplayTime, todayIST, formatAmount } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
-import {
-  useReportQuery,
-  asPaged,
-  display,
-  maskMobile,
-} from './shared';
+import { useReportQuery, asPaged, display, maskMobile } from './shared';
 
 type NewDepositsRow = {
   _id: string;
@@ -91,6 +86,8 @@ export function NewDepositsPage() {
   const navigate = useNavigate();
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
+  const [appliedStart, setAppliedStart] = useState(todayIST);
+  const [appliedEnd, setAppliedEnd] = useState(todayIST);
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
@@ -112,20 +109,25 @@ export function NewDepositsPage() {
     return filter;
   }, [applied]);
 
-  const { rows: rawRows, totalPages, total, loading, load } =
-    useReportQuery<NewDepositsRow>({
-      action: 'ops.newDeposits',
-      buildPayload: () => ({
-        itemsPerPage,
-        pageNo: page,
-        startDate: startDate || todayIST(),
-        endDate: endDate || todayIST(),
-        filter: buildFilter(),
-      }),
-      unpack: (res) => asPaged<NewDepositsRow>(res.data),
-      autoDeps: [page, itemsPerPage, applied],
-      errorMessage: 'Failed to load new deposits',
-    });
+  const {
+    rows: rawRows,
+    totalPages,
+    total,
+    loading,
+    load,
+  } = useReportQuery<NewDepositsRow>({
+    action: 'ops.newDeposits',
+    buildPayload: () => ({
+      itemsPerPage,
+      pageNo: page,
+      startDate: appliedStart || todayIST(),
+      endDate: appliedEnd || todayIST(),
+      filter: buildFilter(),
+    }),
+    unpack: (res) => asPaged<NewDepositsRow>(res.data),
+    autoDeps: [page, itemsPerPage, applied, appliedStart, appliedEnd],
+    errorMessage: 'Failed to load new deposits',
+  });
 
   const rows = useMemo(() => {
     if (accessibleStates.length === 0) return rawRows;
@@ -140,13 +142,14 @@ export function NewDepositsPage() {
   }, [draft]);
 
   const applyDates = useCallback(() => {
+    setApplied(draft);
+    setAppliedStart(startDate);
+    setAppliedEnd(endDate);
     setPage(1);
-    void load();
-  }, [load]);
+  }, [draft, startDate, endDate]);
 
   const setDraftField = useCallback(
-    (key: keyof Filters) => (value: string) =>
-      setDraft((prev) => ({ ...prev, [key]: value })),
+    (key: keyof Filters) => (value: string) => setDraft((prev) => ({ ...prev, [key]: value })),
     [],
   );
 
@@ -181,9 +184,7 @@ export function NewDepositsPage() {
             onClick={() => {
               if (!row._id) return;
               // Laxmi NewDeposits: /user-report/:id/:name
-              navigate(
-                `/users/report/${row._id}/${encodeURIComponent(row.name || '')}`,
-              );
+              navigate(`/users/report/${row._id}/${encodeURIComponent(row.name || '')}`);
             }}
           >
             {display(row.name)}
@@ -227,11 +228,7 @@ export function NewDepositsPage() {
         id: 'previousCallerDpId',
         label: 'Previous Caller DP ID',
         render: (row) =>
-          display(
-            row.previousCaller?.Dp_ID ??
-              row.previousCaller?.DP_ID ??
-              row.previousCallerDpId,
-          ),
+          display(row.previousCaller?.Dp_ID ?? row.previousCaller?.DP_ID ?? row.previousCallerDpId),
       },
       {
         id: 'currentCaller',
@@ -344,13 +341,7 @@ export function NewDepositsPage() {
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}

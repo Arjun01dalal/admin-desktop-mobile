@@ -9,11 +9,7 @@ import type { KpiItem, ProviderCardModel } from './types';
 import { floorNum, toNum } from './mergeMetrics';
 import { useDashboardFilters } from './useDashboardFilters';
 import { useRiskDashboardData } from './useRiskDashboardData';
-import {
-  RISK_CARD_TITLES,
-  RISK_NAV_MAP,
-  metricJyotishLabel,
-} from './jyotishMapping';
+import { RISK_CARD_TITLES, RISK_NAV_MAP, metricJyotishLabel } from './jyotishMapping';
 
 function row(label: string, value: unknown) {
   return { label: metricJyotishLabel(label), value: floorNum(value) };
@@ -26,9 +22,7 @@ function row(label: string, value: unknown) {
 export function RiskAnalysisPage() {
   const navigate = useNavigate();
   const filters = useDashboardFilters();
-  const { bundle, loading, error, reload } = useRiskDashboardData(
-    filters.applied,
-  );
+  const { bundle, loading, error, reload } = useRiskDashboardData(filters.applied);
 
   const dateQuery = useMemo(() => {
     const q = new URLSearchParams({
@@ -99,10 +93,7 @@ export function RiskAnalysisPage() {
           row('Total Win Amount', falcon.payout),
           row('GGR', falcon.TotalGGR ?? falcon.totalGGR),
           row('Commission', falcon.CommissionAmount),
-          row(
-            'GGR - Upline + Commission',
-            falcon.final_ggr ?? falcon.finalGgr,
-          ),
+          row('GGR - Upline + Commission', falcon.final_ggr ?? falcon.finalGgr),
         ],
       },
       {
@@ -116,10 +107,7 @@ export function RiskAnalysisPage() {
           row('Total Bet Amount', aaa.totalVolume),
           row('Total Win', aaa.totalClientWin),
           row('Total Active Users', aaa.totalClient),
-          row(
-            'GGR (Without commission)',
-            aaa.totalWinLossWithoutCommission,
-          ),
+          row('GGR (Without commission)', aaa.totalWinLossWithoutCommission),
           row('Commission', aaa.totalCommission),
           row('Gross GGR', aaa.finalWinLoss),
         ],
@@ -135,10 +123,7 @@ export function RiskAnalysisPage() {
           row('Total Bet Amount', masterAaa.totalVolume),
           row('Total Win', masterAaa.totalClientWin),
           row('Total Active Users', masterAaa.totalClient),
-          row(
-            'GGR (Without commission)',
-            masterAaa.totalWinLossWithoutCommission,
-          ),
+          row('GGR (Without commission)', masterAaa.totalWinLossWithoutCommission),
           row('Commission', masterAaa.totalCommission),
           row('Gross GGR', masterAaa.finalWinLoss),
         ],

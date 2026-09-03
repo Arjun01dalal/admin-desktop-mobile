@@ -1,24 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
-import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
-import { roleFlags, type StoredCallerUser } from './utils';
+import type { StoredCallerUser } from './utils';
 
 type NavState = {
   activeBotUsers?: CallerRow[];
@@ -26,11 +17,24 @@ type NavState = {
   endDate?: string;
 };
 
+function formatBalance(value: unknown): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '-';
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
+function firstBotId(row: CallerRow): string {
+  const ids = row.botIds;
+  if (Array.isArray(ids) && ids.length > 0) return String(ids[0] ?? '-');
+  if (ids != null && ids !== '') return String(ids);
+  return '-';
+}
+
 export function ActiveBotUsersPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const nav = (location.state || {}) as NavState;
   const user = getStoredUser<StoredCallerUser>();
-  const { isCaller } = roleFlags(user?.Role_ID);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
 
   const [startDate, setStartDate] = useState(() => nav.startDate || todayIST());
@@ -63,43 +67,76 @@ export function ActiveBotUsersPage() {
 
   const columns = useMemo<CommonTableColumn<CallerRow>[]>(() => {
     const cols: CommonTableColumn<CallerRow>[] = [
-      { id: '#', label: '#', width: 48, render: (_r, i) => i + 1 },
+      { id: 'sr', label: 'SR.No', width: 64, render: (_r, i) => i + 1 },
       {
         id: 'name',
         label: 'Name',
-        render: (r) => String(r.name || r.userName || '-'),
+        render: (r) => {
+          const name = String(r.name || r.userName || '-');
+          const id = String(r._id || r.userId || '');
+          if (!id) return name;
+          return (
+            <Box
+              component="span"
+              sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+              onClick={() => navigate(`/users/report/${id}/${encodeURIComponent(name)}`)}
+            >
+              {name}
+            </Box>
+          );
+        },
       },
       {
         id: 'dp',
         label: 'DP ID',
         render: (r) => <CopyText value={String(r._id || r.userId || '')} />,
       },
-    ];
-    if (!isCaller) {
-      cols.push({
-        id: 'mobile',
-        label: 'Mobile',
-        render: (r) => {
-          const mob = String(r.mobile || r.userMobile || '');
-          if (!canShowMobile) return maskMobile(mob, false);
-          return mob ? <CopyText value={mob} /> : '—';
-        },
-      });
-    }
-    cols.push(
+      {
+        id: 'bot',
+        label: 'Bot ID',
+        render: (r) => firstBotId(r),
+      },
       {
         id: 'app',
-        label: 'App Code',
-        render: (r) => appCodeForName(r.clientName || r.appName),
+        label: 'App Name',
+        render: (r) => String(r.clientName || r.appName || '-'),
       },
       {
-        id: 'created',
-        label: 'Created',
-        render: (r) => formatDisplayDate(r.createdAt),
+        id: 'mobile',
+        label: 'Mobile No',
+        render: (r) => {
+          const mob = String(r.mobile || r.userMobile || '');
+          if (!mob) return '—';
+          if (!canShowMobile) return maskMobile(mob, false);
+          return <CopyText value={mob} />;
+        },
       },
-    );
+      {
+        id: 'balance',
+        label: 'Balance',
+        render: (r) => formatBalance(r.balance),
+      },
+      {
+        id: 'lastActivity',
+        label: 'Last Activity',
+        render: (r) => {
+          const raw = r.activeUser ?? r.lastActivity ?? r.updatedOn ?? r.updatedAt;
+          return raw ? formatDisplayDate(raw) : '-';
+        },
+      },
+      {
+        id: 'city',
+        label: 'City',
+        render: (r) => String(r.city || '-'),
+      },
+      {
+        id: 'state',
+        label: 'State',
+        render: (r) => String(r.state || '-'),
+      },
+    ];
     return cols;
-  }, [isCaller, canShowMobile]);
+  }, [canShowMobile, navigate]);
 
   return (
     <Box>
@@ -139,15 +176,15 @@ export function ActiveBotUsersPage() {
       </Paper>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(r, i) => String(r._id || r.userId || i)}
-        loading={loading}
-        emptyMessage="No bot users"
-        minWidth={800}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(r, i) => String(r._id || r.userId || i)}
+          loading={loading}
+          emptyMessage="No bot users"
+          minWidth={1100}
+          maxHeight="100%"
+        />
       </TablePanel>
     </Box>
   );

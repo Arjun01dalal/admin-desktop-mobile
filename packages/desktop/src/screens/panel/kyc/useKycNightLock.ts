@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  isKycNightHours,
-  NIGHT_LOCK_KEY,
-  NIGHT_UNLOCK_MS,
-} from './types';
+import { isKycNightHours, NIGHT_LOCK_KEY, NIGHT_UNLOCK_MS } from './types';
 
 /**
  * KYC night lock (8pm–10am IST). Enable-flow OTP unlocks for 1 minute.

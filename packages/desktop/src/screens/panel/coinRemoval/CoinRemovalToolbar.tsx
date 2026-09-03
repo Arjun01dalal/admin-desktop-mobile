@@ -1,10 +1,4 @@
-import {
-  Button,
-  CircularProgress,
-  MenuItem,
-  Stack,
-  TextField,
-} from '@mui/material';
+import { Button, CircularProgress, MenuItem, Stack, TextField } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
@@ -91,9 +85,7 @@ export function CoinRemovalToolbar({
         </Button>
         <Button
           variant="outlined"
-          startIcon={
-            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-          }
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
           onClick={onRefresh}
           disabled={loading}
           sx={{ flexShrink: 0, fontWeight: 700 }}

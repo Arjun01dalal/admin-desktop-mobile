@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   MenuItem,
   Stack,
@@ -10,12 +14,13 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
+import { canUpdateCallerAllotmentEmpCode } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
@@ -47,19 +52,21 @@ type RoleGroup = {
   subAdmins?: SubAdmin[];
 };
 
-type CallerRow = SubAdmin & {
+type CallerRow = SubAdmin;
+
+type CallerHeadOption = { id: string; name: string };
+
+type EditDraft = {
   location: string;
   extensionNo: string;
   botNo: string;
   serverIds: string;
   telegramUserId: string;
+  headIds: string[];
 };
 
-type CallerHeadOption = { id: string; name: string };
-
 const fieldSx = {
-  minWidth: 110,
-  '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
+  '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 13 },
 };
 
 const actionIconBtnSx = {
@@ -79,23 +86,9 @@ const actionIconBtnSx = {
   },
 };
 
-const removeIconBtnSx = {
-  ...actionIconBtnSx,
-  borderColor: '#ef5350',
-  color: '#ef5350',
-  '&:hover': {
-    borderColor: '#e57373',
-    bgcolor: 'rgba(239,83,80,0.12)',
-  },
-  '&.Mui-disabled': {
-    borderColor: 'rgba(239,83,80,0.35)',
-    color: 'rgba(239,83,80,0.45)',
-  },
-};
-
 function formatIdList(value: unknown): string {
-  if (Array.isArray(value)) return value.map(String).filter(Boolean).join(',');
-  if (value == null || value === '') return '';
+  if (Array.isArray(value)) return value.map(String).filter(Boolean).join(', ') || '—';
+  if (value == null || value === '') return '—';
   return String(value);
 }
 
@@ -115,38 +108,40 @@ function parseExtensionIds(value: string): string[] {
     .filter(Boolean);
 }
 
-function toRow(subAdmin: SubAdmin, blockFallback?: boolean): CallerRow {
+function draftFromRow(row: CallerRow): EditDraft {
   return {
-    ...subAdmin,
-    block: subAdmin.block ?? blockFallback ?? false,
-    location: subAdmin.officeLocation || '',
+    location: row.officeLocation || '',
     extensionNo: '',
     botNo: '',
-    serverIds: subAdmin.serverId || '',
-    telegramUserId: subAdmin.telegram_username || '',
+    serverIds: row.serverId || '',
+    telegramUserId: row.telegram_username || '',
+    headIds: [],
   };
 }
 
-/** Caller Allotment — assign caller heads and office/bot/server/telegram attributes. */
+/**
+ * Caller Allotment — read-only table + edit dialog.
+ * Inline inputs on every row made scroll janky; editors live in one dialog.
+ */
 export function CallerAllotmentPage() {
   const [rows, setRows] = useState<CallerRow[]>([]);
   const [callerHeadOptions, setCallerHeadOptions] = useState<CallerHeadOption[]>([]);
-  const [callerHeadMap, setCallerHeadMap] = useState<Record<string, CallerHeadOption[]>>({});
   const [loading, setLoading] = useState(false);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [saving, setSaving] = useState<'head' | 'removeHead' | 'other' | 'empCode' | null>(null);
+  const [editing, setEditing] = useState<CallerRow | null>(null);
+  const [draft, setDraft] = useState<EditDraft | null>(null);
+  const [empCodeEdit, setEmpCodeEdit] = useState<{ id: string; value: string } | null>(null);
+  const canEditEmpCode = canUpdateCallerAllotmentEmpCode();
   const { next, isCurrent, begin, end } = useRequestGeneration();
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
 
   const load = useCallback(async () => {
     const gen = next();
     begin();
     setLoading(true);
     try {
-      const res = await secureApi<{ byRole?: RoleGroup[] }>(
-        'ops.callerAllotmentSubadmins',
-        { filter: {} },
-      );
+      const res = await secureApi<{ byRole?: RoleGroup[] }>('ops.callerAllotmentSubadmins', {
+        filter: {},
+      });
       if (!isCurrent(gen)) return;
 
       if (!res.ok) {
@@ -165,17 +160,17 @@ export function CallerAllotmentPage() {
       const callers = byRole
         .filter((group) => CALLER_ROLE_IDS.has(group.roleId))
         .flatMap((group) =>
-          (group.subAdmins ?? []).map((subAdmin) => toRow(subAdmin, group.block)),
+          (group.subAdmins ?? []).map((subAdmin) => ({
+            ...subAdmin,
+            block: subAdmin.block ?? group.block ?? false,
+          })),
         )
         .sort((a, b) => Number(a.block) - Number(b.block));
 
       setCallerHeadOptions(
-        heads
-          .filter((h) => !h.block)
-          .map((h) => ({ id: h._id, name: h.name || h._id })),
+        heads.filter((h) => !h.block).map((h) => ({ id: h._id, name: h.name || h._id })),
       );
       setRows(callers);
-      setCallerHeadMap({});
     } finally {
       end();
       if (isCurrent(gen)) setLoading(false);
@@ -186,135 +181,150 @@ export function CallerAllotmentPage() {
     void load();
   }, [load]);
 
-  const handleRowChange = useCallback(
-    <K extends keyof CallerRow>(id: string, field: K, value: CallerRow[K]) => {
-      setRows((prev) =>
-        prev.map((row) => (row._id === id ? { ...row, [field]: value } : row)),
+  const openEdit = useCallback((row: CallerRow) => {
+    setEditing(row);
+    setDraft(draftFromRow(row));
+  }, []);
+
+  const closeEdit = useCallback(() => {
+    setEditing(null);
+    setDraft(null);
+  }, []);
+
+  const setDraftField = useCallback(<K extends keyof EditDraft>(key: K, value: EditDraft[K]) => {
+    setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
+  }, []);
+
+  const selectedHeads = useMemo(() => {
+    if (!draft) return [];
+    return callerHeadOptions.filter((opt) => draft.headIds.includes(opt.id));
+  }, [callerHeadOptions, draft]);
+
+  const updateCallerHead = useCallback(async () => {
+    if (!editing) return;
+    if (!selectedHeads.length) {
+      toast.info('Select at least one caller head');
+      return;
+    }
+    setSaving('head');
+    try {
+      const res = await secureApi('ops.updateCallerHead', {
+        _id: editing._id,
+        callerHead: selectedHeads.map((h) => h.name),
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update caller head');
+        return;
+      }
+      toast.success('Caller head updated');
+      closeEdit();
+      void load();
+    } finally {
+      setSaving(null);
+    }
+  }, [editing, selectedHeads, closeEdit, load]);
+
+  const removeCallerHead = useCallback(async () => {
+    if (!editing) return;
+    if (!selectedHeads.length) {
+      toast.error('Please select caller head to remove');
+      return;
+    }
+    setSaving('removeHead');
+    try {
+      const results = await Promise.all(
+        selectedHeads.map((item) =>
+          secureApi('ops.removeCallerHead', {
+            _id: editing._id,
+            callerHead: item.name,
+          }),
+        ),
       );
-    },
-    [],
-  );
-
-  const handleCallerHeadChange = useCallback(
-    (id: string, selectedIds: string[]) => {
-      const selected = callerHeadOptions.filter((opt) => selectedIds.includes(opt.id));
-      setCallerHeadMap((prev) => ({ ...prev, [id]: selected }));
-    },
-    [callerHeadOptions],
-  );
-
-  const updateCallerHead = useCallback(
-    async (row: CallerRow) => {
-      const selectedHeads = callerHeadMap[row._id];
-      if (!selectedHeads?.length) {
-        toast.info('Select at least one caller head');
+      const failed = results.find((r) => !r.ok);
+      if (failed) {
+        toast.error(failed.message || 'Failed to remove caller head');
         return;
       }
-      const key = `${row._id}:head`;
-      setSavingKey(key);
-      try {
-        const res = await secureApi('ops.updateCallerHead', {
-          _id: row._id,
-          callerHead: selectedHeads.map((h) => h.name),
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to update caller head');
-          return;
-        }
-        toast.success('Caller head updated');
-        void load();
-      } finally {
-        setSavingKey(null);
-      }
-    },
-    [callerHeadMap, load],
-  );
+      toast.success('Caller head removed successfully');
+      closeEdit();
+      void load();
+    } finally {
+      setSaving(null);
+    }
+  }, [editing, selectedHeads, closeEdit, load]);
 
-  /** admin-panel-domains removeCallerHead — one API call per selected head name. */
-  const removeCallerHead = useCallback(
-    async (row: CallerRow) => {
-      const selectedHeads = callerHeadMap[row._id] ?? [];
-      if (!selectedHeads.length) {
-        toast.error('Please select caller head to remove');
-        return;
-      }
-      const key = `${row._id}:removeHead`;
-      setSavingKey(key);
-      try {
-        const results = await Promise.all(
-          selectedHeads.map((item) =>
-            secureApi('ops.removeCallerHead', {
-              _id: row._id,
-              callerHead: item.name,
-            }),
-          ),
+  const updateOtherData = useCallback(async () => {
+    if (!editing || !draft) return;
+
+    setSaving('other');
+    try {
+      const requests: Promise<{ ok: boolean; message?: string }>[] = [];
+
+      if (draft.location.trim()) {
+        requests.push(
+          secureApi('ops.updateOfficeLocation', {
+            _id: editing._id,
+            officeLocation: draft.location.trim(),
+          }),
         );
-        const failed = results.find((r) => !r.ok);
-        if (failed) {
-          toast.error(failed.message || 'Failed to remove caller head');
-          return;
-        }
-        toast.success('Caller head removed successfully');
-        setCallerHeadMap((prev) => ({ ...prev, [row._id]: [] }));
-        void load();
-      } finally {
-        setSavingKey(null);
       }
-    },
-    [callerHeadMap, load],
-  );
 
-  const updateOtherData = useCallback(
-    async (rowId: string) => {
-      const row = rowsRef.current.find((r) => r._id === rowId);
-      if (!row) return;
+      const extensionId = parseExtensionIds(draft.extensionNo);
+      const botIds = parseBotIds(draft.botNo);
 
-      const key = `${row._id}:other`;
-      setSavingKey(key);
-      try {
-        const requests: Promise<{ ok: boolean; message?: string }>[] = [];
+      const attrPayload: Record<string, unknown> = { userId: editing._id };
+      if (extensionId.length) attrPayload.extensionId = extensionId;
+      if (draft.serverIds.trim()) attrPayload.serverId = draft.serverIds.trim();
+      if (botIds.length) attrPayload.botIds = botIds;
+      if (draft.telegramUserId.trim()) attrPayload.telegramUsername = draft.telegramUserId.trim();
 
-        if (row.location.trim()) {
-          requests.push(
-            secureApi('ops.updateOfficeLocation', {
-              _id: row._id,
-              officeLocation: row.location.trim(),
-            }),
-          );
-        }
-
-        const extensionId = parseExtensionIds(row.extensionNo);
-        const botIds = parseBotIds(row.botNo);
-
-        const attrPayload: Record<string, unknown> = { userId: row._id };
-        if (extensionId.length) attrPayload.extensionId = extensionId;
-        if (row.serverIds.trim()) attrPayload.serverId = row.serverIds.trim();
-        if (botIds.length) attrPayload.botIds = botIds;
-        if (row.telegramUserId.trim()) attrPayload.telegramUsername = row.telegramUserId.trim();
-
-        if (Object.keys(attrPayload).length > 1) {
-          requests.push(secureApi('ops.updateSubadminAttributes', attrPayload));
-        }
-
-        if (requests.length === 0) {
-          toast.info('Enter Extension No, Bot ID, Server ID, Telegram ID, or Location');
-          return;
-        }
-
-        const results = await Promise.all(requests);
-        const failed = results.find((r) => !r.ok);
-        if (failed) {
-          toast.error(failed.message || 'Some updates failed to save');
-        } else {
-          toast.success('Data updated successfully');
-        }
-        void load();
-      } finally {
-        setSavingKey(null);
+      if (Object.keys(attrPayload).length > 1) {
+        requests.push(secureApi('ops.updateSubadminAttributes', attrPayload));
       }
-    },
-    [load],
-  );
+
+      if (requests.length === 0) {
+        toast.info('Enter Extension No, Bot ID, Server ID, Telegram ID, or Location');
+        return;
+      }
+
+      const results = await Promise.all(requests);
+      const failed = results.find((r) => !r.ok);
+      if (failed) {
+        toast.error(failed.message || 'Some updates failed to save');
+      } else {
+        toast.success('Data updated successfully');
+        closeEdit();
+        void load();
+      }
+    } finally {
+      setSaving(null);
+    }
+  }, [editing, draft, closeEdit, load]);
+
+  const updateEmpCode = useCallback(async () => {
+    if (!empCodeEdit) return;
+    const updatedEmpCode = empCodeEdit.value.trim();
+    if (!updatedEmpCode) {
+      toast.error('Please enter emp code');
+      return;
+    }
+    setSaving('empCode');
+    try {
+      const res = await secureApi('ops.assignSubadminEmpcode', {
+        _id: empCodeEdit.id,
+        empCode: updatedEmpCode,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update emp code');
+        return;
+      }
+      toast.success('Emp code updated successfully');
+      setEmpCodeEdit(null);
+      void load();
+    } finally {
+      setSaving(null);
+    }
+  }, [empCodeEdit, load]);
 
   const columns = useMemo<CommonTableColumn<CallerRow>[]>(
     () => [
@@ -337,141 +347,62 @@ export function CallerAllotmentPage() {
       {
         id: 'empCode',
         label: 'Emp Code',
-        render: (row) => display(row.empCode),
+        width: 120,
+        render: (row) => (
+          <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.25}>
+            <span>{display(row.empCode)}</span>
+            {canEditEmpCode ? (
+              <Tooltip title="Update Emp Code">
+                <IconButton
+                  size="small"
+                  aria-label="Update Emp Code"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEmpCodeEdit({ id: row._id, value: String(row.empCode || '') });
+                  }}
+                  sx={{ color: 'text.secondary', p: 0.25 }}
+                >
+                  <EditOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            ) : null}
+          </Stack>
+        ),
       },
       {
         id: 'callerHead',
         label: 'Caller Head',
-        width: 220,
-        render: (row) => (
-          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 180 }}>
-            <Typography variant="caption" color="text.secondary" textAlign="left">
-              Current: {display(row.callerHead)}
-            </Typography>
-            <TextField
-              select
-              SelectProps={{ multiple: true }}
-              size="small"
-              value={(callerHeadMap[row._id] || []).map((h) => h.id)}
-              onChange={(e) => {
-                const value = e.target.value;
-                handleCallerHeadChange(
-                  row._id,
-                  typeof value === 'string' ? value.split(',') : value,
-                );
-              }}
-              sx={fieldSx}
-            >
-              {callerHeadOptions.map((opt) => (
-                <MenuItem key={opt.id} value={opt.id}>
-                  {opt.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
-        ),
+        render: (row) => display(row.callerHead),
       },
       {
         id: 'location',
         label: 'Location',
-        width: 140,
-        render: (row) => (
-          <TextField
-            select
-            size="small"
-            value={row.location}
-            onChange={(e) => handleRowChange(row._id, 'location', e.target.value)}
-            sx={fieldSx}
-          >
-            <MenuItem value="">Select</MenuItem>
-            {OFFICE_LOCATIONS.map((loc) => (
-              <MenuItem key={loc} value={loc}>
-                {loc}
-              </MenuItem>
-            ))}
-          </TextField>
-        ),
+        render: (row) => display(row.officeLocation),
       },
       {
         id: 'extension',
         label: 'Extension No',
-        width: 160,
-        render: (row) => (
-          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 130 }}>
-            <Typography variant="caption" color="text.secondary" textAlign="left">
-              Extn ID:- {formatIdList(row.extensionId) || '—'}
-            </Typography>
-            <TextField
-              size="small"
-              placeholder="Extension No"
-              value={row.extensionNo}
-              onChange={(e) => handleRowChange(row._id, 'extensionNo', e.target.value)}
-              sx={fieldSx}
-            />
-          </Stack>
-        ),
+        render: (row) => formatIdList(row.extensionId),
       },
       {
         id: 'botId',
-        label: 'Bot ID (e.g 1,2,3 ...)',
-        width: 160,
-        render: (row) => (
-          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 130 }}>
-            <Typography variant="caption" color="text.secondary" textAlign="left">
-              Bot ID:- {formatIdList(row.botIds) || '—'}
-            </Typography>
-            <TextField
-              size="small"
-              placeholder="e.g. 1,2,3"
-              value={row.botNo}
-              onChange={(e) => handleRowChange(row._id, 'botNo', e.target.value)}
-              sx={fieldSx}
-            />
-          </Stack>
-        ),
+        label: 'Bot ID',
+        render: (row) => formatIdList(row.botIds),
       },
       {
         id: 'serverId',
         label: 'Server ID',
-        width: 140,
-        render: (row) => (
-          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 120 }}>
-            <Typography variant="caption" color="text.secondary" textAlign="left">
-              Server ID:- {display(row.serverId)}
-            </Typography>
-            <TextField
-              size="small"
-              placeholder="Server ID"
-              value={row.serverIds}
-              onChange={(e) => handleRowChange(row._id, 'serverIds', e.target.value)}
-              sx={fieldSx}
-            />
-          </Stack>
-        ),
+        render: (row) => display(row.serverId),
       },
       {
         id: 'telegramId',
         label: 'Telegram ID',
-        width: 150,
-        render: (row) => (
-          <Stack spacing={0.75} alignItems="stretch" sx={{ minWidth: 130 }}>
-            <Typography variant="caption" color="text.secondary" textAlign="left">
-              Telegram ID:- {display(row.telegram_username)}
-            </Typography>
-            <TextField
-              size="small"
-              placeholder="Telegram ID"
-              value={row.telegramUserId}
-              onChange={(e) => handleRowChange(row._id, 'telegramUserId', e.target.value)}
-              sx={fieldSx}
-            />
-          </Stack>
-        ),
+        render: (row) => display(row.telegram_username),
       },
       {
         id: 'action',
         label: 'Action',
-        width: 130,
+        width: 88,
         cellSx: { whiteSpace: 'nowrap' },
         render: (row) => {
           if (row.block) {
@@ -481,78 +412,25 @@ export function CallerAllotmentPage() {
               </Typography>
             );
           }
-          const headSaving = savingKey === `${row._id}:head`;
-          const removeSaving = savingKey === `${row._id}:removeHead`;
-          const otherSaving = savingKey === `${row._id}:other`;
           return (
-            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-              <Tooltip title="Update Caller Head">
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label="Update Caller Head"
-                    disabled={headSaving}
-                    onClick={() => void updateCallerHead(row)}
-                    sx={actionIconBtnSx}
-                  >
-                    {headSaving ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <ManageAccountsOutlinedIcon sx={{ fontSize: 18 }} />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Remove Caller Head">
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label="Remove Caller Head"
-                    disabled={removeSaving}
-                    onClick={() => void removeCallerHead(row)}
-                    sx={removeIconBtnSx}
-                  >
-                    {removeSaving ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <PersonRemoveOutlinedIcon sx={{ fontSize: 18 }} />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Update Other Data">
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label="Update Other Data"
-                    disabled={otherSaving}
-                    onClick={() => void updateOtherData(row._id)}
-                    sx={actionIconBtnSx}
-                  >
-                    {otherSaving ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <EditNoteOutlinedIcon sx={{ fontSize: 18 }} />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Stack>
+            <Tooltip title="Edit caller">
+              <IconButton
+                size="small"
+                aria-label="Edit caller"
+                onClick={() => openEdit(row)}
+                sx={actionIconBtnSx}
+              >
+                <EditOutlinedIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
           );
         },
       },
     ],
-    [
-      callerHeadMap,
-      callerHeadOptions,
-      handleCallerHeadChange,
-      handleRowChange,
-      savingKey,
-      updateCallerHead,
-      removeCallerHead,
-      updateOtherData,
-    ],
+    [canEditEmpCode, openEdit],
   );
+
+  const busy = saving != null;
 
   return (
     <Box>
@@ -569,9 +447,7 @@ export function CallerAllotmentPage() {
         </Typography>
         <Button
           variant="outlined"
-          startIcon={
-            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-          }
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
           onClick={() => void load()}
           disabled={loading}
           sx={{
@@ -597,7 +473,7 @@ export function CallerAllotmentPage() {
           emptyMessage="No callers found"
           stickyHeader
           dense
-          minWidth={1500}
+          minWidth={1100}
           maxHeight="100%"
           getRowSx={(row) =>
             row.block
@@ -606,6 +482,183 @@ export function CallerAllotmentPage() {
           }
         />
       </TablePanel>
+
+      <Dialog open={Boolean(editing && draft)} onClose={closeEdit} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Edit — {editing?.name || editing?.empCode || 'Caller'}
+        </DialogTitle>
+        <DialogContent>
+          {draft ? (
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  Caller Head
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                  Current: {display(editing?.callerHead)}
+                </Typography>
+                <TextField
+                  select
+                  SelectProps={{ multiple: true }}
+                  size="small"
+                  fullWidth
+                  label="Select caller head(s)"
+                  value={draft.headIds}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setDraftField(
+                      'headIds',
+                      typeof value === 'string' ? value.split(',') : (value as string[]),
+                    );
+                  }}
+                  sx={fieldSx}
+                >
+                  {callerHeadOptions.map((opt) => (
+                    <MenuItem key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Stack direction="row" spacing={1} mt={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={
+                      saving === 'head' ? (
+                        <CircularProgress size={14} color="inherit" />
+                      ) : (
+                        <ManageAccountsOutlinedIcon />
+                      )
+                    }
+                    disabled={busy || !selectedHeads.length}
+                    onClick={() => void updateCallerHead()}
+                  >
+                    Assign Head
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    startIcon={
+                      saving === 'removeHead' ? (
+                        <CircularProgress size={14} color="inherit" />
+                      ) : (
+                        <PersonRemoveOutlinedIcon />
+                      )
+                    }
+                    disabled={busy || !selectedHeads.length}
+                    onClick={() => void removeCallerHead()}
+                  >
+                    Remove Head
+                  </Button>
+                </Stack>
+              </Box>
+
+              <TextField
+                select
+                size="small"
+                fullWidth
+                label="Location"
+                value={draft.location}
+                onChange={(e) => setDraftField('location', e.target.value)}
+                sx={fieldSx}
+              >
+                <MenuItem value="">Select</MenuItem>
+                {OFFICE_LOCATIONS.map((loc) => (
+                  <MenuItem key={loc} value={loc}>
+                    {loc}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                size="small"
+                fullWidth
+                label="Extension No"
+                placeholder="Comma separated"
+                helperText={`Current: ${formatIdList(editing?.extensionId)}`}
+                value={draft.extensionNo}
+                onChange={(e) => setDraftField('extensionNo', e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                fullWidth
+                label="Bot ID"
+                placeholder="e.g. 1,2,3"
+                helperText={`Current: ${formatIdList(editing?.botIds)}`}
+                value={draft.botNo}
+                onChange={(e) => setDraftField('botNo', e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                fullWidth
+                label="Server ID"
+                helperText={`Current: ${display(editing?.serverId)}`}
+                value={draft.serverIds}
+                onChange={(e) => setDraftField('serverIds', e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                fullWidth
+                label="Telegram ID"
+                helperText={`Current: ${display(editing?.telegram_username)}`}
+                value={draft.telegramUserId}
+                onChange={(e) => setDraftField('telegramUserId', e.target.value)}
+                sx={fieldSx}
+              />
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2, gap: 1 }}>
+          <Button onClick={closeEdit} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={busy}
+            onClick={() => void updateOtherData()}
+          >
+            {saving === 'other' ? 'Saving…' : 'Save Location / IDs'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(empCodeEdit)}
+        onClose={() => setEmpCodeEdit(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Update Emp Code</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            required
+            fullWidth
+            label="Emp Code"
+            margin="dense"
+            value={empCodeEdit?.value ?? ''}
+            onChange={(e) =>
+              setEmpCodeEdit((prev) => (prev ? { ...prev, value: e.target.value } : prev))
+            }
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button onClick={() => setEmpCodeEdit(null)} disabled={saving === 'empCode'}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void updateEmpCode()}
+            disabled={saving === 'empCode'}
+          >
+            {saving === 'empCode' ? 'Updating…' : 'Update'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

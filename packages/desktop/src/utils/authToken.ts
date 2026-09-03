@@ -9,14 +9,7 @@ let memoryToken: string | null = null;
 let initPromise: Promise<void> | null = null;
 
 export function getAuthToken(): string | null {
-  if (memoryToken) return memoryToken;
-  // Brief sync fallback while initAuthToken() migrates legacy storage.
-  try {
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    return legacy && legacy.trim() ? legacy.trim() : null;
-  } catch {
-    return null;
-  }
+  return memoryToken;
 }
 
 export async function initAuthToken(): Promise<void> {
@@ -36,8 +29,11 @@ export async function initAuthToken(): Promise<void> {
     try {
       const legacy = localStorage.getItem(LEGACY_KEY);
       if (legacy && legacy.trim()) {
-        memoryToken = legacy.trim();
-        await window.gcalc?.setSessionToken?.(memoryToken);
+        const value = legacy.trim();
+        const saved = await window.gcalc?.setSessionToken?.(value);
+        // Legacy storage is migration-only; never use it as a persistence
+        // fallback when the OS-encrypted vault is unavailable.
+        if (saved?.ok && saved.encrypted) memoryToken = value;
         localStorage.removeItem(LEGACY_KEY);
       }
     } catch {

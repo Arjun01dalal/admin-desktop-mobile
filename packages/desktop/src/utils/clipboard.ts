@@ -43,10 +43,7 @@ function fallbackCopy(text: string): boolean {
  * Works in Electron (via main-process clipboard) and browsers (Clipboard API + fallback).
  * Reuse from any screen / component.
  */
-export async function copyToClipboard(
-  text: string,
-  options: CopyOptions = {},
-): Promise<boolean> {
+export async function copyToClipboard(text: string, options: CopyOptions = {}): Promise<boolean> {
   const value = String(text ?? '');
   if (!value) {
     if (!options.silent) toast.error('Nothing to copy');

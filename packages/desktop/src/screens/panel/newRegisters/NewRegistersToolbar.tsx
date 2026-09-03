@@ -21,12 +21,7 @@ import { CAMPAIGN_LIST, type CampaignItem } from './campaignList';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import type { ActiveStatusFilter, NewRegistrationFilter } from './types';
 
-const NEW_REG_PAGE_SIZES = [
-  ...ITEMS_PER_PAGE_OPTIONS,
-  '1000',
-  '1500',
-  '2000',
-] as const;
+const NEW_REG_PAGE_SIZES = [...ITEMS_PER_PAGE_OPTIONS, '1000', '1500', '2000'] as const;
 
 /** Theme sets TextField fullWidth by default — override so toolbar stays one row. */
 const fieldSx = {
@@ -192,11 +187,7 @@ export function NewRegistersToolbar({
               setOpen((value) => !value);
             }}
           >
-            {open ? (
-              <ExpandLessIcon fontSize="small" />
-            ) : (
-              <ExpandMoreIcon fontSize="small" />
-            )}
+            {open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
           </IconButton>
         </Stack>
       </Stack>
@@ -270,9 +261,7 @@ export function NewRegistersToolbar({
               label="Active"
               size="small"
               value={activeStatus}
-              onChange={(e) =>
-                onActiveStatusChange(e.target.value as ActiveStatusFilter)
-              }
+              onChange={(e) => onActiveStatusChange(e.target.value as ActiveStatusFilter)}
               sx={{ ...fieldSx, width: 120 }}
             >
               {(['All', 'Active', 'InActive'] as const).map((opt) => (
@@ -287,9 +276,7 @@ export function NewRegistersToolbar({
               label="New Reg"
               size="small"
               value={newRegistration}
-              onChange={(e) =>
-                onNewRegistrationChange(e.target.value as NewRegistrationFilter)
-              }
+              onChange={(e) => onNewRegistrationChange(e.target.value as NewRegistrationFilter)}
               sx={{ ...fieldSx, width: 110 }}
             >
               {(['True', 'False'] as const).map((opt) => (

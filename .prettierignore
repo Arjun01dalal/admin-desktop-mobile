@@ -1,0 +1,11 @@
+node_modules
+dist
+release
+electron-obf
+attached_assets
+docs
+*.apk
+*.pdf
+*.tsbuildinfo
+t.txt
+tsc4.txt

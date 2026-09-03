@@ -46,9 +46,7 @@ export function MetricDashboardPage({
   const [startDate, setStartDate] = useState(todayISO());
   const [endDate, setEndDate] = useState(todayISO());
 
-  const payload = showDateFilter
-    ? { startDate, endDate, ...basePayload }
-    : { ...basePayload };
+  const payload = showDateFilter ? { startDate, endDate, ...basePayload } : { ...basePayload };
 
   const { data, loading, error, refetch } = useSecureQuery<Record<string, unknown>>(
     action,
@@ -76,11 +74,7 @@ export function MetricDashboardPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {metrics.map((m) => {
           const raw = pick(data, m.field);
-          const accent = m.signed
-            ? toNumber(raw) >= 0
-              ? 'positive'
-              : 'negative'
-            : 'default';
+          const accent = m.signed ? (toNumber(raw) >= 0 ? 'positive' : 'negative') : 'default';
           return (
             <StatCard
               key={m.field + m.label}

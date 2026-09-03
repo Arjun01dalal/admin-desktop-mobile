@@ -1,11 +1,4 @@
-import {
-  IconButton,
-  InputAdornment,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { IconButton, InputAdornment, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -105,12 +98,7 @@ export function ItemsPerPageField({
   options?: string[];
 }) {
   return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={0.75}
-      sx={{ flexShrink: 0 }}
-    >
+    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0 }}>
       <Typography sx={{ fontSize: 13, color: '#333', whiteSpace: 'nowrap' }}>
         {toDisplayText('Items Per Page')}
       </Typography>

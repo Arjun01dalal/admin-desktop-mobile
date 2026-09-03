@@ -28,9 +28,12 @@ const LOADERS: Record<string, Loader> = {
   '/leaderboard': () => import('@/screens/panel/LeaderboardPage'),
   '/customer-count': () => import('@/screens/panel/LeaderboardCustomerCountPage'),
   '/caller-responsibility': () => import('@/screens/panel/CallerResponsibilityPage'),
-  '/caller-responsibility/deposit-list': () => import('@/screens/panel/callerResponsibility/CallerDepositListPage'),
-  '/caller-responsibility/bot-users': () => import('@/screens/panel/callerResponsibility/ActiveBotUsersPage'),
-  '/caller-responsibility/details': () => import('@/screens/panel/callerResponsibility/CallerDetailsPage'),
+  '/caller-responsibility/deposit-list': () =>
+    import('@/screens/panel/callerResponsibility/CallerDepositListPage'),
+  '/caller-responsibility/bot-users': () =>
+    import('@/screens/panel/callerResponsibility/ActiveBotUsersPage'),
+  '/caller-responsibility/details': () =>
+    import('@/screens/panel/callerResponsibility/CallerDetailsPage'),
   '/player-activity': () => import('@/screens/panel/PlayerActivityPage'),
   '/player-activity/details': () => import('@/screens/panel/PlayerActivityDetailsPage'),
   '/game-activity': () => import('@/screens/panel/GameActivityPage'),
@@ -44,6 +47,7 @@ const LOADERS: Record<string, Loader> = {
   '/all-user-login-report': () => import('@/screens/panel/AllUserLoginReportPage'),
   '/sos-blocked-users': () => import('@/screens/panel/SosBlockedUsersPage'),
   '/checkers-report': () => import('@/screens/panel/CheckersReportPage'),
+  '/download-report': () => import('@/screens/panel/SheetDownloadReportPage'),
   '/downlaodReport': () => import('@/screens/panel/SheetDownloadReportPage'),
   '/coins-report': () => import('@/screens/panel/PointsReportPage'),
   '/coin-reports/report': () => import('@/screens/panel/pointsReport/PointsReportDetailsPage'),
@@ -84,7 +88,8 @@ const LOADERS: Record<string, Loader> = {
   '/funds/mid/payingAccount': () => import('@/screens/panel/FundsPayinPage'),
   '/whatsappView': () => import('@/screens/panel/WhatsappPage'),
   '/fund-request-bonus-wallet': () => import('@/screens/panel/BonusWalletFundRequestPage'),
-  '/fund-request-bonus-wallet-table': () => import('@/screens/panel/BonusWalletFundRequestTablePage'),
+  '/fund-request-bonus-wallet-table': () =>
+    import('@/screens/panel/BonusWalletFundRequestTablePage'),
   '/bonus-wallet': () => import('@/screens/panel/BonusWalletRequestsPage'),
   '/DepositApprovedReport': () => import('@/screens/panel/DepositApprovedReportPage'),
   '/unique_deposit_pending': () => import('@/screens/panel/UniqueDepositPendingPage'),
@@ -94,6 +99,7 @@ const LOADERS: Record<string, Loader> = {
   '/withdrawal-fund': () => import('@/screens/panel/withdrawalFund'),
   '/withdraw-user-data': () => import('@/screens/panel/withdrawalFund'),
   '/fund-request': () => import('@/screens/panel/FundRequestPage'),
+  '/fund-request-coin': () => import('@/screens/panel/FundRequestCoinTablePage'),
   '/playerRtp': () => import('@/screens/panel/PlayerRtpPage'),
   '/playerRtp/details': () => import('@/screens/panel/playerRtp/PlayerRtpDetailsPage'),
   '/users': () => import('@/screens/panel/UsersPage'),

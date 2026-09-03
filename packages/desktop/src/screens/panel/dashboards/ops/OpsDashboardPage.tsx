@@ -8,10 +8,7 @@ import { buildProviderCards } from './buildProviderCards';
 import { VIP_CLIENT_NAMES } from './constants';
 import { DashboardFilterBar } from './DashboardFilterBar';
 import { KpiStatGrid } from './KpiStatGrid';
-import {
-  LudoDetailsModal,
-  type LudoModalAction,
-} from './LudoDetailsModal';
+import { LudoDetailsModal, type LudoModalAction } from './LudoDetailsModal';
 import { ProviderCardGrid } from './ProviderCardGrid';
 import type { DashboardMode } from './types';
 import { useDashboardFilters } from './useDashboardFilters';
@@ -43,24 +40,18 @@ type Props = {
 export function OpsDashboardPage({ mode }: Props) {
   const meta = TITLES[mode];
   const filters = useDashboardFilters();
-  const {
-    bundle,
-    loading,
-    error,
-    reload,
-    reloadLudo,
-    reloadActiveExchange,
-  } = useOpsDashboardData(mode, filters.applied);
+  const { bundle, loading, error, reload, reloadLudo, reloadActiveExchange } = useOpsDashboardData(
+    mode,
+    filters.applied,
+  );
 
   const [selectedLudoGame, setSelectedLudoGame] = useState('All');
   const [selectedIndianDiva, setSelectedIndianDiva] = useState('All');
   const [selectedPlutus, setSelectedPlutus] = useState('All');
   const [ludoModalOpen, setLudoModalOpen] = useState(false);
-  const [ludoModalAction, setLudoModalAction] =
-    useState<LudoModalAction>(null);
+  const [ludoModalAction, setLudoModalAction] = useState<LudoModalAction>(null);
 
-  const appOptions =
-    mode === 'vip' ? VIP_CLIENT_NAMES : (CLIENT_NAMES as readonly string[]);
+  const appOptions = mode === 'vip' ? VIP_CLIENT_NAMES : (CLIENT_NAMES as readonly string[]);
 
   const ludoGameIds = useMemo(
     () => (bundle?.ludoGameOptions || []).map((o) => o.value),
@@ -69,13 +60,7 @@ export function OpsDashboardPage({ mode }: Props) {
 
   const kpiItems = useMemo(
     () =>
-      buildKpiItems(
-        mode,
-        bundle,
-        filters.applied.startDate,
-        filters.applied.endDate,
-        todayIST(),
-      ),
+      buildKpiItems(mode, bundle, filters.applied.startDate, filters.applied.endDate, todayIST()),
     [mode, bundle, filters.applied.startDate, filters.applied.endDate],
   );
 
@@ -124,9 +109,7 @@ export function OpsDashboardPage({ mode }: Props) {
     ],
   );
 
-  const activeExchangeName = String(
-    bundle?.activeExchange?.activeExchange ?? '',
-  );
+  const activeExchangeName = String(bundle?.activeExchange?.activeExchange ?? '');
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
@@ -161,10 +144,12 @@ export function OpsDashboardPage({ mode }: Props) {
 
       <KpiStatGrid items={kpiItems} />
 
-      <ActiveExchangePanel
-        activeExchangeName={activeExchangeName}
-        onUpdated={() => void reloadActiveExchange()}
-      />
+      {mode === 'main' ? (
+        <ActiveExchangePanel
+          activeExchangeName={activeExchangeName}
+          onUpdated={() => void reloadActiveExchange()}
+        />
+      ) : null}
 
       <ProviderCardGrid cards={providerCards} filterBy={filters.filterBy} />
 

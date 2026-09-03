@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Chip, CircularProgress, Stack, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
@@ -177,9 +170,7 @@ export function SosBlockedUsersPage() {
         </Typography>
         <Button
           variant="contained"
-          startIcon={
-            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-          }
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
           disabled={loading}
           onClick={() => void load()}
           sx={orangeBtnSx}
@@ -193,18 +184,16 @@ export function SosBlockedUsersPage() {
       </Typography>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, i) =>
-          String(row._id || row.blockedById || row.targetCallerId || i)
-        }
-        loading={loading}
-        emptyMessage="No SOS blocks found"
-        stickyHeader
-        dense
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, i) => String(row._id || row.blockedById || row.targetCallerId || i)}
+          loading={loading}
+          emptyMessage="No SOS blocks found"
+          stickyHeader
+          dense
+          maxHeight="100%"
+        />
       </TablePanel>
     </Box>
   );

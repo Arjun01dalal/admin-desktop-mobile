@@ -22,11 +22,9 @@ const OUT_PATH = path.join(ROOT, 'electron', 'env.generated.cjs');
 const REQUIRED = ['API_BASE_URL', 'ENTK_VALUE'];
 const OPTIONAL = [
   'MOBILE_CDN_BASE',
-  'GH_UPDATE_TOKEN',
   'SOS_PUSH_TOPIC',
   'SOS_PUSH_SERVER',
-  'RECORDING_BASIC_AUTH_USERNAME',
-  'RECORDING_BASIC_AUTH_PASSWORD',
+  'RECORDING_ALLOWED_HOSTS',
   'FIREBASE_API_KEY',
   'FIREBASE_APP_ID',
   'FIREBASE_PROJECT_ID',
@@ -98,4 +96,6 @@ module.exports = Object.fromEntries(
 `;
 
 fs.writeFileSync(OUT_PATH, out);
-console.log(`generate-embedded-env: wrote ${path.relative(ROOT, OUT_PATH)} (${names.length} values, XOR+fragmented)`);
+console.log(
+  `generate-embedded-env: wrote ${path.relative(ROOT, OUT_PATH)} (${names.length} values, XOR+fragmented)`,
+);

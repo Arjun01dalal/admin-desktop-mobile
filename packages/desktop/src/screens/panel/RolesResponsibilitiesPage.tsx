@@ -72,8 +72,7 @@ export function RolesResponsibilitiesPage() {
   const canEdit = hasPermission(Permissions.Edit_Role);
   const canDelete = hasPermission(Permissions.Delete_Role);
   /** Laxmi: add_new_role_responsibility; also allow role editors to add entries. */
-  const canAdd =
-    hasPermission(Permissions.add_new_role_responsibility) || canEdit;
+  const canAdd = hasPermission(Permissions.add_new_role_responsibility) || canEdit;
   const canView = hasPermission(Permissions.View_Roles_and_Responsibilities);
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -346,8 +345,7 @@ export function RolesResponsibilitiesPage() {
         label: 'Responsibilities',
         render: (row) => {
           const full = responsibilityNames(row.Responsibilities);
-          const truncated =
-            full.length > TRUNCATE_LEN ? `${full.slice(0, TRUNCATE_LEN)}…` : full;
+          const truncated = full.length > TRUNCATE_LEN ? `${full.slice(0, TRUNCATE_LEN)}…` : full;
           return (
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
               <Typography sx={{ fontSize: 13 }}>{truncated || '—'}</Typography>
@@ -403,14 +401,23 @@ export function RolesResponsibilitiesPage() {
   if (!canView) {
     return (
       <Box sx={{ px: 1.5, py: 2 }}>
-        <Typography color="text.secondary">You do not have permission to view this page.</Typography>
+        <Typography color="text.secondary">
+          You do not have permission to view this page.
+        </Typography>
       </Box>
     );
   }
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        justifyContent="flex-end"
+        flexWrap="wrap"
+        useFlexGap
+        sx={{ mb: 1.5 }}
+      >
         <Button
           variant="contained"
           startIcon={<RefreshIcon />}
@@ -451,21 +458,26 @@ export function RolesResponsibilitiesPage() {
       </Stack>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={roles}
-        loading={loading}
-        getRowKey={(row) => row._id}
-        emptyMessage="No roles found"
-        virtualize={false}
-        stickyHeader
-        dense
-        minWidth={800}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={roles}
+          loading={loading}
+          getRowKey={(row) => row._id}
+          emptyMessage="No roles found"
+          virtualize={false}
+          stickyHeader
+          dense
+          minWidth={800}
+          maxHeight="100%"
+        />
       </TablePanel>
 
-      <Dialog open={cloneOpen} onClose={() => !submitting && setCloneOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={cloneOpen}
+        onClose={() => !submitting && setCloneOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <Box component="form" onSubmit={(e) => void handleClone(e)}>
           <DialogTitle>Add Role</DialogTitle>
           <DialogContent>
@@ -509,7 +521,12 @@ export function RolesResponsibilitiesPage() {
         </Box>
       </Dialog>
 
-      <Dialog open={respOpen} onClose={() => !submitting && setRespOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={respOpen}
+        onClose={() => !submitting && setRespOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <Box component="form" onSubmit={(e) => void handleAddResponsibility(e)}>
           <DialogTitle>Add Responsibility</DialogTitle>
           <DialogContent>
@@ -543,7 +560,12 @@ export function RolesResponsibilitiesPage() {
         </Box>
       </Dialog>
 
-      <Dialog open={editOpen} onClose={() => !submitting && setEditOpen(false)} fullWidth maxWidth="md">
+      <Dialog
+        open={editOpen}
+        onClose={() => !submitting && setEditOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
         <Box component="form" onSubmit={(e) => void handleUpdate(e)}>
           <DialogTitle>Edit Role</DialogTitle>
           <DialogContent>
@@ -567,12 +589,12 @@ export function RolesResponsibilitiesPage() {
                 );
                 if (!items.length) return null;
                 return (
-                <Box key={group}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                    {group}
-                  </Typography>
-                  <FormGroup row sx={{ gap: 0.5 }}>
-                    {items.map((r) => (
+                  <Box key={group}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                      {group}
+                    </Typography>
+                    <FormGroup row sx={{ gap: 0.5 }}>
+                      {items.map((r) => (
                         <FormControlLabel
                           key={r._id}
                           control={
@@ -587,8 +609,8 @@ export function RolesResponsibilitiesPage() {
                           sx={{ mr: 1.5 }}
                         />
                       ))}
-                  </FormGroup>
-                </Box>
+                    </FormGroup>
+                  </Box>
                 );
               })}
             </Stack>
@@ -604,7 +626,12 @@ export function RolesResponsibilitiesPage() {
         </Box>
       </Dialog>
 
-      <Dialog open={deleteOpen} onClose={() => !submitting && setDeleteOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={deleteOpen}
+        onClose={() => !submitting && setDeleteOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <DialogTitle>Are You Sure?</DialogTitle>
         <DialogContent>Do you want to delete this role?</DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

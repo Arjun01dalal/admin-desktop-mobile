@@ -89,9 +89,7 @@ export function CsvUploadModal({ open, onClose }: Props) {
           component="input"
           type="date"
           value={dateOfData}
-          onChange={(e: ChangeEvent<HTMLInputElement>) =>
-            setDateOfData(e.target.value)
-          }
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setDateOfData(e.target.value)}
           sx={{
             width: '100%',
             mb: 2,
@@ -102,12 +100,7 @@ export function CsvUploadModal({ open, onClose }: Props) {
             borderRadius: 1,
           }}
         />
-        <Button
-          component="label"
-          variant="outlined"
-          startIcon={<CloudUploadIcon />}
-          fullWidth
-        >
+        <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />} fullWidth>
           {file ? file.name : 'Choose CSV'}
           <input
             hidden
@@ -121,11 +114,7 @@ export function CsvUploadModal({ open, onClose }: Props) {
         <Button onClick={onClose} disabled={loading}>
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => void handleUpload()}
-          disabled={loading}
-        >
+        <Button variant="contained" onClick={() => void handleUpload()} disabled={loading}>
           {loading ? <CircularProgress size={18} /> : 'Upload'}
         </Button>
       </DialogActions>

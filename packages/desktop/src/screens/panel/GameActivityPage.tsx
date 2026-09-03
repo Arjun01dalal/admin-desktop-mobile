@@ -40,9 +40,7 @@ export function GameActivityPage() {
   const navState = (location.state || {}) as LocationState;
   const lockedSource = Boolean(navState.type);
 
-  const [startDate, setStartDate] = useState(
-    () => navState.startDate || todayIST(),
-  );
+  const [startDate, setStartDate] = useState(() => navState.startDate || todayIST());
   const [endDate, setEndDate] = useState(() => navState.endDate || todayIST());
   const [isQtech, setIsQtech] = useState(() => navState.type === 'Qtech');
   const [loading, setLoading] = useState(false);
@@ -105,11 +103,7 @@ export function GameActivityPage() {
         id: 'provider',
         label: 'Provider',
         render: (row) => (
-          <Box
-            component="span"
-            onClick={() => openProvider(row)}
-            sx={{ cursor: 'pointer' }}
-          >
+          <Box component="span" onClick={() => openProvider(row)} sx={{ cursor: 'pointer' }}>
             {providerLabel(row)}
           </Box>
         ),
@@ -124,8 +118,7 @@ export function GameActivityPage() {
             {
               id: 'licenseFeePercent',
               ...sortable('licenseFeePercent', 'License Fee %'),
-              render: (row: ActivityRow) =>
-                getMetric(row, 'licenseFeePercent'),
+              render: (row: ActivityRow) => getMetric(row, 'licenseFeePercent'),
             } satisfies CommonTableColumn<ActivityRow>,
           ]
         : []),
@@ -209,9 +202,7 @@ export function GameActivityPage() {
         <CommonTable
           columns={columns}
           rows={sorted}
-          getRowKey={(row, i) =>
-            String(row.providerId || row.provider || row.providerName || i)
-          }
+          getRowKey={(row, i) => String(row.providerId || row.provider || row.providerName || i)}
           loading={loading}
           emptyMessage="No data"
           minWidth={1100}

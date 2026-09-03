@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { AstroLogo } from '@/components/AstroLogo';
@@ -11,6 +12,44 @@ type Props = {
 
 function stripInlineStyles(html: string) {
   return html.replace(/\sstyle="[^"]*"/gi, '').replace(/\sstyle='[^']*'/gi, '');
+}
+
+function sanitizeTermsHtml(html: string): string {
+  return DOMPurify.sanitize(stripInlineStyles(html), {
+    ALLOWED_TAGS: [
+      'a',
+      'b',
+      'br',
+      'em',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'hr',
+      'i',
+      'li',
+      'ol',
+      'p',
+      'strong',
+      'u',
+      'ul',
+    ],
+    ALLOWED_ATTR: ['href'],
+    ALLOW_DATA_ATTR: false,
+    FORBID_TAGS: [
+      'embed',
+      'form',
+      'iframe',
+      'img',
+      'input',
+      'math',
+      'object',
+      'script',
+      'style',
+      'svg',
+    ],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):)/i,
+  });
 }
 
 /** Native Terms & Conditions — loads from api.astrothirdeye.com static page. */
@@ -36,7 +75,7 @@ export function TermsAndConditions({ onBack }: Props) {
           return;
         }
         setHeading(res.heading || 'Terms & Conditions');
-        setBodyHtml(stripInlineStyles(res.bodyHtml));
+        setBodyHtml(sanitizeTermsHtml(res.bodyHtml));
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load Terms & Conditions');

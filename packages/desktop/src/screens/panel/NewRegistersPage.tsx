@@ -11,12 +11,7 @@ import {
   Typography,
   Pagination,
 } from '@mui/material';
-import {
-  formatDisplayDate,
-  formatDisplayTime,
-  todayIST,
-  getStoredUser,
-} from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST, getStoredUser } from '@/utils/dates';
 import { getRoleId } from '@/auth/permissions';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable } from '@/components/CommonTable';
@@ -67,7 +62,8 @@ export function NewRegistersPage() {
   }>();
   const isCaller = isNewRegistersCaller(admin?.Role_ID);
   const campaignOptions = useMemo(
-    () => campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
+    () =>
+      campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
     [admin, isCaller],
   );
 
@@ -86,8 +82,7 @@ export function NewRegistersPage() {
     isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
   );
   const [activeStatus, setActiveStatus] = useState<ActiveStatusFilter>('All');
-  const [newRegistration, setNewRegistration] =
-    useState<NewRegistrationFilter>('True');
+  const [newRegistration, setNewRegistration] = useState<NewRegistrationFilter>('True');
   const [otherState, setOtherState] = useState(false);
   const [nonPerforming, setNonPerforming] = useState(false);
   const [appVersions, setAppVersions] = useState<Record<string, string>>({});
@@ -192,8 +187,11 @@ export function NewRegistersPage() {
   );
   const deferredRows = useDeferredValue(rows);
 
-  const { dialerLoading, addComment, addToDialer, block } =
-    useNewRegistersActions(admin, load, page);
+  const { dialerLoading, addComment, addToDialer, block } = useNewRegistersActions(
+    admin,
+    load,
+    page,
+  );
 
   const applyFilters = useCallback(() => {
     setPage(1);
@@ -295,12 +293,7 @@ export function NewRegistersPage() {
         boxSizing: 'border-box',
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="flex-start"
-        spacing={1.5}
-        sx={{ mb: 1, flexShrink: 0 }}
-      >
+      <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ mb: 1, flexShrink: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <NewRegistersToolbar
             title="New Registration"
@@ -380,14 +373,10 @@ export function NewRegistersPage() {
       </TablePanel>
 
       <Dialog open={Boolean(block.target)} onClose={block.close}>
-        <DialogTitle>
-          {block.nextStatus ? 'Block' : 'Unblock'} user
-        </DialogTitle>
+        <DialogTitle>{block.nextStatus ? 'Block' : 'Unblock'} user</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, mt: 0.5 }}>
-            {block.otpSending
-              ? 'Sending OTP to SuperAdmin…'
-              : 'Enter OTP and remark to continue.'}
+            {block.otpSending ? 'Sending OTP to SuperAdmin…' : 'Enter OTP and remark to continue.'}
           </Typography>
           <TextField
             autoFocus
@@ -395,9 +384,7 @@ export function NewRegistersPage() {
             required
             label="Please enter OTP"
             value={block.otp}
-            onChange={(e) =>
-              block.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))
-            }
+            onChange={(e) => block.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
             inputMode="numeric"
             sx={{ mb: 2 }}
           />
@@ -406,9 +393,7 @@ export function NewRegistersPage() {
             required
             label="Please enter remark"
             value={block.remark}
-            onChange={(e) =>
-              block.setRemark(e.target.value.slice(0, block.maxRemark))
-            }
+            onChange={(e) => block.setRemark(e.target.value.slice(0, block.maxRemark))}
             inputProps={{ maxLength: block.maxRemark }}
           />
         </DialogContent>
@@ -423,9 +408,7 @@ export function NewRegistersPage() {
           </Button>
           <Button
             variant="contained"
-            disabled={
-              block.actionBusyId === block.target?._id || block.otpSending
-            }
+            disabled={block.actionBusyId === block.target?._id || block.otpSending}
             onClick={() => void block.confirm()}
           >
             Submit
@@ -433,12 +416,7 @@ export function NewRegistersPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={commentOpen}
-        onClose={() => setCommentOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={commentOpen} onClose={() => setCommentOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add Comment</DialogTitle>
         <DialogContent>
           <TextField
@@ -537,12 +515,7 @@ export function NewRegistersPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={viewLogsOpen}
-        onClose={() => setViewLogsOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={viewLogsOpen} onClose={() => setViewLogsOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 600 }}>
           Call Logs{viewLogsName ? ` — ${viewLogsName}` : ''}
         </DialogTitle>
@@ -584,10 +557,8 @@ export function NewRegistersPage() {
                     {log.status ? ` · ${log.status}` : ''}
                   </Typography>
                   <Typography sx={{ color: 'text.secondary', fontSize: 12 }}>
-                    {formatDisplayDate(log.createdOn || log.createdAt || log.date) ||
-                      '-'}{' '}
-                    {formatDisplayTime(log.createdOn || log.createdAt || log.date) ||
-                      ''}
+                    {formatDisplayDate(log.createdOn || log.createdAt || log.date) || '-'}{' '}
+                    {formatDisplayTime(log.createdOn || log.createdAt || log.date) || ''}
                   </Typography>
                 </Box>
               ))}

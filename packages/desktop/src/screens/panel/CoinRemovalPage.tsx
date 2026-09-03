@@ -67,11 +67,7 @@ export function CoinRemovalPage() {
         id: 'id',
         label: 'Id',
         render: (row) =>
-          row._id ? (
-            <CopyText value={row._id} onClick={() => openDetails(row)} />
-          ) : (
-            '—'
-          ),
+          row._id ? <CopyText value={row._id} onClick={() => openDetails(row)} /> : '—',
       },
       {
         id: 'city',
@@ -87,11 +83,7 @@ export function CoinRemovalPage() {
         id: 'totalBalance',
         label: 'Total Coin Pulled',
         render: (row) => (
-          <Box
-            component="span"
-            onClick={() => openDetails(row)}
-            sx={{ cursor: 'pointer' }}
-          >
+          <Box component="span" onClick={() => openDetails(row)} sx={{ cursor: 'pointer' }}>
             {formatAmount(row.totalBalance ?? 0)}
           </Box>
         ),
@@ -100,11 +92,7 @@ export function CoinRemovalPage() {
         id: 'totalTransactions',
         label: 'Total Transactions',
         render: (row) => (
-          <Box
-            component="span"
-            onClick={() => openDetails(row)}
-            sx={{ cursor: 'pointer' }}
-          >
+          <Box component="span" onClick={() => openDetails(row)} sx={{ cursor: 'pointer' }}>
             {row.totalTransactions ?? 0}
           </Box>
         ),

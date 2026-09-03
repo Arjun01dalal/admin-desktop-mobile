@@ -1,10 +1,4 @@
-import {
-  Button,
-  CircularProgress,
-  MenuItem,
-  Stack,
-  TextField,
-} from '@mui/material';
+import { Button, CircularProgress, MenuItem, Stack, TextField } from '@mui/material';
 import type { ReactNode } from 'react';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { appCodeForName } from '@/constants/clientNames';

@@ -19,16 +19,10 @@ import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
-import {
-  formatDisplayDate,
-  formatDisplayTime,
-  getStoredUser,
-} from '@/utils/dates';
-import {
-  DEFAULT_ITEMS_PER_PAGE,
-  ITEMS_PER_PAGE_OPTIONS,
-} from '@/utils/pagination';
-import { display, displayRaw } from '@/screens/panel/shared';
+import { formatDisplayDate, formatDisplayTime, getStoredUser, todayIST } from '@/utils/dates';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { appCodeForName } from '@/constants/clientNames';
+import { display } from '@/screens/panel/shared';
 
 type MidTotal = { mid?: string; amount?: number; count?: number };
 
@@ -119,12 +113,13 @@ export function DepositListPage() {
   const [rows, setRows] = useState<DepositListRow[]>([]);
   const [totals, setTotals] = useState<Record<string, unknown> | null>(null);
   const [midOptions, setMidOptions] = useState<string[]>([]);
+  const today = todayIST();
   const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [query, setQuery] = useState<QueryState>({
-    startDate: '',
-    endDate: '',
+    startDate: today,
+    endDate: today,
     mid: localStorage.getItem(midStorageKey()) ?? '',
     filters: EMPTY_FILTERS,
   });
@@ -147,9 +142,7 @@ export function DepositListPage() {
     const midWise = Array.isArray(payload.midWiseTotals)
       ? (payload.midWiseTotals as MidTotal[])
       : [];
-    setMidOptions(
-      midWise.map((m) => String(m.mid || '')).filter(Boolean),
-    );
+    setMidOptions(midWise.map((m) => String(m.mid || '')).filter(Boolean));
   }, []);
 
   const loadList = useCallback(async () => {
@@ -179,9 +172,7 @@ export function DepositListPage() {
         return;
       }
       const payload = unpackPayload(res.data);
-      const items = Array.isArray(payload.items)
-        ? (payload.items as DepositListRow[])
-        : [];
+      const items = Array.isArray(payload.items) ? (payload.items as DepositListRow[]) : [];
       const sorted = items.slice().sort((a, b) => {
         const dateA = a?.activeUser || '';
         const dateB = b?.activeUser || '';
@@ -229,30 +220,44 @@ export function DepositListPage() {
     }));
   }, [startDate, endDate, draft]);
 
-  const onDraftChange =
-    (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) => {
-      setDraft((prev) => ({ ...prev, [key]: e.target.value }));
-    };
+  const onDraftChange = (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) => {
+    setDraft((prev) => ({ ...prev, [key]: e.target.value }));
+  };
 
-  const clearFilters = () => {
-    localStorage.removeItem(midStorageKey());
+  const clearDateFilter = useCallback(() => {
     setStartDate('');
     setEndDate('');
-    setDraft(EMPTY_FILTERS);
     setPage(1);
     setQuery((prev) => ({
       ...prev,
       startDate: '',
       endDate: '',
+      filters: draft,
+    }));
+  }, [draft]);
+
+  const clearFilters = () => {
+    const today = todayIST();
+    localStorage.removeItem(midStorageKey());
+    setStartDate(today);
+    setEndDate(today);
+    setDraft(EMPTY_FILTERS);
+    setPage(1);
+    setQuery({
+      startDate: today,
+      endDate: today,
       mid: '',
       filters: EMPTY_FILTERS,
-    }));
+    });
   };
 
-  const openMidBreakdown = (data?: MidTotal[]) => {
-    if (!data?.length) return;
-    navigate('/depositList/user-wise', { state: { data } });
-  };
+  const openMidBreakdown = useCallback(
+    (data?: MidTotal[]) => {
+      if (!data?.length) return;
+      navigate('/depositList/user-wise', { state: { data } });
+    },
+    [navigate],
+  );
 
   const columns = useMemo<CommonTableColumn<DepositListRow>[]>(
     () => [
@@ -341,7 +346,7 @@ export function DepositListPage() {
             placeholder="Search by App Name"
           />
         ),
-        render: (row) => displayRaw(row.clientName),
+        render: (row) => appCodeForName(row.clientName),
       },
       {
         id: 'lastActivity',
@@ -368,8 +373,7 @@ export function DepositListPage() {
       {
         id: 'ratio',
         label: 'Ratio',
-        render: (row) =>
-          withdrawalPct(row.approvedDepositAmount, row.approvedWithdrawalAmount),
+        render: (row) => withdrawalPct(row.approvedDepositAmount, row.approvedWithdrawalAmount),
       },
       {
         id: 'dwRatio',
@@ -381,8 +385,7 @@ export function DepositListPage() {
           </>
         ),
         render: (row) =>
-          Number(row.approvedDepositAmount || 0) -
-          Number(row.approvedWithdrawalAmount || 0),
+          Number(row.approvedDepositAmount || 0) - Number(row.approvedWithdrawalAmount || 0),
       },
       {
         id: 'depositDetails',
@@ -397,9 +400,7 @@ export function DepositListPage() {
           <Box
             onClick={() => openMidBreakdown(row.approvedDepositAmountByMid)}
             sx={{
-              cursor: row.approvedDepositAmountByMid?.length
-                ? 'pointer'
-                : 'default',
+              cursor: row.approvedDepositAmountByMid?.length ? 'pointer' : 'default',
               display: 'flex',
               flexDirection: 'column',
               gap: 0.25,
@@ -423,9 +424,7 @@ export function DepositListPage() {
           <Box
             onClick={() => openMidBreakdown(row.approvedWithdrawalAmountByMid)}
             sx={{
-              cursor: row.approvedWithdrawalAmountByMid?.length
-                ? 'pointer'
-                : 'default',
+              cursor: row.approvedWithdrawalAmountByMid?.length ? 'pointer' : 'default',
               display: 'flex',
               flexDirection: 'column',
               gap: 0.25,
@@ -437,14 +436,7 @@ export function DepositListPage() {
         ),
       },
     ],
-    [
-      page,
-      itemsPerPage,
-      draft,
-      commitQuery,
-      canShowMobile,
-      user,
-    ],
+    [page, itemsPerPage, draft, commitQuery, canShowMobile, user, openMidBreakdown],
   );
 
   return (
@@ -452,9 +444,7 @@ export function DepositListPage() {
       <CollapsibleFilterPanel
         title="Deposit List"
         summary={
-          query.startDate && query.endDate
-            ? `${query.startDate} → ${query.endDate}`
-            : 'All dates'
+          query.startDate && query.endDate ? `${query.startDate} → ${query.endDate}` : 'All dates'
         }
       >
         <Stack
@@ -464,98 +454,89 @@ export function DepositListPage() {
           alignItems="center"
           sx={{ '& > *': { flexShrink: 0 } }}
         >
-        <TextField
-          fullWidth={false}
-          size="small"
-          type="date"
-          label="From Date"
-          InputLabelProps={{ shrink: true }}
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          sx={{ width: 160 }}
-        />
-        <TextField
-          fullWidth={false}
-          size="small"
-          type="date"
-          label="To Date"
-          InputLabelProps={{ shrink: true }}
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          sx={{ width: 160 }}
-        />
-        <Button
-          variant="contained"
-          onClick={applyDates}
-          disabled={loading}
-          sx={orangeBtnSx}
-        >
-          Apply
-        </Button>
-        <Button
-          variant="contained"
-          onClick={clearFilters}
-          disabled={loading}
-          sx={orangeBtnSx}
-        >
-          Clear
-        </Button>
-        <Button
-          variant="contained"
-          startIcon={
-            loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-          }
-          onClick={() => void loadList()}
-          disabled={loading}
-          sx={orangeBtnSx}
-        >
-          Refresh
-        </Button>
-        <Typography fontWeight={700} whiteSpace="nowrap">
-          Deposit Amt:- {String(totals?.totalDepositAmount ?? 0)}
-        </Typography>
-        <Typography fontWeight={700} whiteSpace="nowrap">
-          Withdrawal Amt:- {String(totals?.totalWithdrawalAmount ?? 0)}
-        </Typography>
-        <TextField
-          fullWidth={false}
-          select
-          size="small"
-          label="Select Mid"
-          value={query.mid}
-          onChange={(e) => {
-            const mid = e.target.value;
-            localStorage.setItem(midStorageKey(), mid);
-            setPage(1);
-            setQuery((prev) => ({ ...prev, mid }));
-          }}
-          sx={{ width: 140, ...filterSelectSx }}
-        >
-          <MenuItem value="">All</MenuItem>
-          {midOptions.map((mid) => (
-            <MenuItem key={mid} value={mid}>
-              {mid}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          fullWidth={false}
-          select
-          size="small"
-          label="Items Per Page"
-          value={String(itemsPerPage)}
-          onChange={(e) => {
-            setItemsPerPage(Number(e.target.value));
-            setPage(1);
-          }}
-          sx={{ width: 130, ...filterSelectSx }}
-        >
-          {ITEMS_PER_PAGE_OPTIONS.map((n) => (
-            <MenuItem key={n} value={String(n)}>
-              {n}
-            </MenuItem>
-          ))}
-        </TextField>
+          <TextField
+            fullWidth={false}
+            size="small"
+            type="date"
+            label="From Date"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={{ width: 160 }}
+          />
+          <TextField
+            fullWidth={false}
+            size="small"
+            type="date"
+            label="To Date"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            sx={{ width: 160 }}
+          />
+          <Button variant="contained" onClick={applyDates} disabled={loading} sx={orangeBtnSx}>
+            Apply
+          </Button>
+          <Button variant="contained" onClick={clearDateFilter} disabled={loading} sx={orangeBtnSx}>
+            Clear Date
+          </Button>
+          <Button variant="contained" onClick={clearFilters} disabled={loading} sx={orangeBtnSx}>
+            Clear
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+            onClick={() => void loadList()}
+            disabled={loading}
+            sx={orangeBtnSx}
+          >
+            Refresh
+          </Button>
+          <Typography fontWeight={700} whiteSpace="nowrap">
+            Deposit Amt:- {String(totals?.totalDepositAmount ?? 0)}
+          </Typography>
+          <Typography fontWeight={700} whiteSpace="nowrap">
+            Withdrawal Amt:- {String(totals?.totalWithdrawalAmount ?? 0)}
+          </Typography>
+          <TextField
+            fullWidth={false}
+            select
+            size="small"
+            label="Select Mid"
+            value={query.mid}
+            onChange={(e) => {
+              const mid = e.target.value;
+              localStorage.setItem(midStorageKey(), mid);
+              setPage(1);
+              setQuery((prev) => ({ ...prev, mid }));
+            }}
+            sx={{ width: 140, ...filterSelectSx }}
+          >
+            <MenuItem value="">All</MenuItem>
+            {midOptions.map((mid) => (
+              <MenuItem key={mid} value={mid}>
+                {mid}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth={false}
+            select
+            size="small"
+            label="Items Per Page"
+            value={String(itemsPerPage)}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setPage(1);
+            }}
+            sx={{ width: 130, ...filterSelectSx }}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((n) => (
+              <MenuItem key={n} value={String(n)}>
+                {n}
+              </MenuItem>
+            ))}
+          </TextField>
         </Stack>
       </CollapsibleFilterPanel>
 
@@ -566,12 +547,12 @@ export function DepositListPage() {
       <TablePanel
         footer={
           totalPages > 1 ? (
-          <Pagination
-            count={totalPages}
-            page={page}
-            color="secondary"
-            onChange={(_e, next) => setPage(next)}
-          />
+            <Pagination
+              count={totalPages}
+              page={page}
+              color="secondary"
+              onChange={(_e, next) => setPage(next)}
+            />
           ) : undefined
         }
         footerJustify="center"

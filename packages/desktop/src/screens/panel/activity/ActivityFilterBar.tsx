@@ -98,12 +98,7 @@ export function ActivityFilterBar({
           onChange={(e) => onEndDateChange(e.target.value)}
           sx={dateFieldSx}
         />
-        <Button
-          variant="contained"
-          onClick={onApply}
-          disabled={loading}
-          sx={actionBtnSx}
-        >
+        <Button variant="contained" onClick={onApply} disabled={loading} sx={actionBtnSx}>
           Apply
         </Button>
         {onRefresh && (

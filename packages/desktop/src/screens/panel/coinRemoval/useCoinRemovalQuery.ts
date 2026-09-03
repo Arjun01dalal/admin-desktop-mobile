@@ -25,15 +25,12 @@ export function useCoinRemovalQuery(
         const effectiveStart = startDate || todayIST();
         const effectiveEnd = endDate || todayIST();
 
-        const res = await secureApi<CoinRemovalListResponse>(
-          'users.coinRemovalUsers',
-          {
-            itemsPerPage,
-            pageNo,
-            startDate: effectiveStart,
-            endDate: effectiveEnd,
-          },
-        );
+        const res = await secureApi<CoinRemovalListResponse>('users.coinRemovalUsers', {
+          itemsPerPage,
+          pageNo,
+          startDate: effectiveStart,
+          endDate: effectiveEnd,
+        });
 
         if (!isCurrent(gen)) return;
 

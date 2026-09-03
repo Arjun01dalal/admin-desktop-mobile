@@ -22,10 +22,7 @@ import type { ApiResult } from '@astro/shared';
 import { getSessionUser } from '@/auth/permissions';
 import { apiFailed } from '@/screens/panel/kyc/types';
 import type { SaveWorkbookResult } from '@/utils/downloadSheet';
-import {
-  logSheetDownload,
-  type SheetDownloadFilter,
-} from '@/utils/sheetDownloadAudit';
+import { logSheetDownload, type SheetDownloadFilter } from '@/utils/sheetDownloadAudit';
 
 type Props = {
   open: boolean;
@@ -103,10 +100,7 @@ export function SheetDownloadOtpModal({ open, filter, onClose, onVerified }: Pro
         return;
       }
 
-      if (
-        autoSendMobile === target &&
-        Date.now() - autoSendOkAt < AUTO_SEND_OK_TTL_MS
-      ) {
+      if (autoSendMobile === target && Date.now() - autoSendOkAt < AUTO_SEND_OK_TTL_MS) {
         setSent(true);
         setSending(false);
         return;
@@ -214,9 +208,7 @@ export function SheetDownloadOtpModal({ open, filter, onClose, onVerified }: Pro
               size="small"
               value={otp}
               placeholder="Enter 4-digit OTP"
-              onChange={(e) =>
-                setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))
-              }
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
               inputProps={{
                 inputMode: 'numeric',
                 maxLength: 4,

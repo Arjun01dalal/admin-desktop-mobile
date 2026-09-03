@@ -25,7 +25,11 @@ import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { todayIST, getStoredUser } from '@/utils/dates';
-import { CALLER_HEAD_ROLE_IDS, OFFICE_LOCATIONS, type CallerRow } from './callerResponsibility/constants';
+import {
+  CALLER_HEAD_ROLE_IDS,
+  OFFICE_LOCATIONS,
+  type CallerRow,
+} from './callerResponsibility/constants';
 import { CsvUploadModal } from './callerResponsibility/CsvUploadModal';
 import {
   canSeeTotalDeposit,
@@ -59,27 +63,16 @@ const twoLineHeadSx = { whiteSpace: 'nowrap', lineHeight: 1.3, py: 0.9 } as cons
 export function CallerResponsibilityPage() {
   const navigate = useNavigate();
   const user = getStoredUser<StoredCallerUser>();
-  const { isCaller, isCallerHead, isCallerOrHead, isFullAllotment } = roleFlags(
-    user?.Role_ID,
-  );
+  const { isCaller, isCallerHead, isCallerOrHead, isFullAllotment } = roleFlags(user?.Role_ID);
   const showTotalDeposit = canSeeTotalDeposit(user);
   const showCallerHead = !isCallerOrHead || isFullAllotment;
   const showLocation = !isCaller || isFullAllotment;
   const showOfficeSummary = showTotalDeposit && showLocation;
   const showAssignedCallerTotal = isCallerHead && !showOfficeSummary;
 
-  const [startDate, setStartDate] = useState(
-    () =>
-      isCaller
-        ? todayIST()
-        : localStorage.getItem('callerResponsibilityStartDate') || todayIST(),
-  );
-  const [endDate, setEndDate] = useState(
-    () =>
-      isCaller
-        ? todayIST()
-        : localStorage.getItem('callerResponsibilityEndDate') || todayIST(),
-  );
+  // Always open on today's IST date (Laxmi default); still persist when user changes filters.
+  const [startDate, setStartDate] = useState(() => todayIST());
+  const [endDate, setEndDate] = useState(() => todayIST());
   const [callerHead, setCallerHead] = useState('');
   const [office, setOffice] = useState('');
   const [heads, setHeads] = useState<CallerRow[]>([]);
@@ -121,10 +114,10 @@ export function CallerResponsibilityPage() {
 
       const [depRes, botRes] = await Promise.all([
         secureApi<CallerRow>('caller.depositByEmpcodeOffice', body),
-        secureApi<{ users?: CallerRow[]; total?: number }>(
-          'caller.activeUsersFromCalls',
-          { startDate, endDate },
-        ),
+        secureApi<{ users?: CallerRow[]; total?: number }>('caller.activeUsersFromCalls', {
+          startDate,
+          endDate,
+        }),
       ]);
 
       if (!depRes.ok) {
@@ -134,24 +127,13 @@ export function CallerResponsibilityPage() {
         setPayload({});
       } else {
         const data = (depRes.data || {}) as CallerRow;
-        const byEmp = Array.isArray(data.byEmpCode)
-          ? (data.byEmpCode as CallerRow[])
-          : [];
-        const visibleRows = filterCallerRows(
-          byEmp,
-          user,
-          isCaller,
-          showTotalDeposit,
-        ).filter(
-          (row) =>
-            !isCallerHead ||
-            matchesCallerHeadName(row.callerHead, user?.name),
+        const byEmp = Array.isArray(data.byEmpCode) ? (data.byEmpCode as CallerRow[]) : [];
+        const visibleRows = filterCallerRows(byEmp, user, isCaller, showTotalDeposit).filter(
+          (row) => !isCallerHead || matchesCallerHeadName(row.callerHead, user?.name),
         );
         setCallerRows(visibleRows);
         setLocationRows(
-          Array.isArray(data.byOfficeLocation)
-            ? (data.byOfficeLocation as CallerRow[])
-            : [],
+          Array.isArray(data.byOfficeLocation) ? (data.byOfficeLocation as CallerRow[]) : [],
         );
         setPayload(data);
       }
@@ -163,16 +145,7 @@ export function CallerResponsibilityPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    startDate,
-    endDate,
-    callerHead,
-    office,
-    isCallerHead,
-    isCaller,
-    showTotalDeposit,
-    user,
-  ]);
+  }, [startDate, endDate, callerHead, office, isCallerHead, isCaller, showTotalDeposit, user]);
 
   useEffect(() => {
     void loadHeads();
@@ -188,22 +161,19 @@ export function CallerResponsibilityPage() {
     });
   }, [isCaller, displayedBotCount, navigate, botUsers, startDate, endDate]);
 
-  const summary = (payload.summary || {}) as CallerRow;
-  const summaryRow = useMemo(
-    () => [
+  const summaryRow = useMemo(() => {
+    const summary = (payload.summary || {}) as CallerRow;
+    return [
       {
         totalEmpCodes: isCallerOrHead ? 0 : summary.totalEmpCodes,
         totalOfficeLocations: isCallerOrHead ? 0 : summary.totalOfficeLocations,
         totalTransactions: isCallerOrHead ? 0 : summary.totalTransactions,
         totalActiveUsers: isCallerOrHead ? 0 : payload.totalActiveUsers,
-        totalTransactionCount: isCallerOrHead
-          ? 0
-          : roundAmt(payload.totalDeposit),
+        totalTransactionCount: isCallerOrHead ? 0 : roundAmt(payload.totalDeposit),
         activeByBot: displayedBotCount,
       },
-    ],
-    [isCallerOrHead, summary, payload, displayedBotCount],
-  );
+    ];
+  }, [isCallerOrHead, payload, displayedBotCount]);
 
   /** Caller-head totals from their assigned caller rows (when office summary is hidden). */
   const assignedCallerTotals = useMemo(() => {
@@ -237,59 +207,55 @@ export function CallerResponsibilityPage() {
     };
   }, [callerRows]);
 
-  const summaryColumns = useMemo<CommonTableColumn<(typeof summaryRow)[0]>[]>(
-    () => {
-      const cols: CommonTableColumn<(typeof summaryRow)[0]>[] = [
-        {
-          id: 'emp',
-          label: "Total Employee (Caller's)",
-          render: (r) => cellText(r.totalEmpCodes),
-        },
-      ];
-      if (showLocation) {
-        cols.push({
-          id: 'loc',
-          label: 'Total Office Location',
-          render: (r) => cellText(r.totalOfficeLocations),
-        });
-      }
-      cols.push(
-        {
-          id: 'txn',
-          label: 'Total Transaction',
-          render: (r) => cellText(r.totalTransactions),
-        },
-        {
-          id: 'active',
-          label: 'Total Active Customers',
-          render: (r) => cellText(r.totalActiveUsers),
-        },
-        {
-          id: 'txnCount',
-          label: 'Total Transaction Count',
-          render: (r) => cellText(r.totalTransactionCount),
-        },
-        {
-          id: 'bot',
-          label: 'Active Customers By Bot',
-          render: (r) => (
-            <Box
-              component="span"
-              onClick={openBotUsers}
-              sx={{
-                cursor:
-                  !isCaller && displayedBotCount > 0 ? 'pointer' : 'default',
-              }}
-            >
-              {r.activeByBot}
-            </Box>
-          ),
-        },
-      );
-      return cols;
-    },
-    [isCaller, displayedBotCount, openBotUsers, showLocation],
-  );
+  const summaryColumns = useMemo<CommonTableColumn<(typeof summaryRow)[0]>[]>(() => {
+    const cols: CommonTableColumn<(typeof summaryRow)[0]>[] = [
+      {
+        id: 'emp',
+        label: "Total Employee (Caller's)",
+        render: (r) => cellText(r.totalEmpCodes),
+      },
+    ];
+    if (showLocation) {
+      cols.push({
+        id: 'loc',
+        label: 'Total Office Location',
+        render: (r) => cellText(r.totalOfficeLocations),
+      });
+    }
+    cols.push(
+      {
+        id: 'txn',
+        label: 'Total Transaction',
+        render: (r) => cellText(r.totalTransactions),
+      },
+      {
+        id: 'active',
+        label: 'Total Active Customers',
+        render: (r) => cellText(r.totalActiveUsers),
+      },
+      {
+        id: 'txnCount',
+        label: 'Total Transaction Count',
+        render: (r) => cellText(r.totalTransactionCount),
+      },
+      {
+        id: 'bot',
+        label: 'Active Customers By Bot',
+        render: (r) => (
+          <Box
+            component="span"
+            onClick={openBotUsers}
+            sx={{
+              cursor: !isCaller && displayedBotCount > 0 ? 'pointer' : 'default',
+            }}
+          >
+            {r.activeByBot}
+          </Box>
+        ),
+      },
+    );
+    return cols;
+  }, [isCaller, displayedBotCount, openBotUsers, showLocation]);
 
   const locationColumns = useMemo<CommonTableColumn<CallerRow>[]>(
     () => [
@@ -549,96 +515,96 @@ export function CallerResponsibilityPage() {
           overflow: 'hidden',
         }}
       >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1}
+          onClick={() => setFiltersOpen((open) => !open)}
+          sx={{
+            minHeight: 44,
+            px: 1.5,
+            py: 0.75,
+            cursor: 'pointer',
+            userSelect: 'none',
+            borderBottom: filtersOpen ? '1px solid' : 'none',
+            borderColor: 'divider',
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+        >
           <Stack
             direction="row"
             alignItems="center"
-            justifyContent="space-between"
-            gap={1}
-            onClick={() => setFiltersOpen((open) => !open)}
-            sx={{
-              minHeight: 44,
-              px: 1.5,
-              py: 0.75,
-              cursor: 'pointer',
-              userSelect: 'none',
-              borderBottom: filtersOpen ? '1px solid' : 'none',
-              borderColor: 'divider',
-              '&:hover': { bgcolor: 'action.hover' },
-            }}
+            spacing={1}
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ minWidth: 0 }}
           >
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1}
-              flexWrap="wrap"
-              useFlexGap
-              sx={{ minWidth: 0 }}
-            >
-              <TuneIcon sx={{ color: '#ff9f0a', fontSize: 20 }} />
-              <Typography variant="subtitle2" fontWeight={800}>
-                Caller Responsibility
-              </Typography>
-              {!filtersOpen ? (
-                <>
-                  {!isCaller ? (
-                    <Chip
-                      size="small"
-                      label={`${startDate} → ${endDate}`}
-                      variant="outlined"
-                      sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
-                    />
-                  ) : null}
+            <TuneIcon sx={{ color: '#ff9f0a', fontSize: 20 }} />
+            <Typography variant="subtitle2" fontWeight={800}>
+              Caller Responsibility
+            </Typography>
+            {!filtersOpen ? (
+              <>
+                {!isCaller ? (
                   <Chip
                     size="small"
-                    label={`Bots: ${displayedBotCount}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openBotUsers();
-                    }}
-                    sx={{
-                      height: 24,
-                      fontWeight: 700,
-                      color: '#c77a18',
-                      bgcolor: 'rgba(255,159,10,0.12)',
-                      cursor: displayedBotCount > 0 ? 'pointer' : 'default',
-                    }}
+                    label={`${startDate} → ${endDate}`}
+                    variant="outlined"
+                    sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
                   />
-                </>
-              ) : null}
-            </Stack>
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Tooltip title="Refresh">
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label="Refresh"
-                    disabled={loading}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void loadMain();
-                    }}
-                    sx={{
-                      color: '#e8e8ea',
-                      border: '1px solid',
-                      borderColor: 'rgba(255,255,255,0.28)',
-                      borderRadius: '8px',
-                      width: 34,
-                      height: 34,
-                      '&:hover': {
-                        borderColor: '#ff9f0a',
-                        bgcolor: 'rgba(255,159,10,0.08)',
-                      },
-                    }}
-                  >
-                    {loading ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <RefreshIcon sx={{ fontSize: 18 }} />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <IconButton
+                ) : null}
+                <Chip
+                  size="small"
+                  label={`Bots: ${displayedBotCount}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openBotUsers();
+                  }}
+                  sx={{
+                    height: 24,
+                    fontWeight: 700,
+                    color: '#c77a18',
+                    bgcolor: 'rgba(255,159,10,0.12)',
+                    cursor: displayedBotCount > 0 ? 'pointer' : 'default',
+                  }}
+                />
+              </>
+            ) : null}
+          </Stack>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Tooltip title="Refresh">
+              <span>
+                <IconButton
+                  size="small"
+                  aria-label="Refresh"
+                  disabled={loading}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void loadMain();
+                  }}
+                  sx={{
+                    color: '#e8e8ea',
+                    border: '1px solid',
+                    borderColor: 'rgba(255,255,255,0.28)',
+                    borderRadius: '8px',
+                    width: 34,
+                    height: 34,
+                    '&:hover': {
+                      borderColor: '#ff9f0a',
+                      bgcolor: 'rgba(255,159,10,0.08)',
+                    },
+                  }}
+                >
+                  {loading ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <RefreshIcon sx={{ fontSize: 18 }} />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+            <IconButton
               size="small"
               aria-label={filtersOpen ? 'Collapse filters' : 'Expand filters'}
               onClick={(event) => {
@@ -652,114 +618,114 @@ export function CallerResponsibilityPage() {
                 <ExpandMoreIcon fontSize="small" />
               )}
             </IconButton>
-            </Stack>
           </Stack>
+        </Stack>
 
-          <Collapse in={filtersOpen} timeout="auto" unmountOnExit>
-            <Box sx={{ p: 1.5 }}>
-              <Stack
-                direction="row"
-                spacing={1.5}
-                alignItems="center"
-                flexWrap="wrap"
-                useFlexGap
-                sx={{ minWidth: 0, maxWidth: '100%' }}
+        <Collapse in={filtersOpen} timeout="auto" unmountOnExit>
+          <Box sx={{ p: 1.5 }}>
+            <Stack
+              direction="row"
+              spacing={1.5}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+              sx={{ minWidth: 0, maxWidth: '100%' }}
+            >
+              {!isCaller ? (
+                <>
+                  <TextField
+                    type="date"
+                    label="From Date"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    sx={{ width: 170, flexShrink: 0 }}
+                  />
+                  <TextField
+                    type="date"
+                    label="To Date"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    sx={{ width: 170, flexShrink: 0 }}
+                  />
+                </>
+              ) : null}
+              {showCallerHead && (
+                <TextField
+                  select
+                  label="Caller Head"
+                  size="small"
+                  value={callerHead}
+                  onChange={(e) => setCallerHead(e.target.value)}
+                  sx={{ width: 200, flexShrink: 0 }}
+                >
+                  <MenuItem value="">
+                    <em>Select</em>
+                  </MenuItem>
+                  {heads.map((h) => (
+                    <MenuItem key={String(h._id || h.name)} value={String(h.name || '')}>
+                      {String(h.name || h.empCode || '-')}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              {showLocation && (
+                <TextField
+                  select
+                  label="Location"
+                  size="small"
+                  value={office}
+                  onChange={(e) => setOffice(e.target.value)}
+                  sx={{ width: 180, flexShrink: 0 }}
+                >
+                  <MenuItem value="">
+                    <em>Select</em>
+                  </MenuItem>
+                  {OFFICE_LOCATIONS.map((o) => (
+                    <MenuItem key={o} value={o}>
+                      {o}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              <Button
+                variant="contained"
+                onClick={() => void loadMain()}
+                disabled={loading}
+                sx={{ flexShrink: 0, fontWeight: 700 }}
               >
-                {!isCaller ? (
-                  <>
-                    <TextField
-                      type="date"
-                      label="From Date"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      sx={{ width: 170, flexShrink: 0 }}
-                    />
-                    <TextField
-                      type="date"
-                      label="To Date"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      sx={{ width: 170, flexShrink: 0 }}
-                    />
-                  </>
-                ) : null}
-                {showCallerHead && (
-                  <TextField
-                    select
-                    label="Caller Head"
-                    size="small"
-                    value={callerHead}
-                    onChange={(e) => setCallerHead(e.target.value)}
-                    sx={{ width: 200, flexShrink: 0 }}
-                  >
-                    <MenuItem value="">
-                      <em>Select</em>
-                    </MenuItem>
-                    {heads.map((h) => (
-                      <MenuItem key={String(h._id || h.name)} value={String(h.name || '')}>
-                        {String(h.name || h.empCode || '-')}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-                {showLocation && (
-                  <TextField
-                    select
-                    label="Location"
-                    size="small"
-                    value={office}
-                    onChange={(e) => setOffice(e.target.value)}
-                    sx={{ width: 180, flexShrink: 0 }}
-                  >
-                    <MenuItem value="">
-                      <em>Select</em>
-                    </MenuItem>
-                    {OFFICE_LOCATIONS.map((o) => (
-                      <MenuItem key={o} value={o}>
-                        {o}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
+                Apply
+              </Button>
+              {!isCaller && (
                 <Button
-                  variant="contained"
-                  onClick={() => void loadMain()}
-                  disabled={loading}
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => setValidateOpen(true)}
                   sx={{ flexShrink: 0, fontWeight: 700 }}
                 >
-                  Apply
+                  Validate Data
                 </Button>
-                {!isCaller && (
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => setValidateOpen(true)}
-                    sx={{ flexShrink: 0, fontWeight: 700 }}
-                  >
-                    Validate Data
-                  </Button>
-                )}
-                {loading && <CircularProgress size={22} />}
-              </Stack>
+              )}
+              {loading && <CircularProgress size={22} />}
+            </Stack>
 
-              <Typography
-                variant="body2"
-                mt={1.25}
-                onClick={openBotUsers}
-                sx={{
-                  cursor: displayedBotCount > 0 ? 'pointer' : 'default',
-                  width: 'fit-content',
-                }}
-              >
-                <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
-              </Typography>
-            </Box>
-          </Collapse>
-        </Box>
+            <Typography
+              variant="body2"
+              mt={1.25}
+              onClick={openBotUsers}
+              sx={{
+                cursor: displayedBotCount > 0 ? 'pointer' : 'default',
+                width: 'fit-content',
+              }}
+            >
+              <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
+            </Typography>
+          </Box>
+        </Collapse>
+      </Box>
 
       {showTotalDeposit && (
         <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
@@ -802,8 +768,7 @@ export function CallerResponsibilityPage() {
               {
                 id: 'pnl',
                 label: 'PNL',
-                render: (r) =>
-                  pnl(r.totalDeposit, r.withdrawalApprovedAmount),
+                render: (r) => pnl(r.totalDeposit, r.withdrawalApprovedAmount),
               },
               {
                 id: 'wPendAmt',

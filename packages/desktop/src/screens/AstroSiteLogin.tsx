@@ -18,7 +18,6 @@ import { getAstroSiteDeviceId } from '@/utils/astroSiteDeviceId';
 
 const PANEL_GATE_PASSWORD = '123456789';
 const SITE_IDENTITY_KEY = 'astro_panel_site_identity_v1';
-const SITE_ACCESS_TOKEN_KEY = 'astro_site_access_token_v1';
 
 type Props = {
   onOpenPanelLogin: (prefill?: { email?: string; mobile?: string }) => void;
@@ -101,7 +100,11 @@ export function AstroSiteLogin({
     let longitude = '0.0';
     try {
       const loc = await window.gcalc?.getIpLocation?.();
-      if (loc?.ok && Number.isFinite(Number(loc.latitude)) && Number.isFinite(Number(loc.longitude))) {
+      if (
+        loc?.ok &&
+        Number.isFinite(Number(loc.latitude)) &&
+        Number.isFinite(Number(loc.longitude))
+      ) {
         latitude = String(loc.latitude);
         longitude = String(loc.longitude);
       }
@@ -145,7 +148,8 @@ export function AstroSiteLogin({
       // Geo + FCM in parallel — FCM is usually already warm from app-ready / splash / mount.
       const [geo, fcmRes] = await Promise.all([
         resolveGeo(),
-        window.gcalc?.getFcmToken?.({}) ?? Promise.resolve({ ok: false as const, message: 'FCM unavailable' }),
+        window.gcalc?.getFcmToken?.({}) ??
+          Promise.resolve({ ok: false as const, message: 'FCM unavailable' }),
       ]);
       if (!fcmRes?.ok || !fcmRes.fcmToken) {
         toast.error(fcmRes?.message || 'Failed to get FCM token. Check network and try again.');
@@ -172,12 +176,6 @@ export function AstroSiteLogin({
       if (!accessToken) {
         toast.error('Login succeeded but no access token was returned. Cannot open Astro home.');
         return;
-      }
-
-      try {
-        localStorage.setItem(SITE_ACCESS_TOKEN_KEY, accessToken);
-      } catch {
-        // ignore
       }
 
       toast.success(res.message || 'Login successful');

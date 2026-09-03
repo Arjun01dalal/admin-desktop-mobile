@@ -71,69 +71,72 @@ export function useReportQuery<T>({
   const [error, setError] = useState<string | null>(null);
   const { next, isCurrent, begin, end } = useRequestGeneration();
 
-  const load = useCallback(async (opts?: { force?: boolean }) => {
-    const payload = buildPayload();
-    const key = cacheTtlMs > 0 ? cacheKey(action, payload) : '';
+  const load = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const payload = buildPayload();
+      const key = cacheTtlMs > 0 ? cacheKey(action, payload) : '';
 
-    if (!opts?.force && key) {
-      const cached = readCache<T>(key);
-      if (cached) {
+      if (!opts?.force && key) {
+        const cached = readCache<T>(key);
+        if (cached) {
+          startTransition(() => {
+            setRows(cached.rows as T[]);
+            setTotal(cached.total);
+            setTotalPages(cached.totalPages);
+            setError(null);
+            setLoading(false);
+          });
+          return;
+        }
+      }
+
+      const gen = next();
+      begin();
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await secureApi(action, payload);
+        if (!isCurrent(gen)) return;
+
+        if (!res.ok) {
+          const msg = res.message || errorMessage;
+          setError(msg);
+          toast.error(msg);
+          if (key) queryCache.delete(key);
+          startTransition(() => {
+            setRows([]);
+            setTotal(0);
+            setTotalPages(1);
+          });
+          return;
+        }
+
+        const parsed = unpack(res);
+        const nextRows = parsed.rows;
+        const nextTotal = parsed.total ?? parsed.rows.length;
+        const nextPages = Math.max(1, parsed.totalPages ?? 1);
+
+        if (key) {
+          queryCache.set(key, {
+            rows: nextRows,
+            total: nextTotal,
+            totalPages: nextPages,
+            expiresAt: Date.now() + cacheTtlMs,
+          });
+        }
+
         startTransition(() => {
-          setRows(cached.rows as T[]);
-          setTotal(cached.total);
-          setTotalPages(cached.totalPages);
-          setError(null);
-          setLoading(false);
+          setRows(nextRows);
+          setTotal(nextTotal);
+          setTotalPages(nextPages);
         });
-        return;
+      } finally {
+        end();
+        if (isCurrent(gen)) setLoading(false);
       }
-    }
-
-    const gen = next();
-    begin();
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await secureApi(action, payload);
-      if (!isCurrent(gen)) return;
-
-      if (!res.ok) {
-        const msg = res.message || errorMessage;
-        setError(msg);
-        toast.error(msg);
-        if (key) queryCache.delete(key);
-        startTransition(() => {
-          setRows([]);
-          setTotal(0);
-          setTotalPages(1);
-        });
-        return;
-      }
-
-      const parsed = unpack(res);
-      const nextRows = parsed.rows;
-      const nextTotal = parsed.total ?? parsed.rows.length;
-      const nextPages = Math.max(1, parsed.totalPages ?? 1);
-
-      if (key) {
-        queryCache.set(key, {
-          rows: nextRows,
-          total: nextTotal,
-          totalPages: nextPages,
-          expiresAt: Date.now() + cacheTtlMs,
-        });
-      }
-
-      startTransition(() => {
-        setRows(nextRows);
-        setTotal(nextTotal);
-        setTotalPages(nextPages);
-      });
-    } finally {
-      end();
-      if (isCurrent(gen)) setLoading(false);
-    }
-  }, [action, buildPayload, unpack, errorMessage, cacheTtlMs, next, begin, end, isCurrent]);
+    },
+    [action, buildPayload, unpack, errorMessage, cacheTtlMs, next, begin, end, isCurrent],
+  );
 
   useEffect(() => {
     void load();

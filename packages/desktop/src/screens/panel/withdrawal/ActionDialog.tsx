@@ -30,7 +30,6 @@ type Props = {
   onSubmit: () => void;
 };
 
-
 /** Approve / Reject / Reverse / Manual / On Hold dialog. */
 export function ActionDialog({
   open,
@@ -49,9 +48,7 @@ export function ActionDialog({
   onSubmit,
 }: Props) {
   // Admin parity: Gateway/MID not shown for Approved / Reverse / Rejected / on hold.
-  const needsGatewayMid = !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(
-    status,
-  );
+  const needsGatewayMid = !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(status);
   const gatewayOptions =
     status === 'Manual Approved'
       ? Array.from(new Set([...MANUAL_GATEWAYS, ...payoutGateways]))
@@ -90,7 +87,9 @@ export function ActionDialog({
             value={remark}
             onChange={(e) => onRemark(e.target.value)}
             sx={fieldSx}
-            helperText={status === 'Approved' ? 'Defaults to "Approved"' : 'Required for non-approve actions'}
+            helperText={
+              status === 'Approved' ? 'Defaults to "Approved"' : 'Required for non-approve actions'
+            }
           />
           {needsGatewayMid ? (
             <>

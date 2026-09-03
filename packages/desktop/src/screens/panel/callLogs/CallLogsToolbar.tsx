@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { CAMPAIGN_LIST, campaignsForLoginUser, type CampaignItem } from '../newRegisters/campaignList';
+import { CAMPAIGN_LIST, type CampaignItem } from '../newRegisters/campaignList';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 
 type CallLogsToolbarProps = {
@@ -173,11 +173,7 @@ export function CallLogsToolbar({
               setOpen((value) => !value);
             }}
           >
-            {open ? (
-              <ExpandLessIcon fontSize="small" />
-            ) : (
-              <ExpandMoreIcon fontSize="small" />
-            )}
+            {open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
           </IconButton>
         </Stack>
       </Stack>
@@ -279,7 +275,7 @@ export function CallLogsToolbar({
                   ref={fileRef}
                   hidden
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx,.csv"
                   onChange={(e) => onUpload(e.target.files?.[0])}
                 />
               </Button>

@@ -10,11 +10,7 @@ const { assertHttpsUrl, attachHttpsOnlyInterceptor } = require('../httpsOnly.cjs
 // Single shared agent so pinned connections can be keep-alive pooled.
 const pinnedAgent = createPinnedAgent();
 const { encrypt, decrypt } = require('./crypto.cjs');
-const {
-  sanitizeBridgePayload,
-  sanitizeToken,
-  isSafeId,
-} = require('./bridgeSanitize.cjs');
+const { sanitizeBridgePayload, sanitizeToken, isSafeId } = require('./bridgeSanitize.cjs');
 const { attachAxiosDevLog } = require('./devHttpLog.cjs');
 
 const REGISTRY_PATH = require.resolve('./registry.cjs');
@@ -23,8 +19,7 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 let cachedRegistry = null;
 
 function getRegistry() {
-  const hotReload =
-    useViteDevServer || process.env.SECURE_HOT_REGISTRY === '1';
+  const hotReload = useViteDevServer || process.env.SECURE_HOT_REGISTRY === '1';
   if (hotReload) {
     delete require.cache[REGISTRY_PATH];
     cachedRegistry = null;
@@ -89,6 +84,21 @@ function apiClient(action) {
   };
 }
 
+/**
+ * Panel session tokens belong only to the configured panel API origin.
+ * Registry actions may call explicitly configured external services, but those
+ * services must never receive the panel's Bearer token by accident.
+ */
+function shouldAttachPanelToken(def) {
+  const pathValue = String(def?.path || '');
+  if (!/^https?:\/\//i.test(pathValue)) return true;
+  try {
+    return new URL(pathValue).origin === new URL(getApiBaseUrl()).origin;
+  } catch {
+    return false;
+  }
+}
+
 function buildMobileLinks(empCode = '001') {
   return APP_DETAILS.map((item) => {
     const registrationAppName = `AS${item.code}`;
@@ -105,8 +115,8 @@ function buildMobileLinks(empCode = '001') {
 }
 
 const DIALER_SERVER_MAP = {
-  '1': 'api2',
-  '3': 'api',
+  1: 'api2',
+  3: 'api',
   // Campaign list serverId values (laxminarayan NewRegisterUsers SERVER_MAP_BY_IP)
   '49.206.26.7': 'api2',
   '3.200': 'api',
@@ -153,7 +163,9 @@ function isDialerSuccess(data) {
   if (data.success === true || data.success === 'true' || data.success === 1) {
     return true;
   }
-  const status = String(data.status || '').trim().toLowerCase();
+  const status = String(data.status || '')
+    .trim()
+    .toLowerCase();
   return status === 'success' || status === 'ok';
 }
 
@@ -170,7 +182,9 @@ function sanitizeDialerLead(item = {}) {
   return {
     first_name: String(item.first_name || item.client_name || item.name || '').slice(0, 120),
     last_name: String(item.last_name || '').slice(0, 120),
-    phone_number: String(item.phone_number || item.mobile || '').replace(/\D/g, '').slice(0, 20),
+    phone_number: String(item.phone_number || item.mobile || '')
+      .replace(/\D/g, '')
+      .slice(0, 20),
     city: String(item.city ?? '').slice(0, 80),
     state: String(item.state ?? '').slice(0, 80),
     email: String(item.email || item.clientName || item.app_name || '').slice(0, 120),
@@ -217,22 +231,13 @@ async function postAddDialerData(body, token) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to save dialer data',
+      message: error?.response?.data?.message || error?.message || 'Failed to save dialer data',
     };
   }
 }
 
 async function addToDialer(payload = {}, token = null) {
-  const {
-    campaignName,
-    users = [],
-    extensionId = [],
-    adminName = 'ADMIN',
-    serverId,
-  } = payload;
+  const { campaignName, users = [], extensionId = [], adminName = 'ADMIN', serverId } = payload;
 
   if (!campaignName) {
     return { ok: false, message: 'Campaign Name should not be empty' };
@@ -287,18 +292,13 @@ async function addToDialer(payload = {}, token = null) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to add to dialer',
+      message: error?.response?.data?.message || error?.message || 'Failed to add to dialer',
     };
   }
 }
 
 async function externalDialerBatch(payload = {}, token = null) {
-  const campaignId = String(
-    payload.campaignId || payload.campaign_id || '',
-  ).trim();
+  const campaignId = String(payload.campaignId || payload.campaign_id || '').trim();
   const { leads = [], serverId } = payload;
   if (!campaignId) {
     return { ok: false, message: 'Campaign Name should not be empty' };
@@ -324,9 +324,7 @@ async function externalDialerBatch(payload = {}, token = null) {
       : randomDialerListId();
 
   // Web panel uses campaign display name as list_name.
-  const listName = String(
-    payload.listName || payload.list_name || campaignId,
-  ).slice(0, 120);
+  const listName = String(payload.listName || payload.list_name || campaignId).slice(0, 120);
 
   const dialerBody = {
     list_id: listId,
@@ -470,10 +468,7 @@ async function listIncomingBotCalls(payload = {}) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to load incoming calls',
+      message: error?.response?.data?.message || error?.message || 'Failed to load incoming calls',
     };
   }
 }
@@ -486,7 +481,9 @@ async function uploadDiallerData(payload = {}, token = null) {
   if (!dateOfData) {
     return { ok: false, message: 'Please select date' };
   }
-  const safeName = String(fileName).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
+  const safeName = String(fileName)
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .slice(0, 120);
   if (!/\.csv$/i.test(safeName)) {
     return { ok: false, message: 'Only CSV uploads are allowed' };
   }
@@ -511,10 +508,10 @@ async function uploadDiallerData(payload = {}, token = null) {
       '/SubAdmin/upload-dialler-data',
       form,
       {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      maxBodyLength: Infinity,
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        maxBodyLength: Infinity,
       },
     );
 
@@ -527,10 +524,7 @@ async function uploadDiallerData(payload = {}, token = null) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        'Upload failed',
+      message: error?.response?.data?.message || error?.message || 'Upload failed',
       status: error?.response?.status,
     };
   }
@@ -549,7 +543,9 @@ async function uploadBannerVideo(payload = {}, token = null) {
   if (!BANNER_VIDEO_TYPES.has(type)) {
     return { ok: false, message: 'Please select a valid video type' };
   }
-  const safeName = String(fileName).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
+  const safeName = String(fileName)
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .slice(0, 120);
   if (!/\.(mp4|webm|mov|m4v|avi)$/i.test(safeName)) {
     return { ok: false, message: 'Only video uploads are allowed (mp4, webm, mov, m4v, avi)' };
   }
@@ -606,10 +602,7 @@ async function uploadBannerVideo(payload = {}, token = null) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        'Video upload failed',
+      message: error?.response?.data?.message || error?.message || 'Video upload failed',
       status: error?.response?.status,
     };
   }
@@ -653,23 +646,16 @@ async function uploadLlmVoice(payload = {}, token = null) {
 
     const form = new FormData();
     form.append('audio', new Blob([buffer], { type: mime }), safeName);
-    form.append(
-      'token',
-      encrypt({ history: Array.isArray(history) ? history : [] }),
-    );
+    form.append('token', encrypt({ history: Array.isArray(history) ? history : [] }));
 
-    const response = await apiClient('llmChat.sendVoice').post(
-      '/llm-chat/send-voice',
-      form,
-      {
-        headers: {
-          Authorization: `Bearer ${safeToken}`,
-        },
-        maxBodyLength: Infinity,
-        timeout: 180000,
-        metadata: { action: 'llmChat.sendVoice', start: Date.now() },
+    const response = await apiClient('llmChat.sendVoice').post('/llm-chat/send-voice', form, {
+      headers: {
+        Authorization: `Bearer ${safeToken}`,
       },
-    );
+      maxBodyLength: Infinity,
+      timeout: 180000,
+      metadata: { action: 'llmChat.sendVoice', start: Date.now() },
+    });
 
     let data = response.data;
     if (data?.data != null && typeof data.data === 'string') {
@@ -684,8 +670,7 @@ async function uploadLlmVoice(payload = {}, token = null) {
       }
     }
 
-    const payloadOut =
-      data?.data?.payload ?? data?.data ?? data?.payload ?? data;
+    const payloadOut = data?.data?.payload ?? data?.data ?? data?.payload ?? data;
 
     return {
       ok: true,
@@ -697,10 +682,7 @@ async function uploadLlmVoice(payload = {}, token = null) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to send voice message',
+      message: error?.response?.data?.message || error?.message || 'Failed to send voice message',
       status: error?.response?.status,
     };
   }
@@ -731,7 +713,10 @@ async function execute(action, payload = {}, token = null) {
 
   if (def.type === 'local') {
     if (action === 'mobileApp.getLinks') {
-      const empCode = String(safePayload?.empCode || '001').replace(/\D/g, '').slice(0, 12) || '001';
+      const empCode =
+        String(safePayload?.empCode || '001')
+          .replace(/\D/g, '')
+          .slice(0, 12) || '001';
       return {
         ok: true,
         data: buildMobileLinks(empCode),
@@ -787,14 +772,16 @@ async function execute(action, payload = {}, token = null) {
 
     const method = String(def.method || 'POST').toUpperCase();
     const isGet = method === 'GET';
-    const body = def.encryptRequest
-      ? { token: encrypt(requestPayload) }
-      : requestPayload;
+    const body = def.encryptRequest ? { token: encrypt(requestPayload) } : requestPayload;
     const headers = {
       'Content-Type': 'application/json',
-      ...(safeToken ? { Authorization: `Bearer ${safeToken}` } : {}),
+      ...(safeToken && shouldAttachPanelToken(def) ? { Authorization: `Bearer ${safeToken}` } : {}),
       ...(clientNameHeader ? { 'client-name': clientNameHeader } : {}),
       ...(def.headers && typeof def.headers === 'object' ? def.headers : {}),
+      // Env override for sportBook xcheck (registry has Laxmi default).
+      ...(action === 'dashboard.sportBook' && process.env.XCHECK_HEADER
+        ? { xcheck: process.env.XCHECK_HEADER }
+        : {}),
     };
 
     // Match laxminarayan Live Match calls: dates go in the query string for GET.
@@ -804,9 +791,7 @@ async function execute(action, payload = {}, token = null) {
         ([, v]) => v != null && String(v).length > 0,
       );
       if (entries.length > 0) {
-        const qs = new URLSearchParams(
-          entries.map(([k, v]) => [k, String(v)]),
-        ).toString();
+        const qs = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
         url = `${def.path}${def.path.includes('?') ? '&' : '?'}${qs}`;
       }
     }
@@ -885,9 +870,7 @@ async function execute(action, payload = {}, token = null) {
       ok: false,
       message:
         apiMessage ||
-        (timedOut
-          ? 'Request timed out. Try again or use a shorter date range.'
-          : error?.message) ||
+        (timedOut ? 'Request timed out. Try again or use a shorter date range.' : error?.message) ||
         'Secure API request failed',
       status: error?.response?.status,
     };

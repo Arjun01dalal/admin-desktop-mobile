@@ -29,10 +29,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { toast } from 'react-toastify';
-import {
-  useColorMode,
-  type ColorModePreference,
-} from '@/context/ColorModeContext';
+import { useColorMode, type ColorModePreference } from '@/context/ColorModeContext';
 import type { AuthUser } from '@/types/gcalc';
 import { getRoleOptions, selectActiveRole } from '@/auth/roleSelection';
 
@@ -199,7 +196,11 @@ export function ProfileMenu({
             Email: {displayOrDash(email)}
           </Typography>
           {user?.empCode ? (
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 0.75, display: 'block' }}
+            >
               Emp: {String(user.empCode)}
             </Typography>
           ) : null}
@@ -309,9 +310,7 @@ export function ProfileMenu({
                 gap: 1,
               }}
             >
-              <InfoOutlinedIcon
-                sx={{ fontSize: 16, color: 'text.disabled' }}
-              />
+              <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
               <Typography variant="caption" color="text.secondary">
                 Desktop v{appVersion}
               </Typography>
@@ -320,7 +319,12 @@ export function ProfileMenu({
         ) : null}
       </Menu>
 
-      <Dialog open={roleOpen} onClose={() => !roleLoading && setRoleOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={roleOpen}
+        onClose={() => !roleLoading && setRoleOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <DialogTitle>Change Role</DialogTitle>
         <DialogContent>
           <TextField

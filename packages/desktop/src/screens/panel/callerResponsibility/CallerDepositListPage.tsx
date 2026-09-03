@@ -117,10 +117,7 @@ function pickItems(data: unknown): CallerRow[] {
 function pickTotalPages(data: unknown): number {
   if (!data || typeof data !== 'object') return 1;
   const obj = data as CallerRow;
-  const nested =
-    obj.payload && typeof obj.payload === 'object'
-      ? (obj.payload as CallerRow)
-      : null;
+  const nested = obj.payload && typeof obj.payload === 'object' ? (obj.payload as CallerRow) : null;
   return Number(obj.totalPages ?? nested?.totalPages ?? 1) || 1;
 }
 
@@ -144,16 +141,14 @@ function pickWithdrawalTotals(data: unknown): {
           typeof (obj.payload as CallerRow).totals === 'object'
         ? (obj.payload as CallerRow).totals
         : null
-  ) as
-    | {
-        all?: StatusTotal;
-        byStatus?: {
-          Approved?: StatusTotal;
-          Cancel?: StatusTotal;
-          Pending?: StatusTotal;
-        };
-      }
-    | null;
+  ) as {
+    all?: StatusTotal;
+    byStatus?: {
+      Approved?: StatusTotal;
+      Cancel?: StatusTotal;
+      Pending?: StatusTotal;
+    };
+  } | null;
 
   return {
     all: totals?.all ?? empty,
@@ -210,10 +205,7 @@ export function CallerDepositListPage() {
   }, [isWithdrawal, isUniquePending, payload, list]);
 
   const totalPages = pickTotalPages(payload);
-  const withdrawalTotals = useMemo(
-    () => pickWithdrawalTotals(payload),
-    [payload],
-  );
+  const withdrawalTotals = useMemo(() => pickWithdrawalTotals(payload), [payload]);
 
   const loadRemote = useCallback(async () => {
     if (!isWithdrawal && !isUniquePending) return;
@@ -291,11 +283,7 @@ export function CallerDepositListPage() {
     void loadRemote();
   }, [loadRemote]);
 
-  const title = isWithdrawal
-    ? 'Refund List'
-    : isUniquePending
-      ? 'Unique Pending'
-      : 'Deposit List';
+  const title = isWithdrawal ? 'Refund List' : isUniquePending ? 'Unique Pending' : 'Deposit List';
 
   const columns = useMemo<CommonTableColumn<CallerRow>[]>(() => {
     const col = (
@@ -317,9 +305,7 @@ export function CallerDepositListPage() {
       />
     ));
     const app = col('app', 'App Code', (r) =>
-      appCodeForName(
-        r.clientName || r.appName || r.app_name || r.AppName || r.subDomain,
-      ),
+      appCodeForName(r.clientName || r.appName || r.app_name || r.AppName || r.subDomain),
     );
     const mobile = col(
       'mobile',
@@ -347,35 +333,22 @@ export function CallerDepositListPage() {
       const raw = r.createdOn || r.createdAt || r.created_at;
       return formatDisplayDate(raw) || String(raw || '-');
     });
-    const amount = col('amount', 'Amount', (r) =>
-      formatAmount(r.amount || r.Amount),
-    );
-    const order = col('order', 'Order ID', (r) =>
-      String(r.orderId || r.order_id || '-'),
-    );
+    const amount = col('amount', 'Amount', (r) => formatAmount(r.amount || r.Amount));
+    const order = col('order', 'Order ID', (r) => String(r.orderId || r.order_id || '-'));
     const status = col('status', 'Status', (r) => String(r.status || '-'));
 
     if (isWithdrawal) {
-      const cols: CommonTableColumn<CallerRow>[] = [
-        sr,
-        name,
-        dp,
-        app,
-      ];
+      const cols: CommonTableColumn<CallerRow>[] = [sr, name, dp, app];
       if (!isCaller) {
         cols.push(
           col('ubank', 'User Bank Name', (r) => String(r.userBankName || '-')),
-          col('acc', 'Account No', (r) =>
-            String(r.accountNo || r.accountNumber || '-'),
-          ),
+          col('acc', 'Account No', (r) => String(r.accountNo || r.accountNumber || '-')),
           col('bank', 'Bank Name', (r) => String(r.bankName || '-')),
         );
       }
       cols.push(
         col('bonus', 'Bonus Laps', (r) => formatAmount(r.bonusLaps)),
-        col('comm', 'Commission Amount', (r) =>
-          formatAmount(r.commissionAmount),
-        ),
+        col('comm', 'Commission Amount', (r) => formatAmount(r.commissionAmount)),
       );
       if (!isCaller) {
         cols.push(
@@ -401,31 +374,25 @@ export function CallerDepositListPage() {
       return cols;
     }
 
-    const cols: CommonTableColumn<CallerRow>[] = [
-      sr,
-      name,
-      dp,
-      app,
-    ];
+    const cols: CommonTableColumn<CallerRow>[] = [sr, name, dp, app];
     // Unique Pending always shows Mobile + Call (even for callers)
     if (isUniquePending || !isCaller) cols.push(mobile);
     cols.push(created, amount);
 
     if (!isCaller) {
+      cols.push(order);
+    }
+
+    // Callers on Unique Pending also need gateway + payment type (admin-panel CallerDepositList).
+    if (!isCaller || isUniquePending) {
       cols.push(
-        order,
         col('gateway', 'Payment Gateway Name', (r) =>
           String(r.paymentGatewayName || r.gateway || '-'),
         ),
       );
     }
 
-    // Hide Payment Type from callers on Unique Pending only
-    if (!(isCaller && isUniquePending)) {
-      cols.push(
-        col('ptype', 'Payment Type', (r) => String(r.paymentType || r.type || '-')),
-      );
-    }
+    cols.push(col('ptype', 'Payment Type', (r) => String(r.paymentType || r.type || '-')));
 
     if (isUniquePending) {
       cols.push(
@@ -449,9 +416,7 @@ export function CallerDepositListPage() {
           {title}
         </Typography>
         <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
-          <Typography color="text.secondary">
-            No caller selected.
-          </Typography>
+          <Typography color="text.secondary">No caller selected.</Typography>
         </Paper>
       </Box>
     );

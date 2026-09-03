@@ -90,9 +90,7 @@ export function DepositConfigPage() {
       clientName: String(row.clientName || ''),
       minDeposit: String(row.minDeposit ?? ''),
       maxDeposit: String(row.maxDeposit ?? ''),
-      allowedAmounts: Array.isArray(row.allowedAmounts)
-        ? row.allowedAmounts.join(', ')
-        : '',
+      allowedAmounts: Array.isArray(row.allowedAmounts) ? row.allowedAmounts.join(', ') : '',
     });
     setEditOpen(true);
   };
@@ -159,8 +157,7 @@ export function DepositConfigPage() {
       {
         id: 'allowedAmounts',
         label: 'Allowed Amount',
-        render: (row) =>
-          Array.isArray(row.allowedAmounts) ? row.allowedAmounts.join(', ') : '—',
+        render: (row) => (Array.isArray(row.allowedAmounts) ? row.allowedAmounts.join(', ') : '—'),
       },
       {
         id: 'action',

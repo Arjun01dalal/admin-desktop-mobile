@@ -51,6 +51,7 @@ type ColumnFilters = {
   state: string;
   clientName: string;
   empCode: string;
+  dpId: string;
   min: string;
   max: string;
 };
@@ -70,6 +71,7 @@ const EMPTY_FILTERS: ColumnFilters = {
   state: '',
   clientName: '',
   empCode: '',
+  dpId: '',
   min: '',
   max: '',
 };
@@ -145,6 +147,7 @@ export function BotPerformancePage() {
     if (f.clientName) filter.clientName = f.clientName;
     if (f.state) filter.state = f.state;
     if (f.mobile.trim()) filter.mobile = f.mobile.trim();
+    if (f.dpId.trim()) filter._id = f.dpId.trim();
     if (f.city.trim()) filter.city = f.city.trim();
     if (f.empCode.trim()) filter.empCode = f.empCode.trim();
     if (f.min) filter.min = Number(f.min);
@@ -194,19 +197,24 @@ export function BotPerformancePage() {
     [],
   );
 
-  const onDraftChange =
+  const onDraftChange = useCallback(
     (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
-      setDraftField(key)(e.target.value);
+      setDraftField(key)(e.target.value),
+    [setDraftField],
+  );
 
   const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r._id));
 
-  const toggleAll = (checked: boolean) => {
-    if (!checked) {
-      setSelectedIds(new Set());
-      return;
-    }
-    setSelectedIds(new Set(rows.map((r) => r._id).filter(Boolean)));
-  };
+  const toggleAll = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        setSelectedIds(new Set());
+        return;
+      }
+      setSelectedIds(new Set(rows.map((r) => r._id).filter(Boolean)));
+    },
+    [rows],
+  );
 
   const toggleOne = (id: string, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -231,16 +239,14 @@ export function BotPerformancePage() {
     setPushing(true);
     try {
       const leads = mapUsersToDialerLeads(
-        selected.map(
-          (r): UserRow => ({
-            _id: r._id,
-            name: r.name || r.client_name,
-            mobile: r.mobile || r.phone_number,
-            city: r.city,
-            state: r.state,
-            clientName: r.clientName,
-          }),
-        ),
+        selected.map((r): UserRow => ({
+          _id: r._id,
+          name: r.name || r.client_name,
+          mobile: r.mobile || r.phone_number,
+          city: r.city,
+          state: r.state,
+          clientName: r.clientName,
+        })),
       );
       const res = await secureApi('callLogs.externalDialerBatch', {
         campaignId: campaignId.trim(),
@@ -307,6 +313,14 @@ export function BotPerformancePage() {
       {
         id: 'dpId',
         label: 'DP ID',
+        filter: (
+          <TableSearchBar
+            value={draft.dpId}
+            onChange={onDraftChange('dpId')}
+            onSearch={() => commitQuery()}
+            placeholder="DP ID"
+          />
+        ),
         render: (row) => display(row._id),
       },
       {
@@ -441,6 +455,7 @@ export function BotPerformancePage() {
       commitQuery,
       onDraftChange,
       setDraftField,
+      toggleAll,
     ],
   );
 
@@ -459,126 +474,126 @@ export function BotPerformancePage() {
           useFlexGap
           sx={{ '& > *': { flexShrink: 0 } }}
         >
-              <TextField
-                size="small"
-                type="date"
-                label="From Date"
-                fullWidth={false}
-                InputLabelProps={{ shrink: true }}
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                sx={fieldSx}
-              />
-              <TextField
-                size="small"
-                type="date"
-                label="To Date"
-                fullWidth={false}
-                InputLabelProps={{ shrink: true }}
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                sx={fieldSx}
-              />
-              <TextField
-                select
-                size="small"
-                label="Items / Page"
-                fullWidth={false}
-                value={String(itemsPerPage)}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value) || 10);
-                  setPage(1);
-                  setSelectedIds(new Set());
-                }}
-                sx={fieldSx}
-              >
-                {PAGE_SIZE_OPTIONS.map((n) => (
-                  <MenuItem key={n} value={n}>
-                    {n}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                size="small"
-                label="Type"
-                fullWidth={false}
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                sx={fieldSx}
-              >
-                {TYPE_OPTIONS.map((t) => (
-                  <MenuItem key={t} value={t}>
-                    {t}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                size="small"
-                label="Bot ID"
-                fullWidth={false}
-                SelectProps={{
-                  multiple: true,
-                  renderValue: (v) => {
-                    const vals = v as string[];
-                    return vals.length > 3
-                      ? `${vals.slice(0, 3).join(', ')} +${vals.length - 3}`
-                      : vals.join(', ') || 'All';
-                  },
-                }}
-                value={botIds}
-                onChange={(e) => setBotIds(e.target.value as unknown as string[])}
-                sx={{ ...fieldSx, width: 180 }}
-              >
-                {BOT_ID_OPTIONS.map((id) => (
-                  <MenuItem key={id} value={id}>
-                    <Checkbox size="small" checked={botIds.includes(id)} />
-                    {id}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                size="small"
-                label="Campaign"
-                fullWidth={false}
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                sx={{ ...fieldSx, width: 170 }}
-              >
-                <MenuItem value="">Select</MenuItem>
-                {CAMPAIGN_LIST.map((c) => (
-                  <MenuItem key={c.id} value={c.id.trim()}>
-                    {c.id.trim()}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
-                variant="contained"
-                disabled={loading}
-                onClick={() => commitQuery()}
-                sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
-              >
-                Apply
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<RefreshIcon />}
-                disabled={loading}
-                onClick={() => void load()}
-                sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
-              >
-                Refresh
-              </Button>
-              <Button
-                variant="contained"
-                disabled={pushing || !selectedIds.size}
-                onClick={() => void addToDialer()}
-                sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
-              >
-                Add to Dialer
-              </Button>
+          <TextField
+            size="small"
+            type="date"
+            label="From Date"
+            fullWidth={false}
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            size="small"
+            type="date"
+            label="To Date"
+            fullWidth={false}
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            select
+            size="small"
+            label="Items / Page"
+            fullWidth={false}
+            value={String(itemsPerPage)}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value) || 10);
+              setPage(1);
+              setSelectedIds(new Set());
+            }}
+            sx={fieldSx}
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <MenuItem key={n} value={n}>
+                {n}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Type"
+            fullWidth={false}
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            sx={fieldSx}
+          >
+            {TYPE_OPTIONS.map((t) => (
+              <MenuItem key={t} value={t}>
+                {t}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Bot ID"
+            fullWidth={false}
+            SelectProps={{
+              multiple: true,
+              renderValue: (v) => {
+                const vals = v as string[];
+                return vals.length > 3
+                  ? `${vals.slice(0, 3).join(', ')} +${vals.length - 3}`
+                  : vals.join(', ') || 'All';
+              },
+            }}
+            value={botIds}
+            onChange={(e) => setBotIds(e.target.value as unknown as string[])}
+            sx={{ ...fieldSx, width: 180 }}
+          >
+            {BOT_ID_OPTIONS.map((id) => (
+              <MenuItem key={id} value={id}>
+                <Checkbox size="small" checked={botIds.includes(id)} />
+                {id}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Campaign"
+            fullWidth={false}
+            value={campaignId}
+            onChange={(e) => setCampaignId(e.target.value)}
+            sx={{ ...fieldSx, width: 170 }}
+          >
+            <MenuItem value="">Select</MenuItem>
+            {CAMPAIGN_LIST.map((c) => (
+              <MenuItem key={c.id} value={c.id.trim()}>
+                {c.id.trim()}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button
+            variant="contained"
+            disabled={loading}
+            onClick={() => commitQuery()}
+            sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
+          >
+            Apply
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<RefreshIcon />}
+            disabled={loading}
+            onClick={() => void load()}
+            sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            disabled={pushing || !selectedIds.size}
+            onClick={() => void addToDialer()}
+            sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
+          >
+            Add to Dialer
+          </Button>
         </Stack>
       </CollapsibleFilterPanel>
 

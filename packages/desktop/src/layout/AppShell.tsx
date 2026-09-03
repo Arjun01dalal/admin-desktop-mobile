@@ -30,10 +30,7 @@ import { NAV_ITEMS } from './navItems';
 import { getBackPath } from './backPaths';
 import { AstroLogo } from '@/components/AstroLogo';
 import { BackButton } from '@/components/BackButton';
-import {
-  BackRowActionsProvider,
-  useBackRowActionsSlot,
-} from '@/layout/BackRowActions';
+import { BackRowActionsProvider, useBackRowActionsSlot } from '@/layout/BackRowActions';
 import { RevealCodesOtpModal } from '@/components/RevealCodesOtpModal';
 import { ProfileMenu } from '@/components/ProfileMenu';
 import { AdminLlmChatWidget } from '@/components/AdminLlmChatWidget';
@@ -41,16 +38,12 @@ import { secureApi } from '@/api/secureClient';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { useTheme } from '@mui/material/styles';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
-import {
-  prefetchPanelRoute,
-  prefetchPanelRoutesIdle,
-} from '@/app/routePrefetch';
+import { prefetchPanelRoute, prefetchPanelRoutesIdle } from '@/app/routePrefetch';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   buildSosEnablePayload,
   canAccessNavItem,
   canShowSos,
-  getResponsibilities,
   getRoleId,
   getSessionUser,
   isPathAllowed,
@@ -108,14 +101,9 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
   void revealTick;
 
   const user = getSessionUser();
-  const responsibilities = getResponsibilities(user);
-  const roleKey = `${getRoleId(user)}|${responsibilities.join(',')}|${userVersion}`;
   const sosExempt = isSosExemptRole(user);
 
-  const navItems = useMemo(
-    () => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)),
-    [roleKey, user],
-  );
+  const navItems = useMemo(() => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)), [user]);
 
   const filteredNavItems = useMemo(() => {
     const q = navSearch.trim().toLowerCase();
@@ -128,6 +116,9 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
     // Nested drill-down (not in sidebar) — allow when parent is visible.
     if (paths.includes('/fund-request-bonus-wallet')) {
       paths.push('/fund-request-bonus-wallet-table');
+    }
+    if (paths.includes('/fund-request')) {
+      paths.push('/fund-request-coin');
     }
     if (paths.includes('/deposit') || paths.includes('/state-wise-deposit')) {
       paths.push('/state-wise-deposit');
@@ -350,9 +341,9 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
             </Typography>
           </Box>
 
-          {showSosControls && (
+          {showSosControls &&
             // SOS also lives in Profile menu; keep a compact header chip when active.
-            sosEnabled ? (
+            (sosEnabled ? (
               <Button
                 size="small"
                 variant="contained"
@@ -363,8 +354,7 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
               >
                 {sosLoading ? 'Unblocking…' : 'SOS active — Unblock'}
               </Button>
-            ) : null
-          )}
+            ) : null)}
 
           <Button
             size="small"
@@ -603,22 +593,16 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
         <DialogContent>
           <Stack spacing={1.5} sx={{ pt: 0.5 }}>
             <Typography variant="body2" color="text.secondary">
-              Emergency support. Use this only when you need immediate help from the
-              admin team.
+              Emergency support. Use this only when you need immediate help from the admin team.
             </Typography>
             <Typography variant="body2">
-              Logged in as{' '}
-              <strong>{user?.name || user?.mobile || 'Admin'}</strong>
+              Logged in as <strong>{user?.name || user?.mobile || 'Admin'}</strong>
               {user?.empCode ? ` · Emp ${user.empCode}` : ''}.
             </Typography>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button
-            onClick={() => setSosOpen(false)}
-            color="inherit"
-            disabled={sosLoading}
-          >
+          <Button onClick={() => setSosOpen(false)} color="inherit" disabled={sosLoading}>
             Close
           </Button>
           <Button
@@ -632,10 +616,7 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
         </DialogActions>
       </Dialog>
 
-      <RevealCodesOtpModal
-        open={revealOtpOpen}
-        onClose={() => setRevealOtpOpen(false)}
-      />
+      <RevealCodesOtpModal open={revealOtpOpen} onClose={() => setRevealOtpOpen(false)} />
     </Box>
   );
 }

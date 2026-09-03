@@ -15,11 +15,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { formatLudoRtp, parseLudoRtpList, type LudoRtpRow } from '@astro/shared/ludoRtp';
-import {
-  apiOtpFailed,
-  maskOtpMobile,
-  resolveLudoRtpOtpMobile,
-} from '@astro/shared/walletOtp';
+import { apiOtpFailed, maskOtpMobile, resolveLudoRtpOtpMobile } from '@astro/shared/walletOtp';
 import { secureApi } from '@/api/secureClient';
 
 export type LudoModalAction = 'update' | 'rtp' | null;
@@ -70,14 +66,13 @@ export function LudoDetailsModal({
 
   const otpMobile = resolveLudoRtpOtpMobile();
 
-  const gameIdsKey = existingGameIds.join(',');
   const updateOpen = open && action === 'update';
   const rtpOpen = open && action === 'rtp';
 
   useEffect(() => {
     const gameIds = existingGameIds.filter((id) => id && id !== 'All');
     setCurrentGameIds(gameIds);
-  }, [gameIdsKey]);
+  }, [existingGameIds]);
 
   useEffect(() => {
     if (!open) return;
@@ -161,18 +156,14 @@ export function LudoDetailsModal({
       gameIds: selectedToRemove,
     });
     if (success) {
-      setCurrentGameIds((prev) =>
-        prev.filter((id) => !selectedToRemove.includes(id)),
-      );
+      setCurrentGameIds((prev) => prev.filter((id) => !selectedToRemove.includes(id)));
       setSelectedToRemove([]);
     }
   };
 
   const toggleRemoveSelection = (gameId: string) => {
     setSelectedToRemove((prev) =>
-      prev.includes(gameId)
-        ? prev.filter((id) => id !== gameId)
-        : [...prev, gameId],
+      prev.includes(gameId) ? prev.filter((id) => id !== gameId) : [...prev, gameId],
     );
   };
 
@@ -216,9 +207,7 @@ export function LudoDetailsModal({
       }
       toast.success(res.message || 'RTP updated successfully');
       setRtpRows((prev) =>
-        prev.map((row) =>
-          row.gameId === selectedRtpGameId ? { ...row, rtp } : row,
-        ),
+        prev.map((row) => (row.gameId === selectedRtpGameId ? { ...row, rtp } : row)),
       );
       setOtpPending(false);
       setOtp('');
@@ -291,12 +280,7 @@ export function LudoDetailsModal({
 
   return (
     <>
-      <Dialog
-        open={updateOpen}
-        onClose={handleCloseUpdate}
-        fullWidth
-        maxWidth="sm"
-      >
+      <Dialog open={updateOpen} onClose={handleCloseUpdate} fullWidth maxWidth="sm">
         <DialogTitle>Update Game IDs</DialogTitle>
         <DialogContent>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
@@ -309,9 +293,7 @@ export function LudoDetailsModal({
                   key={id}
                   label={id}
                   color={selectedToRemove.includes(id) ? 'error' : 'default'}
-                  variant={
-                    selectedToRemove.includes(id) ? 'filled' : 'outlined'
-                  }
+                  variant={selectedToRemove.includes(id) ? 'filled' : 'outlined'}
                   onClick={() => toggleRemoveSelection(id)}
                 />
               ))
@@ -352,10 +334,7 @@ export function LudoDetailsModal({
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
               Click chips above to select game IDs for removal
-              {selectedToRemove.length
-                ? ` (${selectedToRemove.length} selected)`
-                : ''}
-              .
+              {selectedToRemove.length ? ` (${selectedToRemove.length} selected)` : ''}.
             </Typography>
             <Button
               variant="contained"
@@ -476,8 +455,8 @@ export function LudoDetailsModal({
             {otpPending ? (
               <Stack spacing={1.5} sx={{ mt: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  OTP sent to SuperAdmin ({maskOtpMobile(otpMobile)}). Verify to save RTP
-                  for {selectedRtpGameId} → {rtpValue}.
+                  OTP sent to SuperAdmin ({maskOtpMobile(otpMobile)}). Verify to save RTP for{' '}
+                  {selectedRtpGameId} → {rtpValue}.
                 </Typography>
                 <TextField
                   fullWidth
@@ -485,9 +464,7 @@ export function LudoDetailsModal({
                   label="OTP"
                   placeholder="4-digit OTP"
                   value={otp}
-                  onChange={(e) =>
-                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))
-                  }
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   disabled={otpVerifying || rtpLoading}
                   inputProps={{ inputMode: 'numeric', maxLength: 4 }}
                 />
@@ -522,12 +499,7 @@ export function LudoDetailsModal({
               <Button
                 variant="contained"
                 onClick={() => void verifyRtpOtpAndUpdate()}
-                disabled={
-                  otpVerifying ||
-                  rtpLoading ||
-                  !otpSent ||
-                  otp.trim().length !== 4
-                }
+                disabled={otpVerifying || rtpLoading || !otpSent || otp.trim().length !== 4}
               >
                 {otpVerifying || rtpLoading ? (
                   <CircularProgress size={18} color="inherit" />
@@ -540,12 +512,7 @@ export function LudoDetailsModal({
             <Button
               variant="contained"
               onClick={() => void beginRtpOtpVerification()}
-              disabled={
-                rtpLoading ||
-                rtpListLoading ||
-                otpSending ||
-                !selectedRtpGameId
-              }
+              disabled={rtpLoading || rtpListLoading || otpSending || !selectedRtpGameId}
             >
               {otpSending ? <CircularProgress size={18} color="inherit" /> : 'Update RTP'}
             </Button>

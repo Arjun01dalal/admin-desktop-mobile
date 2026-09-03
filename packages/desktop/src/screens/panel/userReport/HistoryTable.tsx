@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Pagination,
-  Stack,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Pagination, Stack } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
@@ -38,10 +32,7 @@ type Props<T extends HistoryRow> = {
   reloadKey?: number;
 };
 
-function unpackRows(
-  data: unknown,
-  mode: UnpackMode,
-): { rows: HistoryRow[]; totalPages: number } {
+function unpackRows(data: unknown, mode: UnpackMode): { rows: HistoryRow[]; totalPages: number } {
   if (!data) return { rows: [], totalPages: 1 };
   if (Array.isArray(data)) return { rows: data as HistoryRow[], totalPages: 1 };
 
@@ -128,14 +119,7 @@ export function HistoryTable<T extends HistoryRow>({
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={1.25}
-        flexWrap="wrap"
-        useFlexGap
-        alignItems="center"
-        mb={1.5}
-      >
+      <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap alignItems="center" mb={1.5}>
         <ItemsPerPageField
           value={itemsPerPage}
           onChange={(v) => {

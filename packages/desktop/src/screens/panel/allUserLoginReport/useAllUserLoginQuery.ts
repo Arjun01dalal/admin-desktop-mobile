@@ -40,14 +40,11 @@ export function useAllUserLoginQuery(
         if (active.name) filter.name = active.name;
         if (active.realName) filter.realName = active.realName;
 
-        const res = await secureApi<AllUserLoginResponse>(
-          'reports.allUserLoginLogout',
-          {
-            page: pageNo,
-            limit: itemsPerPage,
-            filter,
-          },
-        );
+        const res = await secureApi<AllUserLoginResponse>('reports.allUserLoginLogout', {
+          page: pageNo,
+          limit: itemsPerPage,
+          filter,
+        });
 
         if (!isCurrent(gen)) return;
 

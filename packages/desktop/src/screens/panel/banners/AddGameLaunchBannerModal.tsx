@@ -21,10 +21,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import {
-  GAME_LAUNCH_CATEGORY,
-  GAME_LAUNCH_PROVIDERS,
-} from '@/screens/panel/banners/constants';
+import { GAME_LAUNCH_CATEGORY, GAME_LAUNCH_PROVIDERS } from '@/screens/panel/banners/constants';
 
 type BannerMode = 'existing' | 'new';
 
@@ -203,9 +200,7 @@ export function AddGameLaunchBannerModal({ open, onClose, onSuccess }: Props) {
                   fullWidth
                   required
                   value={existingForm.gameId}
-                  onChange={(e) =>
-                    setExistingForm((prev) => ({ ...prev, gameId: e.target.value }))
-                  }
+                  onChange={(e) => setExistingForm((prev) => ({ ...prev, gameId: e.target.value }))}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -337,9 +332,7 @@ export function AddGameLaunchBannerModal({ open, onClose, onSuccess }: Props) {
                   <RadioGroup
                     row
                     value={newForm.deepLink}
-                    onChange={(e) =>
-                      setNewForm((prev) => ({ ...prev, deepLink: e.target.value }))
-                    }
+                    onChange={(e) => setNewForm((prev) => ({ ...prev, deepLink: e.target.value }))}
                   >
                     <FormControlLabel value="true" control={<Radio />} label="True" />
                     <FormControlLabel value="false" control={<Radio />} label="False" />
@@ -352,9 +345,7 @@ export function AddGameLaunchBannerModal({ open, onClose, onSuccess }: Props) {
                   <RadioGroup
                     row
                     value={newForm.status}
-                    onChange={(e) =>
-                      setNewForm((prev) => ({ ...prev, status: e.target.value }))
-                    }
+                    onChange={(e) => setNewForm((prev) => ({ ...prev, status: e.target.value }))}
                   >
                     <FormControlLabel value="true" control={<Radio />} label="Active" />
                     <FormControlLabel value="false" control={<Radio />} label="Inactive" />

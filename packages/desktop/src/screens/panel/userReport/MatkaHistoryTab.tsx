@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Pagination,
-  Stack,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Pagination, Stack } from '@mui/material';
 import { toast } from 'react-toastify';
 import type { SecureAction } from '@/api/secureActions';
 import { secureApi } from '@/api/secureClient';
@@ -122,10 +116,10 @@ export function MatkaHistoryTab({ userId, variant }: Props) {
     void load();
   }, [load]);
 
-  const search = () => {
+  const search = useCallback(() => {
     if (page !== 1) setPage(1);
     else void load();
-  };
+  }, [load, page]);
 
   const columns = useMemo<CommonTableColumn<HistoryRow>[]>(() => {
     const cols: CommonTableColumn<HistoryRow>[] = [
@@ -198,12 +192,7 @@ export function MatkaHistoryTab({ userId, variant }: Props) {
       id: 'game',
       label: 'Game',
       filter: (
-        <SearchFilter
-          value={game}
-          onChange={setGame}
-          onSearch={search}
-          placeholder="Search game"
-        />
+        <SearchFilter value={game} onChange={setGame} onSearch={search} placeholder="Search game" />
       ),
       render: (r) => String(r.game || '-'),
     });
@@ -229,13 +218,7 @@ export function MatkaHistoryTab({ userId, variant }: Props) {
     cols.push({
       id: 'gameDate',
       label: 'Game Date',
-      filter: (
-        <DateSearchFilter
-          value={resultDate}
-          onChange={setResultDate}
-          onSearch={search}
-        />
-      ),
+      filter: <DateSearchFilter value={resultDate} onChange={setResultDate} onSearch={search} />,
       render: (r) => String(r.result_date || '-'),
     });
 
@@ -337,18 +320,12 @@ export function MatkaHistoryTab({ userId, variant }: Props) {
     transactionId,
     winBeforeStatus,
     winningPoint,
+    search,
   ]);
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={1.25}
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        mb={1.5}
-      >
+      <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap mb={1.5}>
         <ItemsPerPageField
           value={itemsPerPage}
           onChange={(v) => {

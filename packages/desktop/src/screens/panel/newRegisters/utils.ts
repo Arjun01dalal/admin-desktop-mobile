@@ -58,8 +58,7 @@ export function pickUserBankName(row: UserRow): string {
     (row as { user_bank_name?: unknown }).user_bank_name,
     (row as { accountHolderName?: unknown }).accountHolderName,
     (row as { bankHolderName?: unknown }).bankHolderName,
-    (row as { bankDetails?: { bankName?: unknown; name?: unknown } }).bankDetails
-      ?.bankName,
+    (row as { bankDetails?: { bankName?: unknown; name?: unknown } }).bankDetails?.bankName,
     (row as { bankDetails?: { name?: unknown } }).bankDetails?.name,
   );
   const text = raw == null ? '' : String(raw).trim();
@@ -77,7 +76,10 @@ export function pickPlayIn(row: UserRow): string {
   if (raw === true) return 'Yes';
   if (raw === false) return 'No';
   if (Array.isArray(raw)) {
-    const joined = raw.map((v) => String(v).trim()).filter(Boolean).join(', ');
+    const joined = raw
+      .map((v) => String(v).trim())
+      .filter(Boolean)
+      .join(', ');
     return joined || '-';
   }
   const text = raw == null ? '' : String(raw).trim();
@@ -90,8 +92,7 @@ export function pickAccountNumber(row: UserRow): string {
     (row as { accountNo?: unknown }).accountNo,
     (row as { accNo?: unknown }).accNo,
     (row as { account_number?: unknown }).account_number,
-    (row as { bankDetails?: { accountNumber?: unknown } }).bankDetails
-      ?.accountNumber,
+    (row as { bankDetails?: { accountNumber?: unknown } }).bankDetails?.accountNumber,
   );
   const text = raw == null ? '' : String(raw).trim();
   return text || '-';
@@ -139,10 +140,7 @@ function normKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function findByNormKeys(
-  row: Record<string, unknown>,
-  candidates: string[],
-): unknown {
+function findByNormKeys(row: Record<string, unknown>, candidates: string[]): unknown {
   const wanted = new Set(candidates.map(normKey));
   for (const [key, value] of Object.entries(row)) {
     if (!wanted.has(normKey(key))) continue;
@@ -187,12 +185,7 @@ export function pickBalance(row: UserRow): number | null {
     rec.availableBalance,
     rec.userBalance,
     rec.Balance,
-    findByNormKeys(rec, [
-      'balance',
-      'walletBalance',
-      'availableBalance',
-      'userBalance',
-    ]),
+    findByNormKeys(rec, ['balance', 'walletBalance', 'availableBalance', 'userBalance']),
   );
   if (raw == null) return null;
   if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;

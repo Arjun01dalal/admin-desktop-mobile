@@ -97,9 +97,7 @@ export function RemoveBonusTab({ userId }: Props) {
           </Typography>
           <Stack spacing={2}>
             <Box>
-              <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
-                Amount
-              </Typography>
+              <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>Amount</Typography>
               <TextField
                 label="Enter Amount"
                 type="number"
@@ -111,9 +109,7 @@ export function RemoveBonusTab({ userId }: Props) {
               />
             </Box>
             <Box>
-              <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>
-                Remark
-              </Typography>
+              <Typography sx={{ fontSize: 13, mb: 0.5, color: '#333' }}>Remark</Typography>
               <TextField
                 label="Enter Remark"
                 value={remark}

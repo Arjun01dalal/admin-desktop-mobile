@@ -46,7 +46,7 @@ export type ProviderCardModel = {
    * sattamatka / exchange). When set, player count is clickable.
    */
   activeCustomerKey?: string;
-  /** Override label (e.g. Total Exchange Players on Jetfair / AAA). */
+  /** Override label (e.g. Total Played Player on Jetfair / AAA). */
   activeCustomerLabel?: string;
   loading?: boolean;
   /** Optional game filter dropdown (Ludo / Diva / Plutus). */
@@ -109,7 +109,20 @@ export type OpsDashboardBundle = {
   summary: Record<string, unknown>;
   depositCount: Record<string, unknown>;
   depositWithdrawal: Record<string, unknown>;
+  /** Provider-wise active counts from get-active-customers-categorywise. */
   activeCustomers: Record<string, unknown>;
+  /**
+   * Today's Active Users KPI — from `/User/get-active-customers` `.count`
+   * (laxminarayan Dashboard.getActiveCustomers), not a sum of providerWise.
+   */
+  todaysActiveCount: number;
+  /** Total Non Performing Users KPI — from `/User/nonPerformingUser` `.total`. */
+  nonPerformingUserCount: number;
+  /**
+   * Previous-date User Balance KPI — from `/change-percentage/get-user-balance`
+   * with `{ date: startDate }` (laxminarayan getUserBalPrevDay).
+   */
+  prevDayBalance: number;
   qtech: Record<string, unknown>;
   wco: unknown;
   falcon: Record<string, unknown>;

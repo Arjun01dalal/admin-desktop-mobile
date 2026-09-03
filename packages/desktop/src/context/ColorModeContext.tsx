@@ -36,9 +36,7 @@ function readStoredPreference(): ColorModePreference {
 
 function getSystemMode(): AppPaletteMode {
   if (typeof window === 'undefined') return 'dark';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function applyDomMode(mode: AppPaletteMode) {
@@ -50,9 +48,7 @@ export function ColorModeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreferenceState] = useState<ColorModePreference>(() =>
     readStoredPreference(),
   );
-  const [systemMode, setSystemMode] = useState<AppPaletteMode>(() =>
-    getSystemMode(),
-  );
+  const [systemMode, setSystemMode] = useState<AppPaletteMode>(() => getSystemMode());
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -62,8 +58,7 @@ export function ColorModeProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  const resolved: AppPaletteMode =
-    preference === 'system' ? systemMode : preference;
+  const resolved: AppPaletteMode = preference === 'system' ? systemMode : preference;
 
   useEffect(() => {
     applyDomMode(resolved);
@@ -85,9 +80,7 @@ export function ColorModeProvider({ children }: { children: ReactNode }) {
     [preference, resolved, setPreference, theme],
   );
 
-  return (
-    <ColorModeContext.Provider value={value}>{children}</ColorModeContext.Provider>
-  );
+  return <ColorModeContext.Provider value={value}>{children}</ColorModeContext.Provider>;
 }
 
 export function useColorMode(): ColorModeContextValue {

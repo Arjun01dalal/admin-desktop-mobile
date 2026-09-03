@@ -1,19 +1,12 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Pagination, Typography } from '@mui/material';
-import {
-  canAccessNavItem,
-  hasPermission,
-  Permissions,
-} from '@/auth/permissions';
+import { canAccessNavItem, hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { KycDialogs } from '@/screens/panel/kyc/KycDialogs';
-import {
-  KycFiltersProvider,
-  type KycFiltersCtx,
-} from '@/screens/panel/kyc/FiltersContext';
+import { KycFiltersProvider, type KycFiltersCtx } from '@/screens/panel/kyc/FiltersContext';
 import { KycToolbar } from '@/screens/panel/kyc/KycToolbar';
 import { useKycActions } from '@/screens/panel/kyc/useKycActions';
 import { useKycColumns } from '@/screens/panel/kyc/useKycColumns';

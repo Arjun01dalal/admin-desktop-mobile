@@ -363,7 +363,13 @@ export function WithdrawalProvidersPage() {
                   component="img"
                   src={src}
                   alt={row.name || 'gateway'}
-                  sx={{ width: 48, height: 48, objectFit: 'contain', bgcolor: '#fff', borderRadius: 1 }}
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    objectFit: 'contain',
+                    bgcolor: '#fff',
+                    borderRadius: 1,
+                  }}
                 />
               ) : (
                 <Typography variant="body2">—</Typography>
@@ -412,7 +418,12 @@ export function WithdrawalProvidersPage() {
           <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
             <Typography
               variant="body2"
-              sx={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              sx={{
+                maxWidth: 160,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
             >
               {display(row.link)}
             </Typography>
@@ -590,15 +601,15 @@ export function WithdrawalProvidersPage() {
       </Box>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={filteredRows}
-        loading={loading}
-        getRowKey={(row) => row._id}
-        emptyMessage="No withdrawal providers"
-        virtualize={false}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={filteredRows}
+          loading={loading}
+          getRowKey={(row) => row._id}
+          emptyMessage="No withdrawal providers"
+          virtualize={false}
+          maxHeight="100%"
+        />
       </TablePanel>
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="sm">
@@ -662,7 +673,12 @@ export function WithdrawalProvidersPage() {
         <DialogTitle>Are You Sure?</DialogTitle>
         <DialogActions>
           <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
-          <Button color="error" variant="contained" disabled={submitting} onClick={() => void handleDelete()}>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void handleDelete()}
+          >
             Delete
           </Button>
         </DialogActions>

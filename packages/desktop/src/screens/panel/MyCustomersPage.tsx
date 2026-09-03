@@ -292,7 +292,6 @@ export function MyCustomersPage() {
     setPage(1);
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerType]);
 
   useEffect(() => {
@@ -304,9 +303,10 @@ export function MyCustomersPage() {
   const paginated = PAGINATED_TYPES.has(customerType);
 
   const applyDates = useCallback(() => {
+    setAppliedFilters(draftFilters);
     setPage(1);
-    void load(1);
-  }, [load]);
+    void load(1, draftFilters);
+  }, [draftFilters, load]);
 
   const search = useCallback(() => {
     setAppliedFilters(draftFilters);
@@ -378,8 +378,7 @@ export function MyCustomersPage() {
       {
         id: 'index',
         label: '#',
-        render: (_row, index) =>
-          paginated ? (page - 1) * pageSize + index + 1 : index + 1,
+        render: (_row, index) => (paginated ? (page - 1) * pageSize + index + 1 : index + 1),
       },
       {
         id: 'name',
@@ -476,9 +475,7 @@ export function MyCustomersPage() {
           <SearchInput
             value={draftFilters.referralCodeUser}
             placeholder="Search referral"
-            onChange={(v) =>
-              setDraftFilters((prev) => ({ ...prev, referralCodeUser: v }))
-            }
+            onChange={(v) => setDraftFilters((prev) => ({ ...prev, referralCodeUser: v }))}
             onSearch={search}
           />
         ),

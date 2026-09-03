@@ -42,11 +42,7 @@ export function PointsReportPage() {
   );
 
   const totalBalanceGiven = useMemo(
-    () =>
-      deferredRows.reduce(
-        (sum, row) => sum + (Number(row.totalBalanceGiven) || 0),
-        0,
-      ),
+    () => deferredRows.reduce((sum, row) => sum + (Number(row.totalBalanceGiven) || 0), 0),
     [deferredRows],
   );
 
@@ -69,11 +65,7 @@ export function PointsReportPage() {
         id: 'realName',
         label: 'Real-Name',
         render: (row) => (
-          <Box
-            component="span"
-            onClick={() => openDocs(row)}
-            sx={{ cursor: 'pointer' }}
-          >
+          <Box component="span" onClick={() => openDocs(row)} sx={{ cursor: 'pointer' }}>
             {row.realName || '—'}
           </Box>
         ),
@@ -159,9 +151,7 @@ export function PointsReportPage() {
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{ fontWeight: 700, flexShrink: 0 }}

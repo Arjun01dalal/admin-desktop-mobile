@@ -62,10 +62,7 @@ export function CallingBtn({
   const [busy, setBusy] = useState(false);
 
   const ids = useMemo(() => extensionIds(admin), [admin]);
-  const numericCampaignId = useMemo(
-    () => ids.find((val) => /^\d+$/.test(val)) || '',
-    [ids],
-  );
+  const numericCampaignId = useMemo(() => ids.find((val) => /^\d+$/.test(val)) || '', [ids]);
   // Same values posted by externalDialerSingle / laxmi sendData
   const dialerListId = numericCampaignId ? `9${numericCampaignId}` : '—';
   const dialerListName = `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`;
@@ -210,34 +207,21 @@ export function CallingBtn({
               borderColor: 'divider',
             }}
           >
-            <Typography
-              variant="caption"
-              sx={{ color: 'text.secondary', fontWeight: 500 }}
-            >
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
               CAMPAIGN ID
             </Typography>
-            <Typography
-              sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}
-            >
+            <Typography sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}>
               {dialerCampaignLabel}
             </Typography>
 
-            <Typography
-              variant="caption"
-              sx={{ color: 'text.secondary', fontWeight: 500 }}
-            >
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
               LIST ID
             </Typography>
-            <Typography
-              sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}
-            >
+            <Typography sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}>
               {dialerListId}
             </Typography>
 
-            <Typography
-              variant="caption"
-              sx={{ color: 'text.secondary', fontWeight: 500 }}
-            >
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
               LIST NAME
             </Typography>
             <Typography sx={{ fontWeight: 600, fontSize: 15, color: 'text.primary' }}>

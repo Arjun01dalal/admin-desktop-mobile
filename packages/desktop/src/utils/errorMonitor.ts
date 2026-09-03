@@ -25,11 +25,7 @@ export function reportRendererError(
   extra: Record<string, string | undefined> = {},
 ): void {
   const message =
-    err instanceof Error
-      ? err.message
-      : typeof err === 'string'
-        ? err
-        : 'Unknown renderer error';
+    err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown renderer error';
   const name = err instanceof Error ? err.name : undefined;
   const stack = err instanceof Error ? err.stack?.slice(0, 4000) : undefined;
   forward({ source, message, name, stack, ...extra });

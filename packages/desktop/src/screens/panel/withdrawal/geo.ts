@@ -17,9 +17,7 @@ type LocationSlice = {
 };
 
 /** Require lat/long + city/state for withdrawal mutations (matches old panel). */
-export async function requireWithdrawalGeo(
-  loc: LocationSlice,
-): Promise<GeoContext | null> {
+export async function requireWithdrawalGeo(loc: LocationSlice): Promise<GeoContext | null> {
   let coords = loc.coords;
   if (!coords) {
     try {

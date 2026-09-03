@@ -100,7 +100,7 @@ export function FundsPayinPage() {
           midID?: string;
         } | null) || null,
       ),
-    [location.state, location.key],
+    [location.state],
   );
 
   const mid = String(
@@ -169,19 +169,14 @@ export function FundsPayinPage() {
         });
 
       let res = await requestOnce();
-      const timedOut =
-        !res.ok &&
-        /timeout|etimedout|econnaborted/i.test(String(res.message || ''));
+      const timedOut = !res.ok && /timeout|etimedout|econnaborted/i.test(String(res.message || ''));
       if (timedOut) {
         toast.info('Request timed out — retrying once…');
         res = await requestOnce();
       }
 
       if (!res.ok) {
-        toast.error(
-          res.message ||
-            'Failed to load payin accounts. Try a shorter date range.',
-        );
+        toast.error(res.message || 'Failed to load payin accounts. Try a shorter date range.');
         setSummary(null);
         setTransactions([]);
         setCoins([]);
@@ -356,8 +351,7 @@ export function FundsPayinPage() {
     [requestType, indexCol, canShowMobile],
   );
 
-  const columns =
-    requestType === 'automaticDeposit' ? autoColumns : scannerColumns;
+  const columns = requestType === 'automaticDeposit' ? autoColumns : scannerColumns;
 
   if (!mid) {
     return (
@@ -387,11 +381,7 @@ export function FundsPayinPage() {
         <Typography variant="h5" fontWeight={700}>
           Funds — {drill?.name ? `${display(drill.name)} / ${mid}` : mid}
         </Typography>
-        <Button
-          onClick={() => void load()}
-          disabled={loading}
-          sx={orangeBtnSx}
-        >
+        <Button onClick={() => void load()} disabled={loading} sx={orangeBtnSx}>
           {loading ? 'Loading…' : 'Retry'}
         </Button>
       </Stack>
@@ -411,8 +401,7 @@ export function FundsPayinPage() {
           Total Amount: {roundAmt(summary?.totalAmount)}
         </Paper>
         <Paper elevation={0} sx={kpiSx}>
-          Today Total: {roundAmt(dateSplitStats.todayTotal)} (
-          {dateSplitStats.todayCount})
+          Today Total: {roundAmt(dateSplitStats.todayTotal)} ({dateSplitStats.todayCount})
         </Paper>
         <Paper elevation={0} sx={kpiSx}>
           Previous Date Total: {roundAmt(dateSplitStats.previousTotal)} (
@@ -427,11 +416,7 @@ export function FundsPayinPage() {
         <Paper elevation={0} sx={kpiSx}>
           Scanner Remove: {roundAmt(summary?.debitAmount)} ({debitCount})
         </Paper>
-        <Button
-          startIcon={<DownloadIcon />}
-          onClick={() => setDownloadOpen(true)}
-          sx={orangeBtnSx}
-        >
+        <Button startIcon={<DownloadIcon />} onClick={() => setDownloadOpen(true)} sx={orangeBtnSx}>
           Download Excel
         </Button>
         <TextField
@@ -451,15 +436,15 @@ export function FundsPayinPage() {
       </Stack>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={activeRows}
-        getRowKey={(row, i) => String(row._id || row.orderId || i)}
-        loading={loading}
-        emptyMessage="No data"
-        minWidth={1200}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={activeRows}
+          getRowKey={(row, i) => String(row._id || row.orderId || i)}
+          loading={loading}
+          emptyMessage="No data"
+          minWidth={1200}
+          maxHeight="100%"
+        />
       </TablePanel>
       <SheetDownloadOtpModal
         open={downloadOpen}

@@ -10,9 +10,13 @@ release/
 *.dmg
 *.exe
 *.blockmap
+*.apk
+*.tsbuildinfo
 .vite/
 **/electron/env.generated.cjs
 **/electron-obf/
+/t.txt
+/tsc4.txt
 packages/*/node_modules/
 packages/*/dist/
 packages/*/release/

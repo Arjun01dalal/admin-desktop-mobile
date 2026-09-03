@@ -3,8 +3,7 @@ import { CLIENT_APP_CODES, type ClientName } from './clientNames';
 /** CDN used for Mobile App registration / deposit links. */
 export const MOBILE_CDN_BASE =
   (typeof import.meta !== 'undefined' &&
-    (import.meta as { env?: { VITE_MOBILE_CDN_BASE?: string } }).env
-      ?.VITE_MOBILE_CDN_BASE) ||
+    (import.meta as { env?: { VITE_MOBILE_CDN_BASE?: string } }).env?.VITE_MOBILE_CDN_BASE) ||
   'https://d2opi4jisa0j0o.cloudfront.net';
 
 export type MobileAppDef = {
@@ -45,7 +44,10 @@ export type MobileAppLink = {
 
 /** Build Mobile App table rows with AS{code} registration + deposit paths. */
 export function buildMobileAppLinks(empCode = '001'): MobileAppLink[] {
-  const code = String(empCode || '001').replace(/\D/g, '').slice(0, 12) || '001';
+  const code =
+    String(empCode || '001')
+      .replace(/\D/g, '')
+      .slice(0, 12) || '001';
   return MOBILE_APP_DETAILS.map((item) => {
     const appCode = CLIENT_APP_CODES[item.clientName];
     const asPath = `AS${appCode}`;

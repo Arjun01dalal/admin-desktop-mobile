@@ -77,8 +77,7 @@ function calculateTeamWiseTotals(obj1: unknown[], obj2: unknown[]): MatchTotals[
     processMarkets(game2.markets);
 
     Object.values(teamMap).forEach((team) => {
-      team.total =
-        team.MATCH_ODDS + team.Bookmaker + team.BookmakerAndMatchOdds;
+      team.total = team.MATCH_ODDS + team.Bookmaker + team.BookmakerAndMatchOdds;
     });
 
     result.push({

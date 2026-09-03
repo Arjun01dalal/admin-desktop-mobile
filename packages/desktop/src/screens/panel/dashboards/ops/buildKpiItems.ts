@@ -1,6 +1,11 @@
 import type { DashboardMode, KpiItem, OpsDashboardBundle } from './types';
-import { floorNum, toNum, activeCount } from './mergeMetrics';
+import { floorNum, toNum, pickNum } from './mergeMetrics';
 import { KPI_MAP, NAV_MAP } from './jyotishMapping';
+
+/** Laxmi StatCards for these KPIs use Math.round (not floor). */
+function roundNum(value: unknown): number {
+  return Math.round(toNum(value));
+}
 
 function navCards(startDate: string, endDate: string): KpiItem[] {
   const dateState = { startDate, endDate };
@@ -24,7 +29,7 @@ function navCards(startDate: string, endDate: string): KpiItem[] {
   ];
 }
 
-/** Build KPI tiles — full KPIs on main; Panchang/Gochar nav on VIP & Combined. */
+/** Build KPI tiles — full KPIs on main; Panchang/Gochar nav on VIP only. */
 export function buildKpiItems(
   mode: DashboardMode,
   bundle: OpsDashboardBundle | null,
@@ -32,31 +37,25 @@ export function buildKpiItems(
   endDate: string,
   today: string,
 ): KpiItem[] {
-  if (mode === 'vip' || mode === 'combined') {
+  if (mode === 'vip') {
     return navCards(startDate, endDate);
   }
+  // Combined: provider cards only — no Master Data / Live Match Total / Active Exchange KPIs.
+  if (mode === 'combined') return [];
 
   if (mode !== 'main' || !bundle) return [];
 
   const s = bundle.summary;
   const dw = bundle.depositWithdrawal;
   const dc = bundle.depositCount;
-  const active = bundle.activeCustomers;
 
   const liability =
     toNum(s.falconTotalBetPendingAmount) +
     toNum(s.jetfairTotalBetPendingAmount) +
     toNum(s.sattaMatkaTotalBetPendingAmount);
 
-  const todaysActiveCustomers =
-    floorNum(
-      activeCount(active, 'qtech') +
-        activeCount(active, 'wco', 'wacs') +
-        activeCount(active, 'jetfair') +
-        activeCount(active, 'falcon') +
-        activeCount(active, 'sattaMatka', 'sattamatka', 'satta') +
-        activeCount(active, 'exchange'),
-    ) || floorNum(s.totalActiveCustomersToday ?? s.todaysActiveUsers);
+  // Laxmi: payload.count from /User/get-active-customers (not providerWise sum)
+  const todaysActiveCustomers = floorNum(bundle.todaysActiveCount);
 
   const dateState = { startDate, endDate };
 
@@ -70,20 +69,13 @@ export function buildKpiItems(
     {
       id: 'totalWithdrawal',
       label: KPI_MAP.totalWithdrawal.jyotish,
-      value: floorNum(
-        dw.totalRefund ??
-          s.totalRefund ??
-          dw.totalWithdrawal ??
-          s.totalWithdrawal,
-      ),
+      value: floorNum(dw.totalRefund ?? s.totalRefund ?? dw.totalWithdrawal ?? s.totalWithdrawal),
       prefix: '₹',
     },
     {
       id: 'totalPendingWithdrawal',
       label: KPI_MAP.totalPendingWithdrawal.jyotish,
-      value: floorNum(
-        dw.totalPendingWithdrawal ?? s.totalPendingWithdrawal,
-      ),
+      value: floorNum(dw.totalPendingWithdrawal ?? s.totalPendingWithdrawal),
       prefix: '₹',
     },
     {
@@ -95,14 +87,16 @@ export function buildKpiItems(
     {
       id: 'usersBalance',
       label: 'Total Users Balance',
-      value: floorNum(s.totalBalanceOfUsers),
+      // Laxmi: Math.round(dashboardPayload.totalBalanceOfUsers)
+      value: roundNum(pickNum(s, ['totalBalanceOfUsers'])),
       prefix: '₹',
       href: '/balance-f',
     },
     {
       id: 'bonusBalance',
       label: 'Total Users Bonus Balance',
-      value: floorNum(s.totalBonusBalanceOfUsers),
+      // Laxmi: Math.round(dashboardPayload.totalBonusBalanceOfUsers)
+      value: roundNum(pickNum(s, ['totalBonusBalanceOfUsers'])),
       prefix: '₹',
       href: '/total-bonus-users-p',
     },
@@ -141,12 +135,21 @@ export function buildKpiItems(
     {
       id: 'active7d',
       label: 'Last 7 days Active Users',
-      value: floorNum(s.totalActiveUsers),
+      // Laxmi: Math.round(dashboardPayload.totalActiveUsers)
+      value: roundNum(pickNum(s, ['totalActiveUsers'])),
     },
     {
       id: 'active7dApp',
       label: 'Last 7 Days Active Users App',
-      value: floorNum(s.totalActiveUsersApp),
+      // Laxmi: Math.round(dashboardPayload.totalActiveUsersApp)
+      value: roundNum(pickNum(s, ['totalActiveUsersApp'])),
+    },
+    {
+      id: 'nonPerforming',
+      label: 'Total Non Performing Users',
+      // Laxmi: Math.round(payload.total) from /User/nonPerformingUser
+      value: roundNum(bundle.nonPerformingUserCount),
+      href: '/non_performing_user',
     },
     {
       id: 'liability',
@@ -194,8 +197,8 @@ export function buildKpiItems(
       id: 'todaysActive',
       label: "Today's Active Users",
       value: todaysActiveCustomers,
-      href: '/todays-active',
-      state: dateState,
+      href: '/users',
+      state: { selectActiveCustomers: true, ...dateState },
     });
   }
 
@@ -205,7 +208,8 @@ export function buildKpiItems(
     items.splice(3, 0, {
       id: 'balancePrev',
       label: `User Balance (Date:-${startDate})`,
-      value: floorNum(s.balance),
+      // Laxmi StatCard shows raw balance (no Math.round) — keep parity via round for display consistency with Total Users Balance.
+      value: roundNum(bundle.prevDayBalance),
       prefix: '₹',
     });
   }

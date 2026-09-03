@@ -1,8 +1,4 @@
-import type {
-  ChatSummary,
-  GroupedChats,
-  WhatsappMessage,
-} from './types';
+import type { ChatSummary, GroupedChats, WhatsappMessage } from './types';
 
 export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -14,8 +10,7 @@ export function normalizePhone(phone: string): string {
 
 export function groupChats(data: WhatsappMessage[]): GroupedChats {
   return data.reduce<GroupedChats>((acc, item) => {
-    const raw =
-      item.callback_type === 'incoming_message' ? item.from : item.to;
+    const raw = item.callback_type === 'incoming_message' ? item.from : item.to;
     if (!raw) return acc;
     const number = normalizePhone(raw);
     if (!acc[number]) acc[number] = [];
@@ -26,23 +21,14 @@ export function groupChats(data: WhatsappMessage[]): GroupedChats {
 
 export function sortChats(grouped: GroupedChats): GroupedChats {
   Object.values(grouped).forEach((messages) =>
-    messages.sort(
-      (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-    ),
+    messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
   );
   return grouped;
 }
 
 export function getProfileName(messages: WhatsappMessage[], phone: string) {
-  const withName = [...messages]
-    .reverse()
-    .find((m) => m.profile_name || m.content?.profile_name);
-  return (
-    withName?.profile_name ||
-    withName?.content?.profile_name ||
-    phone
-  );
+  const withName = [...messages].reverse().find((m) => m.profile_name || m.content?.profile_name);
+  return withName?.profile_name || withName?.content?.profile_name || phone;
 }
 
 export function getMessagePreview(msg: WhatsappMessage): string {
@@ -52,9 +38,7 @@ export function getMessagePreview(msg: WhatsappMessage): string {
     case 'text':
       return content.text.body;
     case 'image':
-      return content.image.caption
-        ? `📷 ${content.image.caption}`
-        : '📷 Photo';
+      return content.image.caption ? `📷 ${content.image.caption}` : '📷 Photo';
     default:
       return msg.description || '';
   }
@@ -65,8 +49,7 @@ export function buildChatSummaries(records: GroupedChats): ChatSummary[] {
     .map(([phone, messages]) => {
       const visibleMessages = messages.filter((m) => m.callback_type !== 'dlr');
       const lastMessage =
-        visibleMessages[visibleMessages.length - 1] ??
-        messages[messages.length - 1];
+        visibleMessages[visibleMessages.length - 1] ?? messages[messages.length - 1];
       if (!lastMessage) return null;
       return {
         phone,
@@ -77,10 +60,7 @@ export function buildChatSummaries(records: GroupedChats): ChatSummary[] {
       };
     })
     .filter((summary): summary is ChatSummary => summary !== null)
-    .sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    );
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
 export function formatMessageTime(timestamp: string) {

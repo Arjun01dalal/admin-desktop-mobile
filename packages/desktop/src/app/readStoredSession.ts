@@ -1,7 +1,4 @@
-import {
-  clearAuthStorage,
-  isJwtExpired,
-} from '@/utils/session';
+import { clearAuthStorage, isJwtExpired } from '@/utils/session';
 import { getAuthToken } from '@/utils/authToken';
 import type { AuthUser } from '@/types/gcalc';
 
@@ -19,4 +16,3 @@ export function readStoredSession(): AuthUser | null {
     return null;
   }
 }
-

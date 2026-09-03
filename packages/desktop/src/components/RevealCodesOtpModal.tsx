@@ -92,10 +92,7 @@ export function RevealCodesOtpModal({ open, onClose }: Props) {
       }
 
       // Recent successful send — just show the OTP field.
-      if (
-        autoSendMobile === target &&
-        Date.now() - autoSendOkAt < AUTO_SEND_OK_TTL_MS
-      ) {
+      if (autoSendMobile === target && Date.now() - autoSendOkAt < AUTO_SEND_OK_TTL_MS) {
         setSent(true);
         setSending(false);
         return;
@@ -181,9 +178,7 @@ export function RevealCodesOtpModal({ open, onClose }: Props) {
               autoFocus
               size="small"
               value={otp}
-              onChange={(e) =>
-                setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))
-              }
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
               inputProps={{
                 inputMode: 'numeric',
                 maxLength: 4,

@@ -154,9 +154,7 @@ export function BannersPage() {
   const [updateImageId, setUpdateImageId] = useState('');
   const [updateImagePath, setUpdateImagePath] = useState('');
   const [updateImageName, setUpdateImageName] = useState('');
-  const [gameImageTarget, setGameImageTarget] = useState<GameImageUpdateTarget | null>(
-    null,
-  );
+  const [gameImageTarget, setGameImageTarget] = useState<GameImageUpdateTarget | null>(null);
   const [gameImageSaving, setGameImageSaving] = useState(false);
   const [updatingImage, setUpdatingImage] = useState(false);
 
@@ -576,8 +574,7 @@ export function BannersPage() {
         render: (row) => {
           const draft = positionDrafts[row._id];
           const current = draft ?? String(row.position ?? '');
-          const selectValue =
-            current && POSITION_OPTIONS.includes(Number(current)) ? current : '';
+          const selectValue = current && POSITION_OPTIONS.includes(Number(current)) ? current : '';
 
           return (
             <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
@@ -707,9 +704,7 @@ export function BannersPage() {
           ) : null}
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{
@@ -741,7 +736,12 @@ export function BannersPage() {
         />
       </TablePanel>
 
-      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={addOpen}
+        onClose={() => !submitting && setAddOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <form onSubmit={(e) => void handleCreate(e)}>
           <DialogTitle>Add</DialogTitle>
           <DialogContent>
@@ -775,9 +775,7 @@ export function BannersPage() {
                     labelId="mobile-page-label"
                     label="Mobile Page"
                     value={form.mobilePage}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, mobilePage: e.target.value }))
-                    }
+                    onChange={(e) => setForm((prev) => ({ ...prev, mobilePage: e.target.value }))}
                   >
                     {MOBILE_PAGE_OPTIONS.map((opt) => (
                       <MenuItem key={opt.value || 'none'} value={opt.value}>
@@ -843,9 +841,7 @@ export function BannersPage() {
                     size="small"
                     fullWidth
                     value={form.bonusTitle}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, bonusTitle: e.target.value }))
-                    }
+                    onChange={(e) => setForm((prev) => ({ ...prev, bonusTitle: e.target.value }))}
                   />
                   <TextField
                     label="Banner Subtitle"
@@ -877,12 +873,7 @@ export function BannersPage() {
         onSuccess={() => void load()}
       />
 
-      <Dialog
-        open={updateImageOpen}
-        onClose={closeUpdateImage}
-        fullWidth
-        maxWidth="sm"
-      >
+      <Dialog open={updateImageOpen} onClose={closeUpdateImage} fullWidth maxWidth="sm">
         <DialogTitle>
           Update Banner Image
           {updateImageName ? ` — ${updateImageName}` : ''}
@@ -941,11 +932,7 @@ export function BannersPage() {
             disabled={updatingImage}
             sx={orangeBtnSx}
           >
-            {updatingImage ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : (
-              'Update Image'
-            )}
+            {updatingImage ? <CircularProgress size={16} color="inherit" /> : 'Update Image'}
           </Button>
         </DialogActions>
       </Dialog>

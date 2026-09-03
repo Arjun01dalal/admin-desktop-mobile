@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogContent,
-  IconButton,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Dialog, DialogContent, IconButton, Stack, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
@@ -65,20 +57,14 @@ export function AAABlacklistedUsersPage() {
     const dynamic = columnsKeys.map((col) => ({
       id: col,
       label: formatColumnLabel(col),
-      render: (row: Record<string, unknown>) =>
-        renderAaaCell(col, row?.[col], setPreviewImage),
+      render: (row: Record<string, unknown>) => renderAaaCell(col, row?.[col], setPreviewImage),
     }));
     return [sr, ...dynamic];
   }, [columnsKeys]);
 
   return (
     <Box sx={{ p: 2 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
-      >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h6" fontWeight={700}>
           AAA Black Listed Users
         </Typography>
@@ -93,16 +79,14 @@ export function AAABlacklistedUsersPage() {
       </Stack>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        getRowKey={(row, index) =>
-          String(row._id || row.id || row.userId || index)
-        }
-        emptyMessage="No blacklisted users found."
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          getRowKey={(row, index) => String(row._id || row.id || row.userId || index)}
+          emptyMessage="No blacklisted users found."
+          maxHeight="100%"
+        />
       </TablePanel>
 
       <Dialog open={Boolean(previewImage)} onClose={() => setPreviewImage(null)} maxWidth="md">

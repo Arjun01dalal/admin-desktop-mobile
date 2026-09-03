@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -44,14 +37,10 @@ export function AppInner() {
   const [screen, setScreen] = useState<AppScreen>(skipSiteLaunch ? 'login' : 'splash');
   const [returnTo, setReturnTo] = useState<AppScreen>('astro-login');
   const sessionToastShown = useRef(false);
-  const goLoginRef = useRef<(prefill?: { email?: string; mobile?: string }) => void>(
-    () => {},
-  );
+  const goLoginRef = useRef<(prefill?: { email?: string; mobile?: string }) => void>(() => {});
   const sosBlocksLoginRef = useRef(false);
   const [sosBlocksLogin, setSosBlocksLogin] = useState(false);
-  const [loginPrefill, setLoginPrefill] = useState<{ email?: string; mobile?: string }>(
-    {},
-  );
+  const [loginPrefill, setLoginPrefill] = useState<{ email?: string; mobile?: string }>({});
 
   // Load OS-encrypted token before session checks.
   useEffect(() => {
@@ -98,34 +87,37 @@ export function AppInner() {
     window.gcalc?.showWelcome?.();
   }, []);
 
-  const goLogin = useCallback((prefill?: { email?: string; mobile?: string }) => {
-    if (prefill?.email || prefill?.mobile) {
-      setLoginPrefill({
-        email: prefill.email || '',
-        mobile: prefill.mobile || '',
-      });
-      try {
-        if (prefill.email) localStorage.setItem('astro_site_email', prefill.email);
-        const digits = String(prefill.mobile || prefill.email || '')
-          .replace(/\D/g, '')
-          .slice(-10);
-        if (/^[6-9]\d{9}$/.test(digits)) {
-          localStorage.setItem('mobile', digits);
+  const goLogin = useCallback(
+    (prefill?: { email?: string; mobile?: string }) => {
+      if (prefill?.email || prefill?.mobile) {
+        setLoginPrefill({
+          email: prefill.email || '',
+          mobile: prefill.mobile || '',
+        });
+        try {
+          if (prefill.email) localStorage.setItem('astro_site_email', prefill.email);
+          const digits = String(prefill.mobile || prefill.email || '')
+            .replace(/\D/g, '')
+            .slice(-10);
+          if (/^[6-9]\d{9}$/.test(digits)) {
+            localStorage.setItem('mobile', digits);
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
-    }
-    // Valid existing session → skip login and open admin panel.
-    const session = readStoredSession();
-    if (session) {
-      goPanel(session);
-      return;
-    }
-    setScreen('login');
-    window.gcalc?.hideSite?.();
-    window.gcalc?.showLogin?.();
-  }, [goPanel]);
+      // Valid existing session → skip login and open admin panel.
+      const session = readStoredSession();
+      if (session) {
+        goPanel(session);
+        return;
+      }
+      setScreen('login');
+      window.gcalc?.hideSite?.();
+      window.gcalc?.showLogin?.();
+    },
+    [goPanel],
+  );
 
   goLoginRef.current = goLogin;
 
@@ -151,8 +143,7 @@ export function AppInner() {
 
   // Keep SOS gate in sync on native Astro login + customer site (panel gate).
   useEffect(() => {
-    const onAstroGate =
-      screen === 'astro-login' || screen === 'splash' || screen === 'site';
+    const onAstroGate = screen === 'astro-login' || screen === 'splash' || screen === 'site';
     if (!onAstroGate) {
       sosBlocksLoginRef.current = false;
       setSosBlocksLogin(false);
@@ -288,15 +279,9 @@ export function AppInner() {
             }}
           />
         )}
-        {screen === 'site' && (
-          <AstroSite onBackToNativeLogin={goAstroLogin} />
-        )}
-        {screen === 'forgot' && (
-          <ForgotPassword onBack={() => setScreen(returnTo)} />
-        )}
-        {screen === 'terms' && (
-          <TermsAndConditions onBack={() => setScreen(returnTo)} />
-        )}
+        {screen === 'site' && <AstroSite onBackToNativeLogin={goAstroLogin} />}
+        {screen === 'forgot' && <ForgotPassword onBack={() => setScreen(returnTo)} />}
+        {screen === 'terms' && <TermsAndConditions onBack={() => setScreen(returnTo)} />}
         {screen === 'login' && (
           <Login
             onSuccess={(u) => goPanel(u)}
@@ -306,9 +291,7 @@ export function AppInner() {
           />
         )}
 
-        {inPanel && (
-          <PanelRoutes user={user} logout={logout} goPanel={goPanel} />
-        )}
+        {inPanel && <PanelRoutes user={user} logout={logout} goPanel={goPanel} />}
 
         <UpdateToast />
       </LocationProvider>

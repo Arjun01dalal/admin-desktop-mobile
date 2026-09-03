@@ -1,29 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Pagination, Stack, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
-import {
-  getRoleId,
-  getRoleName,
-  hasPermission,
-} from '@/auth/permissions';
+import { secureApi } from '@/api/secureClient';
+import { getRoleId, getRoleName, hasPermission } from '@/auth/permissions';
 import { CommonTable } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { getStoredUser } from '@/utils/dates';
 import { AddUserDataDialog } from './users/AddUserDataDialog';
-import {
-  CreateUserDialog,
-  type CreateUserMode,
-} from './users/CreateUserDialog';
+import { CreateUserDialog, type CreateUserMode } from './users/CreateUserDialog';
 import { UsersDialogs } from './users/UsersDialogs';
 import { UsersToolbar } from './users/UsersToolbar';
 import { useUsersActions } from './users/useUsersActions';
 import { useUsersColumns } from './users/useUsersColumns';
 import { useUsersDialer } from './users/useUsersDialer';
-import {
-  useUsersQuery,
-  type UsersAdmin,
-} from './users/useUsersQuery';
+import { useUsersQuery, type UsersAdmin } from './users/useUsersQuery';
 import { isCallerRole, stableKey } from './users/usersHelpers';
 
 /** Users page — converted from laxminarayan Users (caller + core admin). */
@@ -88,9 +79,7 @@ export function UsersPage() {
   // Match laxminarayan: CallingBtn column when contact_visibility_none is off
   const showMobileColumn = !hideContact;
   const showDates =
-    hasPermission('user_table') ||
-    hasPermission('View_Users') ||
-    hasPermission('All_user_table');
+    hasPermission('user_table') || hasPermission('View_Users') || hasPermission('All_user_table');
   const canRegister = !isCaller && hasPermission('Register_New_User');
   // Match laxminarayan + keep visible for Users operators
   const canCreateUser =
@@ -99,8 +88,7 @@ export function UsersPage() {
       hasPermission('Register_New_User') ||
       hasPermission('View_Users'));
   const canCreateAdmin =
-    !isCaller &&
-    (hasPermission('create_new_user') || hasPermission('View_Users'));
+    !isCaller && (hasPermission('create_new_user') || hasPermission('View_Users'));
   const canAddToBot = hasPermission('add_to_bot');
   const canAddToDialer = hasPermission('add_to_dilaler');
   const canAddUserData = hasPermission('show_user_upload_data');
@@ -151,10 +139,32 @@ export function UsersPage() {
     page: query.page,
     appliedBlockStatus: query.applied.blockStatus,
     setRows: query.setRows,
+    removeUserById: query.removeUserById,
   });
 
   const [createMode, setCreateMode] = useState<CreateUserMode | null>(null);
   const [addUserDataOpen, setAddUserDataOpen] = useState(false);
+  const [appVersions, setAppVersions] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await secureApi<{ clientName?: string; version?: string }[]>(
+        'users.appVersions',
+        {},
+      );
+      if (cancelled || !res.ok) return;
+      const list = Array.isArray(res.data) ? res.data : [];
+      const map: Record<string, string> = {};
+      for (const item of list) {
+        if (item?.clientName) map[item.clientName] = String(item.version ?? '');
+      }
+      setAppVersions(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const columns = useUsersColumns({
     userType: query.userType,
@@ -191,16 +201,12 @@ export function UsersPage() {
     openRealName: actions.openRealName,
     startBlockWithOtp: actions.startBlockWithOtp,
     openDump: actions.openDump,
+    appVersions,
   });
 
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Stack
-        direction="row"
-        alignItems="flex-start"
-        spacing={1.5}
-        sx={{ mb: 1, flexShrink: 0 }}
-      >
+      <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ mb: 1, flexShrink: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <UsersToolbar
             title="Users"
@@ -219,10 +225,7 @@ export function UsersPage() {
             loading={query.loading}
             dialerLoading={dialer.dialerLoading}
             dialerCount={
-              query.total ||
-              (query.dialerData.length
-                ? query.dialerData.length
-                : query.rows.length)
+              query.total || (query.dialerData.length ? query.dialerData.length : query.rows.length)
             }
             showDates={showDates}
             canRegister={canRegister}
@@ -306,11 +309,13 @@ export function UsersPage() {
                 ? 1000
                 : query.userType === 'LAXMI_999_Users'
                   ? 1800
-                  : query.userType === 'In_Active_Deposit'
+                : query.userType === 'In_Active_Deposit'
                     ? 2000
-                    : isCaller
-                      ? 1500
-                      : 2000
+                    : query.userType === 'Todays_Active'
+                      ? 1700
+                      : isCaller
+                        ? 1500
+                        : 2000
           }
           dense
           maxHeight="100%"

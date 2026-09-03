@@ -142,10 +142,7 @@ function casinoGameId(row: CasinoGameRow): string {
 
 function casinoProviderRaw(row: CasinoGameRow): string {
   return String(
-    row.provider?.name ||
-      row.Provider_ID ||
-      (row as { providerName?: string }).providerName ||
-      '',
+    row.provider?.name || row.Provider_ID || (row as { providerName?: string }).providerName || '',
   ).trim();
 }
 
@@ -235,7 +232,10 @@ export function CasinoGamesPage() {
   }, []);
 
   const loadMiraiStatus = useCallback(async () => {
-    const res = await secureApi<Array<{ type?: string; status?: boolean }>>('ops.casinoMiraiGet', {});
+    const res = await secureApi<Array<{ type?: string; status?: boolean }>>(
+      'ops.casinoMiraiGet',
+      {},
+    );
     if (!res.ok || !Array.isArray(res.data)) return;
     for (const item of res.data) {
       switch (item.type) {
@@ -364,13 +364,16 @@ export function CasinoGamesPage() {
     }
   }, []);
 
-  const setMiraiStatus = useCallback(async (type: MiraiType, status: boolean) => {
-    const res = await secureApi('ops.casinoMiraiStatus', { type, status });
-    if (!res.ok) {
-      toast.error(res.message || 'Failed to update Mirai status');
-      void loadMiraiStatus();
-    }
-  }, [loadMiraiStatus]);
+  const setMiraiStatus = useCallback(
+    async (type: MiraiType, status: boolean) => {
+      const res = await secureApi('ops.casinoMiraiStatus', { type, status });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to update Mirai status');
+        void loadMiraiStatus();
+      }
+    },
+    [loadMiraiStatus],
+  );
 
   const openTableIdDialog = useCallback((row: CasinoGameRow) => {
     setTableIdGameName(row.Name || '');
@@ -409,9 +412,7 @@ export function CasinoGamesPage() {
       }
       setRows((prev) =>
         prev.map((item) =>
-          item.gameId === tableIdGameId
-            ? { ...item, tableId: tableIdValue.trim() }
-            : item,
+          item.gameId === tableIdGameId ? { ...item, tableId: tableIdValue.trim() } : item,
         ),
       );
       toast.success('Table Id uploaded successfully');
@@ -603,7 +604,13 @@ export function CasinoGamesPage() {
         label: 'Status',
         width: 120,
         render: (row) => (
-          <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center" sx={{ py: 0.25 }}>
+          <Stack
+            direction="row"
+            spacing={0.75}
+            alignItems="center"
+            justifyContent="center"
+            sx={{ py: 0.25 }}
+          >
             <Switch
               size="small"
               checked={Boolean(row.status)}
@@ -646,9 +653,7 @@ export function CasinoGamesPage() {
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={(event) => {
               event.stopPropagation();
               void load(page);
@@ -867,13 +872,7 @@ export function CasinoGamesPage() {
         <DialogTitle>Add Table ID</DialogTitle>
         <DialogContent>
           <Stack spacing={2} pt={1}>
-            <TextField
-              size="small"
-              fullWidth
-              label="Game Name"
-              value={tableIdGameName}
-              disabled
-            />
+            <TextField size="small" fullWidth label="Game Name" value={tableIdGameName} disabled />
             <TextField
               size="small"
               fullWidth

@@ -41,7 +41,6 @@ function reinforceExternalLoginHash(webContents, accessToken) {
   webContents.executeJavaScript(script, true).catch(() => {});
 }
 
-
 function applyLoginSize(rec) {
   if (!rec) return;
   hideSiteView(rec);
@@ -129,11 +128,7 @@ function loadPersistedSiteIdentity() {
 function persistSiteIdentityToDisk() {
   if (!cachedSiteIdentity.email && !cachedSiteIdentity.mobile) return;
   try {
-    fs.writeFileSync(
-      siteIdentityPath(),
-      JSON.stringify(cachedSiteIdentity),
-      'utf8',
-    );
+    fs.writeFileSync(siteIdentityPath(), JSON.stringify(cachedSiteIdentity), 'utf8');
   } catch {
     // ignore disk errors
   }
@@ -141,7 +136,9 @@ function persistSiteIdentityToDisk() {
 
 function normalizeSiteIdentity(payload) {
   const src = payload && typeof payload === 'object' ? payload : {};
-  const email = String(src.email || '').trim().slice(0, 200);
+  const email = String(src.email || '')
+    .trim()
+    .slice(0, 200);
   let mobile = String(src.mobile || '').replace(/\D/g, '');
   if (mobile.length > 10) mobile = mobile.slice(-10);
   if (mobile && !/^[6-9]\d{9}$/.test(mobile)) mobile = '';
@@ -334,8 +331,6 @@ function showSiteView(rec, opts = {}) {
   // Existing view (non-SSO): just attach.
   attachWhenReady(rec.siteView);
 }
-
-
 
 ctx.applyLoginSize = applyLoginSize;
 ctx.applyWelcomeSize = applyWelcomeSize;

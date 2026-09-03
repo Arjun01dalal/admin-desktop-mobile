@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  MenuItem,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, CircularProgress, MenuItem, TextField, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
@@ -49,7 +42,6 @@ const ORANGE_BTN = {
   '&:hover': { bgcolor: '#e08c00', boxShadow: 'none !important' },
 };
 
-
 function asList(data: unknown, keys: string[]): HistoryRow[] {
   if (!data) return [];
   if (Array.isArray(data)) return data as HistoryRow[];
@@ -76,9 +68,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
   const [marketId, setMarketId] = useState('');
   const [marketCode, setMarketCode] = useState('301');
   const [itemsPerPage, setItemsPerPage] = useState('1000');
-  const [viewType, setViewType] = useState(
-    kind === 'missing' ? 'Missing Provider' : 'Provider',
-  );
+  const [viewType, setViewType] = useState(kind === 'missing' ? 'Missing Provider' : 'Provider');
   const [status, setStatus] = useState('');
   const [totals, setTotals] = useState<Record<string, number>>({});
   const [betCount, setBetCount] = useState(0);
@@ -118,67 +108,34 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
       setRaw(nested);
 
       setTotals({
-        providerBet: Number(
-          nested.totalBetAmountProvider ?? nested.providerBetAmount ?? 0,
-        ),
-        providerWin: Number(
-          nested.totalWinAmountProvider ?? nested.providerWinAmount ?? 0,
-        ),
-        platformComm: Number(
-          nested.platformCommissionAmount ?? nested.commissionAmount ?? 0,
-        ),
-        platformBet: Number(
-          nested.platformBetAmount ?? nested.totalPlatformBet ?? 0,
-        ),
-        platformWin: Number(
-          nested.platformWinAmount ?? nested.totalPlatformWin ?? 0,
-        ),
+        providerBet: Number(nested.totalBetAmountProvider ?? nested.providerBetAmount ?? 0),
+        providerWin: Number(nested.totalWinAmountProvider ?? nested.providerWinAmount ?? 0),
+        platformComm: Number(nested.platformCommissionAmount ?? nested.commissionAmount ?? 0),
+        platformBet: Number(nested.platformBetAmount ?? nested.totalPlatformBet ?? 0),
+        platformWin: Number(nested.platformWinAmount ?? nested.totalPlatformWin ?? 0),
       });
 
       let list: HistoryRow[] = [];
       if (kind === 'missing') {
         list =
           viewType === 'Missing Platforms'
-            ? asList(nested, [
-                'missingInPlatform',
-                'missingPlatforms',
-                'platformMissing',
-                'items',
-              ])
-            : asList(nested, [
-                'missingInProvider',
-                'missingProviders',
-                'providerMissing',
-                'items',
-              ]);
+            ? asList(nested, ['missingInPlatform', 'missingPlatforms', 'platformMissing', 'items'])
+            : asList(nested, ['missingInProvider', 'missingProviders', 'providerMissing', 'items']);
       } else if (viewType === 'Platform' || viewType === 'Provider') {
         list =
           viewType === 'Platform'
-            ? asList(nested, [
-                'platformBets',
-                'platform',
-                'plateformDetails',
-                'items',
-              ])
-            : asList(nested, [
-                'providerBets',
-                'provider',
-                'providersDetail',
-                'items',
-              ]);
+            ? asList(nested, ['platformBets', 'platform', 'plateformDetails', 'items'])
+            : asList(nested, ['providerBets', 'provider', 'providersDetail', 'items']);
       } else {
         list = asList(nested, ['items', 'providerBets', 'list']);
       }
 
       if (status) {
-        list = list.filter(
-          (r) => String(r.status || '').toLowerCase() === status.toLowerCase(),
-        );
+        list = list.filter((r) => String(r.status || '').toLowerCase() === status.toLowerCase());
       }
       setRows(list);
       setBetCount(
-        Number(nested.totalBets ?? nested.totalNumberOfBets ?? list.length) ||
-          list.length,
+        Number(nested.totalBets ?? nested.totalNumberOfBets ?? list.length) || list.length,
       );
     } finally {
       setLoading(false);
@@ -514,12 +471,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
     [viewType],
   );
 
-  const columns =
-    kind === 'sm'
-      ? smColumns
-      : kind === 'jetfair'
-        ? jetfairColumns
-        : qtechColumns;
+  const columns = kind === 'sm' ? smColumns : kind === 'jetfair' ? jetfairColumns : qtechColumns;
 
   return (
     <Box>
@@ -561,10 +513,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               >
                 {String(label)}
               </Typography>
-              <Typography
-                noWrap
-                sx={{ mt: 0.2, fontSize: 14, fontWeight: 700, color: '#111827' }}
-              >
+              <Typography noWrap sx={{ mt: 0.2, fontSize: 14, fontWeight: 700, color: '#111827' }}>
                 {num(value)}
               </Typography>
             </Box>
@@ -669,8 +618,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               disableElevation
               sx={{
                 ...ORANGE_BTN,
-                bgcolor:
-                  viewType === 'Missing Provider' ? '#1565c0' : '#ff9f0a',
+                bgcolor: viewType === 'Missing Provider' ? '#1565c0' : '#ff9f0a',
                 color: viewType === 'Missing Provider' ? '#fff' : '#111',
               }}
               onClick={() => setViewType('Missing Provider')}
@@ -683,8 +631,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
               disableElevation
               sx={{
                 ...ORANGE_BTN,
-                bgcolor:
-                  viewType === 'Missing Platforms' ? '#1565c0' : '#ff9f0a',
+                bgcolor: viewType === 'Missing Platforms' ? '#1565c0' : '#ff9f0a',
                 color: viewType === 'Missing Platforms' ? '#fff' : '#111',
               }}
               onClick={() => setViewType('Missing Platforms')}
@@ -707,9 +654,7 @@ export function ProviderHistoryTab({ userId, kind }: Props) {
             whiteSpace: 'nowrap',
           }}
         >
-          {kind === 'missing'
-            ? `Total Missing Bets: ${betCount}`
-            : `Total Bets: ${betCount}`}
+          {kind === 'missing' ? `Total Missing Bets: ${betCount}` : `Total Bets: ${betCount}`}
         </Box>
         {loading && <CircularProgress size={22} />}
       </Box>

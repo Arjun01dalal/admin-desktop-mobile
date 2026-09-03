@@ -37,10 +37,7 @@ import {
 } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { asPaged, display, useReportQuery } from '@/screens/panel/shared';
-import {
-  getCachedEmpCodeNameMap,
-  getEmpCodeNameMap,
-} from '@/utils/empCodeNameCache';
+import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '@/utils/empCodeNameCache';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
 import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
@@ -162,8 +159,8 @@ export function UniqueDepositPendingPage() {
   const [statusRemark, setStatusRemark] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
-    () => getCachedEmpCodeNameMap(),
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
+    getCachedEmpCodeNameMap(),
   );
 
   useEffect(() => {
@@ -197,10 +194,7 @@ export function UniqueDepositPendingPage() {
     return payload;
   }, [query, page, itemsPerPage, canShowEmpCode]);
 
-  const unpack = useCallback(
-    (res: { data?: unknown }) => asPaged<UniquePendingRow>(res.data),
-    [],
-  );
+  const unpack = useCallback((res: { data?: unknown }) => asPaged<UniquePendingRow>(res.data), []);
 
   const { rows, total, totalPages, loading, load } = useReportQuery<UniquePendingRow>({
     action: 'uniquePending.list',
@@ -268,9 +262,11 @@ export function UniqueDepositPendingPage() {
     [],
   );
 
-  const onDraftChange =
+  const onDraftChange = useCallback(
     (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
-      setDraftField(key)(e.target.value);
+      setDraftField(key)(e.target.value),
+    [setDraftField],
+  );
 
   const searchFilter = useCallback(
     (key: keyof ColumnFilters, placeholder: string) => (
@@ -281,7 +277,7 @@ export function UniqueDepositPendingPage() {
         placeholder={placeholder}
       />
     ),
-    [draft, commitQuery],
+    [draft, commitQuery, onDraftChange],
   );
 
   const submitComment = useCallback(
@@ -403,10 +399,7 @@ export function UniqueDepositPendingPage() {
             ? `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nநீங்கள் டெப்பாசிட் செய்ய முயற்சிக்கிறீர்கள் என்று பார்க்கிறேன். இன்று நான் உங்களுக்கு எப்படி உதவலாம்?`
             : `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nI see you're trying to make a deposit. How can I assist you today?`;
 
-    const message = stateWiseMsg.replace(
-      '{USER_NAME}',
-      (row.userName || '').split(' ')[0] || '',
-    );
+    const message = stateWiseMsg.replace('{USER_NAME}', (row.userName || '').split(' ')[0] || '');
     const encodedMessage = encodeURIComponent(message);
     const appUrl = `whatsapp://send?phone=${formatted}&text=${encodedMessage}`;
     const webUrl = `https://wa.me/${formatted}?text=${encodedMessage}`;
@@ -441,9 +434,7 @@ export function UniqueDepositPendingPage() {
             }}
             onClick={() => {
               if (!row.userId) return;
-              navigate(
-                `/users/report/${row.userId}/${encodeURIComponent(row.userName || '')}`,
-              );
+              navigate(`/users/report/${row.userId}/${encodeURIComponent(row.userName || '')}`);
             }}
           >
             {display(row.userName)}
@@ -682,9 +673,7 @@ export function UniqueDepositPendingPage() {
                 minRows={2}
                 placeholder="Comment"
                 value={comments[row._id] || ''}
-                onChange={(e) =>
-                  setComments((prev) => ({ ...prev, [row._id]: e.target.value }))
-                }
+                onChange={(e) => setComments((prev) => ({ ...prev, [row._id]: e.target.value }))}
                 sx={{
                   flex: 1,
                   minWidth: 0,
@@ -760,6 +749,7 @@ export function UniqueDepositPendingPage() {
     toCallingItem,
     openWhatsApp,
     navigate,
+    onDraftChange,
   ]);
 
   return (
@@ -833,19 +823,12 @@ export function UniqueDepositPendingPage() {
             >
               Apply
             </Button>
-            <Button
-              variant="contained"
-              disabled={loading}
-              onClick={clearDates}
-              sx={orangeBtnSx}
-            >
+            <Button variant="contained" disabled={loading} onClick={clearDates} sx={orangeBtnSx}>
               Clear
             </Button>
             <Button
               variant="contained"
-              startIcon={
-                loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />
-              }
+              startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />}
               disabled={loading}
               onClick={() => {
                 void load();

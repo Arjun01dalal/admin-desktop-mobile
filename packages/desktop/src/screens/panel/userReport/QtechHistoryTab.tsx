@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Pagination,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Pagination, Stack, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -109,10 +102,10 @@ export function QtechHistoryTab({ userId }: Props) {
     void load();
   }, [load]);
 
-  const search = () => {
+  const search = useCallback(() => {
     if (page !== 1) setPage(1);
     else void load();
-  };
+  }, [load, page]);
 
   const columns = useMemo<CommonTableColumn<HistoryRow>[]>(
     () => [
@@ -199,33 +192,26 @@ export function QtechHistoryTab({ userId }: Props) {
             placeholder="Search winning"
           />
         ),
-        render: (r) =>
-          formatAmount(Math.round(Number(r.wining ?? r.winning ?? 0) || 0)),
+        render: (r) => formatAmount(Math.round(Number(r.wining ?? r.winning ?? 0) || 0)),
       },
       {
         id: 'rollback',
         label: 'Roll Back Amount',
         filter: null,
-        render: (r) =>
-          formatAmount(
-            Math.round(Number(r.rollBackAmount ?? r.rollBack ?? 0) || 0),
-          ),
+        render: (r) => formatAmount(Math.round(Number(r.rollBackAmount ?? r.rollBack ?? 0) || 0)),
       },
       {
         id: 'commission',
         label: 'Commission Amount',
         filter: null,
         render: (r) =>
-          formatAmount(
-            Math.round(Number(r.commissionAmount ?? r.commission ?? 0) || 0),
-          ),
+          formatAmount(Math.round(Number(r.commissionAmount ?? r.commission ?? 0) || 0)),
       },
       {
         id: 'after',
         label: 'Amount After Commission',
         filter: null,
-        render: (r) =>
-          formatAmount(Math.round(Number(r.amountAfterCommission) || 0)),
+        render: (r) => formatAmount(Math.round(Number(r.amountAfterCommission) || 0)),
       },
       {
         id: 'time',
@@ -249,29 +235,12 @@ export function QtechHistoryTab({ userId }: Props) {
         render: (r) => statusLabel(r.status),
       },
     ],
-    [
-      amount,
-      category,
-      gameId,
-      itemsPerPage,
-      page,
-      roundId,
-      status,
-      transactionId,
-      winning,
-    ],
+    [amount, category, gameId, itemsPerPage, page, roundId, status, transactionId, winning, search],
   );
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={1.25}
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        mb={1.5}
-      >
+      <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap mb={1.5}>
         <ItemsPerPageField
           value={itemsPerPage}
           onChange={(v) => {
@@ -304,9 +273,7 @@ export function QtechHistoryTab({ userId }: Props) {
               sx={HISTORY_PAGINATION_SX}
             />
           ) : (
-            <Typography sx={{ fontSize: 12, color: '#667085' }}>
-              Page 1 of 1
-            </Typography>
+            <Typography sx={{ fontSize: 12, color: '#667085' }}>Page 1 of 1</Typography>
           )
         }
       >

@@ -190,11 +190,7 @@ export function FeedbackPage() {
         label: 'Mobile',
         render: (row) => {
           if (!canShowMobile) {
-            return (
-              <Typography variant="body2">
-                {maskMobile(row.mobile, false)}
-              </Typography>
-            );
+            return <Typography variant="body2">{maskMobile(row.mobile, false)}</Typography>;
           }
           const mobile = String(row.mobile || '');
           return (
@@ -287,9 +283,7 @@ export function FeedbackPage() {
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={(event) => {
               event.stopPropagation();
               void load();

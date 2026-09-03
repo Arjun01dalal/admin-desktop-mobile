@@ -62,10 +62,7 @@ export function useHouseGamesQuery(
 
       setLoader(true);
       try {
-        const res = await secureApi<HouseGamesListResponse>(
-          'houseGames.transactions',
-          payload,
-        );
+        const res = await secureApi<HouseGamesListResponse>('houseGames.transactions', payload);
         if (!isCurrent(gen)) return;
         if (!res.ok) {
           toast.error(res.message || 'Failed to fetch transactions');
@@ -74,9 +71,7 @@ export function useHouseGamesQuery(
         startTransition(() => setListData(res.data || {}));
       } catch (error: unknown) {
         if (!isCurrent(gen)) return;
-        toast.error(
-          error instanceof Error ? error.message : 'Failed to fetch transactions',
-        );
+        toast.error(error instanceof Error ? error.message : 'Failed to fetch transactions');
       } finally {
         end();
         if (isCurrent(gen)) setLoader(false);

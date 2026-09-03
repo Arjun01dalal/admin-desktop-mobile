@@ -5,10 +5,7 @@ import { isAuthFailureMessage, networkForbiddenUserMessage } from '@astro/shared
 import { sanitizeBridgePayload } from './bridgeSanitize';
 import { isSecureAction, type SecureAction } from './secureActions';
 import { getAuthToken } from '@/utils/authToken';
-import {
-  isJwtExpired,
-  notifySessionExpired,
-} from '@/utils/session';
+import { isJwtExpired, notifySessionExpired } from '@/utils/session';
 import { scheduleSessionRecheck } from '@/utils/sessionCheck';
 
 /** Login/OTP flows — never treat their 401s as a session logout. */
@@ -36,7 +33,7 @@ const SKIP_SESSION_RECHECK = new Set<SecureAction>([
  * Everything else is treated as a read (in-flight dedupe + tiny TTL).
  */
 const MUTATION_RE =
-  /(^|\.)(create|update|delete|remove|send|verify|add|change|save|upload|register|set[A-Z]|lock|unlock|process|block|unblock|enable|disable|insert|statusUpdate|sosFlag|externalDialer|uploadDialler|savePerformance|settle|approve|reject|assign|allot|reset|cancel|confirm)/i;
+  /(^|\.)(create|update|delete|remove|send|verify|add|change|save|upload|register|set[A-Z]|lock|unlock|process|block|unblock|enable|disable|insert|statusUpdate|sosFlag|externalDialer|uploadDialler|savePerformance|settle|approve|reject|assign|allot|reset|cancel|confirm|dump)|(?:Users)?Update|(?:Users)?Dump/i;
 
 /** @deprecated Prefer ApiResult from @astro/shared/api — alias kept for existing imports. */
 export type SecureResult<T = unknown> = ApiResult<T>;
@@ -97,17 +94,13 @@ function maybeExpireSession(
   if (!hadToken) return;
 
   if (isAuthFailureMessage(status, message)) {
-    notifySessionExpired(
-      message || 'Session expired. Please login again.',
-    );
+    notifySessionExpired(message || 'Session expired. Please login again.');
     return;
   }
 
   // Some backends return HTTP 200 with success:false + blacklist/expired text.
   if (success === false && isAuthFailureMessage(undefined, message)) {
-    notifySessionExpired(
-      message || 'Session expired. Please login again.',
-    );
+    notifySessionExpired(message || 'Session expired. Please login again.');
   }
 }
 
@@ -123,11 +116,9 @@ async function invokeSecureApi<T>(
     return { ok: false, message: 'Secure API bridge unavailable' };
   }
 
-  const message =
-    typeof result.message === 'string' ? result.message : undefined;
+  const message = typeof result.message === 'string' ? result.message : undefined;
   const status = typeof result.status === 'number' ? result.status : undefined;
-  const success =
-    typeof result.success === 'boolean' ? result.success : undefined;
+  const success = typeof result.success === 'boolean' ? result.success : undefined;
 
   maybeExpireSession(action, hadToken, status, message, success);
 
@@ -167,11 +158,7 @@ export async function secureApi<T = unknown>(
   const token = getAuthToken();
   const hadToken = Boolean(token);
 
-  if (
-    hadToken &&
-    !SKIP_SESSION_LOGOUT.has(action) &&
-    isJwtExpired(token)
-  ) {
+  if (hadToken && !SKIP_SESSION_LOGOUT.has(action) && isJwtExpired(token)) {
     notifySessionExpired('Your session has expired. Please login again.');
     return {
       ok: false,

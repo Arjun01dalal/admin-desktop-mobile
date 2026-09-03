@@ -19,9 +19,7 @@ export function AstroLogo({ size = 72, showGlow = true }: Props) {
         objectFit: 'contain',
         flexShrink: 0,
         display: 'block',
-        filter: showGlow
-          ? 'drop-shadow(0 10px 28px rgba(168, 120, 255, 0.45))'
-          : 'none',
+        filter: showGlow ? 'drop-shadow(0 10px 28px rgba(168, 120, 255, 0.45))' : 'none',
       }}
     />
   );

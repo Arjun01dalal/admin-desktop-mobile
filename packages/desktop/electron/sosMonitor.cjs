@@ -8,16 +8,12 @@
  * NOTE: get-sos-flag requires a Bearer token — use getToken() from the
  * last successful renderer secure:api call.
  */
-const {
-  BrowserWindow,
-  Notification,
-  ipcMain,
-  screen,
-} = require('electron');
+const { BrowserWindow, Notification, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const secureApi = require('./secure/index.cjs');
 const { optionalEnv } = require('./config.cjs');
+const panelWindows = require('./panelWindows.cjs');
 
 /**
  * Adaptive SOS poll (was fixed 10s).
@@ -122,15 +118,9 @@ function extractSosMeta(payload) {
     payload;
   return {
     type: String(nest.type || nest.sosType || nest.sos_type || '').trim(),
-    location: String(
-      nest.location || nest.officeLocation || nest.office_location || '',
-    ).trim(),
-    blockedByName: String(
-      nest.blockedByName || nest.blocked_by_name || nest.name || '',
-    ).trim(),
-    blockedById: String(
-      nest.blockedById || nest.blocked_by_id || '',
-    ).trim(),
+    location: String(nest.location || nest.officeLocation || nest.office_location || '').trim(),
+    blockedByName: String(nest.blockedByName || nest.blocked_by_name || nest.name || '').trim(),
+    blockedById: String(nest.blockedById || nest.blocked_by_id || '').trim(),
   };
 }
 
@@ -192,6 +182,8 @@ function startSosMonitor({
   };
   /** Logged-in user's office (for office-based suppress on peers). */
   let localOfficeLocation = '';
+  /** Last JSON written for local SOS context (skip redundant disk writes). */
+  let lastSavedContextJson = '';
 
   function nextPollDelayMs() {
     const token = typeof getToken === 'function' ? getToken() : null;
@@ -216,9 +208,7 @@ function startSosMonitor({
   function contextPath() {
     try {
       const base =
-        typeof getUserDataPath === 'function'
-          ? getUserDataPath()
-          : path.join(__dirname, '..');
+        typeof getUserDataPath === 'function' ? getUserDataPath() : path.join(__dirname, '..');
       return path.join(base, LOCAL_CONTEXT_FILE);
     } catch {
       return null;
@@ -231,6 +221,7 @@ function startSosMonitor({
       if (!p || !fs.existsSync(p)) return;
       const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
       localOfficeLocation = String(raw?.officeLocation || '').trim();
+      lastSavedContextJson = JSON.stringify({ officeLocation: localOfficeLocation }, null, 0);
     } catch {
       // ignore
     }
@@ -240,11 +231,11 @@ function startSosMonitor({
     try {
       const p = contextPath();
       if (!p) return;
-      fs.writeFileSync(
-        p,
-        JSON.stringify({ officeLocation: localOfficeLocation }, null, 0),
-        'utf8',
-      );
+      const payload = JSON.stringify({ officeLocation: localOfficeLocation }, null, 0);
+      // Skip redundant sync writes (Windows AV freezes main on repeated writeFileSync).
+      if (lastSavedContextJson === payload) return;
+      fs.writeFileSync(p, payload, 'utf8');
+      lastSavedContextJson = payload;
     } catch (err) {
       log('could not persist local SOS context:', err?.message || err);
     }
@@ -258,7 +249,9 @@ function startSosMonitor({
 
   function shouldSuppressAlert(meta = {}) {
     if (suppressOriginatorAlert) return true;
-    const type = String(meta.type || activeSosMeta.type || '').trim().toLowerCase();
+    const type = String(meta.type || activeSosMeta.type || '')
+      .trim()
+      .toLowerCase();
     const location = String(meta.location || activeSosMeta.location || '').trim();
     if (
       (type === 'office-based' || type === 'office') &&
@@ -599,18 +592,22 @@ function startSosMonitor({
       if (refreshQueued) {
         refreshQueued = false;
         void runPoll();
-        return;
+      } else {
+        scheduleNext();
       }
-      scheduleNext();
     }
   }
 
   if (!ipcRegistered) {
     ipcRegistered = true;
-    ipcMain.on('sos:acknowledge', () => {
+    ipcMain.on('sos:acknowledge', (event) => {
+      if (!alertWin || event?.sender !== alertWin.webContents) return;
       acknowledge();
     });
-    ipcMain.on('sos:activated', (_event, meta = {}) => {
+    ipcMain.on('sos:activated', (event, meta = {}) => {
+      const senderWin = BrowserWindow.fromWebContents(event?.sender);
+      const panel = panelWindows.getPanelByWindow(senderWin);
+      if (!panel || panel.win.webContents.id !== event?.sender?.id) return;
       const payload = meta && typeof meta === 'object' ? meta : {};
       const silent = Boolean(payload.silent || payload.self);
       rememberMeta(payload);
@@ -632,11 +629,17 @@ function startSosMonitor({
       // Switch to active cadence after local activate.
       scheduleNext(POLL_ACTIVE_MS);
     });
-    ipcMain.on('sos:cleared', () => {
+    ipcMain.on('sos:cleared', (event) => {
+      const senderWin = BrowserWindow.fromWebContents(event?.sender);
+      const panel = panelWindows.getPanelByWindow(senderWin);
+      if (!panel || panel.win.webContents.id !== event?.sender?.id) return;
       onSosState(false, 'ipc');
       scheduleNext(nextPollDelayMs());
     });
-    ipcMain.on('sos:set-local-context', (_event, ctx = {}) => {
+    ipcMain.on('sos:set-local-context', (event, ctx = {}) => {
+      const senderWin = BrowserWindow.fromWebContents(event?.sender);
+      const panel = panelWindows.getPanelByWindow(senderWin);
+      if (!panel || panel.win.webContents.id !== event?.sender?.id) return;
       if (ctx && typeof ctx === 'object') {
         if (ctx.officeLocation != null) {
           localOfficeLocation = String(ctx.officeLocation || '').trim();

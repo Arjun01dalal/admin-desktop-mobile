@@ -135,14 +135,18 @@ export function KycDialogs({ approve, reject, manual, enableOtp }: Props) {
               ) : (
                 <>
                   <TextField
-                    label="Customer OTP"
+                    label="Customer OTP (6 digit)"
                     size="small"
                     fullWidth
                     required
                     autoFocus
+                    inputProps={{ maxLength: 6, inputMode: 'numeric', pattern: '[0-9]*' }}
                     value={approve.form.otp}
                     onChange={(e) =>
-                      approve.setForm((prev) => ({ ...prev, otp: e.target.value }))
+                      approve.setForm((prev) => ({
+                        ...prev,
+                        otp: e.target.value.replace(/\D/g, '').slice(0, 6),
+                      }))
                     }
                   />
                   <TextField
@@ -182,11 +186,7 @@ export function KycDialogs({ approve, reject, manual, enableOtp }: Props) {
               disabled={approve.submitting}
               sx={orangeBtnSx}
             >
-              {approve.submitting
-                ? 'Saving…'
-                : approve.step === 'details'
-                  ? 'Send OTP'
-                  : 'Approve'}
+              {approve.submitting ? 'Saving…' : approve.step === 'details' ? 'Send OTP' : 'Approve'}
             </Button>
           </DialogActions>
         </form>
@@ -222,12 +222,7 @@ export function KycDialogs({ approve, reject, manual, enableOtp }: Props) {
             <Button onClick={reject.close} disabled={reject.submitting}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="error"
-              disabled={reject.submitting}
-            >
+            <Button type="submit" variant="contained" color="error" disabled={reject.submitting}>
               {reject.submitting ? 'Saving…' : 'Reject'}
             </Button>
           </DialogActions>
@@ -292,9 +287,7 @@ export function KycDialogs({ approve, reject, manual, enableOtp }: Props) {
                   fullWidth
                   required
                   value={manual.form.upiId}
-                  onChange={(e) =>
-                    manual.setForm((prev) => ({ ...prev, upiId: e.target.value }))
-                  }
+                  onChange={(e) => manual.setForm((prev) => ({ ...prev, upiId: e.target.value }))}
                 />
                 <TextField
                   label="IFSC"
@@ -316,9 +309,7 @@ export function KycDialogs({ approve, reject, manual, enableOtp }: Props) {
                 fullWidth
                 required
                 value={manual.form.otp}
-                onChange={(e) =>
-                  manual.setForm((prev) => ({ ...prev, otp: e.target.value }))
-                }
+                onChange={(e) => manual.setForm((prev) => ({ ...prev, otp: e.target.value }))}
               />
               <TextField
                 label="Admin OTP"
@@ -336,9 +327,7 @@ export function KycDialogs({ approve, reject, manual, enableOtp }: Props) {
                 fullWidth
                 required
                 value={manual.form.comment}
-                onChange={(e) =>
-                  manual.setForm((prev) => ({ ...prev, comment: e.target.value }))
-                }
+                onChange={(e) => manual.setForm((prev) => ({ ...prev, comment: e.target.value }))}
               />
             </Stack>
           </DialogContent>
@@ -346,12 +335,7 @@ export function KycDialogs({ approve, reject, manual, enableOtp }: Props) {
             <Button onClick={manual.close} disabled={manual.submitting}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={manual.submitting}
-              sx={orangeBtnSx}
-            >
+            <Button type="submit" variant="contained" disabled={manual.submitting} sx={orangeBtnSx}>
               {manual.submitting ? 'Saving…' : 'Save'}
             </Button>
           </DialogActions>

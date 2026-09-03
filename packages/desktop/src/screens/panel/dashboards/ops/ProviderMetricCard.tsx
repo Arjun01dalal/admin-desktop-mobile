@@ -1,12 +1,4 @@
-import {
-  Box,
-  Link,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Link, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import type { ProviderCardModel } from './types';
 import { floorNum } from './mergeMetrics';
@@ -29,16 +21,12 @@ export function ProviderMetricCard({ card, onClick }: Props) {
     if (!card.activeCustomerKey) return;
     const startDate = String(
       card.state?.startDate ||
-        (card.search
-          ? new URLSearchParams(card.search.replace(/^\?/, '')).get('startDate')
-          : '') ||
+        (card.search ? new URLSearchParams(card.search.replace(/^\?/, '')).get('startDate') : '') ||
         '',
     );
     const endDate = String(
       card.state?.endDate ||
-        (card.search
-          ? new URLSearchParams(card.search.replace(/^\?/, '')).get('endDate')
-          : '') ||
+        (card.search ? new URLSearchParams(card.search.replace(/^\?/, '')).get('endDate') : '') ||
         '',
     );
     navigate('/activeUserData', {
@@ -51,8 +39,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
     });
   };
 
-  const activeLabel =
-    card.activeCustomerLabel || metricJyotishLabel('Active Customer');
+  const activeLabel = card.activeCustomerLabel || metricJyotishLabel('Active Customer');
 
   const useLudoTable =
     Boolean(card.selectStatsMap) &&
@@ -166,10 +153,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
           </Box>
         )}
         {card.rows.map((row) => (
-          <Box
-            key={row.label}
-            sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}
-          >
+          <Box key={row.label} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
             <Typography variant="body2" fontWeight={700}>
               {toDisplayText(row.label)}:
             </Typography>
@@ -177,8 +161,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
               variant="body2"
               fontWeight={800}
               color={
-                row.label.toLowerCase().includes('ggr') &&
-                typeof row.value === 'number'
+                row.label.toLowerCase().includes('ggr') && typeof row.value === 'number'
                   ? row.value < 0
                     ? 'error.main'
                     : 'success.main'
@@ -187,8 +170,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
               sx={{
                 fontVariantNumeric: 'tabular-nums',
                 textDecoration:
-                  row.label.toLowerCase().includes('ggr') &&
-                  typeof row.value === 'number'
+                  row.label.toLowerCase().includes('ggr') && typeof row.value === 'number'
                     ? 'underline'
                     : 'none',
               }}
@@ -200,12 +182,7 @@ export function ProviderMetricCard({ card, onClick }: Props) {
       </Stack>
 
       {card.actions && card.actions.length > 0 && (
-        <Stack
-          direction="row"
-          spacing={2}
-          mt={1.5}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <Stack direction="row" spacing={2} mt={1.5} onClick={(e) => e.stopPropagation()}>
           {card.actions.map((action) => (
             <Link
               key={action.label}

@@ -117,23 +117,14 @@ function StatPill({
 export function BotValidationModal({ open, items, onClose }: Props) {
   const [details, setDetails] = useState<Record<string, unknown> | null>(null);
 
-  const passedCount = useMemo(
-    () => items.filter((item) => Boolean(item.passed)).length,
-    [items],
-  );
+  const passedCount = useMemo(() => items.filter((item) => Boolean(item.passed)).length, [items]);
   const failedCount = items.length - passedCount;
 
   const closeDetails = () => setDetails(null);
 
   return (
     <>
-      <Dialog
-        open={open}
-        onClose={onClose}
-        fullWidth
-        maxWidth="md"
-        PaperProps={{ sx: paperSx }}
-      >
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: paperSx }}>
         <DialogTitle
           sx={{
             py: 1.75,
@@ -290,9 +281,7 @@ export function BotValidationModal({ open, items, onClose }: Props) {
                           <Tooltip title="Other details">
                             <IconButton
                               size="small"
-                              onClick={() =>
-                                setDetails(isRecord(v.details) ? v.details : {})
-                              }
+                              onClick={() => setDetails(isRecord(v.details) ? v.details : {})}
                               sx={{
                                 bgcolor: '#f1a144',
                                 color: '#111',
@@ -385,11 +374,7 @@ export function BotValidationModal({ open, items, onClose }: Props) {
             bgcolor: 'action.hover',
           }}
         >
-          <Button
-            variant="contained"
-            onClick={closeDetails}
-            sx={{ ...orangeBtnSx, minWidth: 110 }}
-          >
+          <Button variant="contained" onClick={closeDetails} sx={{ ...orangeBtnSx, minWidth: 110 }}>
             Close
           </Button>
         </DialogActions>
@@ -455,9 +440,7 @@ function NestedValue({ label, value }: { label: string; value: unknown }) {
               }}
             >
               {isRecord(entry) ? (
-                Object.entries(entry).map(([k, v]) => (
-                  <NestedValue key={k} label={k} value={v} />
-                ))
+                Object.entries(entry).map(([k, v]) => <NestedValue key={k} label={k} value={v} />)
               ) : (
                 <Typography variant="body2">{formatPrimitive(entry)}</Typography>
               )}

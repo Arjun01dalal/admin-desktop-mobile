@@ -68,10 +68,7 @@ export function normalizePayload(payload: unknown): TopGamesDoc {
   return { data: {} };
 }
 
-export function mapCategoryGames(
-  category: string,
-  items: TopGameItem[] = [],
-): GameRow[] {
+export function mapCategoryGames(category: string, items: TopGameItem[] = []): GameRow[] {
   return items.map((item, index) => ({
     ...item,
     _categoryKey: category,
@@ -86,9 +83,7 @@ export function buildGameRows(
 ): GameRow[] {
   const list =
     selectedCategory === 'All'
-      ? Object.entries(data).flatMap(([category, items]) =>
-          mapCategoryGames(category, items),
-        )
+      ? Object.entries(data).flatMap(([category, items]) => mapCategoryGames(category, items))
       : mapCategoryGames(selectedCategory, data[selectedCategory] || []);
 
   const query = search.trim().toLowerCase();
@@ -116,25 +111,17 @@ export function unpackCatalogGames(raw: unknown): Array<{
   const items = Array.isArray(payload)
     ? payload
     : Array.isArray((payload as { items?: unknown })?.items)
-      ? ((payload as { items: unknown[] }).items)
+      ? (payload as { items: unknown[] }).items
       : [];
 
-  const unique = new Map<
-    string,
-    { gameId: string; gameName: string; providerName: string }
-  >();
+  const unique = new Map<string, { gameId: string; gameName: string; providerName: string }>();
   items.forEach((item) => {
     const row = (item || {}) as Record<string, unknown>;
-    const provider =
-      (row.provider as { name?: string } | undefined) || undefined;
+    const provider = (row.provider as { name?: string } | undefined) || undefined;
     const gameId = row.gameId ?? row.Game_Code ?? row.id;
     const gameName = row.Name ?? row.gameName ?? row.name ?? gameId;
     const providerName =
-      row.providerName ??
-      provider?.name ??
-      row.Provider_Name ??
-      row.Provider_ID ??
-      '';
+      row.providerName ?? provider?.name ?? row.Provider_Name ?? row.Provider_ID ?? '';
     if (gameId == null || gameId === '') return;
     const normalized = {
       gameId: String(gameId),
@@ -144,7 +131,5 @@ export function unpackCatalogGames(raw: unknown): Array<{
     unique.set(`${normalized.providerName}:${normalized.gameId}`, normalized);
   });
 
-  return Array.from(unique.values()).sort((a, b) =>
-    a.gameName.localeCompare(b.gameName),
-  );
+  return Array.from(unique.values()).sort((a, b) => a.gameName.localeCompare(b.gameName));
 }

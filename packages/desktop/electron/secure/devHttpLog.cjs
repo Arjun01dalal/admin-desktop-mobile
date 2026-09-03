@@ -24,8 +24,7 @@ function redactHeaders(headers = {}) {
 function summarizeBody(body, max = 1200) {
   if (body == null) return undefined;
   try {
-    const text =
-      typeof body === 'string' ? body : JSON.stringify(body, null, 0);
+    const text = typeof body === 'string' ? body : JSON.stringify(body, null, 0);
     if (text.length <= max) return body;
     return `${text.slice(0, max)}…(+${text.length - max} chars)`;
   } catch {

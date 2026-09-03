@@ -88,9 +88,7 @@ function ResultTable({
       toast.error('Please select a Campaign ID');
       return;
     }
-    const userIds = Array.from(
-      new Set([...collectUserIds(rows), ...(extraIds || [])]),
-    );
+    const userIds = Array.from(new Set([...collectUserIds(rows), ...(extraIds || [])]));
     if (userIds.length === 0) {
       toast.error('No user IDs found in this result');
       return;
@@ -117,8 +115,7 @@ function ResultTable({
         serverId: campaignMeta?.serverId ?? String(admin?.serverId ?? ''),
         listId: getListIdForCampaign(selectedCampaignId),
         listName:
-          campaignMeta?.name ||
-          `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
+          campaignMeta?.name || `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
       });
       if (!dialerRes.ok) {
         toast.error(dialerRes.message || 'Failed to push to dialer');
@@ -224,7 +221,12 @@ function ResultTable({
               {columns.map((col) => (
                 <TableCell
                   key={col}
-                  sx={{ bgcolor: '#0f172a', color: '#f8fafc', fontWeight: 600, whiteSpace: 'nowrap' }}
+                  sx={{
+                    bgcolor: '#0f172a',
+                    color: '#f8fafc',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
                 >
                   {col}
                 </TableCell>
@@ -312,9 +314,7 @@ function MessageBody({
 
 export function AdminLlmChatWidget() {
   const listRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(
-    () => sessionStorage.getItem(LLM_CHAT_OPEN_KEY) === '1',
-  );
+  const [open, setOpen] = useState(() => sessionStorage.getItem(LLM_CHAT_OPEN_KEY) === '1');
   const [messages, setMessages] = useState<LlmChatMessage[]>(loadStoredMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -374,7 +374,6 @@ export function AdminLlmChatWidget() {
       stopMediaTracks();
     }
     setRecording(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {
@@ -400,7 +399,10 @@ export function AdminLlmChatWidget() {
     sessionStorage.removeItem(LLM_CHAT_HISTORY_KEY);
   };
 
-  const appendAssistantFromPayload = (payload: ReturnType<typeof parseLlmSendResult>, fallback: string) => {
+  const appendAssistantFromPayload = (
+    payload: ReturnType<typeof parseLlmSendResult>,
+    fallback: string,
+  ) => {
     setMessages((prev) => [
       ...prev,
       {
@@ -542,8 +544,7 @@ export function AdminLlmChatWidget() {
       }, 200);
       setRecording(true);
     } catch (err) {
-      const denied =
-        err instanceof DOMException && err.name === 'NotAllowedError';
+      const denied = err instanceof DOMException && err.name === 'NotAllowedError';
       toast.error(denied ? 'Microphone permission denied' : 'Could not access microphone');
       stopMediaTracks();
       setRecording(false);
@@ -671,18 +672,14 @@ export function AdminLlmChatWidget() {
             bgcolor: '#f8fafc',
           }}
         >
-          <Box
-            ref={listRef}
-            sx={{ flex: 1, overflowY: 'auto', px: 2.25, py: 2, minHeight: 0 }}
-          >
+          <Box ref={listRef} sx={{ flex: 1, overflowY: 'auto', px: 2.25, py: 2, minHeight: 0 }}>
             {messages.length === 0 && (
               <Typography
                 color="text.secondary"
                 sx={{ textAlign: 'center', py: 6, px: 3, fontSize: 14, lineHeight: 1.5 }}
               >
-                Ask in English or Hindi about deposits, withdrawals, users, offices, callers,
-                roles, or wallet metrics — type or use the mic. Sensitive customer data is
-                masked.
+                Ask in English or Hindi about deposits, withdrawals, users, offices, callers, roles,
+                or wallet metrics — type or use the mic. Sensitive customer data is masked.
               </Typography>
             )}
             {messages.map((m, idx) => {
@@ -704,12 +701,7 @@ export function AdminLlmChatWidget() {
                     borderRadius: 2,
                     borderBottomRightRadius: m.role === 'user' ? 1 : 2,
                     borderBottomLeftRadius: m.role === 'assistant' ? 1 : 2,
-                    bgcolor:
-                      m.role === 'user'
-                        ? '#1e293b'
-                        : m.refused
-                          ? '#fffbeb'
-                          : '#fff',
+                    bgcolor: m.role === 'user' ? '#1e293b' : m.refused ? '#fffbeb' : '#fff',
                     color: m.role === 'user' ? '#fff' : '#0f172a',
                     border: m.role === 'assistant' ? '1px solid' : 'none',
                     borderColor: m.refused ? '#f59e0b' : '#e2e8f0',
@@ -763,9 +755,7 @@ export function AdminLlmChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={
-                recording
-                  ? 'Listening… click stop when done'
-                  : 'Ask a question (English or Hindi)…'
+                recording ? 'Listening… click stop when done' : 'Ask a question (English or Hindi)…'
               }
               disabled={loading || recording}
               autoFocus
@@ -835,8 +825,7 @@ export function AdminLlmChatWidget() {
                   px: 3,
                   py: 3.5,
                   borderRadius: 3,
-                  background:
-                    'linear-gradient(165deg, #0f172a 0%, #1e293b 55%, #0f172a 100%)',
+                  background: 'linear-gradient(165deg, #0f172a 0%, #1e293b 55%, #0f172a 100%)',
                   border: '1px solid rgba(148, 163, 184, 0.25)',
                   boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
                   color: '#f8fafc',

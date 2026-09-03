@@ -57,12 +57,7 @@ const bodyCellSx = {
   verticalAlign: 'middle',
 } as const;
 
-export function DepositWithdrawalMidModal({
-  open,
-  row,
-  catalogMids,
-  onClose,
-}: Props) {
+export function DepositWithdrawalMidModal({ open, row, catalogMids, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<MergedMidReportRow[]>([]);
 
@@ -155,8 +150,7 @@ export function DepositWithdrawalMidModal({
               No routing MID available
             </Typography>
             <Typography color="text.secondary" fontSize={12.5} textAlign="center">
-              User has deposited on all configured MIDs. Use a MID where the user has not
-              deposited.
+              User has deposited on all configured MIDs. Use a MID where the user has not deposited.
             </Typography>
           </Stack>
         ) : (

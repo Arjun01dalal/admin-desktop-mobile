@@ -14,9 +14,7 @@ function registerProtocolClient() {
   try {
     if (process.defaultApp) {
       if (process.argv.length >= 2) {
-        app.setAsDefaultProtocolClient(SCHEME, process.execPath, [
-          path.resolve(process.argv[1]),
-        ]);
+        app.setAsDefaultProtocolClient(SCHEME, process.execPath, [path.resolve(process.argv[1])]);
       }
     } else {
       app.setAsDefaultProtocolClient(SCHEME);
@@ -61,7 +59,9 @@ function parseDeepLink(url) {
 }
 
 function findDeepLinkInArgv(argv = process.argv) {
-  return (argv || []).map(String).find((item) => item.toLowerCase().startsWith(`${SCHEME}://`)) || null;
+  return (
+    (argv || []).map(String).find((item) => item.toLowerCase().startsWith(`${SCHEME}://`)) || null
+  );
 }
 
 function setPending(payload) {

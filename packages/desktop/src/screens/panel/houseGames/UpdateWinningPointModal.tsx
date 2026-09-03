@@ -92,9 +92,7 @@ export default function UpdateWinningPointModal({
         toast.error(res.message || 'Failed to update winning point');
       }
     } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update winning point',
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to update winning point');
     } finally {
       setLoading(false);
     }

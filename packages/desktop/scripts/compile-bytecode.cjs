@@ -80,8 +80,7 @@ const useNode = process.argv.includes('--node');
 // `--plain` / `--for-win` on non-Windows: copy sources (no .jsc) so a
 // Windows installer built from macOS does not ship incompatible bytecode.
 const forWin = process.argv.includes('--for-win');
-const usePlain =
-  process.argv.includes('--plain') || (forWin && process.platform !== 'win32');
+const usePlain = process.argv.includes('--plain') || (forWin && process.platform !== 'win32');
 
 function copyModule(rel) {
   const src = path.join(SRC, rel);

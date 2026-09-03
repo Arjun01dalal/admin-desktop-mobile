@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  IconButton,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { DEPOSIT_STATES } from '@/screens/panel/newRegisters/constants';

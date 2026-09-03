@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, CircularProgress, Collapse, IconButton, Stack, Typography } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { secureApi } from '@/api/secureClient';
@@ -32,11 +25,7 @@ function restrictCallerAmountTiles(): boolean {
     .trim()
     .toLowerCase()
     .replace(/[-\s]+/g, '_');
-  return (
-    name === 'caller' ||
-    name === 'caller_new' ||
-    name.startsWith('caller_head')
-  );
+  return name === 'caller' || name === 'caller_new' || name.startsWith('caller_head');
 }
 
 type BonusEarning = {
@@ -233,8 +222,7 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
   };
 
   const profit = depositTotal - withdrawalTotal;
-  const profitAfter =
-    depositTotal - withdrawalTotal - balanceTotal - pendingWithdrawal;
+  const profitAfter = depositTotal - withdrawalTotal - balanceTotal - pendingWithdrawal;
 
   const ownEarning = Number(bonusData?.userOwnEarning) || 0;
   const ownEarningCount = Number(bonusData?.userOwnEarningCount) || 0;
@@ -280,18 +268,9 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
       <CompactStat label="Withdraw" value={formatAmount(withdrawalTotal)} />
       <CompactStat label="Balance" value={formatAmount(balanceTotal)} />
       <CompactStat label="Bonus Wallet" value={formatAmount(bonusBalance)} />
-      <CompactStat
-        label="Pending Withdrawal"
-        value={formatAmount(pendingWithdrawal)}
-      />
-      <CompactStat
-        label="Created"
-        value={formatReportDate(encrypted?.createdAt)}
-      />
-      <CompactStat
-        label="Last Activity"
-        value={formatReportDate(pickLastActivity(encrypted))}
-      />
+      <CompactStat label="Pending Withdrawal" value={formatAmount(pendingWithdrawal)} />
+      <CompactStat label="Created" value={formatReportDate(encrypted?.createdAt)} />
+      <CompactStat label="Last Activity" value={formatReportDate(pickLastActivity(encrypted))} />
       <CompactStat
         label={profit < 0 ? 'Loss' : 'Profit'}
         value={formatAmount(profit)}
@@ -299,11 +278,7 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
         strong
       />
       <CompactStat
-        label={toDisplayText(
-          profitAfter < 0
-            ? 'Loss After Withdrawal'
-            : 'Profit After Withdrawal',
-        )}
+        label={toDisplayText(profitAfter < 0 ? 'Loss After Withdrawal' : 'Profit After Withdrawal')}
         value={formatAmount(profitAfter)}
         tone={profitAfter < 0 ? 'error' : 'success'}
         strong
@@ -316,11 +291,7 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
         onClick={() => openBonusEarning('bonus')}
       />
       <CompactStat
-        label={
-          availedAmount > 0
-            ? `Availed Bonus (${availedCount})`
-            : 'Bonus Earning (0)'
-        }
+        label={availedAmount > 0 ? `Availed Bonus (${availedCount})` : 'Bonus Earning (0)'}
         value={formatAmount(availedAmount)}
         strong
         clickable={availedAmount > 0}
@@ -459,9 +430,7 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
                     minWidth: 0,
                   }}
                 >
-                  <Typography
-                    sx={{ fontSize: 13, fontWeight: 700, color: '#374151' }}
-                  >
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
                     Wallet Overview
                   </Typography>
                   {!loading && (
@@ -476,11 +445,7 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
                 </Box>
                 <IconButton
                   size="small"
-                  aria-label={
-                    summaryOpen
-                      ? 'Collapse wallet overview'
-                      : 'Expand wallet overview'
-                  }
+                  aria-label={summaryOpen ? 'Collapse wallet overview' : 'Expand wallet overview'}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSummaryOpen((v) => !v);
@@ -510,15 +475,7 @@ export function WalletHistoryView({ userId, encrypted }: Props) {
   );
 }
 
-function BazarCol({
-  header,
-  rows,
-  footer,
-}: {
-  header: string;
-  rows: string[];
-  footer: string;
-}) {
+function BazarCol({ header, rows, footer }: { header: string; rows: string[]; footer: string }) {
   return (
     <Box sx={{ width: '32%', minWidth: 0 }}>
       <Box sx={{ borderBottom: '1px solid rgba(0,0,0,0.45)', mb: 0.25, pb: 0.25 }}>

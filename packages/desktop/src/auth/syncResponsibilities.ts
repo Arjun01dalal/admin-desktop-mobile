@@ -1,9 +1,5 @@
 import { secureApi } from '@/api/secureClient';
-import {
-  getRoleId,
-  getResponsibilities,
-  updateStoredResponsibilities,
-} from '@/auth/permissions';
+import { getRoleId, getResponsibilities, updateStoredResponsibilities } from '@/auth/permissions';
 
 const isMongoObjectId = (value: string) => /^[a-f\d]{24}$/i.test(value);
 
@@ -12,8 +8,7 @@ function fromResponsibilityItem(item: unknown): string {
   if (typeof item === 'string') return item.trim();
   if (item && typeof item === 'object') {
     const obj = item as Record<string, unknown>;
-    const named =
-      obj.Enum ?? obj.enum ?? obj.name ?? obj.Name ?? obj.key ?? obj.Key ?? obj._id;
+    const named = obj.Enum ?? obj.enum ?? obj.name ?? obj.Name ?? obj.key ?? obj.Key ?? obj._id;
     if (named != null && String(named).trim()) return String(named).trim();
   }
   return '';
@@ -25,8 +20,7 @@ function extractResponsibilityList(data: unknown): string[] {
   }
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
-    const nested =
-      obj.payload ?? obj.Responsibilities ?? obj.responsibilities ?? obj.data;
+    const nested = obj.payload ?? obj.Responsibilities ?? obj.responsibilities ?? obj.data;
     if (Array.isArray(nested)) {
       return nested.map(fromResponsibilityItem).filter(Boolean);
     }
@@ -49,7 +43,7 @@ async function resolveResponsibilityEnums(keys: string[]): Promise<string[]> {
     const list = Array.isArray(res.data)
       ? res.data
       : Array.isArray((res.data as { payload?: unknown } | null)?.payload)
-        ? ((res.data as { payload: unknown[] }).payload)
+        ? (res.data as { payload: unknown[] }).payload
         : [];
     const idToEnum: Record<string, string> = {};
     for (const item of list) {
@@ -64,9 +58,7 @@ async function resolveResponsibilityEnums(keys: string[]): Promise<string[]> {
         (typeof row.name === 'string' && row.name);
       if (enumKey) idToEnum[id] = enumKey;
     }
-    return keys
-      .map((key) => (isMongoObjectId(key) ? idToEnum[key] || key : key))
-      .filter(Boolean);
+    return keys.map((key) => (isMongoObjectId(key) ? idToEnum[key] || key : key)).filter(Boolean);
   } catch {
     return keys;
   }
@@ -77,9 +69,7 @@ async function resolveResponsibilityEnums(keys: string[]): Promise<string[]> {
  * Login often returns enum strings; get-responsibility may return ObjectIds —
  * resolve + never wipe good login enums with unresolved ids (Laxmi parity).
  */
-export async function syncResponsibilitiesForRole(
-  roleId?: string,
-): Promise<string[]> {
+export async function syncResponsibilitiesForRole(roleId?: string): Promise<string[]> {
   const id = String(roleId || getRoleId() || '');
   if (!id) return [];
 

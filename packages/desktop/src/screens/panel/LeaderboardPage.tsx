@@ -35,6 +35,14 @@ type LeaderboardRow = {
   plainPassword?: string;
 };
 
+type LeaderboardResponse =
+  | LeaderboardRow[]
+  | {
+      items?: LeaderboardRow[];
+      users?: LeaderboardRow[];
+      rows?: LeaderboardRow[];
+    };
+
 const CITY_KEYS = ['nagpur', 'dubai', 'bangluru', 'pune', 'mysuru'] as const;
 
 const CITY_TOTAL_LABELS: { key: keyof ReturnType<typeof emptyCityTotals>; label: string }[] = [
@@ -134,7 +142,7 @@ export function LeaderboardPage() {
     begin();
     setLoading(true);
     try {
-      const res = await secureApi<unknown>('leaderboard.list', {
+      const res = await secureApi<LeaderboardResponse>('leaderboard.list', {
         startDate: startDate || null,
         endDate: endDate || null,
       });
@@ -296,10 +304,7 @@ export function LeaderboardPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
-      <CollapsibleFilterPanel
-        title="Leaderboard"
-        summary={`${startDate} → ${endDate}`}
-      >
+      <CollapsibleFilterPanel title="Leaderboard" summary={`${startDate} → ${endDate}`}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={1.5}
@@ -325,7 +330,12 @@ export function LeaderboardPage() {
             onChange={(e) => setEndDate(e.target.value)}
             sx={dateFieldSx}
           />
-          <Button variant="contained" onClick={() => void load()} disabled={loading} sx={applyBtnSx}>
+          <Button
+            variant="contained"
+            onClick={() => void load()}
+            disabled={loading}
+            sx={applyBtnSx}
+          >
             Apply
           </Button>
         </Stack>

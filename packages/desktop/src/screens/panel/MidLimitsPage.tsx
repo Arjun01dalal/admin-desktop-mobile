@@ -87,9 +87,7 @@ export function MidLimitsPage() {
   const [telegramChatIdsDraft, setTelegramChatIdsDraft] = useState('');
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [alertRecipients, setAlertRecipients] = useState<RecipientsConfig | null>(null);
-  const [alertRecipientDisplays, setAlertRecipientDisplays] = useState<AlertRecipientDisplay[]>(
-    [],
-  );
+  const [alertRecipientDisplays, setAlertRecipientDisplays] = useState<AlertRecipientDisplay[]>([]);
   const [activeRow, setActiveRow] = useState<MidLimitRow | null>(null);
   const [limitDraft, setLimitDraft] = useState('');
 
@@ -116,19 +114,13 @@ export function MidLimitsPage() {
 
       const recipientsConfig = parseAlertRecipientsFromLimitsGet(limitsData);
       setAlertRecipients(recipientsConfig);
-      setAlertRecipientDisplays(
-        buildAlertRecipientDisplayList(recipientsConfig, subOptions),
-      );
+      setAlertRecipientDisplays(buildAlertRecipientDisplayList(recipientsConfig, subOptions));
 
       const options = parseMidOptions(midData);
-      const limitsMap = await collectMidLimitsMap(
-        limitsData,
-        options,
-        async (mid) => {
-          const res = await secureApi('midLimits.get', { mid });
-          return res.ok ? res.data : null;
-        },
-      );
+      const limitsMap = await collectMidLimitsMap(limitsData, options, async (mid) => {
+        const res = await secureApi('midLimits.get', { mid });
+        return res.ok ? res.data : null;
+      });
 
       setRows(mergeMidLimitRows(midData, limitsMap));
     } finally {
@@ -140,10 +132,7 @@ export function MidLimitsPage() {
     void load();
   }, [load]);
 
-  const filteredRows = useMemo(
-    () => filterMidLimitRows(rows, search),
-    [rows, search],
-  );
+  const filteredRows = useMemo(() => filterMidLimitRows(rows, search), [rows, search]);
 
   const openEdit = useCallback((row: MidLimitRow) => {
     setActiveRow(row);
@@ -462,7 +451,12 @@ export function MidLimitsPage() {
         />
       </TablePanel>
 
-      <Dialog open={editOpen} onClose={() => !submitting && setEditOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={editOpen}
+        onClose={() => !submitting && setEditOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
         <Box component="form" onSubmit={handleSave}>
           <DialogTitle>Set MID Limit</DialogTitle>
           <DialogContent>
@@ -606,10 +600,7 @@ export function MidLimitsPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => setRecipientsOpen(false)}
-            disabled={recipientsSaving}
-          >
+          <Button onClick={() => setRecipientsOpen(false)} disabled={recipientsSaving}>
             Cancel
           </Button>
           <Button
@@ -617,11 +608,7 @@ export function MidLimitsPage() {
             disabled={recipientsSaving || recipientsLoading}
             sx={orangeBtnSx}
           >
-            {recipientsSaving ? (
-              <CircularProgress size={18} color="inherit" />
-            ) : (
-              'Save Recipients'
-            )}
+            {recipientsSaving ? <CircularProgress size={18} color="inherit" /> : 'Save Recipients'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -17,11 +17,7 @@ import { getStoredUser, todayIST } from '@/utils/dates';
 import { orangeBtnSx } from '@/screens/panel/transactions/shared';
 import type { MidOption } from '@/screens/panel/transactions/shared';
 import type { DepositRow } from './DepositCells';
-import {
-  defaultSettleReason,
-  isUpiGateway,
-  settleReasonOptions,
-} from './logic';
+import { defaultSettleReason, isUpiGateway, settleReasonOptions } from './logic';
 
 type Props = {
   open: boolean;
@@ -193,12 +189,7 @@ export function SettleDialog({ open, row, mids, onClose, onDone, onReject }: Pro
           Cancel
         </Button>
         {row ? (
-          <Button
-            color="error"
-            variant="outlined"
-            disabled={saving}
-            onClick={() => onReject(row)}
-          >
+          <Button color="error" variant="outlined" disabled={saving} onClick={() => onReject(row)}>
             Reject
           </Button>
         ) : null}

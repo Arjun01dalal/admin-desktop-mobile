@@ -18,10 +18,7 @@ import { TablePanel } from '@/components/TablePanel';
 import { hasPermission } from '@/auth/permissions';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { display, maskMobile } from '@/screens/panel/shared';
-import {
-  providerWiseActive,
-  toNum,
-} from '@/screens/panel/dashboards/ops/mergeMetrics';
+import { providerWiseActive, toNum } from '@/screens/panel/dashboards/ops/mergeMetrics';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 import { formatAmount, todayIST } from '@/utils/dates';
 
@@ -53,9 +50,7 @@ export function ActiveUserDataPage() {
   const customerKey = String(nav.customerKey || '').trim();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
 
-  const [startDate, setStartDate] = useState(
-    () => nav.startDate || todayIST(),
-  );
+  const [startDate, setStartDate] = useState(() => nav.startDate || todayIST());
   const [endDate, setEndDate] = useState(() => nav.endDate || todayIST());
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -96,9 +91,8 @@ export function ActiveUserDataPage() {
       const keyLower = customerKey.toLowerCase();
       const entry =
         (providerWise[customerKey] as Record<string, unknown> | undefined) ||
-        (Object.entries(providerWise).find(
-          ([k]) => k.toLowerCase() === keyLower,
-        )?.[1] as Record<string, unknown> | undefined) ||
+        (Object.entries(providerWise).find(([k]) => k.toLowerCase() === keyLower)?.[1] as
+          Record<string, unknown> | undefined) ||
         {};
 
       const list = Array.isArray(entry.list) ? (entry.list as UserRow[]) : [];

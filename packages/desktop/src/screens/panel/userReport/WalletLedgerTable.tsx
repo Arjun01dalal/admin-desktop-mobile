@@ -12,11 +12,7 @@ import {
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import {
-  formatAmount,
-  formatDisplayDate,
-  formatDisplayTime,
-} from '@/utils/dates';
+import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { BetAmountBars } from './BetAmountBars';
 import { UserReportTablePanel } from './UserReportTablePanel';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
@@ -29,10 +25,7 @@ type Props = {
    * Optional layout wrapper: `overview` = filters + bet chart, `table` = ledger + pagination.
    * Used to nest overview inside a parent collapse while keeping the table visible.
    */
-  wrapOverview?: (parts: {
-    overview: ReactNode;
-    table: ReactNode;
-  }) => ReactNode;
+  wrapOverview?: (parts: { overview: ReactNode; table: ReactNode }) => ReactNode;
 };
 
 const PAGE_SIZE_OPTIONS = ['75', '150', '250', '500'] as const;
@@ -93,9 +86,7 @@ function parseChartPayload(raw: unknown): { name: string; amount: number }[] {
     // Only unwrap if inner looks like a category map (not a single metric object)
     const innerKeys = Object.keys(inner);
     if (
-      innerKeys.some((k) =>
-        ['casino', 'exchange', 'sattamatka'].includes(k.toLowerCase()),
-      ) ||
+      innerKeys.some((k) => ['casino', 'exchange', 'sattamatka'].includes(k.toLowerCase())) ||
       innerKeys.some((k) => {
         const v = inner[k];
         return v != null && typeof v === 'object' && 'betAmount' in (v as object);
@@ -104,11 +95,7 @@ function parseChartPayload(raw: unknown): { name: string; amount: number }[] {
       map = inner;
     }
   }
-  if (
-    map.payload &&
-    typeof map.payload === 'object' &&
-    !Array.isArray(map.payload)
-  ) {
+  if (map.payload && typeof map.payload === 'object' && !Array.isArray(map.payload)) {
     map = map.payload as Record<string, unknown>;
   }
 
@@ -140,8 +127,7 @@ function parseChartPayload(raw: unknown): { name: string; amount: number }[] {
     else if (typeof v === 'string') amount = Number(v.replace(/,/g, '')) || 0;
     else if (v && typeof v === 'object') {
       const o = v as Record<string, unknown>;
-      amount =
-        Number(o.betAmount ?? o.BetAmount ?? o.amount ?? o.Amount ?? 0) || 0;
+      amount = Number(o.betAmount ?? o.BetAmount ?? o.amount ?? o.Amount ?? 0) || 0;
     }
     return { name: key.toUpperCase(), amount };
   });
@@ -161,9 +147,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
   const [action, setAction] = useState('');
   const [amount, setAmount] = useState('');
   const [txnType, setTxnType] = useState('');
-  const [chartData, setChartData] = useState<{ name: string; amount: number }[]>(
-    [],
-  );
+  const [chartData, setChartData] = useState<{ name: string; amount: number }[]>([]);
 
   const loadChart = useCallback(async () => {
     // Laxmi sends empty strings when dates are cleared ("" ?? today keeps "").
@@ -194,8 +178,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
       if (action.trim()) filter.action = action.trim();
       if (amount.trim()) filter.amount = amount.trim();
       if (txnType) {
-        filter.transactionType =
-          txnType.toLowerCase() === 'credited' ? 'CR' : txnType;
+        filter.transactionType = txnType.toLowerCase() === 'credited' ? 'CR' : txnType;
       }
 
       const payload: Record<string, unknown> = {
@@ -242,18 +225,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [
-    action,
-    amount,
-    endDate,
-    itemsPerPage,
-    marketId,
-    page,
-    provider,
-    startDate,
-    txnType,
-    userId,
-  ]);
+  }, [action, amount, endDate, itemsPerPage, marketId, page, provider, startDate, txnType, userId]);
 
   useEffect(() => {
     void load();
@@ -438,9 +410,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
         }}
       >
         <Box sx={{ width: 110 }}>
-          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
-            Items Per Page
-          </Typography>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>Items Per Page</Typography>
           <TextField
             select
             size="small"
@@ -460,9 +430,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
           </TextField>
         </Box>
         <Box sx={{ width: 140 }}>
-          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
-            Market ID
-          </Typography>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>Market ID</Typography>
           <TextField
             size="small"
             value={marketId}
@@ -472,9 +440,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
           />
         </Box>
         <Box sx={{ width: 140 }}>
-          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
-            From Date
-          </Typography>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>From Date</Typography>
           <TextField
             type="date"
             size="small"
@@ -486,9 +452,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
           />
         </Box>
         <Box sx={{ width: 140 }}>
-          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>
-            To Date
-          </Typography>
+          <Typography sx={{ fontSize: 11, mb: 0.25, color: '#475467' }}>To Date</Typography>
           <TextField
             type="date"
             size="small"
@@ -587,9 +551,7 @@ export function WalletLedgerTable({ userId, wrapOverview }: Props) {
             }}
           />
         ) : (
-          <Typography sx={{ fontSize: 12, color: '#667085' }}>
-            Page 1 of 1
-          </Typography>
+          <Typography sx={{ fontSize: 12, color: '#667085' }}>Page 1 of 1</Typography>
         )
       }
     >

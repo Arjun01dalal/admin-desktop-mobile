@@ -176,7 +176,10 @@ function Pie3D({ rows }: { rows: CountRow[] }) {
         >
           <Typography sx={{ fontSize: 11, fontWeight: 800, lineHeight: 1.1, textAlign: 'center' }}>
             {total}
-            <Box component="span" sx={{ display: 'block', fontSize: 9, fontWeight: 600, color: 'text.secondary' }}>
+            <Box
+              component="span"
+              sx={{ display: 'block', fontSize: 9, fontWeight: 600, color: 'text.secondary' }}
+            >
               total
             </Box>
           </Typography>
@@ -187,7 +190,10 @@ function Pie3D({ rows }: { rows: CountRow[] }) {
 }
 
 function Legend({ rows }: { rows: CountRow[] }) {
-  const total = Math.max(1, rows.reduce((s, r) => s + r.count, 0));
+  const total = Math.max(
+    1,
+    rows.reduce((s, r) => s + r.count, 0),
+  );
   if (!rows.length) return null;
   return (
     <Box
@@ -227,7 +233,9 @@ function Legend({ rows }: { rows: CountRow[] }) {
             <Typography sx={{ flex: 1, fontSize: 12.5, fontWeight: 600 }} noWrap title={row.name}>
               {row.name}
             </Typography>
-            <Typography sx={{ fontSize: 12, color: 'text.secondary', minWidth: 44, textAlign: 'right' }}>
+            <Typography
+              sx={{ fontSize: 12, color: 'text.secondary', minWidth: 44, textAlign: 'right' }}
+            >
               {pct}%
             </Typography>
             <Typography sx={{ fontSize: 13, fontWeight: 800, minWidth: 36, textAlign: 'right' }}>
@@ -290,9 +298,7 @@ export function EmpCodePieChartModal({
       >
         <Stack direction="row" alignItems="center" spacing={1}>
           <PieChartOutlineIcon sx={{ color: '#ff9f0a' }} />
-          <Typography sx={{ fontWeight: 800, fontSize: 18, lineHeight: 1.25 }}>
-            {title}
-          </Typography>
+          <Typography sx={{ fontWeight: 800, fontSize: 18, lineHeight: 1.25 }}>{title}</Typography>
         </Stack>
         {subtitle ? (
           <Typography sx={{ mt: 0.5, ml: 4, fontSize: 12.5, color: 'text.secondary' }}>
@@ -380,9 +386,7 @@ export function EmpCodePieChartModal({
         {loading ? (
           <Stack alignItems="center" justifyContent="center" py={8} spacing={1.5}>
             <CircularProgress size={36} sx={{ color: '#ff9f0a' }} />
-            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-              Loading chart…
-            </Typography>
+            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Loading chart…</Typography>
           </Stack>
         ) : (
           <Stack

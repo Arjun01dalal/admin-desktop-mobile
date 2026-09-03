@@ -86,9 +86,7 @@ export function TopGamesPage() {
       const normalized = unpackDoc(res.data);
       const keys = Object.keys(normalized.data || {});
       setDoc(normalized);
-      setSelectedCategory((prev) =>
-        prev !== 'All' && keys.includes(prev) ? prev : 'All',
-      );
+      setSelectedCategory((prev) => (prev !== 'All' && keys.includes(prev) ? prev : 'All'));
     } finally {
       setLoading(false);
     }
@@ -98,10 +96,7 @@ export function TopGamesPage() {
     void loadGames();
   }, [loadGames]);
 
-  const categoryKeys = useMemo(
-    () => Object.keys(doc?.data || {}),
-    [doc?.data],
-  );
+  const categoryKeys = useMemo(() => Object.keys(doc?.data || {}), [doc?.data]);
 
   const existingProviders = useMemo(() => {
     const names = new Set<string>();
@@ -138,22 +133,22 @@ export function TopGamesPage() {
     });
   };
 
-  const openStatus = (item: GameRow, status: boolean) => {
-    if (!item.gameId) {
-      toast.error('Game ID is required');
-      return;
-    }
-    setStatusTarget({
-      // All section → no category. Specific category filter → include it.
-      category:
-        selectedCategory !== 'All'
-          ? item._categoryKey || selectedCategory
-          : undefined,
-      gameId: item.gameId,
-      status,
-      name: getGameName(item),
-    });
-  };
+  const openStatus = useCallback(
+    (item: GameRow, status: boolean) => {
+      if (!item.gameId) {
+        toast.error('Game ID is required');
+        return;
+      }
+      setStatusTarget({
+        // All section → no category. Specific category filter → include it.
+        category: selectedCategory !== 'All' ? item._categoryKey || selectedCategory : undefined,
+        gameId: item.gameId,
+        status,
+        name: getGameName(item),
+      });
+    },
+    [selectedCategory],
+  );
 
   const openImageUpdate = (item: GameRow) => {
     if (!item.gameId) {
@@ -267,11 +262,10 @@ export function TopGamesPage() {
             ...prev,
             data: {
               ...prev.data,
-              [statusTarget.category]: prev.data[statusTarget.category].map(
-                (game) =>
-                  game.gameId === statusTarget.gameId
-                    ? { ...game, status: statusTarget.status }
-                    : game,
+              [statusTarget.category]: prev.data[statusTarget.category].map((game) =>
+                game.gameId === statusTarget.gameId
+                  ? { ...game, status: statusTarget.status }
+                  : game,
               ),
             },
           };
@@ -280,16 +274,12 @@ export function TopGamesPage() {
         const nextData: typeof prev.data = {};
         Object.entries(prev.data).forEach(([category, list]) => {
           nextData[category] = list.map((game) =>
-            game.gameId === statusTarget.gameId
-              ? { ...game, status: statusTarget.status }
-              : game,
+            game.gameId === statusTarget.gameId ? { ...game, status: statusTarget.status } : game,
           );
         });
         return { ...prev, data: nextData };
       });
-      toast.success(
-        `Status ${statusTarget.status ? 'activated' : 'deactivated'} successfully`,
-      );
+      toast.success(`Status ${statusTarget.status ? 'activated' : 'deactivated'} successfully`);
     } finally {
       setStatusTarget(null);
       setActionLoading(false);
@@ -323,9 +313,7 @@ export function TopGamesPage() {
         id: 'name',
         label: 'Name',
         render: (row) => (
-          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
-            {getGameName(row)}
-          </Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{getGameName(row)}</Typography>
         ),
       },
       {
@@ -384,7 +372,7 @@ export function TopGamesPage() {
         ),
       },
     ],
-    [actionLoading],
+    [actionLoading, openStatus],
   );
 
   return (
@@ -420,13 +408,7 @@ export function TopGamesPage() {
             {addOpen ? 'Close Add Games' : 'Add Games'}
           </Button>
           <Button
-            startIcon={
-              loading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void loadGames()}
             disabled={busy}
             sx={orangeBtnSx}
@@ -444,13 +426,7 @@ export function TopGamesPage() {
         onOpenChange={setAddOpen}
       />
 
-      <Stack
-        direction="row"
-        alignItems="center"
-        flexWrap="nowrap"
-        gap={1.5}
-        mb={2}
-      >
+      <Stack direction="row" alignItems="center" flexWrap="nowrap" gap={1.5} mb={2}>
         <TextField
           select
           size="small"
@@ -504,14 +480,9 @@ export function TopGamesPage() {
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>Remove game</DialogTitle>
         <DialogContent>
-          Do you want to remove{' '}
-          <strong>{deleteTarget?.name || 'this game'}</strong> from{' '}
-          <strong>
-            {deleteTarget
-              ? formatCategoryLabel(deleteTarget.category)
-              : '-'}
-          </strong>{' '}
-          at position <strong>{deleteTarget?.position}</strong>?
+          Do you want to remove <strong>{deleteTarget?.name || 'this game'}</strong> from{' '}
+          <strong>{deleteTarget ? formatCategoryLabel(deleteTarget.category) : '-'}</strong> at
+          position <strong>{deleteTarget?.position}</strong>?
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)} disabled={actionLoading}>
@@ -531,10 +502,7 @@ export function TopGamesPage() {
       <Dialog open={!!statusTarget} onClose={() => setStatusTarget(null)}>
         <DialogTitle>Change status</DialogTitle>
         <DialogContent>
-          Do you want to{' '}
-          <strong>
-            {statusTarget?.status ? 'activate' : 'deactivate'}
-          </strong>{' '}
+          Do you want to <strong>{statusTarget?.status ? 'activate' : 'deactivate'}</strong>{' '}
           <strong>{statusTarget?.name || 'this game'}</strong>?
         </DialogContent>
         <DialogActions>

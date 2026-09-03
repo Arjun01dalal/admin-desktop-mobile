@@ -110,17 +110,13 @@ export function useKycColumns({
       {
         id: 'aadhaar',
         label: 'Aadhar',
-        filter: (
-          <KycColumnFilter field="aadhaarNumber" placeholder="Search aadhar" />
-        ),
+        filter: <KycColumnFilter field="aadhaarNumber" placeholder="Search aadhar" />,
         render: (row) => display(row.aadhaarNumber),
       },
       {
         id: 'account',
         label: 'Account',
-        filter: (
-          <KycColumnFilter field="accountNumber" placeholder="Search account" />
-        ),
+        filter: <KycColumnFilter field="accountNumber" placeholder="Search account" />,
         render: (row) => display(row.accountNumber),
       },
       {
@@ -132,12 +128,7 @@ export function useKycColumns({
         id: 'upi',
         label: 'UPI',
         render: (row) => (
-          <Stack
-            direction="column"
-            spacing={0.5}
-            alignItems="center"
-            justifyContent="center"
-          >
+          <Stack direction="column" spacing={0.5} alignItems="center" justifyContent="center">
             <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
               {display(row.upiId)}
             </Typography>

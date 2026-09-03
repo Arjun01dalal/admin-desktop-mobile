@@ -7,7 +7,8 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { Notification, nativeImage, app, net } = require('electron');
+const { pathToFileURL } = require('node:url');
+const { Notification, nativeImage, app, net, BrowserWindow } = require('electron');
 const {
   getFcmToken,
   getStoredCredentials,
@@ -23,6 +24,8 @@ let inflightStart = null;
 let retryTimer = null;
 /** @type {ReturnType<typeof startFcmListener> | null} */
 let activeService = null;
+/** Reused hidden window for notify.mp3 — avoids Windows PowerShell cold-start hitch. */
+let notifySoundWin = null;
 
 function log(...args) {
   console.log('[fcm-listen]', ...args);
@@ -134,9 +137,7 @@ function extractSosMeta(payload) {
   return {
     type: String(data.type || data.event || '').trim(),
     location: String(data.location || '').trim(),
-    blockedByName: String(
-      data.blockedByName || data.blockedBy || data.userName || '',
-    ).trim(),
+    blockedByName: String(data.blockedByName || data.blockedBy || data.userName || '').trim(),
     blockedById: String(data.blockedById || data.userId || '').trim(),
   };
 }
@@ -149,6 +150,19 @@ function destroyListenClient() {
     // ignore
   }
   listenClient = null;
+}
+
+function destroyNotifySoundWin() {
+  if (!notifySoundWin || notifySoundWin.isDestroyed()) {
+    notifySoundWin = null;
+    return;
+  }
+  try {
+    notifySoundWin.destroy();
+  } catch {
+    // ignore
+  }
+  notifySoundWin = null;
 }
 
 /**
@@ -189,18 +203,19 @@ function downloadImageToTemp(url) {
               app.getPath('temp'),
               `astro-push-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`,
             );
-            fs.writeFileSync(file, buf);
-            const img = nativeImage.createFromPath(file);
-            if (img.isEmpty()) {
-              try {
-                fs.unlinkSync(file);
-              } catch {
-                // ignore
-              }
-              resolve(null);
-              return;
-            }
-            resolve(file);
+            void fs.promises
+              .writeFile(file, buf)
+              .then(() => {
+                const img = nativeImage.createFromPath(file);
+                if (img.isEmpty()) {
+                  void fs.promises.unlink(file).catch(() => {});
+                  resolve(null);
+                  return;
+                }
+                resolve(file);
+              })
+              .catch(() => resolve(null));
+            return;
           } catch {
             resolve(null);
           }
@@ -241,20 +256,44 @@ function notifySoundPath() {
   return null;
 }
 
-/** Play a loud local WAV even when the renderer audio context is locked. */
+/** Play notify.mp3 even when the renderer audio context is locked. */
 function playLocalNotifySound() {
   const file = notifySoundPath();
   if (!file) return;
   try {
-    const { execFile } = require('node:child_process');
     if (process.platform === 'darwin') {
+      const { execFile } = require('node:child_process');
       execFile('afplay', ['-v', '1.0', file], () => {});
       return;
     }
-    if (process.platform === 'win32') {
-      const ps = `Add-Type -AssemblyName PresentationCore; $p=New-Object System.Windows.Media.MediaPlayer; $p.Open([uri]'${file.replace(/'/g, "''")}'); $p.Volume=1; $p.Play(); Start-Sleep -Milliseconds 4500`;
-      execFile('powershell.exe', ['-NoProfile', '-Command', ps], () => {});
+
+    // Windows/Linux: HTML5 audio in a reused hidden BrowserWindow.
+    // PowerShell + PresentationCore cold-starts in 1–3s and freezes the main process.
+    const src = pathToFileURL(file).href;
+    if (!notifySoundWin || notifySoundWin.isDestroyed()) {
+      notifySoundWin = new BrowserWindow({
+        show: false,
+        width: 1,
+        height: 1,
+        skipTaskbar: true,
+        focusable: false,
+        webPreferences: {
+          sandbox: true,
+          backgroundThrottling: false,
+          nodeIntegration: false,
+          contextIsolation: true,
+        },
+      });
+      notifySoundWin.on('closed', () => {
+        notifySoundWin = null;
+      });
     }
+    const html = `<!DOCTYPE html><html><body><script>
+      const a = new Audio(${JSON.stringify(src)});
+      a.volume = 1;
+      a.play().catch(function () {});
+    </script></body></html>`;
+    void notifySoundWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   } catch (err) {
     warn('local sound failed:', err?.message || err);
   }
@@ -401,6 +440,7 @@ function startFcmListener(handlers = {}) {
         retryTimer = null;
       }
       destroyListenClient();
+      destroyNotifySoundWin();
     },
     restart() {
       this.stop();

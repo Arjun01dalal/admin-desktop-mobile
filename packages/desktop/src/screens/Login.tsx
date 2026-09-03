@@ -16,11 +16,7 @@ import { useLocationController } from '@/controllers/LocationProvider';
 import { AstroLogo } from '@/components/AstroLogo';
 import { ThemeModeMenu } from '@/components/ThemeModeMenu';
 import { persistRoleFromLogin } from '@/auth/permissions';
-import {
-  getRoleOptions,
-  selectActiveRole,
-  type RoleOption,
-} from '@/auth/roleSelection';
+import { getRoleOptions, selectActiveRole, type RoleOption } from '@/auth/roleSelection';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import { registerSubAdminFcmToken } from '@/auth/registerFcmToken';
 import type { AddressInfo, AuthUser } from '@/types/gcalc';
@@ -65,15 +61,12 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
   const [pendingUser, setPendingUser] = useState<AuthUser | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState('');
 
-  const {
-    coords,
-    address: geoAddress,
-    isReady,
-    requestLocation,
-  } = useLocationController();
+  const { coords, address: geoAddress, isReady, requestLocation } = useLocationController();
 
   useEffect(() => {
-    const fromSite = String(initialMobile || '').replace(/\D/g, '').slice(-10);
+    const fromSite = String(initialMobile || '')
+      .replace(/\D/g, '')
+      .slice(-10);
     const stored = localStorage.getItem('mobile') || '';
     const emailStored = localStorage.getItem('astro_site_email') || '';
     const emailProp = String(initialEmail || '').trim();

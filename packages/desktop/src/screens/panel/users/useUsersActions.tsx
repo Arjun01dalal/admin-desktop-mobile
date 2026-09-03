@@ -3,17 +3,9 @@ import { IconButton, Stack, Typography } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import {
-  getRoleName,
-  hasPermission,
-  Permissions,
-} from '@/auth/permissions';
+import { getRoleName, hasPermission, Permissions } from '@/auth/permissions';
 import { SHOW_EDIT_EMP_CODE, resolveBlockOtpMobile } from './constants';
-import {
-  MAX_REMARK,
-  type RoleOption,
-  type SubAdminEditType,
-} from './usersHelpers';
+import { MAX_REMARK, type RoleOption, type SubAdminEditType } from './usersHelpers';
 import type { UsersAdmin } from './useUsersQuery';
 import type { UserRow } from './utils';
 
@@ -24,6 +16,7 @@ type Params = {
   page: number;
   appliedBlockStatus: string;
   setRows: Dispatch<SetStateAction<UserRow[]>>;
+  removeUserById: (userId: string) => void;
 };
 
 export function useUsersActions({
@@ -33,13 +26,13 @@ export function useUsersActions({
   page,
   appliedBlockStatus,
   setRows,
+  removeUserById,
 }: Params) {
   const [blockTarget, setBlockTarget] = useState<UserRow | null>(null);
   const [blockNextStatus, setBlockNextStatus] = useState(false);
   const [dumpTarget, setDumpTarget] = useState<UserRow | null>(null);
   const [remark, setRemark] = useState('');
   const [otp, setOtp] = useState('');
-  const [dumpReason, setDumpReason] = useState('');
   const [otpSending, setOtpSending] = useState(false);
   const [actionBusyId, setActionBusyId] = useState('');
 
@@ -54,16 +47,12 @@ export function useUsersActions({
   const [roleEditValue, setRoleEditValue] = useState('');
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [roleEditBusy, setRoleEditBusy] = useState(false);
-  const [locationDraft, setLocationDraft] = useState<Record<string, string>>(
-    {},
-  );
+  const [locationDraft, setLocationDraft] = useState<Record<string, string>>({});
   const [locationBusyId, setLocationBusyId] = useState('');
   const [realNameTargetId, setRealNameTargetId] = useState<string | null>(null);
   const [realNameValue, setRealNameValue] = useState('');
   const [realNameBusy, setRealNameBusy] = useState(false);
-  const [blockCallerTarget, setBlockCallerTarget] = useState<UserRow | null>(
-    null,
-  );
+  const [blockCallerTarget, setBlockCallerTarget] = useState<UserRow | null>(null);
   const [blockCallerNext, setBlockCallerNext] = useState(false);
   const [blockCallerRemark, setBlockCallerRemark] = useState('');
   const [blockCallerOtp, setBlockCallerOtp] = useState('');
@@ -75,11 +64,7 @@ export function useUsersActions({
       .trim()
       .toLowerCase()
       .replace(/[-\s]+/g, '_');
-    return (
-      name === 'full_access' ||
-      name === 'dev_full_access' ||
-      name.endsWith('_full_access')
-    );
+    return name === 'full_access' || name === 'dev_full_access' || name.endsWith('_full_access');
   }, [admin]);
 
   const canEditEmpCode = useMemo(() => {
@@ -212,39 +197,48 @@ export function useUsersActions({
     setRows,
   ]);
 
-  const confirmDump = useCallback(async () => {
-    if (!dumpTarget) return;
-    if (!dumpReason.trim()) {
-      toast.error('Reason is Required');
-      return;
-    }
-    setActionBusyId(dumpTarget._id);
-    try {
-      // Match laxminarayan: IST date as YYYY-MM-DD
-      const istDate = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0];
-      const res = await secureApi('ops.dumpUsersUpdate', {
-        _id: dumpTarget._id,
-        dump: true,
-        dumpReason: {
-          name: admin?.name || '',
-          reason: dumpReason.trim(),
-          Date: istDate,
-        },
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to dump user');
-        return;
+  const confirmDump = useCallback(
+    async (reason: string): Promise<boolean> => {
+      if (!dumpTarget) return false;
+      const trimmed = reason.trim();
+      if (!trimmed) {
+        toast.error('Reason is Required');
+        return false;
       }
-      toast.success('User dumped');
-      setDumpTarget(null);
-      setDumpReason('');
-      void load(page);
-    } finally {
-      setActionBusyId('');
-    }
-  }, [admin?.name, dumpReason, dumpTarget, load, page]);
+      const dumpedId = dumpTarget._id;
+      setActionBusyId(dumpedId);
+      try {
+        // Match laxminarayan: IST date as YYYY-MM-DD
+        const istDate = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const res = await secureApi('ops.dumpUsersUpdate', {
+          _id: dumpedId,
+          dump: true,
+          dumpReason: {
+            name: admin?.name || '',
+            reason: trimmed,
+            Date: istDate,
+          },
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to dump user');
+          return false;
+        }
+        toast.success('User dumped');
+        // Close modal + drop row locally. Do NOT call load() here — users.getAll
+        // decrypt/render freezes the panel after dump (heavy list refresh).
+        setDumpTarget(null);
+        removeUserById(dumpedId);
+        return true;
+      } finally {
+        setActionBusyId('');
+      }
+    },
+    [admin?.name, dumpTarget, removeUserById],
+  );
+
+  const openDump = useCallback((row: UserRow) => {
+    setDumpTarget(row);
+  }, []);
 
   const openSubEdit = useCallback((id: string, type: SubAdminEditType, current?: string) => {
     setSubEdit({ id, type });
@@ -285,9 +279,7 @@ export function useUsersActions({
           ...(subEdit.type === 'name' ? { name: value } : { mobile: value }),
           updatedBy: { _id: admin?._id, name: admin?.name },
           reason:
-            subEdit.type === 'name'
-              ? 'Correcting wrong Name'
-              : 'Correcting wrong Mobile Number',
+            subEdit.type === 'name' ? 'Correcting wrong Name' : 'Correcting wrong Mobile Number',
         });
         if (!res.ok) {
           toast.error(res.message || 'Failed to update');
@@ -330,34 +322,29 @@ export function useUsersActions({
     [canEditEmpCode, openSubEdit],
   );
 
-  const openRoleEdit = useCallback(
-    async (row: UserRow) => {
-      setRoleEditId(row._id);
-      setRoleEditValue(String(row.Role_ID || ''));
-      try {
-        const res = await secureApi('roles.list', {});
-        if (!res.ok) {
-          toast.error(res.message || 'Failed to load roles');
-          return;
-        }
-        const data = res.data as
-          | RoleOption[]
-          | { items?: RoleOption[]; payload?: RoleOption[] }
-          | undefined;
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.items)
-            ? data.items
-            : Array.isArray(data?.payload)
-              ? data.payload
-              : [];
-        setRoleOptions(list);
-      } catch {
-        toast.error('Failed to load roles');
+  const openRoleEdit = useCallback(async (row: UserRow) => {
+    setRoleEditId(row._id);
+    setRoleEditValue(String(row.Role_ID || ''));
+    try {
+      const res = await secureApi('roles.list', {});
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to load roles');
+        return;
       }
-    },
-    [],
-  );
+      const data = res.data as
+        RoleOption[] | { items?: RoleOption[]; payload?: RoleOption[] } | undefined;
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.payload)
+            ? data.payload
+            : [];
+      setRoleOptions(list);
+    } catch {
+      toast.error('Failed to load roles');
+    }
+  }, []);
 
   const submitRoleEdit = useCallback(async () => {
     if (!roleEditId || !roleEditValue) {
@@ -441,7 +428,7 @@ export function useUsersActions({
 
   const startBlockCaller = useCallback(
     async (row: UserRow) => {
-      const next = !Boolean(row.block);
+      const next = !row.block;
       setBlockCallerBusy(true);
       try {
         const res = await secureApi('users.sendBlockOtp', {
@@ -509,11 +496,6 @@ export function useUsersActions({
     page,
   ]);
 
-  const openDump = useCallback((row: UserRow) => {
-    setDumpTarget(row);
-    setDumpReason('');
-  }, []);
-
   return {
     actionBusyId,
     otpSending,
@@ -547,8 +529,6 @@ export function useUsersActions({
     },
     dump: {
       target: dumpTarget,
-      reason: dumpReason,
-      setReason: setDumpReason,
       actionBusyId,
       close: () => setDumpTarget(null),
       confirm: confirmDump,

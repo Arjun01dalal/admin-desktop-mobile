@@ -26,11 +26,7 @@ import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
-import {
-  formatDisplayDate,
-  formatDisplayTime,
-  getStoredUser,
-} from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime, getStoredUser } from '@/utils/dates';
 import { asPaged, display, useReportQuery } from '@/screens/panel/shared';
 
 type InstantRow = {
@@ -114,7 +110,12 @@ export function InstantDepositProvidersPage() {
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
-    if (!form.gatewayName.trim() || !form.midName.trim() || !form.linkName.trim() || !form.type.trim()) {
+    if (
+      !form.gatewayName.trim() ||
+      !form.midName.trim() ||
+      !form.linkName.trim() ||
+      !form.type.trim()
+    ) {
       toast.error('Please fill gateway name, mid, link and type');
       return;
     }
@@ -190,26 +191,29 @@ export function InstantDepositProvidersPage() {
     }
   };
 
-  const handleToggle = async (row: InstantRow, next: boolean) => {
-    setTogglingId(row._id);
-    try {
-      const res = await secureApi('instantDeposit.updateStatus', {
-        _id: row._id,
-        status: next,
-        updatedBy: { userId: user?._id, userName: user?.name },
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to update status');
-        return;
+  const handleToggle = useCallback(
+    async (row: InstantRow, next: boolean) => {
+      setTogglingId(row._id);
+      try {
+        const res = await secureApi('instantDeposit.updateStatus', {
+          _id: row._id,
+          status: next,
+          updatedBy: { userId: user?._id, userName: user?.name },
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update status');
+          return;
+        }
+        setRows((prev) =>
+          prev.map((item) => (item._id === row._id ? { ...item, status: next } : item)),
+        );
+        void load();
+      } finally {
+        setTogglingId('');
       }
-      setRows((prev) =>
-        prev.map((item) => (item._id === row._id ? { ...item, status: next } : item)),
-      );
-      void load();
-    } finally {
-      setTogglingId('');
-    }
-  };
+    },
+    [load, setRows, user],
+  );
 
   const columns = useMemo<CommonTableColumn<InstantRow>[]>(
     () => [
@@ -247,7 +251,10 @@ export function InstantDepositProvidersPage() {
         render: (row) => (
           <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
             <Typography variant="body2">{display(row.mid)}</Typography>
-            <IconButton size="small" onClick={() => openUpdate(row._id, 'mid', String(row.mid ?? ''))}>
+            <IconButton
+              size="small"
+              onClick={() => openUpdate(row._id, 'mid', String(row.mid ?? ''))}
+            >
               <EditIcon sx={{ fontSize: 15 }} />
             </IconButton>
           </Stack>
@@ -259,7 +266,10 @@ export function InstantDepositProvidersPage() {
         filter: <Box />,
         render: (row) => (
           <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-            <Typography variant="body2" sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <Typography
+              variant="body2"
+              sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
+            >
               {display(row.link)}
             </Typography>
             <IconButton size="small" onClick={() => openUpdate(row._id, 'link', row.link)}>
@@ -314,7 +324,7 @@ export function InstantDepositProvidersPage() {
         ),
       },
     ],
-    [nameFilter, midFilter, search, togglingId],
+    [nameFilter, midFilter, search, togglingId, handleToggle],
   );
 
   return (
@@ -343,14 +353,14 @@ export function InstantDepositProvidersPage() {
       </Stack>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        getRowKey={(row) => row._id}
-        emptyMessage="No instant deposit providers"
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          getRowKey={(row) => row._id}
+          emptyMessage="No instant deposit providers"
+          maxHeight="100%"
+        />
       </TablePanel>
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth maxWidth="xs">
@@ -424,7 +434,12 @@ export function InstantDepositProvidersPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUpdateOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={submitting} onClick={() => void handleUpdate()} sx={orangeBtnSx}>
+          <Button
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void handleUpdate()}
+            sx={orangeBtnSx}
+          >
             {submitting ? '…' : 'Update'}
           </Button>
         </DialogActions>
@@ -434,7 +449,12 @@ export function InstantDepositProvidersPage() {
         <DialogTitle>Are You Sure?</DialogTitle>
         <DialogActions>
           <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
-          <Button color="error" variant="contained" disabled={submitting} onClick={() => void handleDelete()}>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void handleDelete()}
+          >
             {submitting ? '…' : 'Delete'}
           </Button>
         </DialogActions>

@@ -47,11 +47,7 @@ const createSummary = (
   summary: Record<string, unknown> = {},
 ): EmpCodeWithdrawalSummary => {
   const withdrawalsRaw =
-    summary.approvedItems ||
-    summary.withdrawals ||
-    summary.items ||
-    summary.docs ||
-    [];
+    summary.approvedItems || summary.withdrawals || summary.items || summary.docs || [];
   const withdrawals = Array.isArray(withdrawalsRaw)
     ? (withdrawalsRaw as Record<string, unknown>[])
     : [];
@@ -64,20 +60,13 @@ const createSummary = (
   );
 
   const pendingCount = toNumber(
-    summary.pendingCount ??
-      summary.withdrawalPendingCount ??
-      summary.lockCount ??
-      summary.pending,
+    summary.pendingCount ?? summary.withdrawalPendingCount ?? summary.lockCount ?? summary.pending,
   );
 
   const fallbackCount =
-    approvedCount + pendingCount > 0
-      ? approvedCount + pendingCount
-      : withdrawals.length;
+    approvedCount + pendingCount > 0 ? approvedCount + pendingCount : withdrawals.length;
 
-  const withdrawalCount = toNumber(
-    summary.withdrawalCount ?? summary.count ?? fallbackCount,
-  );
+  const withdrawalCount = toNumber(summary.withdrawalCount ?? summary.count ?? fallbackCount);
 
   const totalAmount = toNumber(
     summary.totalAmount ??
@@ -165,10 +154,7 @@ export const getWithdrawalSummaryByEmpCode = (
   if (payload.empCodeWiseSummary && typeof payload.empCodeWiseSummary === 'object') {
     return Object.entries(payload.empCodeWiseSummary as Record<string, unknown>)
       .map(([empCode, summary]) =>
-        createSummary(
-          normalizeEmpCode(empCode),
-          (summary as Record<string, unknown>) || {},
-        ),
+        createSummary(normalizeEmpCode(empCode), (summary as Record<string, unknown>) || {}),
       )
       .sort((a, b) => b.withdrawalCount - a.withdrawalCount);
   }
@@ -193,11 +179,7 @@ const getAgentName = (withdrawal: Record<string, unknown>): string => {
   const action = withdrawal?.action as { name?: unknown } | undefined;
   const updatedBy = withdrawal?.updatedBy as { name?: unknown } | undefined;
   const approvedBy = withdrawal?.approvedBy as { name?: unknown } | undefined;
-  const name =
-    action?.name ??
-    withdrawal?.agentName ??
-    updatedBy?.name ??
-    approvedBy?.name;
+  const name = action?.name ?? withdrawal?.agentName ?? updatedBy?.name ?? approvedBy?.name;
 
   if (name === null || name === undefined || name === '') {
     return UNASSIGNED_AGENT;
@@ -244,9 +226,7 @@ export const getAgentWithdrawalSummary = (
       .sort((a, b) => b.withdrawalCount - a.withdrawalCount);
   }
 
-  const allWithdrawals = getWithdrawalSummaryByEmpCode(payload).flatMap(
-    (item) => item.withdrawals,
-  );
+  const allWithdrawals = getWithdrawalSummaryByEmpCode(payload).flatMap((item) => item.withdrawals);
 
   const agentMap = new Map<string, Record<string, unknown>[]>();
 
@@ -266,13 +246,10 @@ export const getAgentWithdrawalSummary = (
     .sort((a, b) => b.withdrawalCount - a.withdrawalCount);
 };
 
-export const getAgentCountRows = (
-  withdrawals: Record<string, unknown>[] = [],
-): CountRow[] => countByKey(withdrawals, getAgentName);
+export const getAgentCountRows = (withdrawals: Record<string, unknown>[] = []): CountRow[] =>
+  countByKey(withdrawals, getAgentName);
 
-export const getEmpCodeCountRows = (
-  withdrawals: Record<string, unknown>[] = [],
-): CountRow[] =>
+export const getEmpCodeCountRows = (withdrawals: Record<string, unknown>[] = []): CountRow[] =>
   countByKey(withdrawals, (withdrawal) => normalizeEmpCode(withdrawal?.empCode));
 
 /** Per agent, how many withdrawals for each empCode. */

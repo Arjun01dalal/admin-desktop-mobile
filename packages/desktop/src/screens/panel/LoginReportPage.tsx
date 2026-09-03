@@ -1,12 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  MenuItem,
-  Stack,
-  TextField,
-} from '@mui/material';
+import { Box, Button, CircularProgress, MenuItem, Stack, TextField } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
@@ -63,11 +56,7 @@ export function LoginReportPage() {
       }
 
       const raw = res.data;
-      const groups = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.payload)
-          ? raw.payload
-          : [];
+      const groups = Array.isArray(raw) ? raw : Array.isArray(raw?.payload) ? raw.payload : [];
 
       const nextGrouped: Record<string, LoginReportItem[]> = {};
       for (const group of groups) {
@@ -123,8 +112,7 @@ export function LoginReportPage() {
       {
         id: 'loginTime',
         label: 'Login Time',
-        render: (row) =>
-          row.updatedOn ? formatDisplayTime(row.updatedOn) : '—',
+        render: (row) => (row.updatedOn ? formatDisplayTime(row.updatedOn) : '—'),
       },
     ],
     [],
@@ -161,9 +149,7 @@ export function LoginReportPage() {
           </TextField>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{ fontWeight: 700, flexShrink: 0 }}

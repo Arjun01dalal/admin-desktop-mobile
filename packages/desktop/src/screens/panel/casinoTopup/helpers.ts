@@ -28,10 +28,7 @@ export type FormState = {
   note: string;
 };
 
-export const PROVIDER_CONFIG: Record<
-  ProviderKey,
-  { title: string; defaultNote: string }
-> = {
+export const PROVIDER_CONFIG: Record<ProviderKey, { title: string; defaultNote: string }> = {
   qtech: {
     title: 'Qtech',
     defaultNote: 'Qtech wallet top-up',
@@ -57,8 +54,7 @@ export function getCurrentIstDatetimeLocal(): string {
     hour12: false,
   }).formatToParts(new Date());
 
-  const get = (type: string) =>
-    parts.find((p) => p.type === type)?.value || '00';
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || '00';
 
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`;
 }
@@ -75,9 +71,7 @@ export function emptyForm(note: string): FormState {
 export function toApiDateTime(datetimeLocal: string): string {
   if (!datetimeLocal) return '';
   const normalized = datetimeLocal.trim().replace('T', ' ').replace('Z', '');
-  const match = normalized.match(
-    /^(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/,
-  );
+  const match = normalized.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
   if (!match) return normalized;
   const [, date, hours, minutes, seconds = '00'] = match;
   return `${date} ${hours}:${minutes}:${seconds}`;
@@ -94,12 +88,7 @@ function emptyProvider(): Omit<ProviderState, 'loading'> {
 }
 
 function recordTimestamp(item: TopupRecord): number {
-  const raw =
-    item.toppedUpAt ||
-    item.recordedAt ||
-    item.createdAt ||
-    item.toppedUpAtIst ||
-    '';
+  const raw = item.toppedUpAt || item.recordedAt || item.createdAt || item.toppedUpAtIst || '';
   const normalized = String(raw).replace(' IST', '').replace(' ', 'T');
   const time = Date.parse(normalized);
   return Number.isFinite(time) ? time : 0;
@@ -110,9 +99,7 @@ function sortRecordsDesc(records: TopupRecord[]): TopupRecord[] {
 }
 
 /** API doc shape: { type: "qtech topped up balance", data: { amount, currency, history } } */
-export function parseTopupDocument(
-  doc: unknown,
-): Omit<ProviderState, 'loading'> {
+export function parseTopupDocument(doc: unknown): Omit<ProviderState, 'loading'> {
   if (!doc || typeof doc !== 'object') return emptyProvider();
   const root = doc as Record<string, unknown>;
   const wallet =
@@ -157,13 +144,7 @@ function resolveRootPayload(decrypted: unknown): unknown {
     obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)
       ? (obj.data as Record<string, unknown>)
       : null;
-  return (
-    obj.payload ??
-    nestedData?.payload ??
-    obj.data ??
-    obj.result ??
-    decrypted
-  );
+  return obj.payload ?? nestedData?.payload ?? obj.data ?? obj.result ?? decrypted;
 }
 
 export function parseBothProviders(

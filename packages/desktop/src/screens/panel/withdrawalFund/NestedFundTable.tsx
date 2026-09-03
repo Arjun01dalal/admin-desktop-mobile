@@ -107,10 +107,7 @@ export function NestedFundTable({ apiData, startDate, endDate, onUpload }: Props
     [fetchMidData, midCache],
   );
 
-  const handleProviderClick = async (
-    providerKey: string,
-    gatewayNames: GatewayGroup[],
-  ) => {
+  const handleProviderClick = async (providerKey: string, gatewayNames: GatewayGroup[]) => {
     const isOpen = openProviderIndex === providerKey;
     setOpenProviderIndex(isOpen ? null : providerKey);
     if (isOpen) return;
@@ -181,8 +178,7 @@ export function NestedFundTable({ apiData, startDate, endDate, onUpload }: Props
                 >
                   <TableCell sx={cellSx}>{typeIndex + 1}</TableCell>
                   <TableCell sx={cellSx}>
-                    <strong>{String(typeItem.type).toUpperCase()}</strong>{' '}
-                    {isTypeOpen ? '▲' : '▼'}
+                    <strong>{String(typeItem.type).toUpperCase()}</strong> {isTypeOpen ? '▲' : '▼'}
                   </TableCell>
                   <TableCell sx={cellSx}>{typeTotal(typeItem)}</TableCell>
                   <TableCell sx={cellSx}>{typeItem.providers?.length ?? 0}</TableCell>
@@ -205,8 +201,7 @@ export function NestedFundTable({ apiData, startDate, endDate, onUpload }: Props
                           >
                             <TableCell sx={cellSx} />
                             <TableCell sx={cellSx}>
-                              {provider.withdrewalProviderName}{' '}
-                              {isProviderOpen ? '▲' : '▼'}
+                              {provider.withdrewalProviderName} {isProviderOpen ? '▲' : '▼'}
                             </TableCell>
                             <TableCell sx={cellSx}>{provider.totalAmount}</TableCell>
                             <TableCell sx={cellSx}>{mids.length}</TableCell>
@@ -290,10 +285,7 @@ export function NestedFundTable({ apiData, startDate, endDate, onUpload }: Props
                                         size="small"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          onUpload(
-                                            provider.withdrewalProviderName,
-                                            mid.mid,
-                                          );
+                                          onUpload(provider.withdrewalProviderName, mid.mid);
                                         }}
                                         sx={{ color: '#ff9f0a' }}
                                       >

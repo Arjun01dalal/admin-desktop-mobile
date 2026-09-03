@@ -7,6 +7,7 @@
  *
  * Email / mobile typed on the site are remembered (localStorage + main process)
  * and re-filled after reload / SPA remount so the user does not re-type.
+ * SSO tokens are intentionally never persisted in renderer storage.
  */
 const { ipcRenderer } = require('electron');
 
@@ -40,13 +41,6 @@ function applyPendingExternalLogin() {
     // ignore hash write failures
   }
 
-  // Backup if hash is stripped before Splash runs — o5() reads these keys.
-  try {
-    localStorage.setItem('IS_LOGGED_IN', 'true');
-    localStorage.setItem('LOGIN_TOKEN', token);
-  } catch {
-    // ignore
-  }
   return true;
 }
 
@@ -144,11 +138,7 @@ function readIdentityFields() {
     if (type === 'email' || /email|user(name)?|login|mail/.test(hint) || raw.includes('@')) {
       if (!email) email = raw;
     }
-    if (
-      type === 'tel' ||
-      /mobile|phone|tel|whatsapp/.test(hint) ||
-      /^[6-9]\d{9}$/.test(digits)
-    ) {
+    if (type === 'tel' || /mobile|phone|tel|whatsapp/.test(hint) || /^[6-9]\d{9}$/.test(digits)) {
       if (!mobile && digits.length >= 10) mobile = digits.slice(-10);
     }
   });
@@ -261,11 +251,7 @@ function persistIdentity() {
 
 function loginLabel(el) {
   return String(
-    el.textContent ||
-      el.value ||
-      el.getAttribute('aria-label') ||
-      el.getAttribute('title') ||
-      '',
+    el.textContent || el.value || el.getAttribute('aria-label') || el.getAttribute('title') || '',
   )
     .replace(/\s+/g, ' ')
     .trim()
@@ -315,11 +301,7 @@ function hideRegisterAccountOption() {
       const parentText = String(parent.textContent || '')
         .replace(/\s+/g, ' ')
         .trim();
-      if (
-        parentText.length <= 80 &&
-        /new here/i.test(parentText) &&
-        /register/i.test(parentText)
-      ) {
+      if (parentText.length <= 80 && /new here/i.test(parentText) && /register/i.test(parentText)) {
         target = parent;
       }
     }

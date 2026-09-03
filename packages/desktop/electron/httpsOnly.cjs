@@ -32,11 +32,7 @@ function assertHttpsUrl(rawUrl, opts = {}) {
   if (parsed.protocol === 'https:') return s;
   if (parsed.protocol === 'wss:') return s;
 
-  if (
-    allowLocalHttp &&
-    parsed.protocol === 'http:' &&
-    isLocalDevHost(parsed.hostname)
-  ) {
+  if (allowLocalHttp && parsed.protocol === 'http:' && isLocalDevHost(parsed.hostname)) {
     return s;
   }
 

@@ -64,12 +64,14 @@ export function FundsEditAccessModal({ open, onClose, target }: Props) {
         setSubadminList([]);
         return;
       }
-      const allowed = new Set(
-        FUND_EDIT_ACCESS.map((r) => r.trim().toLowerCase()),
-      );
+      const allowed = new Set(FUND_EDIT_ACCESS.map((r) => r.trim().toLowerCase()));
       const byRole = res.data?.byRole ?? [];
       const filteredRoles = byRole.filter((v) =>
-        allowed.has(String(v.roleName || '').trim().toLowerCase()),
+        allowed.has(
+          String(v.roleName || '')
+            .trim()
+            .toLowerCase(),
+        ),
       );
       const list = [
         ...new Map(
@@ -92,9 +94,7 @@ export function FundsEditAccessModal({ open, onClose, target }: Props) {
   }, [open, loadUsers]);
 
   const toggleUser = (id: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedUsers((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const handleApprove = async () => {

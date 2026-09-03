@@ -26,10 +26,7 @@ import { COMMENT_FILTER_OPTIONS } from './callLogs/constants';
 import { CallLogsToolbar } from './callLogs/CallLogsToolbar';
 import { BotStatusTable } from './callLogs/BotStatusTable';
 import { CallLogsFiltersProvider } from './callLogs/FiltersContext';
-import {
-  CallLogsSelectionProvider,
-  useCallLogsSelection,
-} from './callLogs/SelectionContext';
+import { CallLogsSelectionProvider, useCallLogsSelection } from './callLogs/SelectionContext';
 import { useCallLogsColumns } from './callLogs/useCallLogsColumns';
 import { useCallLogsQuery } from './callLogs/useCallLogsQuery';
 import { useCallLogsActions } from './callLogs/useCallLogsActions';
@@ -49,7 +46,8 @@ export function CallLogsPage() {
   }>();
   const isCaller = isCallLogsCaller(admin);
   const campaignOptions = useMemo(
-    () => campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
+    () =>
+      campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
     [admin, isCaller],
   );
   const [startDate, setStartDate] = useState(todayIST);
@@ -82,10 +80,7 @@ export function CallLogsPage() {
     commentFilter,
   };
 
-  const { calls, total, botSummary, loading, load, filtersRef } = useCallLogsQuery(
-    filters,
-    admin,
-  );
+  const { calls, total, botSummary, loading, load, filtersRef } = useCallLogsQuery(filters, admin);
 
   return (
     <CallLogsSelectionProvider calls={calls}>
@@ -252,10 +247,7 @@ function CallLogsPageBody({
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
 
-  const summaryRows = useMemo(
-    () => buildCallRecordRows(summaryData),
-    [summaryData],
-  );
+  const summaryRows = useMemo(() => buildCallRecordRows(summaryData), [summaryData]);
 
   const onPageReset = useCallback(() => setPage(1), [setPage]);
 
@@ -342,12 +334,7 @@ function CallLogsPageBody({
         boxSizing: 'border-box',
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="flex-start"
-        spacing={1.5}
-        sx={{ mb: 1.5, flexShrink: 0 }}
-      >
+      <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ mb: 1.5, flexShrink: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <CallLogsToolbar
             title="Call Logs"
@@ -419,15 +406,9 @@ function CallLogsPageBody({
         </CallLogsFiltersProvider>
       </TablePanel>
 
-      <RecordingPlayerDialog
-        url={recordingUrl}
-        onClose={() => setRecordingUrl(null)}
-      />
+      <RecordingPlayerDialog url={recordingUrl} onClose={() => setRecordingUrl(null)} />
 
-      <Dialog
-        open={!isCaller && pauseOpen}
-        onClose={() => setPauseOpen(false)}
-      >
+      <Dialog open={!isCaller && pauseOpen} onClose={() => setPauseOpen(false)}>
         <DialogTitle>Enter Bot ID (For Record Deletion)</DialogTitle>
         <DialogContent>
           <TextField
@@ -478,9 +459,7 @@ function CallLogsPageBody({
               <TextField
                 label="Custom comment"
                 value={commentText}
-                onChange={(e) =>
-                  setCommentText(e.target.value.slice(0, MAX_COMMENT_LENGTH))
-                }
+                onChange={(e) => setCommentText(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
                 inputProps={{ maxLength: MAX_COMMENT_LENGTH }}
               />
             )}
@@ -492,9 +471,7 @@ function CallLogsPageBody({
             variant="contained"
             onClick={() => {
               const value =
-                commentDropdown && commentDropdown !== 'other'
-                  ? commentDropdown
-                  : commentText;
+                commentDropdown && commentDropdown !== 'other' ? commentDropdown : commentText;
               void submitComment(commentSid, value).then((ok) => {
                 if (ok) setCommentOpen(false);
               });
@@ -522,9 +499,7 @@ function CallLogsPageBody({
           },
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700, color: '#000', pb: 1 }}>
-          Call Record
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: '#000', pb: 1 }}>Call Record</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: '#fff' }}>
           {summaryRows.length === 0 ? (
             <Typography color="text.secondary">No summary data available.</Typography>
@@ -563,13 +538,8 @@ function CallLogsPageBody({
                 </TableHead>
                 <TableBody>
                   {summaryRows.map((item, idx) => (
-                    <TableRow
-                      key={item.title}
-                      sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#f5f5f5' }}
-                    >
-                      <TableCell sx={{ fontWeight: 700, width: '22%' }}>
-                        {item.title}
-                      </TableCell>
+                    <TableRow key={item.title} sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#f5f5f5' }}>
+                      <TableCell sx={{ fontWeight: 700, width: '22%' }}>{item.title}</TableCell>
                       <TableCell sx={{ width: '40%' }}>{item.value}</TableCell>
                       <TableCell>{item.reason || '—'}</TableCell>
                     </TableRow>

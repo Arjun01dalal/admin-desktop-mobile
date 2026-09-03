@@ -18,10 +18,7 @@ type LocationState = {
 export function DepositListUserWisePage() {
   const location = useLocation();
   const state = (location.state || {}) as LocationState;
-  const rows = useMemo(
-    () => (Array.isArray(state.data) ? state.data : []),
-    [state.data],
-  );
+  const rows = useMemo(() => (Array.isArray(state.data) ? state.data : []), [state.data]);
 
   const columns = useMemo<CommonTableColumn<MidRow>[]>(
     () => [
@@ -52,8 +49,7 @@ export function DepositListUserWisePage() {
         </Typography>
         <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography color="text.secondary">
-            No MID breakdown selected. Open Deposit / Withdrawal details from
-            Deposit List.
+            No MID breakdown selected. Open Deposit / Withdrawal details from Deposit List.
           </Typography>
         </Paper>
       </Box>
@@ -66,14 +62,14 @@ export function DepositListUserWisePage() {
         Deposit List — MID Breakdown
       </Typography>
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row, i) => String(row.mid || i)}
-        emptyMessage="No MID data"
-        minWidth={480}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row, i) => String(row.mid || i)}
+          emptyMessage="No MID data"
+          minWidth={480}
+          maxHeight="100%"
+        />
       </TablePanel>
     </Box>
   );

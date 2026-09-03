@@ -50,6 +50,9 @@ export function getBackPath(pathname: string): string | null {
   if (pathname === '/fund-request-bonus-wallet-table') {
     return '/fund-request-bonus-wallet';
   }
+  if (pathname === '/fund-request-coin') {
+    return '/fund-request';
+  }
   if (pathname === '/withdraw-user-data') {
     return '/withdrawal-fund';
   }

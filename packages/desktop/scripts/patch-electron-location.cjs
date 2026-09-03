@@ -9,11 +9,33 @@ const { execFileSync } = require('node:child_process');
 
 function resolveElectronPlist() {
   const candidates = [
-    path.join(__dirname, '..', 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'Info.plist'),
-    path.join(__dirname, '..', '..', '..', 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'Info.plist'),
+    path.join(
+      __dirname,
+      '..',
+      'node_modules',
+      'electron',
+      'dist',
+      'Electron.app',
+      'Contents',
+      'Info.plist',
+    ),
+    path.join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'node_modules',
+      'electron',
+      'dist',
+      'Electron.app',
+      'Contents',
+      'Info.plist',
+    ),
   ];
   try {
-    const pkgDir = path.dirname(require.resolve('electron/package.json', { paths: [path.join(__dirname, '..')] }));
+    const pkgDir = path.dirname(
+      require.resolve('electron/package.json', { paths: [path.join(__dirname, '..')] }),
+    );
     candidates.unshift(path.join(pkgDir, 'dist', 'Electron.app', 'Contents', 'Info.plist'));
   } catch {
     // fall through to path candidates
@@ -39,11 +61,9 @@ function setPlistKey(key, value) {
       stdio: 'inherit',
     });
   } catch {
-    execFileSync(
-      '/usr/libexec/PlistBuddy',
-      ['-c', `Add :${key} string ${value}`, plist],
-      { stdio: 'inherit' },
-    );
+    execFileSync('/usr/libexec/PlistBuddy', ['-c', `Add :${key} string ${value}`, plist], {
+      stdio: 'inherit',
+    });
   }
 }
 

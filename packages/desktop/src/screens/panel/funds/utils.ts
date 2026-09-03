@@ -126,14 +126,16 @@ export function readFundsDrill(
     locationState.endDate &&
     (Array.isArray(locationState.mids) || locationState.midID)
   ) {
-    const existing = fundsDrillMemory || (() => {
-      try {
-        const saved = sessionStorage.getItem(FUNDS_DRILL_STORAGE_KEY);
-        return saved ? (JSON.parse(saved) as FundsDrillState) : null;
-      } catch {
-        return null;
-      }
-    })();
+    const existing =
+      fundsDrillMemory ||
+      (() => {
+        try {
+          const saved = sessionStorage.getItem(FUNDS_DRILL_STORAGE_KEY);
+          return saved ? (JSON.parse(saved) as FundsDrillState) : null;
+        } catch {
+          return null;
+        }
+      })();
     const next: FundsDrillState = {
       name: String(locationState.name),
       mids: Array.isArray(locationState.mids)
@@ -141,9 +143,7 @@ export function readFundsDrill(
         : normalizeMids(existing?.mids),
       startDate: locationState.startDate,
       endDate: locationState.endDate,
-      midID: locationState.midID
-        ? String(locationState.midID)
-        : existing?.midID,
+      midID: locationState.midID ? String(locationState.midID) : existing?.midID,
     };
     saveFundsDrill(next);
     return next;
@@ -219,8 +219,7 @@ export function computeFundsDateSplitStats(input: {
   credits?: Record<string, unknown>[];
   debits?: Record<string, unknown>[];
 }): FundsDateSplitStats {
-  const referenceDay =
-    input.endDate || input.startDate || toIstYmd(new Date());
+  const referenceDay = input.endDate || input.startDate || toIstYmd(new Date());
 
   const isPreviousDate = (timestamp?: string) => {
     const createdDay = toIstYmd(timestamp);
@@ -238,19 +237,11 @@ export function computeFundsDateSplitStats(input: {
   const credits = input.credits ?? [];
   const debits = input.debits ?? [];
 
-  const previousTransactions = transactions.filter((row) =>
-    isPreviousDate(getCreatedOn(row)),
-  );
-  const previousCredits = credits.filter((row) =>
-    isPreviousDate(getCreatedOn(row)),
-  );
-  const previousDebits = debits.filter((row) =>
-    isPreviousDate(getCreatedOn(row)),
-  );
+  const previousTransactions = transactions.filter((row) => isPreviousDate(getCreatedOn(row)));
+  const previousCredits = credits.filter((row) => isPreviousDate(getCreatedOn(row)));
+  const previousDebits = debits.filter((row) => isPreviousDate(getCreatedOn(row)));
 
-  const todayTransactions = transactions.filter((row) =>
-    isTodayDate(getCreatedOn(row)),
-  );
+  const todayTransactions = transactions.filter((row) => isTodayDate(getCreatedOn(row)));
   const todayCredits = credits.filter((row) => isTodayDate(getCreatedOn(row)));
   const todayDebits = debits.filter((row) => isTodayDate(getCreatedOn(row)));
 
@@ -261,18 +252,9 @@ export function computeFundsDateSplitStats(input: {
 
   return {
     previousTotal:
-      sumAmount(previousTransactions) +
-      sumBalance(previousCredits) -
-      sumBalance(previousDebits),
-    previousCount:
-      previousTransactions.length +
-      previousCredits.length +
-      previousDebits.length,
-    todayTotal:
-      sumAmount(todayTransactions) +
-      sumBalance(todayCredits) -
-      sumBalance(todayDebits),
-    todayCount:
-      todayTransactions.length + todayCredits.length + todayDebits.length,
+      sumAmount(previousTransactions) + sumBalance(previousCredits) - sumBalance(previousDebits),
+    previousCount: previousTransactions.length + previousCredits.length + previousDebits.length,
+    todayTotal: sumAmount(todayTransactions) + sumBalance(todayCredits) - sumBalance(todayDebits),
+    todayCount: todayTransactions.length + todayCredits.length + todayDebits.length,
   };
 }

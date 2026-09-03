@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { getAuthToken } from '@/utils/authToken';
 import { notifySessionExpired } from '@/utils/session';
-import {
-  runTokenValidation,
-  TOKEN_CHECK_INTERVAL,
-} from '@/utils/sessionCheck';
+import { runTokenValidation, TOKEN_CHECK_INTERVAL } from '@/utils/sessionCheck';
 
 /**
  * Port of laxminarayan `useTokenValidator` — validates session via
@@ -17,9 +14,7 @@ export function useTokenValidator(): void {
   const handleLogout = useCallback((reason?: string) => {
     if (logoutTriggered.current) return;
     logoutTriggered.current = true;
-    notifySessionExpired(
-      reason || 'Your session is no longer valid. Please login again.',
-    );
+    notifySessionExpired(reason || 'Your session is no longer valid. Please login again.');
   }, []);
 
   const validateToken = useCallback(

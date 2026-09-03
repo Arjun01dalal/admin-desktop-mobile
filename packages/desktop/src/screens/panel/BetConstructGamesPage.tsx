@@ -103,6 +103,8 @@ export function BetConstructGamesPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [nameSearch, setNameSearch] = useState('');
   const [appliedName, setAppliedName] = useState('');
+  /** List filter — API only returns games matching this status. */
+  const [statusFilter, setStatusFilter] = useState(true);
   const [rows, setRows] = useState<BetConstructRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -112,11 +114,12 @@ export function BetConstructGamesPage() {
   const [activeGameId, setActiveGameId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
 
   const { next, begin, end, isCurrent } = useRequestGeneration();
 
   const load = useCallback(
-    async (pageNo = page, nameOverride = appliedName) => {
+    async (pageNo = page, nameOverride = appliedName, statusOverride = statusFilter) => {
       const gen = next();
       begin();
       setLoading(true);
@@ -125,7 +128,7 @@ export function BetConstructGamesPage() {
         const payload: Record<string, unknown> = {
           pageNo,
           itemPerPage: pageSize,
-          status: true,
+          status: statusOverride,
         };
         const name = nameOverride.trim();
         if (name) payload.Name = name;
@@ -161,13 +164,13 @@ export function BetConstructGamesPage() {
         if (isCurrent(gen)) setLoading(false);
       }
     },
-    [page, pageSize, appliedName, next, begin, end, isCurrent],
+    [page, pageSize, appliedName, statusFilter, next, begin, end, isCurrent],
   );
 
   useEffect(() => {
     void load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize]);
+  }, [page, pageSize, statusFilter]);
 
   const deferredRows = useDeferredValue(rows);
 
@@ -215,6 +218,29 @@ export function BetConstructGamesPage() {
       setSubmitting(false);
     }
   }, [imageUrl, activeGameId, closeImageDialog, load]);
+
+  const handleStatusChange = useCallback(
+    async (row: BetConstructRow, nextStatus: boolean) => {
+      if (!row.gameId || statusBusyId) return;
+      setStatusBusyId(row.gameId);
+      try {
+        const res = await secureApi('ops.betConstructUpdateStatus', {
+          gameId: row.gameId,
+          status: nextStatus,
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to update game status');
+          return;
+        }
+        toast.success(nextStatus ? 'Game activated' : 'Game deactivated');
+        // List is filtered by status — reload so the row moves to the other bucket.
+        void load();
+      } finally {
+        setStatusBusyId(null);
+      }
+    },
+    [load, statusBusyId],
+  );
 
   const columns = useMemo<CommonTableColumn<BetConstructRow>[]>(
     () => [
@@ -266,7 +292,17 @@ export function BetConstructGamesPage() {
       {
         id: 'status',
         label: 'Status',
-        render: (row) => <Switch checked={Boolean(row.status)} color="warning" size="small" disabled />,
+        render: (row) => (
+          <Switch
+            checked={Boolean(row.status)}
+            color="warning"
+            size="small"
+            disabled={loading || statusBusyId === row.gameId}
+            onChange={(e) => {
+              void handleStatusChange(row, e.target.checked);
+            }}
+          />
+        ),
       },
       {
         id: 'images',
@@ -306,7 +342,7 @@ export function BetConstructGamesPage() {
             : '—',
       },
     ],
-    [page, pageSize, nameSearch, search, openImageDialog],
+    [page, pageSize, nameSearch, search, openImageDialog, handleStatusChange, loading, statusBusyId],
   );
 
   return (
@@ -318,9 +354,7 @@ export function BetConstructGamesPage() {
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={(event) => {
               event.stopPropagation();
               void load();
@@ -333,6 +367,20 @@ export function BetConstructGamesPage() {
         }
       >
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+          <TextField
+            select
+            label="Status"
+            size="small"
+            value={statusFilter ? 'active' : 'inactive'}
+            onChange={(e) => {
+              setStatusFilter(e.target.value === 'active');
+              setPage(1);
+            }}
+            sx={{ ...headerFieldSx, minWidth: 140 }}
+          >
+            <MenuItem value="active">Active</MenuItem>
+            <MenuItem value="inactive">Inactive</MenuItem>
+          </TextField>
           <TextField
             select
             label="Items Per Page"

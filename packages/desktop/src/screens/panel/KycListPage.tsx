@@ -274,9 +274,7 @@ export function KycListPage() {
             <Stack spacing={0.25}>
               <span>{row.kycDocCheckBy.name}</span>
               <span style={{ fontSize: 11, opacity: 0.7 }}>
-                {row.kycDocCheckBy.date
-                  ? formatDisplayDate(row.kycDocCheckBy.date)
-                  : ''}
+                {row.kycDocCheckBy.date ? formatDisplayDate(row.kycDocCheckBy.date) : ''}
               </span>
             </Stack>
           ) : (
@@ -291,9 +289,7 @@ export function KycListPage() {
             <Stack spacing={0.25}>
               <span>{row.kycDocCrossCheckBy.name}</span>
               <span style={{ fontSize: 11, opacity: 0.7 }}>
-                {row.kycDocCrossCheckBy.date
-                  ? formatDisplayDate(row.kycDocCrossCheckBy.date)
-                  : ''}
+                {row.kycDocCrossCheckBy.date ? formatDisplayDate(row.kycDocCrossCheckBy.date) : ''}
               </span>
             </Stack>
           ) : (
@@ -402,67 +398,58 @@ export function KycListPage() {
         contentSx={{ pt: 2.25 }}
       >
         <Box sx={{ overflowX: 'auto', overflowY: 'visible', pb: 0.25 }}>
-        <Stack
-          direction="row"
-          spacing={1.5}
-          alignItems="center"
-          flexWrap="nowrap"
-          sx={{ pt: 1, minWidth: 'max-content' }}
-        >
-          <TextField
-            type="date"
-            label="From Date"
-            size="small"
-            fullWidth={false}
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            type="date"
-            label="To Date"
-            size="small"
-            fullWidth={false}
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            select
-            label="Items Per Page"
-            size="small"
-            fullWidth={false}
-            value={String(pageSize)}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setPage(1);
-            }}
-            sx={{ ...fieldSx, width: 130 }}
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            flexWrap="nowrap"
+            sx={{ pt: 1, minWidth: 'max-content' }}
           >
-            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button
-            variant="contained"
-            onClick={apply}
-            disabled={loading}
-            sx={orangeBtnSx}
-          >
-            Apply
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => navigate('/users-kyc')}
-            sx={orangeBtnSx}
-          >
-            KYC
-          </Button>
-        </Stack>
+            <TextField
+              type="date"
+              label="From Date"
+              size="small"
+              fullWidth={false}
+              InputLabelProps={{ shrink: true }}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              sx={fieldSx}
+            />
+            <TextField
+              type="date"
+              label="To Date"
+              size="small"
+              fullWidth={false}
+              InputLabelProps={{ shrink: true }}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              sx={fieldSx}
+            />
+            <TextField
+              select
+              label="Items Per Page"
+              size="small"
+              fullWidth={false}
+              value={String(pageSize)}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              sx={{ ...fieldSx, width: 130 }}
+            >
+              {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button variant="contained" onClick={apply} disabled={loading} sx={orangeBtnSx}>
+              Apply
+            </Button>
+            <Button variant="contained" onClick={() => navigate('/users-kyc')} sx={orangeBtnSx}>
+              KYC
+            </Button>
+          </Stack>
         </Box>
       </CollapsibleFilterPanel>
 

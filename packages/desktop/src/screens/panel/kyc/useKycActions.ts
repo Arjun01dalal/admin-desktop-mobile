@@ -43,9 +43,7 @@ export function useKycActions({ reload, unlockNightLock }: Params) {
       toast.error(res.message || 'Failed to send OTP');
       return false;
     }
-    toast.success(
-      sendOTPToClient ? 'OTP Sent Successfully' : 'Admin OTP Sent Successfully',
-    );
+    toast.success(sendOTPToClient ? 'OTP Sent Successfully' : 'Admin OTP Sent Successfully');
     return true;
   }, []);
 
@@ -139,8 +137,9 @@ export function useKycActions({ reload, unlockNightLock }: Params) {
         toast.error('Please enter Admin OTP');
         return;
       }
-      if (!/^\d{4}$/.test(approveForm.otp.trim())) {
-        toast.error('Please enter a valid 4 digit OTP');
+      // Approve flow: customer OTP is 6 digits (admin OTP stays separate).
+      if (!/^\d{6}$/.test(approveForm.otp.trim())) {
+        toast.error('Please enter a valid 6 digit OTP');
         return;
       }
       if (!approveForm.comment.trim()) {

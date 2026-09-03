@@ -272,10 +272,7 @@ export function isAutoMapCandidate(value: string): boolean {
  * Pass `force` for known domains (e.g. House Krida gameId) where plain
  * lowercase ids like "aviator" must still get an alias when unmapped.
  */
-export function ensureAutoAstroAlias(
-  original: string,
-  opts?: { force?: boolean },
-): string {
+export function ensureAutoAstroAlias(original: string, opts?: { force?: boolean }): string {
   const trimmed = original.trim();
   if (!trimmed) return trimmed;
   if (!opts?.force && !isAutoMapCandidate(trimmed)) return trimmed;
@@ -304,10 +301,7 @@ export function reverseAutoAstroAlias(text: string): string {
   let out = text;
   for (const [originalLower, jyotish] of entries) {
     if (!jyotish) continue;
-    const re = new RegExp(
-      jyotish.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-      'gi',
-    );
+    const re = new RegExp(jyotish.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     // Restore original casing from first-seen key is lost — use stored key's
     // best-effort: prefer title-ish from lowercase key.
     const restored = originalLower.replace(/\b([a-z])/g, (c) => c.toUpperCase());

@@ -48,6 +48,7 @@ export const USER_REPORT_TABS: { id: UserReportTab; label: string }[] = [
 export type EncryptedUser = {
   encryptedUserName?: string;
   createdAt?: string;
+  createdOn?: string;
   activeUser?: string;
   lastActivity?: string;
   updatedOn?: string;

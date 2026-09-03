@@ -32,13 +32,7 @@ type Props = {
 };
 
 /** Re-upload game image URL — calls top-games/update-image on submit. */
-export function UpdateGameImageDialog({
-  open,
-  loading,
-  target,
-  onClose,
-  onSubmit,
-}: Props) {
+export function UpdateGameImageDialog({ open, loading, target, onClose, onSubmit }: Props) {
   const [imagePath, setImagePath] = useState('');
   const trimmed = imagePath.trim();
 
@@ -88,7 +82,11 @@ export function UpdateGameImageDialog({
 
           <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
             <Box sx={{ flex: 1, minWidth: 140 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mb: 0.5, display: 'block' }}
+              >
                 Current
               </Typography>
               {target?.currentImageUrl ? (
@@ -112,7 +110,11 @@ export function UpdateGameImageDialog({
               )}
             </Box>
             <Box sx={{ flex: 1, minWidth: 140 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mb: 0.5, display: 'block' }}
+              >
                 New preview
               </Typography>
               {trimmed ? (

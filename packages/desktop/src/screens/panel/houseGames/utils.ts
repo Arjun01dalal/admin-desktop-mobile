@@ -1,3 +1,4 @@
+import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import type { FiltersState } from './constants';
 import type { HouseGameTransaction } from './types';
 
@@ -38,12 +39,14 @@ export const buildFilterPayload = (filters: FiltersState) => {
   return cleanFilter(filter);
 };
 
+/** Laxmi HouseGames: `${formatUTCDate(value)} - ${formatedTime(value)}` (IST). */
 export const formatDateTime = (value?: string) => {
   if (!value) return '-';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  const date = d.toLocaleDateString('en-GB');
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const date = formatDisplayDate(value);
+  const time = formatDisplayTime(value);
+  if (!date && !time) return '-';
+  if (!date) return time;
+  if (!time) return date;
   return `${date} - ${time}`;
 };
 

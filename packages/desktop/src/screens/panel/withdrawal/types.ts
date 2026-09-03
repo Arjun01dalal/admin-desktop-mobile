@@ -113,13 +113,7 @@ export const ACTION_STATUSES = [
   'Manual Approved',
 ] as const;
 
-export const TERMINAL_STATUSES = new Set([
-  'Approved',
-  'Rejected',
-  'Reverse',
-  'Cancel',
-  'Failed',
-]);
+export const TERMINAL_STATUSES = new Set(['Approved', 'Rejected', 'Reverse', 'Cancel', 'Failed']);
 
 export const MANUAL_GATEWAYS = [
   'bramhadev',
@@ -159,11 +153,7 @@ export function emptyWithdrawalSummary(): WithdrawalSummary {
   return {};
 }
 
-export function withdrawalStatLabel(
-  prefix: string,
-  count?: number,
-  amount?: number,
-): string {
+export function withdrawalStatLabel(prefix: string, count?: number, amount?: number): string {
   return `${prefix} (${count ?? 0}) : ${amount ?? 0}`;
 }
 

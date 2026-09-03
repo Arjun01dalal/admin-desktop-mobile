@@ -35,11 +35,7 @@ export function canShowCoinsTab(): boolean {
 export function canShowAddBonusCoinsTab(): boolean {
   const u = sessionFlags();
   const mobile = String(u.mobile || '');
-  return (
-    ADD_BONUS_MOBILES.has(mobile) ||
-    flag(u.showCoinButton) ||
-    hasPermission('showCoinButton')
-  );
+  return ADD_BONUS_MOBILES.has(mobile) || flag(u.showCoinButton) || hasPermission('showCoinButton');
 }
 
 /**

@@ -1,8 +1,43 @@
 /** Numeric merge helpers for Combined dashboard (dual-host sum). */
 
 export function toNum(value: unknown): number {
-  const n = typeof value === 'string' ? Number(value) : Number(value);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'bigint') return Number(value);
+  if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    if ('$numberDecimal' in o) return toNum(o.$numberDecimal);
+    if ('$numberDouble' in o) return toNum(o.$numberDouble);
+    if ('value' in o) return toNum(o.value);
+  }
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[₹,\s]/g, '').trim();
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  }
+  const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** First matching numeric field, searching shallow then one nested payload/data layer. */
+export function pickNum(raw: unknown, keys: string[]): number {
+  const layers: Record<string, unknown>[] = [];
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const root = raw as Record<string, unknown>;
+    layers.push(root);
+    for (const nestKey of ['payload', 'data', 'result']) {
+      const nested = root[nestKey];
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        layers.push(nested as Record<string, unknown>);
+      }
+    }
+  }
+  for (const layer of layers) {
+    for (const key of keys) {
+      if (!(key in layer) || layer[key] == null || layer[key] === '') continue;
+      return toNum(layer[key]);
+    }
+  }
+  return 0;
 }
 
 export function floorNum(value: unknown): number {
@@ -31,10 +66,7 @@ export function mergeNumericObjects(
       !Array.isArray(lv) &&
       !Array.isArray(rv)
     ) {
-      out[key] = mergeNumericObjects(
-        lv as Record<string, unknown>,
-        rv as Record<string, unknown>,
-      );
+      out[key] = mergeNumericObjects(lv as Record<string, unknown>, rv as Record<string, unknown>);
     }
   }
   return out;
@@ -54,13 +86,9 @@ export function sumArrayField(list: unknown, field: string): number {
  * Laxmi stores `payload.providerWise` from get-active-customers-categorywise.
  * Secure unwrap already returns `payload`, so dig one more level when present.
  */
-export function providerWiseActive(
-  raw: unknown,
-): Record<string, unknown> {
+export function providerWiseActive(raw: unknown): Record<string, unknown> {
   const root =
-    raw && typeof raw === 'object' && !Array.isArray(raw)
-      ? (raw as Record<string, unknown>)
-      : {};
+    raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const nested = root.providerWise;
   if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
     return nested as Record<string, unknown>;
@@ -68,14 +96,52 @@ export function providerWiseActive(
   return root;
 }
 
+/**
+ * Normalize Falcon / Jetfair / Sportsbook GGR payloads.
+ * Laxmi reads `decrypt().payload`; some hosts return an array (MasterDashboard
+ * takes `[0]`). Ops `asRecord(array)` was `{}` → Payin/GGR all showed 0.
+ */
+export function normalizeProviderMetrics(raw: unknown): Record<string, unknown> {
+  let cur: unknown = raw;
+  for (let i = 0; i < 4; i += 1) {
+    if (Array.isArray(cur)) {
+      cur = cur[0] ?? {};
+      continue;
+    }
+    if (!cur || typeof cur !== 'object') return {};
+    const obj = cur as Record<string, unknown>;
+    const hasMetric =
+      'payin' in obj ||
+      'TotalGGR' in obj ||
+      'totalGGR' in obj ||
+      'final_ggr' in obj ||
+      'finalGgr' in obj ||
+      'CommissionAmount' in obj ||
+      'commissionAmount' in obj ||
+      'netpl' in obj ||
+      'totalVolume' in obj ||
+      'totalBetAmount' in obj ||
+      'ggr' in obj ||
+      'walletHistory' in obj;
+    if (hasMetric) return obj;
+    if (obj.payload != null) {
+      cur = obj.payload;
+      continue;
+    }
+    if (obj.data != null && typeof obj.data === 'object') {
+      cur = obj.data;
+      continue;
+    }
+    return obj;
+  }
+  return cur && typeof cur === 'object' && !Array.isArray(cur)
+    ? (cur as Record<string, unknown>)
+    : {};
+}
+
 /** Read providerWise[key].count with case-insensitive / alias keys (wacs→wco, sattamatka). */
-export function activeCount(
-  active: Record<string, unknown>,
-  ...keys: string[]
-): number {
-  const lowerEntries = Object.entries(active).map(
-    ([k, v]) => [k.toLowerCase(), v] as const,
-  );
+export function activeCount(active: Record<string, unknown>, ...keys: string[]): number {
+  const lowerEntries = Object.entries(active).map(([k, v]) => [k.toLowerCase(), v] as const);
   const lowerMap = Object.fromEntries(lowerEntries);
 
   for (const key of keys) {

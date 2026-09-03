@@ -62,7 +62,8 @@ function OptionRow({
   header,
 }: {
   name: string;
-  stats?: LudoSelectStats | { uniquePlayers: string; bet: string; win: string; rtp: string; ggr: string };
+  stats?:
+    LudoSelectStats | { uniquePlayers: string; bet: string; win: string; rtp: string; ggr: string };
   header?: boolean;
 }) {
   return (
@@ -91,9 +92,7 @@ function OptionRow({
       <Cell
         header={header}
         align="right"
-        ggr={
-          !header && stats && typeof stats.ggr === 'number' ? stats.ggr : undefined
-        }
+        ggr={!header && stats && typeof stats.ggr === 'number' ? stats.ggr : undefined}
       >
         {stats ? stats.ggr : '—'}
       </Cell>
@@ -103,9 +102,7 @@ function OptionRow({
 
 export function LudoGameSelect({ value, options, statsMap, onChange }: Props) {
   const selectedLabel =
-    value === 'All'
-      ? 'All'
-      : options.find((o) => o.value === value)?.label || value;
+    value === 'All' ? 'All' : options.find((o) => o.value === value)?.label || value;
   const selectedStats = statsMap?.[value];
 
   return (
@@ -133,11 +130,7 @@ export function LudoGameSelect({ value, options, statsMap, onChange }: Props) {
               gap: 0.75,
             }}
           >
-            <Typography
-              component="span"
-              noWrap
-              sx={{ fontSize: 13, fontWeight: 600 }}
-            >
+            <Typography component="span" noWrap sx={{ fontSize: 13, fontWeight: 600 }}>
               {toDisplayText(selectedLabel)}
             </Typography>
             {selectedStats ? (
@@ -146,8 +139,7 @@ export function LudoGameSelect({ value, options, statsMap, onChange }: Props) {
                 sx={{
                   fontSize: 13,
                   fontWeight: 700,
-                  color:
-                    selectedStats.ggr < 0 ? 'error.main' : 'success.main',
+                  color: selectedStats.ggr < 0 ? 'error.main' : 'success.main',
                   flexShrink: 0,
                 }}
               >

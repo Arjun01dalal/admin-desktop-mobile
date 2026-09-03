@@ -61,8 +61,7 @@ export function useFitTableHeight<T extends HTMLElement = HTMLDivElement>(
   options?: FitTableHeightOptions,
 ) {
   const bottomGap = options?.bottomGap ?? DEFAULT_BOTTOM_GAP;
-  const fallbackSubtract =
-    options?.fallbackSubtract ?? DEFAULT_FALLBACK_SUBTRACT;
+  const fallbackSubtract = options?.fallbackSubtract ?? DEFAULT_FALLBACK_SUBTRACT;
   const ref = useRef<T | null>(null);
   const [available, setAvailable] = useState<number | null>(null);
 
@@ -76,19 +75,12 @@ export function useFitTableHeight<T extends HTMLElement = HTMLDivElement>(
       // Scroll-independent: distance from the scroller's content top. The panel's
       // own height never feeds back into `top`, so this cannot oscillate.
       const top =
-        el.getBoundingClientRect().top -
-        scroller.getBoundingClientRect().top +
-        scroller.scrollTop;
+        el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
       // `clientHeight` covers padding while `top` starts at the padding box, so
       // the scroller's bottom padding has to come off too.
-      const padBottom =
-        parseFloat(window.getComputedStyle(scroller).paddingBottom) || 0;
-      const next = Math.round(
-        scroller.clientHeight - padBottom - top - bottomGap,
-      );
-      setAvailable((prev) =>
-        prev != null && Math.abs(prev - next) < 2 ? prev : next,
-      );
+      const padBottom = parseFloat(window.getComputedStyle(scroller).paddingBottom) || 0;
+      const next = Math.round(scroller.clientHeight - padBottom - top - bottomGap);
+      setAvailable((prev) => (prev != null && Math.abs(prev - next) < 2 ? prev : next));
     };
 
     measure();

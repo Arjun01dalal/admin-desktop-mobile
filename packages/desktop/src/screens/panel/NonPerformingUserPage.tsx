@@ -4,26 +4,41 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
   MenuItem,
   Pagination,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import { toast } from 'react-toastify';
+import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
-import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime, getStoredUser } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
-import {
-  useReportQuery,
-  asPaged,
-  display,
-  maskMobile,
-} from './shared';
+import { useReportQuery, asPaged, display, maskMobile } from './shared';
+
+type NonPerformingComment = {
+  comment?: string;
+  who?: { userId?: string; userName?: string };
+  userName?: string;
+  commented_by?: string;
+  date?: string;
+  createdOn?: string;
+  createdAt?: string;
+};
 
 type NonPerformingUserRow = {
   _id: string;
@@ -39,6 +54,10 @@ type NonPerformingUserRow = {
   updatedAppVersion?: string;
   createdOn?: string;
   updatedOn?: string;
+  nonPerformingComments?: NonPerformingComment[];
+  nonPerformingComment?: NonPerformingComment[];
+  newRegistrationComments?: NonPerformingComment[];
+  comments?: NonPerformingComment[];
 };
 
 type Filters = {
@@ -80,6 +99,12 @@ const orangeBtnSx = {
   '&:hover': { bgcolor: '#e08c00' },
 };
 
+const iconActionSx = {
+  p: 0.35,
+  border: '1px solid',
+  borderRadius: 1,
+} as const;
+
 function ColumnSearch({
   value,
   onChange,
@@ -110,9 +135,34 @@ function roundAmount(value: unknown): number {
   return Math.floor(Number(value) || 0);
 }
 
-/** Non Performing User list — ops.nonPerformingUser. */
+/** Tolerant comment lookup (admin-panel-domains / mobile parity). */
+function commentsOf(row: NonPerformingUserRow | null | undefined): NonPerformingComment[] {
+  if (!row) return [];
+  const raw =
+    row.nonPerformingComments ||
+    row.nonPerformingComment ||
+    row.newRegistrationComments ||
+    row.comments ||
+    [];
+  return Array.isArray(raw) ? raw : [];
+}
+
+function commentAuthor(c: NonPerformingComment): string {
+  return String(c.who?.userName || c.userName || c.commented_by || '-');
+}
+
+function commentWhen(c: NonPerformingComment): string {
+  const raw = c.date || c.createdOn || c.createdAt;
+  if (!raw) return '';
+  const date = formatDisplayDate(raw);
+  const time = formatDisplayTime(raw);
+  return [date, time].filter(Boolean).join(' ');
+}
+
+/** Non Performing User list — ops.nonPerformingUser + add/view comments. */
 export function NonPerformingUserPage() {
   const navigate = useNavigate();
+  const admin = getStoredUser<{ _id?: string; name?: string }>();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [appliedStart, setAppliedStart] = useState('');
@@ -122,15 +172,20 @@ export function NonPerformingUserPage() {
   const [clientName, setClientName] = useState('');
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentUserId, setCommentUserId] = useState('');
+  const [commentInput, setCommentInput] = useState('');
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [viewCommentsOpen, setViewCommentsOpen] = useState(false);
+  const [viewComments, setViewComments] = useState<NonPerformingComment[]>([]);
+  const [viewCommentsName, setViewCommentsName] = useState('');
 
   const canShowMobile = hasPermission('show_mobile');
 
   const openUserReport = useCallback(
     (userId?: string, userName?: string) => {
       if (!userId) return;
-      navigate(
-        `/users/report/${userId}/${encodeURIComponent(userName || '')}`,
-      );
+      navigate(`/users/report/${userId}/${encodeURIComponent(userName || '')}`);
     },
     [navigate],
   );
@@ -149,15 +204,13 @@ export function NonPerformingUserPage() {
     return filter;
   }, [applied, clientName]);
 
-  const { rows, totalPages, total, loading, error, load } =
+  const { rows, totalPages, total, loading, error, load, setRows } =
     useReportQuery<NonPerformingUserRow>({
       action: 'ops.nonPerformingUser',
       buildPayload: () => ({
         pageNo: page,
         itemPerPage: itemsPerPage,
-        ...(appliedStart && appliedEnd
-          ? { startDate: appliedStart, endDate: appliedEnd }
-          : {}),
+        ...(appliedStart && appliedEnd ? { startDate: appliedStart, endDate: appliedEnd } : {}),
         filter: buildFilter(),
       }),
       unpack: (res) => asPaged<NonPerformingUserRow>(res.data),
@@ -171,16 +224,67 @@ export function NonPerformingUserPage() {
   }, [draft]);
 
   const applyDates = useCallback(() => {
+    setApplied(draft);
     setAppliedStart(startDate);
     setAppliedEnd(endDate);
     setPage(1);
-  }, [startDate, endDate]);
+  }, [draft, startDate, endDate]);
 
   const setDraftField = useCallback(
-    (key: keyof Filters) => (value: string) =>
-      setDraft((prev) => ({ ...prev, [key]: value })),
+    (key: keyof Filters) => (value: string) => setDraft((prev) => ({ ...prev, [key]: value })),
     [],
   );
+
+  const openAddComment = useCallback((row: NonPerformingUserRow) => {
+    setCommentUserId(row._id);
+    setCommentInput('');
+    setCommentOpen(true);
+  }, []);
+
+  const openViewComments = useCallback((row: NonPerformingUserRow) => {
+    setViewComments(commentsOf(row));
+    setViewCommentsName(String(row.name || ''));
+    setViewCommentsOpen(true);
+  }, []);
+
+  const submitComment = useCallback(async () => {
+    const text = commentInput.trim();
+    if (!text || !commentUserId) {
+      toast.error('Please enter a comment');
+      return;
+    }
+    const newComment: NonPerformingComment = {
+      comment: text,
+      who: { userId: admin?._id, userName: admin?.name },
+      date: new Date().toISOString(),
+    };
+    setCommentBusy(true);
+    try {
+      const res = await secureApi('ops.addNonPerformingComment', {
+        _id: commentUserId,
+        comment: text,
+        who: { userId: admin?._id, userName: admin?.name },
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to add comment');
+        return;
+      }
+      setRows((prev) =>
+        prev.map((u) =>
+          u._id === commentUserId
+            ? { ...u, nonPerformingComments: [...commentsOf(u), newComment] }
+            : u,
+        ),
+      );
+      toast.success('Comment added successfully');
+      setCommentOpen(false);
+      setCommentUserId('');
+      setCommentInput('');
+      void load();
+    } finally {
+      setCommentBusy(false);
+    }
+  }, [admin?._id, admin?.name, commentInput, commentUserId, load, setRows]);
 
   const columns = useMemo<CommonTableColumn<NonPerformingUserRow>[]>(
     () => [
@@ -295,8 +399,7 @@ export function NonPerformingUserPage() {
       {
         id: 'appVersion',
         label: 'Current / Updated App Version',
-        render: (row) =>
-          `${display(row.currentAppVersion)} / ${display(row.updatedAppVersion)}`,
+        render: (row) => `${display(row.currentAppVersion)} / ${display(row.updatedAppVersion)}`,
       },
       {
         id: 'created',
@@ -314,8 +417,73 @@ export function NonPerformingUserPage() {
             ? `${formatDisplayDate(row.updatedOn)} ${formatDisplayTime(row.updatedOn)}`
             : '—',
       },
+      {
+        id: 'comments',
+        label: (
+          <>
+            Add
+            <br />
+            Comment
+          </>
+        ),
+        width: 150,
+        filter: null,
+        render: (row) => {
+          const count = commentsOf(row).length;
+          return (
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.35}>
+              <Tooltip title="Add Comment">
+                <IconButton
+                  size="small"
+                  aria-label="Add Comment"
+                  onClick={() => openAddComment(row)}
+                  sx={{
+                    ...iconActionSx,
+                    color: '#1a1200',
+                    borderColor: '#f1a144',
+                    bgcolor: '#ff9f0a',
+                    '&:hover': { bgcolor: '#e09030' },
+                  }}
+                >
+                  <ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={count > 0 ? `View All (${count})` : 'View All'}>
+                <IconButton
+                  size="small"
+                  aria-label="View All Comments"
+                  onClick={() => openViewComments(row)}
+                  sx={{
+                    ...iconActionSx,
+                    color: 'text.primary',
+                    borderColor: 'divider',
+                    bgcolor: 'transparent',
+                  }}
+                >
+                  <VisibilityOutlinedIcon sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+              {count > 0 ? (
+                <Typography variant="caption" color="text.secondary">
+                  ({count})
+                </Typography>
+              ) : null}
+            </Stack>
+          );
+        },
+      },
     ],
-    [page, itemsPerPage, draft, search, canShowMobile, setDraftField, openUserReport],
+    [
+      page,
+      itemsPerPage,
+      draft,
+      search,
+      canShowMobile,
+      setDraftField,
+      openUserReport,
+      openAddComment,
+      openViewComments,
+    ],
   );
 
   return (
@@ -460,10 +628,88 @@ export function NonPerformingUserPage() {
           emptyMessage="No non performing users found"
           stickyHeader
           dense
-          minWidth={1500}
+          minWidth={1600}
           maxHeight="100%"
         />
       </TablePanel>
+
+      <Dialog
+        open={commentOpen}
+        onClose={() => !commentBusy && setCommentOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Comment</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            label="Please enter Comment"
+            value={commentInput}
+            onChange={(e) => setCommentInput(e.target.value)}
+            disabled={commentBusy}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCommentOpen(false)} disabled={commentBusy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={commentBusy || !commentInput.trim()}
+            onClick={() => void submitComment()}
+          >
+            {commentBusy ? '…' : 'Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={viewCommentsOpen}
+        onClose={() => setViewCommentsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Comments{viewCommentsName ? ` — ${viewCommentsName}` : ''}
+        </DialogTitle>
+        <DialogContent>
+          {viewComments.length === 0 ? (
+            <Typography color="text.secondary" sx={{ py: 2 }}>
+              No Comments
+            </Typography>
+          ) : (
+            <Stack spacing={1.5} sx={{ py: 1 }}>
+              {viewComments.map((c, i) => (
+                <Box
+                  key={`${commentAuthor(c)}-${i}`}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {c.comment || '-'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                    By: {commentAuthor(c)}
+                    {commentWhen(c) ? ` · ${commentWhen(c)}` : ''}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewCommentsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

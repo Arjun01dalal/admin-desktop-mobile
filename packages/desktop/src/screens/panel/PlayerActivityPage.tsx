@@ -35,9 +35,7 @@ export function PlayerActivityPage() {
   const navState = (location.state || {}) as LocationState;
   const lockedSource = Boolean(navState.type);
 
-  const [startDate, setStartDate] = useState(
-    () => navState.startDate || todayIST(),
-  );
+  const [startDate, setStartDate] = useState(() => navState.startDate || todayIST());
   const [endDate, setEndDate] = useState(() => navState.endDate || todayIST());
   const [isQtech, setIsQtech] = useState(() => navState.type === 'Qtech');
   const [loading, setLoading] = useState(false);
@@ -136,10 +134,7 @@ export function PlayerActivityPage() {
         render: (row) => {
           const ggr = getMetric(row, 'ggr');
           return (
-            <Box
-              component="span"
-              sx={{ color: ggr < 0 ? '#e53935' : '#43a047', fontWeight: 600 }}
-            >
+            <Box component="span" sx={{ color: ggr < 0 ? '#e53935' : '#43a047', fontWeight: 600 }}>
               {formatGgr(ggr)}
             </Box>
           );

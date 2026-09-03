@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useDeferredValue,
-  useMemo,
-  useState,
-  type ChangeEvent,
-} from 'react';
+import { useCallback, useDeferredValue, useMemo, useState, type ChangeEvent } from 'react';
 import {
   Alert,
   Box,
@@ -22,15 +16,11 @@ import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { createTableFiltersContext } from '@/components/createTableFiltersContext';
 import { getStoredUser, formatAmount } from '@/utils/dates';
-import {
-  DEFAULT_ITEMS_PER_PAGE,
-  ITEMS_PER_PAGE_OPTIONS,
-} from '@/utils/pagination';
+import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { useSecureQuery } from './useSecureQuery';
 import { toNumber } from './format';
 import { toDisplayText } from './ops/jyotishMapping';
-import { useRevealCodes } from '@/context/useRevealCodes';
 
 type PLRow = {
   _id: string;
@@ -108,9 +98,7 @@ function MobileFilter() {
       value={draft.searchMobile}
       placeholder="Search by mobile"
       width={130}
-      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-        setDraft('searchMobile', e.target.value)
-      }
+      onChange={(e: ChangeEvent<HTMLInputElement>) => setDraft('searchMobile', e.target.value)}
       onSearch={onSearch}
     />
   );
@@ -133,15 +121,9 @@ export function ProfitLossPage() {
   });
   const [filter, setFilter] = useState<Record<string, string>>({});
 
-  const payload = useMemo(
-    () => ({ pageSize, pageNumber: page, filter }),
-    [pageSize, page, filter],
-  );
+  const payload = useMemo(() => ({ pageSize, pageNumber: page, filter }), [pageSize, page, filter]);
 
-  const { data, loading, error, refetch } = useSecureQuery<PLResponse>(
-    'profitLoss.list',
-    payload,
-  );
+  const { data, loading, error, refetch } = useSecureQuery<PLResponse>('profitLoss.list', payload);
 
   const body = data?.payload ?? data;
   const rows: PLRow[] = Array.isArray(body?.data) ? body!.data! : [];
@@ -166,8 +148,6 @@ export function ProfitLossPage() {
     () => ({ draft, setDraft, onSearch: applyFilter }),
     [draft, setDraft, applyFilter],
   );
-
-  const { active: revealActive } = useRevealCodes();
 
   const columns = useMemo<CommonTableColumn<PLRow>[]>(
     () => [
@@ -262,7 +242,7 @@ export function ProfitLossPage() {
         render: (row) => fmt(row.balance),
       },
     ],
-    [page, pageSize, canShowMobile, revealActive],
+    [page, pageSize, canShowMobile],
   );
 
   return (
@@ -306,9 +286,7 @@ export function ProfitLossPage() {
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />}
             onClick={() => void refetch()}
             disabled={loading}
             sx={{ flexShrink: 0 }}

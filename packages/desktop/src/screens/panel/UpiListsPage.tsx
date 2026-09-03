@@ -55,10 +55,7 @@ export function UpiListsPage() {
   const canToggle = hasPermission(Permissions.Toggle_UPI);
 
   const buildPayload = useCallback(() => ({}), []);
-  const unpack = useCallback(
-    (res: { data?: unknown }) => ({ rows: asList<UpiRow>(res.data) }),
-    [],
-  );
+  const unpack = useCallback((res: { data?: unknown }) => ({ rows: asList<UpiRow>(res.data) }), []);
 
   const { rows, loading, load, setRows } = useReportQuery<UpiRow>({
     action: 'ops.upiGetAll',
@@ -212,20 +209,13 @@ export function UpiListsPage() {
         </Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           {canAdd ? (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={openAdd}
-              sx={orangeBtnSx}
-            >
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd} sx={orangeBtnSx}>
               Add
             </Button>
           ) : null}
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{
@@ -257,7 +247,12 @@ export function UpiListsPage() {
         />
       </TablePanel>
 
-      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={addOpen}
+        onClose={() => !submitting && setAddOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <form onSubmit={handleCreate}>
           <DialogTitle>Add UPI</DialogTitle>
           <DialogContent>
@@ -281,9 +276,7 @@ export function UpiListsPage() {
                 control={
                   <Switch
                     checked={form.status}
-                    onChange={(_e, checked) =>
-                      setForm((prev) => ({ ...prev, status: checked }))
-                    }
+                    onChange={(_e, checked) => setForm((prev) => ({ ...prev, status: checked }))}
                     color="warning"
                   />
                 }

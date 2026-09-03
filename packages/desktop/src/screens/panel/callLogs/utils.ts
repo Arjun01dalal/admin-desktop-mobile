@@ -1,13 +1,9 @@
-import * as XLSX from 'xlsx';
 import { getRoleId, getRoleName } from '@/auth/permissions';
 import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
 import type { AuthUser } from '@/types/gcalc';
+import { readSpreadsheetRows } from '@/utils/spreadsheet';
 import { STATE_LANGUAGE_MAP } from './constants';
-import type {
-  CallLogRow,
-  DialerConnectDetails,
-  DialerLead,
-} from './types';
+import type { CallLogRow, CallSummaryResponse, DialerConnectDetails, DialerLead } from './types';
 import { MAX_EXCEL_LEADS } from './types';
 
 export type DialLead = {
@@ -43,10 +39,15 @@ export function toMinSec(second: unknown): string {
 }
 
 /** Normalize assigned bot IDs from login user (`botIds` or `botNo`). */
-export function getAssignedBotIds(user: {
-  botIds?: Array<string | number> | string;
-  botNo?: Array<string | number> | string;
-} | null | undefined): number[] {
+export function getAssignedBotIds(
+  user:
+    | {
+        botIds?: Array<string | number> | string;
+        botNo?: Array<string | number> | string;
+      }
+    | null
+    | undefined,
+): number[] {
   const raw = user?.botIds ?? user?.botNo;
   if (raw == null || raw === '') return [];
   const list = Array.isArray(raw)
@@ -54,13 +55,7 @@ export function getAssignedBotIds(user: {
     : String(raw)
         .split(/[,\s]+/)
         .filter(Boolean);
-  return Array.from(
-    new Set(
-      list
-        .map((v) => Number(v))
-        .filter((n) => Number.isFinite(n) && n > 0),
-    ),
-  );
+  return Array.from(new Set(list.map((v) => Number(v)).filter((n) => Number.isFinite(n) && n > 0)));
 }
 
 /** Normalize role label for caller checks. */
@@ -78,12 +73,15 @@ function normalizeCallerRoleName(value: string): string {
  * Excludes caller_head variants.
  */
 export function isCallLogsCaller(
-  user: {
-    Role_ID?: string;
-    role?: string;
-    Role_Name?: string;
-    roles?: AuthUser['roles'];
-  } | null | undefined,
+  user:
+    | {
+        Role_ID?: string;
+        role?: string;
+        Role_Name?: string;
+        roles?: AuthUser['roles'];
+      }
+    | null
+    | undefined,
 ): boolean {
   const roleId = getRoleId(user ?? null).trim();
   if (roleId && CALLER_ROLE_IDS.has(roleId)) return true;
@@ -110,12 +108,7 @@ export function formatStatusLabel(item: CallLogRow): string {
   return status || '-';
 }
 
-export type StatusBadgeTone =
-  | 'completed'
-  | 'no-answer'
-  | 'busy'
-  | 'deleted'
-  | 'default';
+export type StatusBadgeTone = 'completed' | 'no-answer' | 'busy' | 'deleted' | 'default';
 
 export function statusBadgeTone(item: CallLogRow): StatusBadgeTone {
   const status = String(item.status || '');
@@ -177,58 +170,32 @@ export function toDialerLead(item: CallLogRow): DialerLead {
 }
 
 export function extractDialLeadsFromExcel(file: File): Promise<DialLead[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-          defval: '',
-        });
+  return readSpreadsheetRows(file, { maxRows: MAX_EXCEL_LEADS }).then((jsonData) => {
+    if (!jsonData.length) throw new Error('Excel file is empty');
 
-        if (!jsonData.length) {
-          reject(new Error('Excel file is empty'));
-          return;
-        }
-        if (jsonData.length > MAX_EXCEL_LEADS) {
-          reject(new Error(`Excel exceeds max ${MAX_EXCEL_LEADS} rows`));
-          return;
-        }
+    const excelColumns = Object.keys(jsonData[0]);
+    const missing = ['number', 'state', 'botId'].filter((c) => !excelColumns.includes(c));
+    if (missing.length) {
+      throw new Error(`Invalid Excel file. Missing columns: ${missing.join(', ')}`);
+    }
 
-        const excelColumns = Object.keys(jsonData[0]);
-        const missing = ['number', 'state', 'botId'].filter((c) => !excelColumns.includes(c));
-        if (missing.length) {
-          reject(new Error(`Invalid Excel file. Missing columns: ${missing.join(', ')}`));
-          return;
-        }
-
-        resolve(
-          jsonData.map((row) => {
-            const state = String(row.state || '');
-            const rawPhone = String(row.number || '').replace(/\D/g, '');
-            const botId = Number(row.botId);
-            return {
-              phone_number: rawPhone,
-              app_name: 'OS Games',
-              language: STATE_LANGUAGE_MAP[state] ?? 'hindi',
-              client_name: 'Sir',
-              id: '',
-              state,
-              city: '',
-              email: '',
-              botId: Number.isFinite(botId) && botId > 0 ? botId : 1,
-              reason: String(row.reason || 'New Leads').slice(0, 200),
-            };
-          }),
-        );
-      } catch (err) {
-        reject(err instanceof Error ? err : new Error('Failed to read Excel'));
-      }
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
+    return jsonData.map((row) => {
+      const state = String(row.state || '');
+      const rawPhone = String(row.number || '').replace(/\D/g, '');
+      const botId = Number(row.botId);
+      return {
+        phone_number: rawPhone,
+        app_name: 'OS Games',
+        language: STATE_LANGUAGE_MAP[state] ?? 'hindi',
+        client_name: 'Sir',
+        id: '',
+        state,
+        city: '',
+        email: '',
+        botId: Number.isFinite(botId) && botId > 0 ? botId : 1,
+        reason: String(row.reason || 'New Leads').slice(0, 200),
+      };
+    });
   });
 }
 
@@ -249,9 +216,7 @@ export function filterCallsClientSide(
     return next.filter((c) => c.status === 'completed' && c.call_duration);
   }
   if (selectedStatus === 'no-answer') {
-    return next.filter((c) =>
-      ['busy', 'no-answer', 'failed'].includes(String(c.status || '')),
-    );
+    return next.filter((c) => ['busy', 'no-answer', 'failed'].includes(String(c.status || '')));
   }
   return next;
 }
@@ -302,16 +267,6 @@ export function buildBotSummaryRows(
   });
 }
 
-type SummaryFlag = {
-  flag?: unknown;
-  reason?: string;
-  level?: unknown;
-  required?: unknown;
-  value?: unknown;
-  detected?: unknown;
-  types?: string[];
-};
-
 export type CallRecordRow = {
   title: string;
   value: string;
@@ -323,29 +278,20 @@ export type CallRecordRow = {
  * Accepts either `{ data: { analysis, transcript } }` or nested analysis object.
  */
 export function buildCallRecordRows(
-  summaryData: Record<string, unknown> | null | undefined,
+  summaryData: CallSummaryResponse | null | undefined,
 ): CallRecordRow[] {
-  if (!summaryData || typeof summaryData !== 'object') return [];
+  const envelope = summaryData?.data;
+  if (!envelope) return [];
+  const raw = envelope.analysis ?? envelope;
 
-  const envelope =
-    summaryData.data && typeof summaryData.data === 'object'
-      ? (summaryData.data as Record<string, unknown>)
-      : summaryData;
-  const raw =
-    envelope.analysis && typeof envelope.analysis === 'object'
-      ? (envelope.analysis as Record<string, unknown>)
-      : envelope;
-
-  if (!raw || typeof raw !== 'object') return [];
-
-  const threat = raw.threat as SummaryFlag | undefined;
-  const priority = raw.priority as SummaryFlag | undefined;
-  const humanIntervention = raw.human_intervention as SummaryFlag | undefined;
-  const satisfaction = raw.satisfaction as SummaryFlag | undefined;
-  const frustration = raw.frustration as SummaryFlag | undefined;
-  const nuisance = raw.nuisance as SummaryFlag | undefined;
-  const repeatedComplaint = raw.repeated_complaint as SummaryFlag | undefined;
-  const piiDetails = raw.pii_details as SummaryFlag | undefined;
+  const threat = raw.threat;
+  const priority = raw.priority;
+  const humanIntervention = raw.human_intervention;
+  const satisfaction = raw.satisfaction;
+  const frustration = raw.frustration;
+  const nuisance = raw.nuisance;
+  const repeatedComplaint = raw.repeated_complaint;
+  const piiDetails = raw.pii_details;
 
   const cell = (v: unknown, fallback = '—') => {
     if (v == null || v === '') return fallback;

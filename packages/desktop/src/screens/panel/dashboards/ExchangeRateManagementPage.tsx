@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Paper,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { todayIST } from '@/utils/dates';
@@ -56,20 +49,13 @@ export function ExchangeRateManagementPage() {
       // Laxmi: Object.entries(oldExchData) where each value is a game card.
       if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
         const entries = Object.entries(raw as Record<string, unknown>)
-          .filter(
-            ([, v]) => v && typeof v === 'object' && !Array.isArray(v),
-          )
+          .filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v))
           .map(([k, v]) => [k, v as GameCard] as [string, GameCard]);
         setGames(entries);
         return;
       }
       if (Array.isArray(raw)) {
-        setGames(
-          (raw as GameCard[]).map((g, i) => [
-            String(g.gameId ?? i),
-            g,
-          ]),
-        );
+        setGames((raw as GameCard[]).map((g, i) => [String(g.gameId ?? i), g]));
         return;
       }
       setGames([]);
@@ -99,12 +85,7 @@ export function ExchangeRateManagementPage() {
             {startDate} → {endDate}
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          color="warning"
-          onClick={() => void load()}
-          disabled={loading}
-        >
+        <Button variant="contained" color="warning" onClick={() => void load()} disabled={loading}>
           Refresh
         </Button>
       </Stack>
@@ -194,8 +175,7 @@ export function ExchangeRateManagementPage() {
                       </Typography>
                       {mkt.settleDateTime ? (
                         <Typography variant="caption" color="text.secondary">
-                          Settled On:{' '}
-                          {new Date(mkt.settleDateTime).toLocaleString()}
+                          Settled On: {new Date(mkt.settleDateTime).toLocaleString()}
                         </Typography>
                       ) : null}
                     </Box>
@@ -213,18 +193,11 @@ export function ExchangeRateManagementPage() {
                       }))
                     }
                   >
-                    {isOpen
-                      ? 'Show Less ↑'
-                      : `Show More (${markets.length - 3}) ↓`}
+                    {isOpen ? 'Show Less ↑' : `Show More (${markets.length - 3}) ↓`}
                   </Button>
                 )}
 
-                <Typography
-                  variant="body2"
-                  fontWeight={800}
-                  textAlign="center"
-                  mt={0.5}
-                >
+                <Typography variant="body2" fontWeight={800} textAlign="center" mt={0.5}>
                   Total Game P/L:{' '}
                   <Box
                     component="span"

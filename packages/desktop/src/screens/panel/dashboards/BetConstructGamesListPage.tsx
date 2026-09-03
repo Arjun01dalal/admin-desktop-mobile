@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
@@ -44,6 +36,11 @@ type Summary = {
   ggr?: number;
 };
 
+type BetConstructResponse = {
+  byGame?: GameRow[];
+  summary?: Summary;
+};
+
 /**
  * BetConstruct game-wise GGR — laxminarayan `/betConstructGamesList`
  * (opened from dashboard card, not the `/betConstruct-lists` games CRUD page).
@@ -52,9 +49,7 @@ export function BetConstructGamesListPage() {
   const location = useLocation();
   const nav = (location.state || {}) as LocationState;
 
-  const [startDate, setStartDate] = useState(
-    () => nav.startDate || todayIST(),
-  );
+  const [startDate, setStartDate] = useState(() => nav.startDate || todayIST());
   const [endDate, setEndDate] = useState(() => nav.endDate || todayIST());
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<GameRow[]>([]);
@@ -63,7 +58,7 @@ export function BetConstructGamesListPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await secureApi('dashboard.betConstructGameWiseGgr', {
+      const res = await secureApi<BetConstructResponse>('dashboard.betConstructGameWiseGgr', {
         startDate,
         endDate,
       });
@@ -73,17 +68,8 @@ export function BetConstructGamesListPage() {
         setSummary({});
         return;
       }
-      const payload =
-        res.data && typeof res.data === 'object'
-          ? (res.data as Record<string, unknown>)
-          : {};
-      const byGame = Array.isArray(payload.byGame)
-        ? (payload.byGame as GameRow[])
-        : [];
-      const sum =
-        payload.summary && typeof payload.summary === 'object'
-          ? (payload.summary as Summary)
-          : {};
+      const byGame = res.data?.byGame ?? [];
+      const sum = res.data?.summary ?? {};
       setRows(byGame);
       setSummary(sum);
     } finally {
@@ -93,7 +79,7 @@ export function BetConstructGamesListPage() {
 
   useEffect(() => {
     void load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — initial load only; Apply refreshes
+  }, [load]);
 
   const columns = useMemo<CommonTableColumn<GameRow>[]>(
     () => [
@@ -159,13 +145,7 @@ export function BetConstructGamesListPage() {
       </Typography>
 
       <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
-        <Stack
-          direction="row"
-          spacing={1.5}
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-        >
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <TextField
             type="date"
             label="From Date"
@@ -189,13 +169,7 @@ export function BetConstructGamesListPage() {
           <Button
             variant="contained"
             color="warning"
-            startIcon={
-              loading ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <RefreshIcon />
-              )
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             disabled={loading}
             onClick={() => void load()}
           >
@@ -220,15 +194,15 @@ export function BetConstructGamesListPage() {
       </Paper>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        emptyMessage="No BetConstruct game data"
-        stickyHeader
-        dense
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+          emptyMessage="No BetConstruct game data"
+          stickyHeader
+          dense
+          maxHeight="100%"
+        />
       </TablePanel>
     </Box>
   );

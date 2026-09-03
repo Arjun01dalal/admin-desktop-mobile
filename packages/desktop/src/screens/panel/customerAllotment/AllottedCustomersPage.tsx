@@ -115,9 +115,8 @@ export function AllottedCustomersPage() {
 
         const data = (res.data || {}) as Record<string, unknown>;
         const rawItems = Array.isArray(data.items) ? data.items : [];
-        const items = rawItems.filter(
-          (row): row is AllottedCustomerRow =>
-            Boolean(row && typeof row === 'object' && (row as AllottedCustomerRow)._id != null),
+        const items = rawItems.filter((row): row is AllottedCustomerRow =>
+          Boolean(row && typeof row === 'object' && (row as AllottedCustomerRow)._id != null),
         );
         startTransition(() => {
           setRows(items);
@@ -217,7 +216,13 @@ export function AllottedCustomersPage() {
     >
       <TablePanel
         footer={
-          <ReportPager page={page} totalPages={totalPages} onChange={setPage} disabled={loading} total={total} />
+          <ReportPager
+            page={page}
+            totalPages={totalPages}
+            onChange={setPage}
+            disabled={loading}
+            total={total}
+          />
         }
       >
         <DataTable

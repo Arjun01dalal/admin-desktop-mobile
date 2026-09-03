@@ -75,10 +75,7 @@ export function UtrProviderPage() {
     }),
     [startDate, endDate],
   );
-  const unpack = useCallback(
-    (res: { data?: unknown }) => ({ rows: asList<UtrRow>(res.data) }),
-    [],
-  );
+  const unpack = useCallback((res: { data?: unknown }) => ({ rows: asList<UtrRow>(res.data) }), []);
 
   const { rows, loading, load, setRows } = useReportQuery<UtrRow>({
     action: 'ops.utrGetAll',
@@ -249,24 +246,14 @@ export function UtrProviderPage() {
 
   return (
     <Box>
-      <CollapsibleFilterPanel
-        title="UTR Providers"
-        summary={`${startDate} → ${endDate}`}
-      >
+      <CollapsibleFilterPanel title="UTR Providers" summary={`${startDate} → ${endDate}`}>
         <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openAdd}
-            sx={orangeBtnSx}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd} sx={orangeBtnSx}>
             Add
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{
@@ -326,7 +313,12 @@ export function UtrProviderPage() {
         />
       </TablePanel>
 
-      <Dialog open={addOpen} onClose={() => !submitting && setAddOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={addOpen}
+        onClose={() => !submitting && setAddOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
         <form onSubmit={handleCreate}>
           <DialogTitle>Add UTR Provider</DialogTitle>
           <DialogContent>
@@ -344,9 +336,7 @@ export function UtrProviderPage() {
                 size="small"
                 fullWidth
                 value={form.accountNumber}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, accountNumber: e.target.value }))
-                }
+                onChange={(e) => setForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
               />
               <TextField
                 label="Account Holder Name"

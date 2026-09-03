@@ -10,7 +10,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { pathToFileURL } = require('node:url');
-const { optionalEnv } = require('./config.cjs');
+const { getApiBaseUrl, optionalEnv } = require('./config.cjs');
 const { report: reportError } = require('./errorMonitor.cjs');
 const ctx = require('./ctx.cjs');
 
@@ -37,6 +37,28 @@ const recordingCache = new Map();
 /** @type {Map<string, Promise<{ filePath: string, type: string, size: number, at: number } | { error: string, status: number }>>} */
 const inflightLoads = new Map();
 
+function recordingAllowedOrigins() {
+  const configured = optionalEnv('RECORDING_ALLOWED_HOSTS')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const values = configured.length ? configured : [getApiBaseUrl()];
+  const origins = new Set();
+  for (const value of values) {
+    try {
+      const url = new URL(/^https:\/\//i.test(value) ? value : `https://${value}`);
+      if (url.protocol === 'https:') origins.add(url.origin);
+    } catch {
+      // Ignore malformed allowlist entries.
+    }
+  }
+  return origins;
+}
+
+function isAllowedRecordingTarget(targetUrl) {
+  return recordingAllowedOrigins().has(targetUrl.origin);
+}
+
 function cacheDir() {
   return path.join(app.getPath('userData'), 'recording-cache');
 }
@@ -52,7 +74,10 @@ function cacheKey(targetUrl) {
 }
 
 function recordingContentType(targetUrl, upstreamType) {
-  const upstream = String(upstreamType || '').split(';')[0].trim().toLowerCase();
+  const upstream = String(upstreamType || '')
+    .split(';')[0]
+    .trim()
+    .toLowerCase();
   if (upstream.startsWith('audio/') || upstream.startsWith('video/')) return upstream;
   try {
     const ext = path.extname(new URL(targetUrl).pathname).toLowerCase();
@@ -65,8 +90,10 @@ function recordingContentType(targetUrl, upstreamType) {
 
 function authHeaders() {
   const headers = new Headers({ Accept: 'audio/*,*/*;q=0.8' });
-  const username = optionalEnv('RECORDING_BASIC_AUTH_USERNAME');
-  const password = optionalEnv('RECORDING_BASIC_AUTH_PASSWORD');
+  // Credentials are runtime-only. They must come from the host environment or
+  // a server-side proxy, never from env.generated.cjs in a packaged installer.
+  const username = process.env.RECORDING_BASIC_AUTH_USERNAME || '';
+  const password = process.env.RECORDING_BASIC_AUTH_PASSWORD || '';
   if (username && password) {
     headers.set(
       'Authorization',
@@ -110,7 +137,10 @@ function purgeExpiredCache() {
  * Stream upstream body to disk (chunked) so peak RAM stays near chunk size.
  */
 async function downloadRecordingToDisk(targetUrl) {
-  const res = await net.fetch(targetUrl, { headers: authHeaders() });
+  const res = await net.fetch(targetUrl, {
+    headers: authHeaders(),
+    redirect: 'error',
+  });
   if (!res.ok) {
     return {
       error:
@@ -296,6 +326,9 @@ function registerAppProtocol() {
       const targetUrl = new URL(decodeURIComponent(encodedTarget));
       if (targetUrl.protocol !== 'https:') {
         return new Response('Only HTTPS recordings are allowed', { status: 400 });
+      }
+      if (!isAllowedRecordingTarget(targetUrl)) {
+        return new Response('Recording host is not allowlisted', { status: 403 });
       }
 
       const loaded = await ensureRecordingCached(targetUrl.toString());

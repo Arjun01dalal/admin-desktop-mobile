@@ -20,9 +20,7 @@ export function stableKey(value: unknown): string {
 export function isCallerRole(roleId?: string, roleName?: string): boolean {
   const id = String(roleId || localStorage.getItem('role_id') || '');
   if (id && CALLER_ROLE_IDS.has(id)) return true;
-  const name = String(
-    roleName || localStorage.getItem('role') || '',
-  )
+  const name = String(roleName || localStorage.getItem('role') || '')
     .trim()
     .toLowerCase()
     .replace(/[-\s]+/g, '_');

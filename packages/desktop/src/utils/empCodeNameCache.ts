@@ -12,10 +12,9 @@ export async function getEmpCodeNameMap(options?: {
   forceRefresh?: boolean;
 }): Promise<Record<string, string>> {
   return sharedGetEmpCodeNameMap(async () => {
-    const res = await secureApi<EmpCodeNameFetchResult>(
-      'ops.callerAllotmentSubadmins',
-      { filter: {} },
-    );
+    const res = await secureApi<EmpCodeNameFetchResult>('ops.callerAllotmentSubadmins', {
+      filter: {},
+    });
     if (!res.ok) return null;
     return (res.data as EmpCodeNameFetchResult) || null;
   }, options);

@@ -41,17 +41,11 @@ function setupAutoUpdate() {
   // Prefer baked app-update.yml (always present in NSIS/dmg). package.json
   // `build` is stripped from the packaged asar, so do not require it.
   // Only call setFeedURL when a private-repo token is available.
-  const updateToken =
-    process.env.GH_TOKEN ||
-    process.env.GITHUB_TOKEN ||
-    getGhUpdateToken() ||
-    '';
+  const updateToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || getGhUpdateToken() || '';
   if (updateToken) {
     try {
       const ymlPath = path.join(process.resourcesPath, 'app-update.yml');
-      const yml = fs.existsSync(ymlPath)
-        ? fs.readFileSync(ymlPath, 'utf8')
-        : '';
+      const yml = fs.existsSync(ymlPath) ? fs.readFileSync(ymlPath, 'utf8') : '';
       const owner = (yml.match(/^owner:\s*(.+)$/m) || [])[1]?.trim();
       const repo = (yml.match(/^repo:\s*(.+)$/m) || [])[1]?.trim();
       if (owner && repo) {
@@ -82,6 +76,45 @@ function setupAutoUpdate() {
   let availableDialogShown = false;
   let readyDialogShown = false;
   let errorDialogShown = false;
+  /** Mandatory install — user cannot continue on the old build. */
+  let updateReady = false;
+  let installing = false;
+  let readyPromptInFlight = false;
+
+  const forceInstall = () => {
+    if (installing) return;
+    installing = true;
+    try {
+      autoUpdater.quitAndInstall(false, true);
+    } catch (err) {
+      installing = false;
+      console.warn('autoUpdater quitAndInstall failed:', err?.message || err);
+    }
+  };
+
+  const promptReadyInstall = async (version) => {
+    if (installing || readyPromptInFlight) return;
+    readyPromptInFlight = true;
+    prepareUpdateUi();
+    try {
+      await showUpdateDialog({
+        type: 'info',
+        title: 'Update Required',
+        message: `Version ${version || ''} is ready to install.`,
+        detail:
+          'You must restart and update to continue using the panel. The current version can no longer be used.',
+        buttons: ['Restart & Update'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+    } catch (err) {
+      console.warn('autoUpdater ready dialog failed:', err?.message || err);
+    } finally {
+      readyPromptInFlight = false;
+    }
+    forceInstall();
+  };
 
   autoUpdater.on('checking-for-update', () => {
     console.log(
@@ -98,50 +131,30 @@ function setupAutoUpdate() {
     console.log('autoUpdater: update available', info.version);
     publishUpdate('update:available', { version: info.version });
     // Show immediately — do not wait for the ~100MB+ download to finish.
+    // Keep site blocked until the mandatory install finishes.
     if (!availableDialogShown) {
       availableDialogShown = true;
       void showUpdateDialog({
         type: 'info',
-        title: 'Update Available',
-        message: `Version ${info.version} is available.`,
+        title: 'Update Required',
+        message: `Version ${info.version} is required.`,
         detail:
-          'Downloading in the background. You will be asked to restart when it is ready (~1–3 minutes on typical connections).',
+          'Downloading in the background. When it finishes you must restart to continue (~1–3 minutes on typical connections).',
         buttons: ['OK'],
         noLink: true,
-      }).catch((err) =>
-        console.warn('autoUpdater available dialog failed:', err?.message || err),
-      );
+      }).catch((err) => console.warn('autoUpdater available dialog failed:', err?.message || err));
     }
   });
   autoUpdater.on('download-progress', (p) => {
     publishUpdate('update:progress', { percent: Math.round(p.percent) });
   });
-  autoUpdater.on('update-downloaded', async (info) => {
+  autoUpdater.on('update-downloaded', (info) => {
     console.log('autoUpdater: downloaded', info.version);
+    updateReady = true;
     publishUpdate('update:ready', { version: info.version });
     if (readyDialogShown) return;
     readyDialogShown = true;
-    try {
-      const result = await showUpdateDialog({
-        type: 'info',
-        title: 'Update Ready',
-        message: `Version ${info.version} is ready to install.`,
-        detail: 'Restart now to update, or choose Later.',
-        buttons: ['Restart & Update', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-        noLink: true,
-      });
-      if (result.response === 0) {
-        autoUpdater.quitAndInstall(false, true);
-      } else {
-        // User deferred install — allow site view again; React toast still available.
-        ctx.blockSiteForUpdate = false;
-      }
-    } catch (err) {
-      console.warn('autoUpdater ready dialog failed:', err?.message || err);
-      ctx.blockSiteForUpdate = false;
-    }
+    void promptReadyInstall(info.version);
   });
   autoUpdater.on('error', (err) => {
     const message = err?.message || String(err);
@@ -162,7 +175,8 @@ function setupAutoUpdate() {
       })
         .catch(() => {})
         .finally(() => {
-          ctx.blockSiteForUpdate = false;
+          // Only unblock if we never got a ready package — otherwise keep forced.
+          if (!updateReady) ctx.blockSiteForUpdate = false;
         });
     }
   });
@@ -172,7 +186,7 @@ function setupAutoUpdate() {
 
   const runCheck = (force = false) => {
     // Don't re-check while a ready dialog is already up / install pending.
-    if (readyDialogShown) return;
+    if (readyDialogShown || updateReady) return;
     const now = Date.now();
     if (!force && now - lastCheckAt < MIN_CHECK_GAP_MS) return;
     lastCheckAt = now;
@@ -192,11 +206,20 @@ function setupAutoUpdate() {
   setInterval(() => runCheck(true), PERIODIC_MS);
 
   app.on('browser-window-focus', () => {
+    if (updateReady) {
+      // User tried to keep working — force the install prompt again.
+      if (!installing) void promptReadyInstall(ctx.lastUpdateEvent?.payload?.version);
+      return;
+    }
     if (readyDialogShown || availableDialogShown) return;
     runCheck(false); // throttled
   });
-}
 
+  // Closing / quitting with a downloaded update must install — no skip path.
+  app.on('before-quit', () => {
+    if (updateReady) forceInstall();
+  });
+}
 
 ctx.setupAutoUpdate = setupAutoUpdate;
 ctx.prepareUpdateUi = prepareUpdateUi;

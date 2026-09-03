@@ -67,15 +67,8 @@ import {
   UserUpiCell,
 } from '@/screens/panel/deposit/DepositCells';
 import { SettleDialog } from '@/screens/panel/deposit/SettleDialog';
-import {
-  canEditDeposit,
-  canShowCheckAction,
-  type ScannerRow,
-} from '@/screens/panel/deposit/logic';
-import {
-  getCachedEmpCodeNameMap,
-  getEmpCodeNameMap,
-} from '@/utils/empCodeNameCache';
+import { canEditDeposit, canShowCheckAction, type ScannerRow } from '@/screens/panel/deposit/logic';
+import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '@/utils/empCodeNameCache';
 
 type RequestType = 'automatic' | 'scannerDeposit';
 
@@ -194,8 +187,8 @@ export function DepositPage() {
   const [checkingId, setCheckingId] = useState('');
   const [scannerRows, setScannerRows] = useState<ScannerRow[]>([]);
   const [scannerLoading, setScannerLoading] = useState(false);
-  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
-    () => getCachedEmpCodeNameMap(),
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
+    getCachedEmpCodeNameMap(),
   );
 
   const isScanner = requestType === 'scannerDeposit';
@@ -269,14 +262,10 @@ export function DepositPage() {
           : asList<MidOption>(midRes.data);
       const cleaned = list.filter((m) => m && m.mid != null && m.mid !== '');
       setMids(cleaned);
-      const fromMids = cleaned
-        .map((m) => m.paymentGatewayName || m.name || '')
-        .filter(Boolean);
+      const fromMids = cleaned.map((m) => m.paymentGatewayName || m.name || '').filter(Boolean);
       if (gwRes.ok) {
         const gwList = asList<{ name?: string; paymentGatewayName?: string }>(gwRes.data);
-        const names = gwList
-          .map((g) => g.name || g.paymentGatewayName || '')
-          .filter(Boolean);
+        const names = gwList.map((g) => g.name || g.paymentGatewayName || '').filter(Boolean);
         setGateways(Array.from(new Set([...names, ...fromMids])));
       } else {
         setGateways(Array.from(new Set(fromMids)));
@@ -285,9 +274,7 @@ export function DepositPage() {
     }
     if (gwRes.ok) {
       const gwList = asList<{ name?: string; paymentGatewayName?: string }>(gwRes.data);
-      setGateways(
-        gwList.map((g) => g.name || g.paymentGatewayName || '').filter(Boolean),
-      );
+      setGateways(gwList.map((g) => g.name || g.paymentGatewayName || '').filter(Boolean));
     }
   }, []);
 
@@ -412,9 +399,8 @@ export function DepositPage() {
     [],
   );
 
-  const onDraftChange =
-    (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
-      setDraftField(key)(e.target.value);
+  const onDraftChange = (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
+    setDraftField(key)(e.target.value);
 
   const downloadExcel = useCallback(() => {
     const source = isScanner ? scannerRows : rows;
@@ -430,10 +416,7 @@ export function DepositPage() {
     setSelectedOrders((prev) => {
       if (checked) {
         if (prev.some((o) => o.orderId === orderId)) return prev;
-        return [
-          ...prev,
-          { orderId, paymentGatewayName: row.paymentGatewayName || '' },
-        ];
+        return [...prev, { orderId, paymentGatewayName: row.paymentGatewayName || '' }];
       }
       return prev.filter((o) => o.orderId !== orderId);
     });
@@ -649,9 +632,7 @@ export function DepositPage() {
             }}
             onClick={() => {
               if (!row.userId) return;
-              navigate(
-                `/users/report/${row.userId}/${encodeURIComponent(row.userName || '')}`,
-              );
+              navigate(`/users/report/${row.userId}/${encodeURIComponent(row.userName || '')}`);
             }}
           >
             {display(row.userName)}
@@ -737,16 +718,17 @@ export function DepositPage() {
         id: 'txnDetails',
         label: 'Txn Details',
         width: 120,
+        render: (row) => <TxnDetailsCell row={row} compact={compactRows} />,
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        width: 110,
         filter: selectFilter(
           'status',
           DEPOSIT_STATUSES.map((s) => ({ value: s, label: s || 'All' })),
         ),
-        render: (row) => (
-          <TxnDetailsCell
-            row={row}
-            compact={compactRows}
-          />
-        ),
+        render: (row) => display(row.status),
       },
       {
         id: 'lastActivity',
@@ -887,9 +869,7 @@ export function DepositPage() {
         label: 'Update By Name',
         width: 120,
         render: (row) =>
-          display(
-            typeof row.updatedBy === 'object' ? row.updatedBy?.name : row.updatedBy,
-          ),
+          display(typeof row.updatedBy === 'object' ? row.updatedBy?.name : row.updatedBy),
       },
       {
         id: 'reason',
@@ -968,9 +948,7 @@ export function DepositPage() {
         id: 'givenBy',
         label: 'Given By',
         render: (row) =>
-          display(
-            typeof row.updatedBy === 'object' ? row.updatedBy?.name : row.updatedBy,
-          ),
+          display(typeof row.updatedBy === 'object' ? row.updatedBy?.name : row.updatedBy),
       },
       {
         id: 'reason',
@@ -1007,7 +985,10 @@ export function DepositPage() {
         label: 'Last Activity',
         render: (row) => {
           if (!row.updatedOn) return '—';
-          return `${formatDisplayDate(row.updatedOn) || ''} ${formatDisplayTime(row.updatedOn) || ''}`.trim() || '—';
+          return (
+            `${formatDisplayDate(row.updatedOn) || ''} ${formatDisplayTime(row.updatedOn) || ''}`.trim() ||
+            '—'
+          );
         },
       },
     ],
@@ -1018,14 +999,13 @@ export function DepositPage() {
     (row: DepositRow) => {
       const status = String(row.status || '').toLowerCase();
       const isPending = status === 'pending' || status === 'processing';
-      const isApproved =
-        status === 'approved' || status === 'approved-clr' || status === 'success';
+      const isApproved = status === 'approved' || status === 'approved-clr' || status === 'success';
       const bg = depositRowBg(row.status, isLightMode ? 'light' : 'dark');
       const text = isLightMode ? '#1a1a1f' : '#e8e8ea';
       const border = isLightMode
         ? 'rgba(0, 0, 0, 0.12) !important'
         : isApproved
-          ? 'rgba(154, 255, 77, 0.35) !important'
+          ? 'rgba(255, 159, 10, 0.40) !important'
           : 'rgba(255, 255, 255, 0.10) !important';
       const pendingTighten = isPending
         ? {
@@ -1124,10 +1104,10 @@ export function DepositPage() {
             ) : null}
             {!toolbarOpen ? (
               <>
-                <Chip size="small" label={`Total deposits: ${total}`} sx={chipSx} />
+                <Chip size="small" label={`Total User : ${total}`} sx={chipSx} />
                 <Chip
                   size="small"
-                  label={`Unique pending (${uniquePending?.pendingCount ?? 0}): ${formatAmount(uniquePending?.pendingAmount ?? 0)}`}
+                  label={`Unique Pending Deposit (${uniquePending?.pendingCount ?? 0}) : ${uniquePending?.pendingAmount ?? 0}`}
                   sx={chipSx}
                 />
                 <Chip
@@ -1136,14 +1116,19 @@ export function DepositPage() {
                   sx={chipSx}
                 />
                 {isScanner ? (
-                  <Chip
-                    size="small"
-                    label={`Scanner: ${formatAmount(scannerTotal)}`}
-                    sx={chipSx}
-                  />
+                  <Chip size="small" label={`Scanner: ${formatAmount(scannerTotal)}`} sx={chipSx} />
                 ) : null}
               </>
-            ) : null}
+            ) : (
+              <>
+                <Chip size="small" label={`Total User : ${total}`} sx={chipSx} />
+                <Chip
+                  size="small"
+                  label={`Unique Pending Deposit (${uniquePending?.pendingCount ?? 0}) : ${uniquePending?.pendingAmount ?? 0}`}
+                  sx={chipSx}
+                />
+              </>
+            )}
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1}>
             <ToggleButtonGroup
@@ -1335,20 +1320,15 @@ export function DepositPage() {
               alignItems="center"
               sx={{ mt: 1.25 }}
             >
-              <Chip size="small" label={`Total deposits: ${total}`} sx={chipSx} />
+              <Chip size="small" label={`Total User : ${total}`} sx={chipSx} />
               <Chip
                 size="small"
                 label={`Approved (${depositData?.depositApprovedCount ?? 0}): ${formatAmount(depositData?.depositApprovedTotal ?? 0)}`}
-                sx={statusChipSx('#8BE03A', 'rgba(154,255,77,0.16)')}
+                sx={statusChipSx('#ff9f0a', 'rgba(255,159,10,0.16)')}
               />
               <Chip
                 size="small"
-                label={`Pending (${depositData?.depositPendingCount ?? 0}): ${formatAmount(depositData?.depositPendingTotal ?? 0)}`}
-                sx={statusChipSx('#ed8b00', 'rgba(255,159,10,0.13)')}
-              />
-              <Chip
-                size="small"
-                label={`Unique pending (${uniquePending?.pendingCount ?? 0}): ${formatAmount(uniquePending?.pendingAmount ?? 0)}`}
+                label={`Unique Pending Deposit (${uniquePending?.pendingCount ?? 0}) : ${uniquePending?.pendingAmount ?? 0}`}
                 sx={statusChipSx('#9c6b00', 'rgba(255,193,7,0.13)')}
               />
               <Chip
@@ -1448,9 +1428,7 @@ export function DepositPage() {
             borderRadius: 2,
             overflow: 'hidden',
             bgcolor: 'background.paper',
-            boxShadow: isLightMode
-              ? '0 4px 18px rgba(0,0,0,0.08)'
-              : '0 4px 20px rgba(0,0,0,0.24)',
+            boxShadow: isLightMode ? '0 4px 18px rgba(0,0,0,0.08)' : '0 4px 20px rgba(0,0,0,0.24)',
             // Slight column breathing room without widening the whole table much.
             '& .MuiTableCell-root': {
               px: compactRows ? '10px !important' : '14px !important',

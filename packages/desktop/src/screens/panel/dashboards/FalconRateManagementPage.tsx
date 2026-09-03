@@ -56,15 +56,13 @@ function unpackEvents(raw: unknown): EventRow[] {
 
   if (Array.isArray(cur)) {
     return cur.filter(
-      (v): v is EventRow =>
-        Boolean(v) && typeof v === 'object' && !Array.isArray(v),
+      (v): v is EventRow => Boolean(v) && typeof v === 'object' && !Array.isArray(v),
     );
   }
 
   if (cur && typeof cur === 'object') {
     return Object.values(cur as Record<string, unknown>).filter(
-      (v): v is EventRow =>
-        Boolean(v) && typeof v === 'object' && !Array.isArray(v),
+      (v): v is EventRow => Boolean(v) && typeof v === 'object' && !Array.isArray(v),
     );
   }
 
@@ -93,43 +91,39 @@ export function FalconRateManagementPage() {
     type?: string;
   };
 
-  const startDate =
-    params.get('startDate') || navState.startDate || todayIST();
+  const startDate = params.get('startDate') || navState.startDate || todayIST();
   const endDate = params.get('endDate') || navState.endDate || todayIST();
   // Match laxminarayan: only exact `jetfair` uses jetfair API; else falcon.
-  const type = (
-    params.get('type') ||
-    navState.type ||
-    'jetfair'
-  ).toLowerCase();
+  const type = (params.get('type') || navState.type || 'jetfair').toLowerCase();
   const isJetfair = type === 'jetfair';
 
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const action = isJetfair
-        ? 'dashboard.jetfairByEvent'
-        : 'dashboard.falconByEvent';
-      const res = await secureApi(action, { startDate, endDate });
-      if (!res.ok) {
-        if (!silent) toast.error(res.message || 'Failed to load event GGR');
-        setEvents([]);
-        return;
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const action = isJetfair ? 'dashboard.jetfairByEvent' : 'dashboard.falconByEvent';
+        const res = await secureApi(action, { startDate, endDate });
+        if (!res.ok) {
+          if (!silent) toast.error(res.message || 'Failed to load event GGR');
+          setEvents([]);
+          return;
+        }
+        const list = unpackEvents(res.data);
+        list.sort((a, b) =>
+          String(a.Eventname || a.eventName || '').localeCompare(
+            String(b.Eventname || b.eventName || ''),
+          ),
+        );
+        setEvents(list);
+      } finally {
+        if (!silent) setLoading(false);
       }
-      const list = unpackEvents(res.data);
-      list.sort((a, b) =>
-        String(a.Eventname || a.eventName || '').localeCompare(
-          String(b.Eventname || b.eventName || ''),
-        ),
-      );
-      setEvents(list);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [endDate, isJetfair, startDate]);
+    },
+    [endDate, isJetfair, startDate],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -149,9 +143,7 @@ export function FalconRateManagementPage() {
     };
   }, [load]);
 
-  const title = isJetfair
-    ? 'Jyeshtha Details'
-    : 'Phalguni Details';
+  const title = isJetfair ? 'Jyeshtha Details' : 'Phalguni Details';
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
@@ -186,9 +178,7 @@ export function FalconRateManagementPage() {
         }}
       >
         {events.map((event, index) => {
-          const name = String(
-            event.Eventname || event.eventName || `Event ${index + 1}`,
-          );
+          const name = String(event.Eventname || event.eventName || `Event ${index + 1}`);
           return (
             <Paper key={`${name}-${index}`} sx={{ p: 2, bgcolor: 'background.paper' }}>
               <Typography

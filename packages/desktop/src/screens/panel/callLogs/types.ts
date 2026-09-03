@@ -27,6 +27,48 @@ export type BotStatusSummary = {
   'in-progress-bots-states'?: Record<string, string>;
 };
 
+export type CallSummaryFlag = {
+  flag?: unknown;
+  reason?: string;
+  level?: unknown;
+  required?: unknown;
+  value?: unknown;
+  detected?: unknown;
+  types?: string[];
+};
+
+export type CallSummaryResponse = {
+  status?: string;
+  message?: string;
+  call_sid?: string;
+  data?: {
+    transcript?: string;
+    summary?: unknown;
+    next_best_action?: unknown;
+    threat?: CallSummaryFlag;
+    priority?: CallSummaryFlag;
+    human_intervention?: CallSummaryFlag;
+    satisfaction?: CallSummaryFlag;
+    frustration?: CallSummaryFlag;
+    nuisance?: CallSummaryFlag;
+    repeated_complaint?: CallSummaryFlag;
+    pii_details?: CallSummaryFlag;
+    analysis?: {
+      summary?: unknown;
+      transcript?: string;
+      next_best_action?: unknown;
+      threat?: CallSummaryFlag;
+      priority?: CallSummaryFlag;
+      human_intervention?: CallSummaryFlag;
+      satisfaction?: CallSummaryFlag;
+      frustration?: CallSummaryFlag;
+      nuisance?: CallSummaryFlag;
+      repeated_complaint?: CallSummaryFlag;
+      pii_details?: CallSummaryFlag;
+    };
+  };
+};
+
 export type CallLogsListResponse = {
   calls?: CallLogRow[];
   pagination?: { totalCount?: number; totalPages?: number };

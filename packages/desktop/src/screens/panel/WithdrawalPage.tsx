@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, MouseEvent } from 'react';
 import {
   Box,
   Button,
@@ -48,10 +48,7 @@ import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
 import { saveWorkbook } from '@/utils/downloadSheet';
 import type { SheetDownloadFilter } from '@/utils/sheetDownloadAudit';
 import { copyToClipboard } from '@/utils/clipboard';
-import {
-  getCachedEmpCodeNameMap,
-  getEmpCodeNameMap,
-} from '@/utils/empCodeNameCache';
+import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '@/utils/empCodeNameCache';
 import { asPaged, asList, display, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
@@ -177,7 +174,7 @@ function UserNameMidReportCell({
         title={label}
         onClick={
           canLink
-            ? (e) => {
+            ? (e: MouseEvent<HTMLButtonElement>) => {
                 e.stopPropagation();
                 onOpenUserReport(row, label, reportUserId);
               }
@@ -257,8 +254,7 @@ export function WithdrawalPage() {
   const canAct = hasPermission('withdrawals_button');
   const canReject = hasPermission('View_Reject') || canAct;
   const canReverse = hasPermission('View_Reverse') || canAct;
-  const canDownload =
-    hasPermission('Download_Withdrawal') || hasPermission('show_download_botton');
+  const canDownload = hasPermission('Download_Withdrawal') || hasPermission('show_download_botton');
   const canWhatsApp = hasPermission('whatsapp_icon');
   const canDelay = hasPermission('View_Delay_Reason');
   const hideCheck = hasPermission('Disable_Withdrawals_Check');
@@ -318,8 +314,8 @@ export function WithdrawalPage() {
   };
   const [qrMid, setQrMid] = useState('');
   const [qrSaving, setQrSaving] = useState(false);
-  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
-    () => getCachedEmpCodeNameMap(),
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
+    getCachedEmpCodeNameMap(),
   );
 
   useEffect(() => {
@@ -368,7 +364,15 @@ export function WithdrawalPage() {
     const apps = admin?.clientName || admin?.allotedApps;
     if (apps) payload.app = apps;
     return payload;
-  }, [query, page, itemsPerPage, showAllInProgress, admin?.name, admin?.clientName, admin?.allotedApps]);
+  }, [
+    query,
+    page,
+    itemsPerPage,
+    showAllInProgress,
+    admin?.name,
+    admin?.clientName,
+    admin?.allotedApps,
+  ]);
 
   const unpack = useCallback((res: { data?: unknown }) => asPaged<WithdrawalRow>(res.data), []);
 
@@ -466,7 +470,8 @@ export function WithdrawalPage() {
   }, []);
 
   const setDraftField = useCallback(
-    (key: keyof ColumnFilters) => (value: string) => setDraft((prev) => ({ ...prev, [key]: value })),
+    (key: keyof ColumnFilters) => (value: string) =>
+      setDraft((prev) => ({ ...prev, [key]: value })),
     [],
   );
 
@@ -667,9 +672,7 @@ export function WithdrawalPage() {
       return;
     }
     // Admin parity: Rejected does not require / send gateway + MID.
-    const needsGatewayMid = !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(
-      actionStatus,
-    );
+    const needsGatewayMid = !['Approved', 'Reverse', 'Rejected', 'on hold'].includes(actionStatus);
     if (needsGatewayMid && (!actionGateway || !actionMid)) {
       toast.error('Gateway and Mid are required');
       return;
@@ -813,8 +816,7 @@ export function WithdrawalPage() {
       } else if (action === 'withdrawals.bulkUnlock') {
         payload = { transactionId: selectedIds };
       } else if (action === 'withdrawals.bulkApprove') {
-        const provider =
-          (extra?.withdrewalProviderName as string) || gateways[0] || '';
+        const provider = (extra?.withdrewalProviderName as string) || gateways[0] || '';
         if (!provider) {
           toast.warn('No payout gateway available for bulk approve');
           return;
@@ -880,15 +882,7 @@ export function WithdrawalPage() {
         setBulkBusy(false);
       }
     },
-    [
-      selectedIds,
-      selectedRows,
-      loc,
-      admin,
-      gateways,
-      load,
-      loadSummary,
-    ],
+    [selectedIds, selectedRows, loc, admin, gateways, load, loadSummary],
   );
 
   const downloadExcel = useCallback(() => {
@@ -1045,14 +1039,10 @@ export function WithdrawalPage() {
       const person = kind === 'first' ? row.checkBy : row.crossCheckBy;
       const orderId = orderIdOf(row);
       const busy = busyId === `${orderId}-${kind}`;
-      const blocked =
-        isTerminal(row) || (kind === 'second' && !row.checkBy?.status);
+      const blocked = isTerminal(row) || (kind === 'second' && !row.checkBy?.status);
 
       if (person?.name) {
-        return personCell(
-          `${person.status ? 'OK' : 'Not OK'} by ${person.name}`,
-          person.date,
-        );
+        return personCell(`${person.status ? 'OK' : 'Not OK'} by ${person.name}`, person.date);
       }
       if (hideCheck || blocked) return '—';
 
@@ -1268,7 +1258,11 @@ export function WithdrawalPage() {
         render: (row) => {
           const list = extractBeneficiaryAccounts(row);
           return (
-            <Stack spacing={0.75} alignItems="stretch" sx={{ width: '100%', maxWidth: 165, mx: 'auto' }}>
+            <Stack
+              spacing={0.75}
+              alignItems="stretch"
+              sx={{ width: '100%', maxWidth: 165, mx: 'auto' }}
+            >
               <BeneficiarySelect
                 beneficiaryAccounts={list}
                 selectId={`bene-select-${orderIdOf(row) || row._id || ''}`}
@@ -1411,8 +1405,7 @@ export function WithdrawalPage() {
       {
         id: 'lockBy',
         label: 'Lock By',
-        render: (row) =>
-          row.lockBy?.name ? personCell(row.lockBy.name, row.lockBy.date) : '—',
+        render: (row) => (row.lockBy?.name ? personCell(row.lockBy.name, row.lockBy.date) : '—'),
       },
       {
         id: 'checkBy',
@@ -1493,10 +1486,7 @@ export function WithdrawalPage() {
         render: (row) => {
           // Admin parity: show gateway + MID only for Approved; hide for Rejected / Cancel / etc.
           if (String(row.status || '').toLowerCase() !== 'approved') return '—';
-          const provider = display(
-            row.withdrewalProviderName || row.paymentGatewayName,
-            '',
-          );
+          const provider = display(row.withdrewalProviderName || row.paymentGatewayName, '');
           const mid = row.mid != null && row.mid !== '' ? String(row.mid) : '';
           if (!provider && !mid) return '—';
           return mid ? `${provider} - ${mid}` : provider;
@@ -1609,10 +1599,7 @@ export function WithdrawalPage() {
               px: 0.75,
               py: 0.25,
               borderRadius: 0.5,
-              bgcolor:
-                Number(row.pnl ?? 0) >= 0
-                  ? 'rgba(76,175,80,0.25)'
-                  : 'rgba(244,67,54,0.25)',
+              bgcolor: Number(row.pnl ?? 0) >= 0 ? 'rgba(76,175,80,0.25)' : 'rgba(244,67,54,0.25)',
             }}
           >
             {formatAmount(row.pnl ?? 0)}
@@ -1701,243 +1688,247 @@ export function WithdrawalPage() {
           overflow: 'hidden',
         }}
       >
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            gap={1}
-            onClick={() => setFiltersOpen((open) => !open)}
-            sx={{
-              minHeight: 44,
-              px: 1.5,
-              py: 0.75,
-              cursor: 'pointer',
-              userSelect: 'none',
-              borderBottom: filtersOpen ? '1px solid' : 'none',
-              borderColor: 'divider',
-              '&:hover': { bgcolor: 'action.hover' },
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1}
+          onClick={() => setFiltersOpen((open) => !open)}
+          sx={{
+            minHeight: 44,
+            px: 1.5,
+            py: 0.75,
+            cursor: 'pointer',
+            userSelect: 'none',
+            borderBottom: filtersOpen ? '1px solid' : 'none',
+            borderColor: 'divider',
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+            <TuneIcon sx={{ color: '#ff9f0a', fontSize: 20 }} />
+            <Typography variant="subtitle2" fontWeight={800}>
+              Withdrawal
+            </Typography>
+            {!filtersOpen ? (
+              <>
+                <Chip
+                  size="small"
+                  label={`${startDate} → ${endDate}`}
+                  variant="outlined"
+                  sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
+                />
+                <Chip
+                  size="small"
+                  label={`${itemsPerPage} / page`}
+                  sx={{
+                    display: { xs: 'none', sm: 'inline-flex' },
+                    height: 24,
+                    fontWeight: 700,
+                    color: '#c77a18',
+                    bgcolor: 'rgba(255,159,10,0.12)',
+                  }}
+                />
+              </>
+            ) : null}
+          </Stack>
+          <IconButton
+            size="small"
+            aria-label={filtersOpen ? 'Collapse filters' : 'Expand filters'}
+            onClick={(event) => {
+              event.stopPropagation();
+              setFiltersOpen((open) => !open);
             }}
           >
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-              <TuneIcon sx={{ color: '#ff9f0a', fontSize: 20 }} />
-              <Typography variant="subtitle2" fontWeight={800}>
-                Withdrawal
-              </Typography>
-              {!filtersOpen ? (
+            {filtersOpen ? (
+              <ExpandLessIcon fontSize="small" />
+            ) : (
+              <ExpandMoreIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Stack>
+
+        <Collapse in={filtersOpen} timeout="auto" unmountOnExit>
+          <Box sx={{ p: 1.5 }}>
+            <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1.25} alignItems="center">
+              <TextField
+                size="small"
+                type="date"
+                label="From Date"
+                InputLabelProps={{ shrink: true }}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                sx={{ ...fieldSx, width: 160 }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="To Date"
+                InputLabelProps={{ shrink: true }}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                sx={{ ...fieldSx, width: 160 }}
+              />
+              <TextField
+                select
+                size="small"
+                label="Items / Page"
+                value={String(itemsPerPage)}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value) || 10);
+                  setPage(1);
+                }}
+                sx={{ ...fieldSx, width: 120 }}
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <MenuItem key={n} value={n}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() => commitQuery()}
+                sx={orangeBtnSx}
+              >
+                Apply
+              </Button>
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() => commitQuery({ allData: true })}
+                sx={orangeBtnSx}
+              >
+                All Data
+              </Button>
+              <Button variant="contained" disabled={loading} onClick={clearAll} sx={orangeBtnSx}>
+                Clear
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={
+                  loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />
+                }
+                disabled={loading}
+                onClick={refreshAll}
+                sx={orangeBtnSx}
+              >
+                Refresh
+              </Button>
+              {canDownload ? (
                 <>
-                  <Chip
-                    size="small"
-                    label={`${startDate} → ${endDate}`}
-                    variant="outlined"
-                    sx={{ display: { xs: 'none', md: 'inline-flex' }, height: 24 }}
-                  />
-                  <Chip
-                    size="small"
-                    label={`${itemsPerPage} / page`}
-                    sx={{
-                      display: { xs: 'none', sm: 'inline-flex' },
-                      height: 24,
-                      fontWeight: 700,
-                      color: '#c77a18',
-                      bgcolor: 'rgba(255,159,10,0.12)',
-                    }}
-                  />
+                  <Button
+                    variant="contained"
+                    disabled={loading}
+                    onClick={() =>
+                      requestSheetDownload(
+                        { mid: query.filters.mid || 'withdrawal', type: 'Withdrawal Sheet' },
+                        downloadExcel,
+                      )
+                    }
+                    sx={orangeBtnSx}
+                  >
+                    Download Data
+                  </Button>
+                  <Button
+                    variant="contained"
+                    disabled={loading}
+                    onClick={() =>
+                      requestSheetDownload(
+                        { mid: 'yesBank', type: 'Yes Bank Sheet' },
+                        downloadYesBank,
+                      )
+                    }
+                    sx={orangeBtnSx}
+                  >
+                    Yes Bank Data
+                  </Button>
+                  <Button
+                    variant="contained"
+                    disabled={loading}
+                    onClick={() =>
+                      requestSheetDownload({ mid: 'payok', type: 'Pay OK Sheet' }, downloadPayOk)
+                    }
+                    sx={orangeBtnSx}
+                  >
+                    Pay OK Data
+                  </Button>
                 </>
               ) : null}
             </Stack>
-            <IconButton
-              size="small"
-              aria-label={filtersOpen ? 'Collapse filters' : 'Expand filters'}
-              onClick={(event) => {
-                event.stopPropagation();
-                setFiltersOpen((open) => !open);
-              }}
-            >
-              {filtersOpen ? (
-                <ExpandLessIcon fontSize="small" />
-              ) : (
-                <ExpandMoreIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Stack>
 
-          <Collapse in={filtersOpen} timeout="auto" unmountOnExit>
-            <Box sx={{ p: 1.5 }}>
+            {canAct ? (
               <Stack
                 direction="row"
                 flexWrap="wrap"
                 useFlexGap
-                spacing={1.25}
+                spacing={1}
                 alignItems="center"
+                sx={{ mt: 1.25 }}
               >
-          <TextField
-            size="small"
-            type="date"
-            label="From Date"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={{ ...fieldSx, width: 160 }}
-          />
-          <TextField
-            size="small"
-            type="date"
-            label="To Date"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={{ ...fieldSx, width: 160 }}
-          />
-          <TextField
-            select
-            size="small"
-            label="Items / Page"
-            value={String(itemsPerPage)}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value) || 10);
-              setPage(1);
-            }}
-            sx={{ ...fieldSx, width: 120 }}
-          >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <MenuItem key={n} value={n}>
-                {n}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button variant="contained" disabled={loading} onClick={() => commitQuery()} sx={orangeBtnSx}>
-            Apply
-          </Button>
-          <Button
-            variant="contained"
-            disabled={loading}
-            onClick={() => commitQuery({ allData: true })}
-            sx={orangeBtnSx}
-          >
-            All Data
-          </Button>
-          <Button variant="contained" disabled={loading} onClick={clearAll} sx={orangeBtnSx}>
-            Clear
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />}
-            disabled={loading}
-            onClick={refreshAll}
-            sx={orangeBtnSx}
-          >
-            Refresh
-          </Button>
-          {canDownload ? (
-            <>
-              <Button
-                variant="contained"
-                disabled={loading}
-                onClick={() =>
-                  requestSheetDownload(
-                    { mid: query.filters.mid || 'withdrawal', type: 'Withdrawal Sheet' },
-                    downloadExcel,
-                  )
-                }
-                sx={orangeBtnSx}
-              >
-                Download Data
-              </Button>
-              <Button
-                variant="contained"
-                disabled={loading}
-                onClick={() =>
-                  requestSheetDownload({ mid: 'yesBank', type: 'Yes Bank Sheet' }, downloadYesBank)
-                }
-                sx={orangeBtnSx}
-              >
-                Yes Bank Data
-              </Button>
-              <Button
-                variant="contained"
-                disabled={loading}
-                onClick={() =>
-                  requestSheetDownload({ mid: 'payok', type: 'Pay OK Sheet' }, downloadPayOk)
-                }
-                sx={orangeBtnSx}
-              >
-                Pay OK Data
-              </Button>
-            </>
-          ) : null}
-              </Stack>
-
-              {canAct ? (
-                <Stack
-                  direction="row"
-                  flexWrap="wrap"
-                  useFlexGap
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mt: 1.25 }}
+                <Typography variant="caption" color="text.secondary">
+                  Selected: {selectedIds.length}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={bulkBusy}
+                  onClick={() => void runBulk('withdrawals.bulkLock')}
+                  sx={actionBtnSx}
                 >
-            <Typography variant="caption" color="text.secondary">
-              Selected: {selectedIds.length}
-            </Typography>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={bulkBusy}
-              onClick={() => void runBulk('withdrawals.bulkLock')}
-              sx={actionBtnSx}
-            >
-              Bulk Lock
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={bulkBusy}
-              onClick={() => void runBulk('withdrawals.bulkUnlock')}
-              sx={actionBtnSx}
-            >
-              Bulk Unlock
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={bulkBusy}
-              onClick={() => void runBulk('withdrawals.bulkApprove')}
-              sx={actionBtnSx}
-            >
-              Bulk Approve
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={bulkBusy}
-              onClick={() => {
-                if (!selectedIds.length) {
-                  toast.warn('Select at least one row using the checkboxes');
-                  return;
-                }
-                setBulkManualGateway('');
-                setBulkManualMid('');
-                setBulkManualOpen(true);
-              }}
-              sx={actionBtnSx}
-            >
-              Bulk Manual Approve
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={bulkBusy}
-              onClick={() => setBeneListOpen(true)}
-              sx={actionBtnSx}
-            >
-              Add Bene List
-            </Button>
-            {bulkBusy ? <CircularProgress size={16} sx={{ color: '#ff9f0a' }} /> : null}
-                </Stack>
-              ) : null}
-            </Box>
-          </Collapse>
-        </Box>
+                  Bulk Lock
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={bulkBusy}
+                  onClick={() => void runBulk('withdrawals.bulkUnlock')}
+                  sx={actionBtnSx}
+                >
+                  Bulk Unlock
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={bulkBusy}
+                  onClick={() => void runBulk('withdrawals.bulkApprove')}
+                  sx={actionBtnSx}
+                >
+                  Bulk Approve
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={bulkBusy}
+                  onClick={() => {
+                    if (!selectedIds.length) {
+                      toast.warn('Select at least one row using the checkboxes');
+                      return;
+                    }
+                    setBulkManualGateway('');
+                    setBulkManualMid('');
+                    setBulkManualOpen(true);
+                  }}
+                  sx={actionBtnSx}
+                >
+                  Bulk Manual Approve
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={bulkBusy}
+                  onClick={() => setBeneListOpen(true)}
+                  sx={actionBtnSx}
+                >
+                  Add Bene List
+                </Button>
+                {bulkBusy ? <CircularProgress size={16} sx={{ color: '#ff9f0a' }} /> : null}
+              </Stack>
+            ) : null}
+          </Box>
+        </Collapse>
+      </Box>
 
       <Stack
         direction="row"
@@ -1947,6 +1938,7 @@ export function WithdrawalPage() {
         useFlexGap
         sx={{ mb: 1, flexShrink: 0 }}
       >
+        <Chip label={`Total User : ${total}`} sx={chipSx} />
         <Chip
           label={withdrawalStatLabel(
             'Approved',
@@ -2116,7 +2108,9 @@ export function WithdrawalPage() {
               label="Gateway"
               value={bulkManualGateway}
               onChange={(e) => setBulkManualGateway(e.target.value)}
-              sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper', color: 'text.primary' } }}
+              sx={{
+                '& .MuiInputBase-root': { bgcolor: 'background.paper', color: 'text.primary' },
+              }}
             >
               <MenuItem value="">— Choose —</MenuItem>
               {Array.from(new Set([...MANUAL_GATEWAYS, ...gateways])).map((g) => (
@@ -2131,7 +2125,9 @@ export function WithdrawalPage() {
               label="Mid"
               value={bulkManualMid}
               onChange={(e) => setBulkManualMid(e.target.value)}
-              sx={{ '& .MuiInputBase-root': { bgcolor: 'background.paper', color: 'text.primary' } }}
+              sx={{
+                '& .MuiInputBase-root': { bgcolor: 'background.paper', color: 'text.primary' },
+              }}
             >
               <MenuItem value="">— Choose —</MenuItem>
               {mids.map((m, i) => (

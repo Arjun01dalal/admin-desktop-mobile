@@ -86,7 +86,15 @@ function StatPill({
       >
         {label}
       </Typography>
-      <Typography sx={{ mt: 0.35, fontSize: 22, fontWeight: 800, lineHeight: 1.15, color: accent || 'text.primary' }}>
+      <Typography
+        sx={{
+          mt: 0.35,
+          fontSize: 22,
+          fontWeight: 800,
+          lineHeight: 1.15,
+          color: accent || 'text.primary',
+        }}
+      >
         {value}
       </Typography>
     </Box>
@@ -175,7 +183,15 @@ function CountList({
         <Typography sx={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>
           {nameHeader}
         </Typography>
-        <Typography sx={{ width: 72, textAlign: 'right', fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>
+        <Typography
+          sx={{
+            width: 72,
+            textAlign: 'right',
+            fontSize: 11,
+            fontWeight: 700,
+            color: 'text.secondary',
+          }}
+        >
           Count
         </Typography>
       </Stack>
@@ -198,7 +214,12 @@ function CountList({
               <Stack direction="row" alignItems="center" spacing={1.25}>
                 <RankBadge rank={rank} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="baseline" spacing={1}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="baseline"
+                    spacing={1}
+                  >
                     <Typography
                       noWrap
                       title={row.name}
@@ -206,7 +227,9 @@ function CountList({
                     >
                       {row.name}
                     </Typography>
-                    <Typography sx={{ fontSize: 14, fontWeight: 800, color: '#ff9f0a', flexShrink: 0 }}>
+                    <Typography
+                      sx={{ fontSize: 14, fontWeight: 800, color: '#ff9f0a', flexShrink: 0 }}
+                    >
                       {row.count}
                     </Typography>
                   </Stack>
@@ -287,7 +310,15 @@ function AgentEmpCountList({ rows }: { rows: AgentEmpCountRow[] }) {
         <Typography sx={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>
           Emp code
         </Typography>
-        <Typography sx={{ width: 72, textAlign: 'right', fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>
+        <Typography
+          sx={{
+            width: 72,
+            textAlign: 'right',
+            fontSize: 11,
+            fontWeight: 700,
+            color: 'text.secondary',
+          }}
+        >
           Count
         </Typography>
       </Stack>
@@ -367,14 +398,8 @@ export function EmpCodeWithdrawalModal({
     if (open) setTab(agentEmpRows.length ? 'agentEmp' : 'agents');
   }, [open, agentEmpRows.length]);
 
-  const agentTotal = useMemo(
-    () => agentRows.reduce((s, r) => s + r.count, 0),
-    [agentRows],
-  );
-  const empTotal = useMemo(
-    () => empCodeRows.reduce((s, r) => s + r.count, 0),
-    [empCodeRows],
-  );
+  const agentTotal = useMemo(() => agentRows.reduce((s, r) => s + r.count, 0), [agentRows]);
+  const empTotal = useMemo(() => empCodeRows.reduce((s, r) => s + r.count, 0), [empCodeRows]);
   const agentEmpTotal = useMemo(
     () => agentEmpRows.reduce((s, r) => s + r.count, 0),
     [agentEmpRows],
@@ -480,9 +505,7 @@ export function EmpCodeWithdrawalModal({
         {loading ? (
           <Stack alignItems="center" justifyContent="center" py={8} spacing={1.5}>
             <CircularProgress size={36} sx={{ color: '#ff9f0a' }} />
-            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-              Loading report…
-            </Typography>
+            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Loading report…</Typography>
           </Stack>
         ) : (
           <>
@@ -490,11 +513,7 @@ export function EmpCodeWithdrawalModal({
               <StatPill label="Total withdrawals" value={totalWithdrawals} accent="#ff9f0a" />
               <StatPill label="Agents" value={agentRows.length} accent="#42a5f5" />
               <StatPill label="Emp codes" value={empCodeRows.length} accent="#66bb6a" />
-              <StatPill
-                label="Agent × Emp"
-                value={agentEmpRows.length}
-                accent="#ab47bc"
-              />
+              <StatPill label="Agent × Emp" value={agentEmpRows.length} accent="#ab47bc" />
             </Stack>
 
             {isNarrow ? (
@@ -557,9 +576,7 @@ export function EmpCodeWithdrawalModal({
                 <Box>
                   <Stack direction="row" alignItems="center" spacing={1} mb={1.25}>
                     <BadgeOutlinedIcon sx={{ fontSize: 18, color: '#ab47bc' }} />
-                    <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
-                      Agent × Emp code
-                    </Typography>
+                    <Typography sx={{ fontWeight: 800, fontSize: 14 }}>Agent × Emp code</Typography>
                     <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
                       · {agentEmpTotal} withdrawals · who gave how many per empCode
                     </Typography>
@@ -570,9 +587,7 @@ export function EmpCodeWithdrawalModal({
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" alignItems="center" spacing={1} mb={1.25}>
                       <GroupsOutlinedIcon sx={{ fontSize: 18, color: '#42a5f5' }} />
-                      <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
-                        Agent wise
-                      </Typography>
+                      <Typography sx={{ fontWeight: 800, fontSize: 14 }}>Agent wise</Typography>
                       <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
                         · {agentTotal} withdrawals
                       </Typography>
@@ -586,9 +601,7 @@ export function EmpCodeWithdrawalModal({
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" alignItems="center" spacing={1} mb={1.25}>
                       <BadgeOutlinedIcon sx={{ fontSize: 18, color: '#66bb6a' }} />
-                      <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
-                        Emp code wise
-                      </Typography>
+                      <Typography sx={{ fontWeight: 800, fontSize: 14 }}>Emp code wise</Typography>
                       <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
                         · {empTotal} withdrawals
                       </Typography>

@@ -4,12 +4,7 @@ import { Box, Paper, Typography } from '@mui/material';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { formatAmount } from '@/utils/dates';
-import {
-  getMetric,
-  providerLabel,
-  userIdOf,
-  type ActivityRow,
-} from './activity/utils';
+import { getMetric, providerLabel, userIdOf, type ActivityRow } from './activity/utils';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
@@ -32,9 +27,7 @@ type DetailsState = {
 
 function buildDetailRows(data: ActivityRow, isQtech: boolean): DetailRow[] {
   const rows: DetailRow[] = [];
-  const providers = Array.isArray(data.providers)
-    ? (data.providers as ActivityRow[])
-    : [];
+  const providers = Array.isArray(data.providers) ? (data.providers as ActivityRow[]) : [];
 
   providers.forEach((provider, i) => {
     const pTotals = (provider.totals || {}) as ActivityRow;
@@ -42,30 +35,17 @@ function buildDetailRows(data: ActivityRow, isQtech: boolean): DetailRow[] {
       id: `p-${i}`,
       kind: 'provider',
       label: providerLabel(provider),
-      betAmount: formatAmount(
-        provider.totalBetAmount ?? pTotals.betAmount,
-      ),
-      winAmount: formatAmount(
-        provider.totalWinAmount ?? pTotals.winAmount,
-      ),
-      commission: formatAmount(
-        provider.commissionAmount ?? pTotals.commissionAmount,
-      ),
+      betAmount: formatAmount(provider.totalBetAmount ?? pTotals.betAmount),
+      winAmount: formatAmount(provider.totalWinAmount ?? pTotals.winAmount),
+      commission: formatAmount(provider.commissionAmount ?? pTotals.commissionAmount),
       rtp: formatAmount(provider.rtp ?? pTotals.rtp),
-      rollbackCount: formatAmount(
-        provider.rollbackCount ?? pTotals.rollbackCount ?? 0,
-      ),
+      rollbackCount: formatAmount(provider.rollbackCount ?? pTotals.rollbackCount ?? 0),
       totalRollbackAmount: formatAmount(
-        provider.totalRollbackAmount ??
-          pTotals.totalRollbackAmount ??
-          pTotals.rollbackAmount ??
-          0,
+        provider.totalRollbackAmount ?? pTotals.totalRollbackAmount ?? pTotals.rollbackAmount ?? 0,
       ),
     });
 
-    const games = Array.isArray(provider.games)
-      ? (provider.games as ActivityRow[])
-      : [];
+    const games = Array.isArray(provider.games) ? (provider.games as ActivityRow[]) : [];
     games.forEach((game, j) => {
       rows.push({
         id: `p-${i}-g-${j}`,
@@ -76,10 +56,7 @@ function buildDetailRows(data: ActivityRow, isQtech: boolean): DetailRow[] {
         commission: formatAmount(game.commissionAmount),
         rtp: formatAmount(game.rtp),
         rollbackCount: formatAmount(
-          game.rollbackCount ??
-            provider.rollbackCount ??
-            pTotals.rollbackCount ??
-            0,
+          game.rollbackCount ?? provider.rollbackCount ?? pTotals.rollbackCount ?? 0,
         ),
         totalRollbackAmount: formatAmount(
           game.totalRollbackAmount ??
@@ -100,14 +77,10 @@ function buildDetailRows(data: ActivityRow, isQtech: boolean): DetailRow[] {
       label: 'Total',
       betAmount: formatAmount(totals.betAmount ?? getMetric(data, 'betAmount')),
       winAmount: formatAmount(totals.winAmount ?? getMetric(data, 'winAmount')),
-      commission: formatAmount(
-        totals.commissionAmount ?? getMetric(data, 'commissionAmount'),
-      ),
+      commission: formatAmount(totals.commissionAmount ?? getMetric(data, 'commissionAmount')),
       rtp: formatAmount(totals.rtp ?? getMetric(data, 'rtp')),
       rollbackCount: formatAmount(totals.rollbackCount ?? 0),
-      totalRollbackAmount: formatAmount(
-        totals.totalRollbackAmount ?? totals.rollbackAmount ?? 0,
-      ),
+      totalRollbackAmount: formatAmount(totals.totalRollbackAmount ?? totals.rollbackAmount ?? 0),
     });
   }
 
@@ -121,10 +94,7 @@ export function PlayerActivityDetailsPage() {
   const player = state.data;
   const isQtech = Boolean(state.isQtech);
 
-  const rows = useMemo(
-    () => (player ? buildDetailRows(player, isQtech) : []),
-    [player, isQtech],
-  );
+  const rows = useMemo(() => (player ? buildDetailRows(player, isQtech) : []), [player, isQtech]);
 
   const columns = useMemo<CommonTableColumn<DetailRow>[]>(
     () => [
@@ -201,14 +171,14 @@ export function PlayerActivityDetailsPage() {
       </Typography>
 
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => row.id}
-        emptyMessage="No providers for this player"
-        minWidth={900}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row.id}
+          emptyMessage="No providers for this player"
+          minWidth={900}
+          maxHeight="100%"
+        />
       </TablePanel>
     </Box>
   );

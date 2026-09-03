@@ -49,10 +49,7 @@ const SHORT_LABELS: Record<StatusKey, string> = {
   deleted: 'Del',
 };
 
-const TONE: Record<
-  StatusKey,
-  { fg: string; bg: string; head: string }
-> = {
+const TONE: Record<StatusKey, { fg: string; bg: string; head: string }> = {
   'no-answer': { fg: '#ff8a80', bg: 'rgba(255,138,128,0.12)', head: '#ffab91' },
   completed: { fg: '#69f0ae', bg: 'rgba(105,240,174,0.12)', head: '#69f0ae' },
   'in-progress': { fg: '#80d8ff', bg: 'rgba(128,216,255,0.12)', head: '#80d8ff' },
@@ -89,13 +86,7 @@ const cellSx = {
   lineHeight: 1.2,
 };
 
-function CountCell({
-  statusKey,
-  count,
-}: {
-  statusKey: StatusKey;
-  count: number;
-}) {
+function CountCell({ statusKey, count }: { statusKey: StatusKey; count: number }) {
   const tone = TONE[statusKey];
   if (count <= 0) {
     return (
@@ -139,10 +130,7 @@ export function BotStatusTable({
     return BOT_STATUS_KEYS.filter((key) => rows.some((r) => Number(r[key]) > 0));
   }, [rows]);
 
-  const showState = useMemo(
-    () => rows.some((r) => r.state && r.state !== '-'),
-    [rows],
-  );
+  const showState = useMemo(() => rows.some((r) => r.state && r.state !== '-'), [rows]);
 
   const totals = useMemo(() => {
     const acc = {} as Record<StatusKey, number>;
@@ -178,16 +166,12 @@ export function BotStatusTable({
   };
 
   const toggleAll = () => {
-    setSelected(
-      allSelected ? new Set() : new Set(availableTargets.map((target) => target.key)),
-    );
+    setSelected(allSelected ? new Set() : new Set(availableTargets.map((target) => target.key)));
   };
 
   const reinitiateSelected = () => {
     if (!selectedTargets.length) return;
-    onReinitiate(
-      selectedTargets.map(({ botId, status }) => ({ botId, status })),
-    );
+    onReinitiate(selectedTargets.map(({ botId, status }) => ({ botId, status })));
     setSelected(new Set());
   };
 
@@ -195,7 +179,9 @@ export function BotStatusTable({
 
   // Show full status matrix when open (not only non-empty columns).
   const keysToShow =
-    visibleKeys.length > 0 ? BOT_STATUS_KEYS : (['completed', 'failed', 'no-answer'] as StatusKey[]);
+    visibleKeys.length > 0
+      ? BOT_STATUS_KEYS
+      : (['completed', 'failed', 'no-answer'] as StatusKey[]);
 
   return (
     <Paper
@@ -355,8 +341,7 @@ export function BotStatusTable({
                   {keysToShow.map((key) => {
                     const count = Number(row[key]) || 0;
                     const canReinit =
-                      (key === 'deleted' || key === 'failed' || key === 'no-answer') &&
-                      count > 0;
+                      (key === 'deleted' || key === 'failed' || key === 'no-answer') && count > 0;
                     if (canReinit) {
                       const tone = TONE[key] ?? TONE.deleted;
                       const selectionKey = `${row.botId}:${key}`;

@@ -136,7 +136,9 @@ export type DialerLeadSource = {
 
 export function mapUsersToDialerLeads(rows: DialerLeadSource[]) {
   return rows.map((item) => {
-    const name = String(item.name || '').replace(/_/g, ' ').trim();
+    const name = String(item.name || '')
+      .replace(/_/g, ' ')
+      .trim();
     const [first = name, ...rest] = name.split(' ');
     return {
       first_name: first,

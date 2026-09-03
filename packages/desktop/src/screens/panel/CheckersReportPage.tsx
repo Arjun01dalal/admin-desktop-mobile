@@ -1,11 +1,12 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, startTransition } from 'react';
 import {
-  Box,
-  Button,
-  CircularProgress,
-  Stack,
-  TextField,
-} from '@mui/material';
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  startTransition,
+} from 'react';
+import { Box, Button, CircularProgress, Stack, TextField } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -38,13 +39,10 @@ export function CheckersReportPage() {
     begin();
     setLoading(true);
     try {
-      const res = await secureApi<CheckerMaps[] | CheckerMaps>(
-        'reports.checkersData',
-        {
-          startDate: startDate || null,
-          endDate: endDate || null,
-        },
-      );
+      const res = await secureApi<CheckerMaps[] | CheckerMaps>('reports.checkersData', {
+        startDate: startDate || null,
+        endDate: endDate || null,
+      });
 
       if (!isCurrent(gen)) return;
 
@@ -74,10 +72,7 @@ export function CheckersReportPage() {
 
   const rows = useMemo<CheckerRow[]>(() => {
     const names = Array.from(
-      new Set([
-        ...Object.keys(maps.checkBy || {}),
-        ...Object.keys(maps.crossCheckBy || {}),
-      ]),
+      new Set([...Object.keys(maps.checkBy || {}), ...Object.keys(maps.crossCheckBy || {})]),
     );
     return names.map((name) => ({
       name,
@@ -103,10 +98,7 @@ export function CheckersReportPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      <CollapsibleFilterPanel
-        title="Checkers Report"
-        summary={`${startDate} → ${endDate}`}
-      >
+      <CollapsibleFilterPanel title="Checkers Report" summary={`${startDate} → ${endDate}`}>
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
           <TextField
             type="date"
@@ -136,9 +128,7 @@ export function CheckersReportPage() {
           </Button>
           <Button
             variant="outlined"
-            startIcon={
-              loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />
-            }
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={() => void load()}
             disabled={loading}
             sx={{ fontWeight: 700, flexShrink: 0 }}

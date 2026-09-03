@@ -62,9 +62,7 @@ export async function pushToBotDialer(opts: {
     if (!res.ok) {
       return {
         ok: false,
-        message:
-          res.message ||
-          `Failed after pushing ${pushed} of ${settings.length} leads`,
+        message: res.message || `Failed after pushing ${pushed} of ${settings.length} leads`,
         pushed,
         skipped,
         totalRequested,
@@ -77,9 +75,7 @@ export async function pushToBotDialer(opts: {
   const skipNote = skipped > 0 ? ` (${skipped} skipped — no mobile)` : '';
   return {
     ok: true,
-    message:
-      lastMessage ||
-      `Call Initiated Successfully (${pushed} leads)${skipNote}.`,
+    message: lastMessage || `Call Initiated Successfully (${pushed} leads)${skipNote}.`,
     pushed,
     skipped,
     totalRequested,

@@ -115,10 +115,7 @@ export function GameActivityDetailsPage() {
           const win = Number(row.totalWinAmount ?? row.winAmount ?? 0);
           const ggr = bet - win;
           return (
-            <Box
-              component="span"
-              sx={{ color: ggr < 0 ? '#e53935' : '#43a047', fontWeight: 600 }}
-            >
+            <Box component="span" sx={{ color: ggr < 0 ? '#e53935' : '#43a047', fontWeight: 600 }}>
               {formatAmount(ggr)}
             </Box>
           );

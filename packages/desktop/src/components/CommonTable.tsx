@@ -309,7 +309,8 @@ function BodyRowInner<T>({
     >
       {columns.map((col) => {
         const stickyMeta = stickyOffsets?.get(col.id);
-        const widthPx = stickyMeta?.width ?? (typeof col.width === 'number' ? col.width : undefined);
+        const widthPx =
+          stickyMeta?.width ?? (typeof col.width === 'number' ? col.width : undefined);
         return (
           <TableCell
             key={col.id}
@@ -382,8 +383,7 @@ export function CommonTable<T>({
   useRevealCodes(); // re-render headers when Reveal codes toggles
   const theme = useTheme();
   const resolvedTone = resolveCommonTableTone(tone, theme.palette.mode);
-  const styles =
-    resolvedTone === 'light' ? commonTableStylesLight : commonTableStyles;
+  const styles = resolvedTone === 'light' ? commonTableStylesLight : commonTableStyles;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const cellBase: SxProps<Theme> = compact
     ? { ...styles.cell, fontSize: 12, py: 0.15, px: 0.75, lineHeight: 1.15 }
@@ -417,48 +417,61 @@ export function CommonTable<T>({
 
   const showFilters = columns.some((col) => col.filter != null);
   const shouldVirtualize =
-    virtualize === true ||
-    (virtualize !== false && rows.length >= virtualizeThreshold);
+    virtualize === true || (virtualize !== false && rows.length >= virtualizeThreshold);
   const rowHeight = estimateRowHeight ?? (compact ? 30 : dense ? 40 : 48);
   const isSticky = stickyHeader || shouldVirtualize;
+  /** Windows DPI + getBoundingClientRect during scroll causes layout thrash — use fixed estimates. */
+  const isWindowsUi =
+    typeof navigator !== 'undefined' &&
+    (/Windows/i.test(navigator.userAgent) ||
+      (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData
+        ?.platform === 'Windows');
   /** Measured header height so sticky filters sit fully below labels (no clipping). */
   const headLabelRef = useRef<HTMLTableRowElement | null>(null);
   const [labelRowHeight, setLabelRowHeight] = useState(compact ? 30 : dense ? 40 : 48);
   useLayoutEffect(() => {
     const el = headLabelRef.current;
     if (!el) return;
+    let raf = 0;
     const update = () => {
-      const h = el.getBoundingClientRect().height;
-      if (h > 0) setLabelRowHeight(h);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const h = el.getBoundingClientRect().height;
+        if (h > 0) setLabelRowHeight((prev) => (Math.abs(prev - h) < 0.5 ? prev : h));
+      });
     };
     update();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
     ro?.observe(el);
-    return () => ro?.disconnect();
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
   }, [columns, dense, compact, showFilters, resolvedTone]);
   const filterStickyTop = showFilters ? labelRowHeight : 0;
   const stickyOffsets = useMemo(() => buildStickyOffsets(columns), [columns]);
   const stickyHeadBg = '#ff9f0a';
   const stickyFilterBg = resolvedTone === 'light' ? '#f5f5f7' : '#2c3340';
   const stickyBodyBg = resolvedTone === 'light' ? '#fff' : '#1a1a1f';
-  const overlayBg =
-    resolvedTone === 'light' ? 'rgba(255,255,255,0.55)' : 'rgba(10, 10, 14, 0.55)';
+  const overlayBg = resolvedTone === 'light' ? 'rgba(255,255,255,0.55)' : 'rgba(10, 10, 14, 0.55)';
 
   const virtualizer = useVirtualizer({
     count: shouldVirtualize ? rows.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
-    overscan: 12,
+    overscan: isWindowsUi ? 6 : 12,
+    // Fixed row height on Windows / Firefox — measuring every row during scroll freezes UI.
     measureElement:
       typeof window !== 'undefined' &&
       typeof document !== 'undefined' &&
+      !isWindowsUi &&
       !navigator.userAgent.includes('Firefox')
         ? (el) => el.getBoundingClientRect().height
         : undefined,
   });
 
   const virtualItems = shouldVirtualize ? virtualizer.getVirtualItems() : [];
-  const paddingTop = virtualItems.length ? virtualItems[0]?.start ?? 0 : 0;
+  const paddingTop = virtualItems.length ? (virtualItems[0]?.start ?? 0) : 0;
   const paddingBottom = virtualItems.length
     ? virtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0)
     : 0;
@@ -489,9 +502,7 @@ export function CommonTable<T>({
                 align={col.align ?? 'center'}
                 width={stickyMeta?.width ?? col.width}
                 data-sticky-left={stickyMeta ? 'true' : undefined}
-                onClick={
-                  col.sortable || col.onHeaderClick ? col.onHeaderClick : undefined
-                }
+                onClick={col.sortable || col.onHeaderClick ? col.onHeaderClick : undefined}
                 sx={
                   [
                     headBase,
@@ -596,34 +607,27 @@ export function CommonTable<T>({
           <>
             {paddingTop > 0 && (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  sx={{ p: 0, border: 0, height: paddingTop }}
-                />
+                <TableCell colSpan={columns.length} sx={{ p: 0, border: 0, height: paddingTop }} />
               </TableRow>
             )}
             {virtualItems.map((virtualRow) => {
               const row = rows[virtualRow.index];
               if (row == null) return null;
               return (
-              <BodyRow
-                key={
-                  getRowKey
-                    ? getRowKey(row, virtualRow.index)
-                    : virtualRow.key
-                }
-                row={row}
-                index={virtualRow.index}
-                columns={columns}
-                cellBase={cellBase}
-                hover={hover}
-                onRowClick={onRowClick}
-                getRowSx={getRowSx}
-                dataIndex={virtualRow.index}
-                measureRef={virtualizer.measureElement}
-                stickyOffsets={stickyOffsets}
-                stickyBodyBg={stickyBodyBg}
-              />
+                <BodyRow
+                  key={getRowKey ? getRowKey(row, virtualRow.index) : virtualRow.key}
+                  row={row}
+                  index={virtualRow.index}
+                  columns={columns}
+                  cellBase={cellBase}
+                  hover={hover}
+                  onRowClick={onRowClick}
+                  getRowSx={getRowSx}
+                  dataIndex={virtualRow.index}
+                  measureRef={virtualizer.measureElement}
+                  stickyOffsets={stickyOffsets}
+                  stickyBodyBg={stickyBodyBg}
+                />
               );
             })}
             {paddingBottom > 0 && (
@@ -641,26 +645,25 @@ export function CommonTable<T>({
           rows.map((row, index) => {
             if (row == null) return null;
             return (
-            <BodyRow
-              key={getRowKey ? getRowKey(row, index) : index}
-              row={row}
-              index={index}
-              columns={columns}
-              cellBase={cellBase}
-              hover={hover}
-              onRowClick={onRowClick}
-              getRowSx={getRowSx}
-              stickyOffsets={stickyOffsets}
-              stickyBodyBg={stickyBodyBg}
-            />
+              <BodyRow
+                key={getRowKey ? getRowKey(row, index) : index}
+                row={row}
+                index={index}
+                columns={columns}
+                cellBase={cellBase}
+                hover={hover}
+                onRowClick={onRowClick}
+                getRowSx={getRowSx}
+                stickyOffsets={stickyOffsets}
+                stickyBodyBg={stickyBodyBg}
+              />
             );
           })}
       </TableBody>
     </Table>
   );
 
-  const fillParent =
-    shouldVirtualize || maxHeight === '100%' || maxHeight === '100vh';
+  const fillParent = shouldVirtualize || maxHeight === '100%' || maxHeight === '100vh';
 
   // Keep the scrollport width-bound so wide tables scroll inside the paper
   // instead of expanding the page (overflow:auto alone is not enough).

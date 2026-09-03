@@ -10,10 +10,10 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import * as XLSX from 'xlsx';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { orangeBtnSx, unpackPayload } from '@/screens/panel/transactions/shared';
+import { readSpreadsheetRows } from '@/utils/spreadsheet';
 
 type Props = {
   open: boolean;
@@ -26,7 +26,10 @@ type Props = {
 };
 
 function cleanKey(key: string) {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+  return key
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
 }
 
 const columnMap: Record<string, string[]> = {
@@ -83,33 +86,17 @@ export function SheetUploadDialog({
     onClose();
   };
 
-  const handleFile = (file: File | null) => {
+  const handleFile = async (file: File | null) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = evt.target?.result;
-        if (data == null) return;
-        const isCSV = file.name.toLowerCase().endsWith('.csv');
-        const workbook = XLSX.read(data, { type: isCSV ? 'string' : 'array' });
-        let finalData: Record<string, string>[] = [];
-        workbook.SheetNames.forEach((sheetName) => {
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-            defval: '',
-            raw: false,
-          });
-          finalData = [...finalData, ...jsonData.map(normalizeRow)];
-        });
-        setRows(finalData);
-        setResult(null);
-        toast.success(`Loaded ${finalData.length} rows`);
-      } catch {
-        toast.error('Failed to read file');
-      }
-    };
-    if (file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file);
-    else reader.readAsArrayBuffer(file);
+    try {
+      const parsed = await readSpreadsheetRows(file, { allSheets: true });
+      const finalData = parsed.map(normalizeRow);
+      setRows(finalData);
+      setResult(null);
+      toast.success(`Loaded ${finalData.length} rows`);
+    } catch {
+      toast.error('Failed to read file. Use an .xlsx or .csv file.');
+    }
   };
 
   const submit = async () => {
@@ -159,13 +146,17 @@ export function SheetUploadDialog({
             {' · '}
             Mid: <b style={{ color: '#ff9f0a' }}>{mid || '—'}</b>
           </Typography>
-          <Button variant="outlined" component="label" sx={{ textTransform: 'none', alignSelf: 'flex-start' }}>
-            Choose Excel / CSV
+          <Button
+            variant="outlined"
+            component="label"
+            sx={{ textTransform: 'none', alignSelf: 'flex-start' }}
+          >
+            Choose XLSX / CSV
             <input
               hidden
               type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={(e) => handleFile(e.target.files?.[0] || null)}
+              accept=".xlsx,.csv"
+              onChange={(e) => void handleFile(e.target.files?.[0] || null)}
             />
           </Button>
           <Typography variant="body2" color="text.secondary">

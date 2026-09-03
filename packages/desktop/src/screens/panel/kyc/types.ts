@@ -37,11 +37,7 @@ export const EMPTY_KYC_FILTERS: KycFilters = {
 export const NIGHT_LOCK_KEY = 'nightLockUntil';
 export const NIGHT_UNLOCK_MS = 60_000;
 
-export function apiFailed(res: {
-  ok: boolean;
-  success?: boolean;
-  message?: string;
-}): boolean {
+export function apiFailed(res: { ok: boolean; success?: boolean; message?: string }): boolean {
   return !res.ok || res.success === false;
 }
 

@@ -23,10 +23,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { copyToClipboard } from '@/utils/clipboard';
-import {
-  formatDisplayDate,
-  formatDisplayTime,
-} from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { display } from '@/screens/panel/shared';
 
 export type DepositRow = {
@@ -112,10 +109,7 @@ export function openWhatsApp(row: DepositRow) {
         : ['Tamil Nadu', 'Tiruchirappalli'].includes(state)
           ? `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nநீங்கள் டெப்பாசிட் செய்ய முயற்சிக்கிறீர்கள் என்று பார்க்கிறேன். இன்று நான் உங்களுக்கு எப்படி உதவலாம்?`
           : `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nI see you're trying to make a deposit. How can I assist you today?`;
-  const message = stateWiseMsg.replace(
-    '{USER_NAME}',
-    (row.userName || '').split(' ')[0] || '',
-  );
+  const message = stateWiseMsg.replace('{USER_NAME}', (row.userName || '').split(' ')[0] || '');
   const encoded = encodeURIComponent(message);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (isMobile) {
@@ -191,7 +185,12 @@ export const MobileCell = memo(function MobileCell({
   const iconSize = compact ? 18 : 32;
   const chat =
     canWhatsApp && pending ? (
-      <Stack direction="row" alignItems="center" spacing={compact ? 0.5 : 0.85} sx={{ flexShrink: 0 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={compact ? 0.5 : 0.85}
+        sx={{ flexShrink: 0 }}
+      >
         <Box
           component="button"
           type="button"
@@ -400,10 +399,7 @@ type TxnDetailsCellProps = {
   compact?: boolean;
 };
 
-export const TxnDetailsCell = memo(function TxnDetailsCell({
-  row,
-  compact,
-}: TxnDetailsCellProps) {
+export const TxnDetailsCell = memo(function TxnDetailsCell({ row, compact }: TxnDetailsCellProps) {
   if (compact) {
     return (
       <Typography sx={{ fontSize: 11.5, lineHeight: 1.05, whiteSpace: 'nowrap' }}>
@@ -702,22 +698,15 @@ export const IndexCell = memo(function IndexCell({
 }: IndexCellProps) {
   const status = String(row.status || '');
   const statusKey = status.toLowerCase();
-  // Approved already uses green row background (Laxmi-style). Skip the
+  // Approved already uses light-orange row background. Skip the
   // checkmark icon so Sr No stays clean — keep icons for pending/edit etc.
   const hideStatusIcon =
-    statusKey === 'approved' ||
-    statusKey === 'success' ||
-    statusKey === 'approved-clr';
+    statusKey === 'approved' || statusKey === 'success' || statusKey === 'approved-clr';
   const visual = status && !hideStatusIcon ? statusVisual(status) : null;
   const StatusIcon = visual?.Icon;
 
   return (
-    <Stack
-      alignItems="center"
-      justifyContent="center"
-      spacing={0.2}
-      sx={{ minWidth: 0 }}
-    >
+    <Stack alignItems="center" justifyContent="center" spacing={0.2} sx={{ minWidth: 0 }}>
       <Typography sx={{ fontSize: 12, lineHeight: 1.1 }}>
         {(page - 1) * itemsPerPage + index + 1}
       </Typography>
@@ -776,9 +765,7 @@ export function canUseDepositPencil(): boolean {
   return hasPermission('Deposit_Pensil');
 }
 
-function normalizeUserUpiList(
-  raw: DepositRow['userDepositUpiIds'],
-): string[] {
+function normalizeUserUpiList(raw: DepositRow['userDepositUpiIds']): string[] {
   if (!raw) return [];
   const list = Array.isArray(raw)
     ? raw

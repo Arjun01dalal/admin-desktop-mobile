@@ -1,10 +1,16 @@
 /**
  * OS-backed session token vault (Electron safeStorage).
- * Plaintext token file is encrypted at rest when the OS keychain is available.
+ * Session tokens are never persisted when OS encryption is unavailable.
+ *
+ * Skip redundant writeFileSync when the in-memory token is unchanged — on Windows,
+ * Defender/AV often freezes Electron's main process on every sync token write.
  */
 const { safeStorage, app } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+
+/** Last value we already synced to disk (or intentionally left memory-only). */
+let lastSyncedToken = undefined;
 
 function tokenPath() {
   return path.join(app.getPath('userData'), 'session.token');
@@ -25,6 +31,15 @@ function encryptAvailable() {
 
 function writeToken(token) {
   const value = String(token || '').trim();
+  if (lastSyncedToken === value) {
+    const encrypted = Boolean(value) && encryptAvailable();
+    return {
+      ok: !value || encrypted,
+      encrypted,
+      skipped: true,
+    };
+  }
+
   const dest = tokenPath();
   if (!value) {
     try {
@@ -37,24 +52,57 @@ function writeToken(token) {
     } catch {
       // ignore
     }
+    lastSyncedToken = '';
     return { ok: true, encrypted: false };
   }
 
   if (encryptAvailable()) {
-    const buf = safeStorage.encryptString(value);
-    fs.writeFileSync(dest, buf);
-    // Remove legacy plaintext if present.
     try {
-      fs.rmSync(legacyTokenPath(), { force: true });
-    } catch {
-      // ignore
+      const buf = safeStorage.encryptString(value);
+      fs.writeFileSync(dest, buf, { mode: 0o600 });
+      try {
+        fs.chmodSync(dest, 0o600);
+      } catch {
+        // ignore platform/filesystem permission limitations
+      }
+      // Remove legacy plaintext if present.
+      try {
+        fs.rmSync(legacyTokenPath(), { force: true });
+      } catch {
+        // ignore
+      }
+      lastSyncedToken = value;
+      return { ok: true, encrypted: true };
+    } catch (err) {
+      console.warn('[tokenVault] encrypted token write failed:', err?.message || err);
+      try {
+        fs.rmSync(dest, { force: true });
+        fs.rmSync(legacyTokenPath(), { force: true });
+      } catch {
+        // ignore cleanup failures
+      }
+      return {
+        ok: false,
+        encrypted: false,
+        message: 'OS secure storage is unavailable; token was not persisted',
+      };
     }
-    return { ok: true, encrypted: true };
   }
 
-  // Fallback (rare Linux setups without keyring) — still better than localStorage alone.
-  fs.writeFileSync(dest, value, 'utf8');
-  return { ok: true, encrypted: false };
+  // Never create a plaintext fallback. Memory-only sessions remain supported.
+  try {
+    fs.rmSync(dest, { force: true });
+    fs.rmSync(legacyTokenPath(), { force: true });
+  } catch {
+    // ignore cleanup failures
+  }
+  // Remember value so we don't hammer rmSync/encrypt checks on every API call.
+  lastSyncedToken = value;
+  return {
+    ok: false,
+    encrypted: false,
+    message: 'OS secure storage is unavailable; token was not persisted',
+  };
 }
 
 function readToken() {
@@ -65,15 +113,30 @@ function readToken() {
       if (encryptAvailable()) {
         try {
           const text = safeStorage.decryptString(raw).trim();
-          return text || null;
+          if (text) {
+            lastSyncedToken = text;
+            return text;
+          }
+          return null;
         } catch {
-          // Maybe written as plaintext fallback.
-          const text = raw.toString('utf8').trim();
-          return text || null;
+          // Do not accept a plaintext or corrupt token file.
+          try {
+            fs.rmSync(dest, { force: true });
+          } catch {
+            // ignore cleanup failures
+          }
+          lastSyncedToken = '';
+          return null;
         }
       }
-      const text = raw.toString('utf8').trim();
-      return text || null;
+      // Encryption is unavailable, so an existing file is not trusted.
+      try {
+        fs.rmSync(dest, { force: true });
+      } catch {
+        // ignore cleanup failures
+      }
+      lastSyncedToken = '';
+      return null;
     }
 
     // Migrate legacy SOS plaintext token once.
@@ -81,8 +144,12 @@ function readToken() {
     if (fs.existsSync(legacy)) {
       const text = fs.readFileSync(legacy, 'utf8').trim();
       if (text) {
-        writeToken(text);
-        return text;
+        try {
+          const result = writeToken(text);
+          return result.ok && result.encrypted ? text : null;
+        } catch {
+          return null;
+        }
       }
     }
   } catch (err) {

@@ -31,12 +31,7 @@ import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES } from '@/constants/clientNames';
-import {
-  formatDisplayDate,
-  formatDisplayTime,
-  getStoredUser,
-  todayIST,
-} from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime, getStoredUser, todayIST } from '@/utils/dates';
 import { asList, display, useReportQuery } from '@/screens/panel/shared';
 import { ArrayFieldEditor } from './depositProviders/ArrayFieldEditor';
 import { INDIAN_STATES } from './depositProviders/constants';
@@ -489,7 +484,9 @@ export function DepositProvidersPage() {
 
     const apps =
       amountApp === 'All'
-        ? (activeRow.clientName?.length ? activeRow.clientName.map(String) : [...CLIENT_NAMES])
+        ? activeRow.clientName?.length
+          ? activeRow.clientName.map(String)
+          : [...CLIENT_NAMES]
         : [amountApp];
 
     setSubmitting(true);
@@ -516,9 +513,7 @@ export function DepositProvidersPage() {
         toast.warning(`Updated ${okCount} app(s), failed ${failCount}`);
       } else {
         toast.success(
-          amountApp === 'All'
-            ? `Min/Max updated for all ${okCount} apps`
-            : 'Amount updated',
+          amountApp === 'All' ? `Min/Max updated for all ${okCount} apps` : 'Amount updated',
         );
       }
       setAmountOpen(false);
@@ -609,7 +604,10 @@ export function DepositProvidersPage() {
           <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
             <Typography variant="body2">{display(row.displayName)}</Typography>
             {canEdit && (
-              <IconButton size="small" onClick={() => openUpdate(row, 'displayName', row.displayName)}>
+              <IconButton
+                size="small"
+                onClick={() => openUpdate(row, 'displayName', row.displayName)}
+              >
                 <EditIcon sx={{ fontSize: 15 }} />
               </IconButton>
             )}
@@ -648,7 +646,13 @@ export function DepositProvidersPage() {
                   component="img"
                   src={src}
                   alt={row.displayName || row.name || 'gateway'}
-                  sx={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 1, bgcolor: '#fff' }}
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    objectFit: 'contain',
+                    borderRadius: 1,
+                    bgcolor: '#fff',
+                  }}
                 />
               ) : (
                 '—'
@@ -808,7 +812,9 @@ export function DepositProvidersPage() {
                 }}
                 input={<OutlinedInput />}
                 renderValue={(vals) =>
-                  vals.length > 2 ? `${vals.slice(0, 2).join(', ')} +${vals.length - 2}` : vals.join(', ')
+                  vals.length > 2
+                    ? `${vals.slice(0, 2).join(', ')} +${vals.length - 2}`
+                    : vals.join(', ')
                 }
                 sx={{
                   bgcolor: '#121218',
@@ -1042,9 +1048,7 @@ export function DepositProvidersPage() {
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
       <CollapsibleFilterPanel
         title="Deposit Providers"
-        summary={
-          appliedStart && appliedEnd ? `${appliedStart} → ${appliedEnd}` : 'All dates'
-        }
+        summary={appliedStart && appliedEnd ? `${appliedStart} → ${appliedEnd}` : 'All dates'}
         contentSx={{ overflowX: 'auto' }}
       >
         <Stack
@@ -1210,7 +1214,12 @@ export function DepositProvidersPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUpdateOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={submitting} onClick={() => void handleUpdateField()} sx={orangeBtnSx}>
+          <Button
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void handleUpdateField()}
+            sx={orangeBtnSx}
+          >
             Update
           </Button>
         </DialogActions>
@@ -1231,7 +1240,12 @@ export function DepositProvidersPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOrderOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={submitting} onClick={() => void submitOrder()} sx={orangeBtnSx}>
+          <Button
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void submitOrder()}
+            sx={orangeBtnSx}
+          >
             Submit
           </Button>
         </DialogActions>
@@ -1279,7 +1293,12 @@ export function DepositProvidersPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAmountOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={submitting} onClick={() => void submitAmount()} sx={orangeBtnSx}>
+          <Button
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void submitAmount()}
+            sx={orangeBtnSx}
+          >
             Update
           </Button>
         </DialogActions>
@@ -1303,16 +1322,19 @@ export function DepositProvidersPage() {
               onChange={(e) => setBonusText(e.target.value)}
             />
             <FormControlLabel
-              control={
-                <Switch checked={bonusStatus} onChange={(_, v) => setBonusStatus(v)} />
-              }
+              control={<Switch checked={bonusStatus} onChange={(_, v) => setBonusStatus(v)} />}
               label="Bonus Status"
             />
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setBonusOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={submitting} onClick={() => void submitBonus()} sx={orangeBtnSx}>
+          <Button
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void submitBonus()}
+            sx={orangeBtnSx}
+          >
             Update
           </Button>
         </DialogActions>
@@ -1322,7 +1344,12 @@ export function DepositProvidersPage() {
         <DialogTitle>Are You Sure?</DialogTitle>
         <DialogActions>
           <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
-          <Button color="error" variant="contained" disabled={submitting} onClick={() => void handleDelete()}>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={submitting}
+            onClick={() => void handleDelete()}
+          >
             Delete
           </Button>
         </DialogActions>

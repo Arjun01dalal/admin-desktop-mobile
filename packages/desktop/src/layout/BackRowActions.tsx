@@ -13,9 +13,7 @@ type BackRowActionsContextValue = {
   setActions: (node: ReactNode) => void;
 };
 
-const BackRowActionsContext = createContext<BackRowActionsContextValue | null>(
-  null,
-);
+const BackRowActionsContext = createContext<BackRowActionsContextValue | null>(null);
 
 /** Provides a slot rendered beside AppShell's Back button. */
 export function BackRowActionsProvider({ children }: { children: ReactNode }) {
@@ -23,15 +21,8 @@ export function BackRowActionsProvider({ children }: { children: ReactNode }) {
   const setActions = useCallback((node: ReactNode) => {
     setActionsState(node);
   }, []);
-  const value = useMemo(
-    () => ({ actions, setActions }),
-    [actions, setActions],
-  );
-  return (
-    <BackRowActionsContext.Provider value={value}>
-      {children}
-    </BackRowActionsContext.Provider>
-  );
+  const value = useMemo(() => ({ actions, setActions }), [actions, setActions]);
+  return <BackRowActionsContext.Provider value={value}>{children}</BackRowActionsContext.Provider>;
 }
 
 export function useBackRowActionsSlot(): ReactNode {

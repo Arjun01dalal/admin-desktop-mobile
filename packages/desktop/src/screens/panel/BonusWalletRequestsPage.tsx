@@ -348,9 +348,7 @@ export function BonusWalletRequestsPage() {
             }}
             onClick={() => {
               if (!row.userId) return;
-              navigate(
-                `/users/report/${row.userId}/${encodeURIComponent(row.name || '')}`,
-              );
+              navigate(`/users/report/${row.userId}/${encodeURIComponent(row.name || '')}`);
             }}
           >
             {display(row.name)}
@@ -396,7 +394,10 @@ export function BonusWalletRequestsPage() {
         cellSx: { whiteSpace: 'nowrap' },
         render: (row) => {
           // Match laxminarayan: always show buttons; disable unless pending.
-          const pending = String(row.status || '').trim().toLowerCase() === 'pending';
+          const pending =
+            String(row.status || '')
+              .trim()
+              .toLowerCase() === 'pending';
           return (
             <Stack
               direction="row"
@@ -428,19 +429,10 @@ export function BonusWalletRequestsPage() {
         id: 'updatedBy',
         label: 'Updated By',
         render: (row) =>
-          row.updatedBy?.name
-            ? `${display(row.status)} by ${display(row.updatedBy.name)}`
-            : '—',
+          row.updatedBy?.name ? `${display(row.status)} by ${display(row.updatedBy.name)}` : '—',
       },
     ],
-    [
-      page,
-      itemsPerPage,
-      canShowMobile,
-      actingId,
-      handleAction,
-      navigate,
-    ],
+    [page, itemsPerPage, canShowMobile, actingId, handleAction, navigate],
   );
 
   const filtersCtx = useMemo<BonusFiltersCtx>(
@@ -450,187 +442,182 @@ export function BonusWalletRequestsPage() {
 
   return (
     <BonusFiltersProvider value={filtersCtx}>
-    <Box
-      sx={{
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-        px: 1.5,
-        py: 1.25,
-        boxSizing: 'border-box',
-      }}
-    >
-      <CollapsibleFilterPanel
-        title="Bonus Wallet Requests"
-        summary={`${startDate} → ${endDate}`}
-        sx={{ flexShrink: 0 }}
+      <Box
+        sx={{
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          px: 1.5,
+          py: 1.25,
+          boxSizing: 'border-box',
+        }}
       >
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: 'repeat(2, minmax(0, 1fr))',
-              sm: 'repeat(3, minmax(0, 1fr))',
-              md: 'repeat(4, minmax(0, 1fr))',
-              lg: 'repeat(6, minmax(0, 1fr))',
-            },
-            gap: 1.25,
-            alignItems: 'center',
-            width: '100%',
-          }}
+        <CollapsibleFilterPanel
+          title="Bonus Wallet Requests"
+          summary={`${startDate} → ${endDate}`}
+          sx={{ flexShrink: 0 }}
         >
-          <TextField
-            size="small"
-            type="date"
-            label="From Date"
-            InputLabelProps={{ shrink: true }}
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            size="small"
-            type="date"
-            label="To Date"
-            InputLabelProps={{ shrink: true }}
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            sx={fieldSx}
-          />
-          <TextField
-            select
-            size="small"
-            label="Items / Page"
-            value={String(itemsPerPage)}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value) || DEFAULT_ITEMS_PER_PAGE);
-              setPage(1);
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'repeat(2, minmax(0, 1fr))',
+                sm: 'repeat(3, minmax(0, 1fr))',
+                md: 'repeat(4, minmax(0, 1fr))',
+                lg: 'repeat(6, minmax(0, 1fr))',
+              },
+              gap: 1.25,
+              alignItems: 'center',
+              width: '100%',
             }}
-            sx={fieldSx}
           >
-            {ITEMS_PER_PAGE_OPTIONS.map((n) => (
-              <MenuItem key={n} value={n}>
-                {n}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            size="small"
-            label="Status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            sx={fieldSx}
-          >
-            <MenuItem value="">All</MenuItem>
-            {STATUS_OPTIONS.filter(Boolean).map((s) => (
-              <MenuItem key={s} value={s}>
-                {s}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-            useFlexGap
-            sx={{ gridColumn: { xs: '1 / -1', lg: 'span 2' } }}
-          >
-            <Button
-              variant="contained"
-              disabled={loading}
-              onClick={() => commitQuery()}
-              sx={orangeBtnSx}
-            >
-              Apply
-            </Button>
-            <Button
-              variant="contained"
-              disabled={loading}
-              onClick={() => commitQuery({ allData: true })}
-              sx={orangeBtnSx}
-            >
-              All Data
-            </Button>
-            <Button
-              variant="contained"
-              disabled={loading}
-              onClick={clearDates}
-              sx={orangeBtnSx}
-            >
-              Clear
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={
-                loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />
-              }
-              disabled={loading}
-              onClick={() => {
-                void load();
-                void loadSummary();
-              }}
-              sx={orangeBtnSx}
-            >
-              Refresh
-            </Button>
-          </Stack>
-        </Box>
-      </CollapsibleFilterPanel>
-
-      <Stack
-        direction="row"
-        spacing={1}
-        flexWrap="wrap"
-        useFlexGap
-        mb={1.5}
-        sx={{ flexShrink: 0 }}
-      >
-        <Chip
-          label={`Approved: ${summary.approvedCount}`}
-          sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
-        />
-        <Chip
-          label={`Wallet Balance: ${formatAmount(summary.walletBalance)}`}
-          sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
-        />
-        <Chip
-          label={`Pending: ${summary.pendingCount}`}
-          sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
-        />
-        {summaryLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
-      </Stack>
-
-      <TablePanel
-        footer={
-          <>
-            <Typography variant="body2" color="text.secondary">
-              Total: {total}
-            </Typography>
-            <Pagination
-              count={Math.max(1, totalPages)}
-              page={page}
-              onChange={(_e, p) => setPage(p)}
-              color="primary"
-              disabled={loading}
+            <TextField
+              size="small"
+              type="date"
+              label="From Date"
+              InputLabelProps={{ shrink: true }}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              sx={fieldSx}
             />
-          </>
-        }
-      >
-        <CommonTable
-          columns={columns}
-          rows={rows}
-          getRowKey={(row, index) => row._id || index}
-          loading={loading}
-          emptyMessage="No bonus wallet requests found"
-          stickyHeader
-          dense
-          minWidth={1400}
-          maxHeight="100%"
-        />
-      </TablePanel>
-    </Box>
+            <TextField
+              size="small"
+              type="date"
+              label="To Date"
+              InputLabelProps={{ shrink: true }}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              sx={fieldSx}
+            />
+            <TextField
+              select
+              size="small"
+              label="Items / Page"
+              value={String(itemsPerPage)}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value) || DEFAULT_ITEMS_PER_PAGE);
+                setPage(1);
+              }}
+              sx={fieldSx}
+            >
+              {ITEMS_PER_PAGE_OPTIONS.map((n) => (
+                <MenuItem key={n} value={n}>
+                  {n}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              sx={fieldSx}
+            >
+              <MenuItem value="">All</MenuItem>
+              {STATUS_OPTIONS.filter(Boolean).map((s) => (
+                <MenuItem key={s} value={s}>
+                  {s}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+              sx={{ gridColumn: { xs: '1 / -1', lg: 'span 2' } }}
+            >
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() => commitQuery()}
+                sx={orangeBtnSx}
+              >
+                Apply
+              </Button>
+              <Button
+                variant="contained"
+                disabled={loading}
+                onClick={() => commitQuery({ allData: true })}
+                sx={orangeBtnSx}
+              >
+                All Data
+              </Button>
+              <Button variant="contained" disabled={loading} onClick={clearDates} sx={orangeBtnSx}>
+                Clear
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={
+                  loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />
+                }
+                disabled={loading}
+                onClick={() => {
+                  void load();
+                  void loadSummary();
+                }}
+                sx={orangeBtnSx}
+              >
+                Refresh
+              </Button>
+            </Stack>
+          </Box>
+        </CollapsibleFilterPanel>
+
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+          useFlexGap
+          mb={1.5}
+          sx={{ flexShrink: 0 }}
+        >
+          <Chip
+            label={`Approved: ${summary.approvedCount}`}
+            sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
+          />
+          <Chip
+            label={`Wallet Balance: ${formatAmount(summary.walletBalance)}`}
+            sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
+          />
+          <Chip
+            label={`Pending: ${summary.pendingCount}`}
+            sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
+          />
+          {summaryLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
+        </Stack>
+
+        <TablePanel
+          footer={
+            <>
+              <Typography variant="body2" color="text.secondary">
+                Total: {total}
+              </Typography>
+              <Pagination
+                count={Math.max(1, totalPages)}
+                page={page}
+                onChange={(_e, p) => setPage(p)}
+                color="primary"
+                disabled={loading}
+              />
+            </>
+          }
+        >
+          <CommonTable
+            columns={columns}
+            rows={rows}
+            getRowKey={(row, index) => row._id || index}
+            loading={loading}
+            emptyMessage="No bonus wallet requests found"
+            stickyHeader
+            dense
+            minWidth={1400}
+            maxHeight="100%"
+          />
+        </TablePanel>
+      </Box>
     </BonusFiltersProvider>
   );
 }

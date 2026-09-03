@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  isSosFlagEnabled,
-  type SosBlockInfo,
-  type SosFlagPayload,
-} from '@astro/shared';
+import { isSosFlagEnabled, type SosBlockInfo, type SosFlagPayload } from '@astro/shared';
 import { astroApi } from '@/api/astroApi';
 import { getAuthToken } from '@/utils/authToken';
 

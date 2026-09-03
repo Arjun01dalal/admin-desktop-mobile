@@ -73,16 +73,13 @@ export function isUpiGateway(gateway?: string): boolean {
   return UPI_GATEWAYS.has(String(gateway || ''));
 }
 
-export function depositRowBg(
-  status?: string,
-  mode: 'light' | 'dark' = 'dark',
-): string | undefined {
+export function depositRowBg(status?: string, mode: 'light' | 'dark' = 'dark'): string | undefined {
   const s = String(status || '').toLowerCase();
   const light = mode === 'light';
   // Light mode needs pale tints — the dark greens/reds turn rows unreadable.
   if (s === 'approved' || s === 'approved-clr' || s === 'success') {
-    // Brighter parrot / lime green (not forest-dark).
-    return light ? '#e8fbc8' : '#2f5f1c';
+    // Light orange (replaces parrot green).
+    return light ? '#ffe8cc' : 'rgba(255, 159, 10, 0.28)';
   }
   if (s === 'rejected' || s === 'failed' || s === 'cancel') {
     return light ? '#fde8e8' : '#3d1b1b';

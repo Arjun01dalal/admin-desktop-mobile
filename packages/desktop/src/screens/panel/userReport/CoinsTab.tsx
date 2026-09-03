@@ -81,11 +81,7 @@ export function CoinsTab({ userId }: Props) {
       );
       if (cancelled || !res.ok) return;
       const raw = res.data as { payload?: MidOption[] } | MidOption[] | null;
-      const list = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.payload)
-          ? raw.payload
-          : [];
+      const list = Array.isArray(raw) ? raw : Array.isArray(raw?.payload) ? raw.payload : [];
       setMids(list.filter((m) => m?.mid));
     })();
     return () => {
@@ -93,10 +89,7 @@ export function CoinsTab({ userId }: Props) {
     };
   }, []);
 
-  const minDate = useMemo(
-    () => (canBackDate ? undefined : threeDaysAgoISO()),
-    [canBackDate],
-  );
+  const minDate = useMemo(() => (canBackDate ? undefined : threeDaysAgoISO()), [canBackDate]);
   const maxDate = todayIST();
 
   const submit = async (mode: 'add' | 'remove') => {
@@ -151,9 +144,7 @@ export function CoinsTab({ userId }: Props) {
         toast.error(res.message || 'Failed to update coins');
         return;
       }
-      toast.success(
-        mode === 'add' ? 'Coins Added Successfully' : 'Coins removed Successfully',
-      );
+      toast.success(mode === 'add' ? 'Coins Added Successfully' : 'Coins removed Successfully');
       setAmount('');
       setReason('');
       setRemark('');

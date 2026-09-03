@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Pagination,
-  Stack,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Pagination, Stack } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
@@ -16,12 +10,7 @@ import { maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
-import {
-  HISTORY_PAGINATION_SX,
-  ItemsPerPageField,
-  SearchFilter,
-  formatDt,
-} from './historyFilters';
+import { HISTORY_PAGINATION_SX, ItemsPerPageField, SearchFilter, formatDt } from './historyFilters';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type FundType = 'deposit' | 'withdrawal' | 'coin';
@@ -33,25 +22,11 @@ function createdAtOf(r: HistoryRow) {
     action && typeof action === 'object' && !Array.isArray(action)
       ? (action as Record<string, unknown>).date
       : undefined;
-  return (
-    r.createdOn ||
-    r.createdAt ||
-    r['CreatedOn'] ||
-    r.date ||
-    actionDate ||
-    null
-  );
+  return r.createdOn || r.createdAt || r['CreatedOn'] || r.date || actionDate || null;
 }
 
 function updatedAtOf(r: HistoryRow) {
-  return (
-    r.updatedOn ||
-    r.updatedAt ||
-    r['UpdatedOn'] ||
-    r['updated_at'] ||
-    r['UpdatedAt'] ||
-    null
-  );
+  return r.updatedOn || r.updatedAt || r['UpdatedOn'] || r['updated_at'] || r['UpdatedAt'] || null;
 }
 
 /** Fund Request — deposit columns match Laxmi (Payment Type … Date/Time). */
@@ -114,27 +89,16 @@ export function FundRequestTab({ userId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [
-    amount,
-    gateway,
-    itemsPerPage,
-    mid,
-    orderId,
-    orderKeyId,
-    page,
-    paymentType,
-    type,
-    userId,
-  ]);
+  }, [amount, gateway, itemsPerPage, mid, orderId, orderKeyId, page, paymentType, type, userId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const search = () => {
+  const search = useCallback(() => {
     if (page !== 1) setPage(1);
     else void load();
-  };
+  }, [load, page]);
 
   const columns = useMemo<CommonTableColumn<HistoryRow>[]>(() => {
     if (type === 'deposit') {
@@ -201,8 +165,7 @@ export function FundRequestTab({ userId }: Props) {
               placeholder="Order key id"
             />
           ),
-          render: (r) =>
-            String(r.orderKeyID || r.orderKeyId || r.order_key_id || '-'),
+          render: (r) => String(r.orderKeyID || r.orderKeyId || r.order_key_id || '-'),
         },
         {
           id: 'gw',
@@ -221,12 +184,7 @@ export function FundRequestTab({ userId }: Props) {
           id: 'mid',
           label: 'Mid',
           filter: (
-            <SearchFilter
-              value={mid}
-              onChange={setMid}
-              onSearch={search}
-              placeholder="Mid"
-            />
+            <SearchFilter value={mid} onChange={setMid} onSearch={search} placeholder="Mid" />
           ),
           render: (r) => String(r.mid || '-'),
         },
@@ -283,11 +241,7 @@ export function FundRequestTab({ userId }: Props) {
           label: 'Updated By',
           filter: null,
           render: (r) =>
-            String(
-              (r.updatedBy as { name?: string } | undefined)?.name ||
-                r.updatedBy ||
-                '-',
-            ),
+            String((r.updatedBy as { name?: string } | undefined)?.name || r.updatedBy || '-'),
         },
       ];
     }
@@ -365,8 +319,7 @@ export function FundRequestTab({ userId }: Props) {
           label: 'IfscCode',
           filter: null,
           // Laxmi FundRequestHistory: item.ifscCode
-          render: (r) =>
-            String(r.ifscCode || r.IfscCode || r.ifsc || r.IFSC || '-'),
+          render: (r) => String(r.ifscCode || r.IfscCode || r.ifsc || r.IFSC || '-'),
         },
         {
           id: 'ubank',
@@ -391,9 +344,7 @@ export function FundRequestTab({ userId }: Props) {
           label: 'CommissionAmount',
           filter: null,
           render: (r) =>
-            formatAmount(
-              r.commissionAmount ?? r.CommissionAmount ?? r.commission ?? 0,
-            ),
+            formatAmount(r.commissionAmount ?? r.CommissionAmount ?? r.commission ?? 0),
         },
       ];
     }
@@ -434,11 +385,7 @@ export function FundRequestTab({ userId }: Props) {
         label: 'updatedBy Name',
         filter: null,
         render: (r) =>
-          String(
-            (r.updatedBy as { name?: string } | undefined)?.name ||
-              r.updatedBy ||
-              '-',
-          ),
+          String((r.updatedBy as { name?: string } | undefined)?.name || r.updatedBy || '-'),
       },
       {
         id: 'reason',
@@ -459,7 +406,7 @@ export function FundRequestTab({ userId }: Props) {
         render: (r) => String(r.remark || '-'),
       },
     ];
-  }, [amount, gateway, mid, orderId, orderKeyId, paymentType, type, canShowMobile]);
+  }, [amount, gateway, mid, orderId, orderKeyId, paymentType, type, canShowMobile, search]);
 
   const typeBtn = (id: FundType, label: string) => (
     <Button
@@ -490,14 +437,7 @@ export function FundRequestTab({ userId }: Props) {
         {typeBtn('coin', 'Coins')}
       </Stack>
 
-      <Stack
-        direction="row"
-        spacing={1.25}
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        mb={1.5}
-      >
+      <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap mb={1.5}>
         <ItemsPerPageField
           value={itemsPerPage}
           onChange={(v) => {

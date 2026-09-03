@@ -44,15 +44,17 @@ export function displayName(value: unknown, empty = '-'): string {
 
 /** Match laxmi caller-head assignment (array or comma/pipe-separated names). */
 export function matchesCallerHeadName(value: unknown, name: unknown): boolean {
-  const expected = String(name ?? '').trim().toLowerCase();
+  const expected = String(name ?? '')
+    .trim()
+    .toLowerCase();
   if (!expected || value == null) return false;
 
-  const assigned = Array.isArray(value)
-    ? value
-    : String(value).split(/[,|]/);
+  const assigned = Array.isArray(value) ? value : String(value).split(/[,|]/);
 
   return assigned.some((entry) => {
-    const normalized = String(entry ?? '').trim().toLowerCase();
+    const normalized = String(entry ?? '')
+      .trim()
+      .toLowerCase();
     return normalized !== 'not assigned' && normalized === expected;
   });
 }
@@ -61,8 +63,7 @@ export function matchesCallerHeadName(value: unknown, name: unknown): boolean {
 export function minutesForDate(data: unknown, startDate: string): string {
   if (!Array.isArray(data)) return '-';
   const entry = data.find((item) => item && typeof item === 'object' && startDate in item) as
-    | Record<string, { minutes?: number }>
-    | undefined;
+    Record<string, { minutes?: number }> | undefined;
   const minutes = entry?.[startDate]?.minutes;
   return minutes !== undefined ? `${Number(minutes).toFixed(2)} mins` : '-';
 }

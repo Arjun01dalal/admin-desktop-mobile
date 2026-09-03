@@ -12,10 +12,13 @@ import type {
   CallLogsListResponse,
 } from './types';
 
-type AdminBots = {
-  botIds?: Array<string | number> | string;
-  botNo?: Array<string | number> | string;
-} | null | undefined;
+type AdminBots =
+  | {
+      botIds?: Array<string | number> | string;
+      botNo?: Array<string | number> | string;
+    }
+  | null
+  | undefined;
 
 export function useCallLogsQuery(
   filters: CallLogsFilterState,
@@ -107,14 +110,8 @@ export function useCallLogsQuery(
         } else {
           const data = listRes.data || {};
           const raw = data.calls || [];
-          const nextCalls = filterCallsClientSide(
-            raw,
-            f.selectedStatus,
-            assigned,
-          );
-          const nextTotal = Number(
-            data.pagination?.totalCount ?? nextCalls.length,
-          );
+          const nextCalls = filterCallsClientSide(raw, f.selectedStatus, assigned);
+          const nextTotal = Number(data.pagination?.totalCount ?? nextCalls.length);
           startTransition(() => {
             setCalls(nextCalls);
             setTotal(nextTotal);
@@ -140,7 +137,8 @@ export function useCallLogsQuery(
     filters.selectedStatus,
     filters.selectedBotId,
     filters.commentFilter,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
+    load,
+  ]);
 
   useEffect(() => {
     if (options?.poll === false) return;

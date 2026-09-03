@@ -13,10 +13,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getStoredUser, todayIST } from '@/utils/dates';
-import {
-  BOT_DATA_BOT_IDS,
-  PLAY_IN_OPTIONS,
-} from '@/screens/panel/botData/constants';
+import { BOT_DATA_BOT_IDS, PLAY_IN_OPTIONS } from '@/screens/panel/botData/constants';
 import { BOT_DATA_USER_TYPE_OPTIONS } from '@astro/shared/userTypes';
 import { pushToBotDialer } from '@/screens/panel/shared/pushToBotDialer';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
@@ -62,8 +59,7 @@ function asBotMap(raw: unknown): Record<string, BotUser[]> {
     (obj.users_by_bots as Record<string, BotUser[]> | undefined) ||
     (obj.payload && typeof obj.payload === 'object'
       ? ((obj.payload as Record<string, unknown>).users_by_bots as
-          | Record<string, BotUser[]>
-          | undefined)
+          Record<string, BotUser[]> | undefined)
       : undefined) ||
     obj;
   if (!nested || typeof nested !== 'object' || Array.isArray(nested)) return {};
@@ -97,10 +93,7 @@ export function BotDataPage() {
     [botMap],
   );
 
-  const totalUsers = useMemo(
-    () => cards.reduce((sum, c) => sum + c.count, 0),
-    [cards],
-  );
+  const totalUsers = useMemo(() => cards.reduce((sum, c) => sum + c.count, 0), [cards]);
 
   const load = useCallback(async () => {
     if (!userType || !bots.length || !states.length) {
@@ -375,9 +368,7 @@ export function BotDataPage() {
                 borderRadius: 1.5,
               }}
             >
-              <Typography sx={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                Bot ID
-              </Typography>
+              <Typography sx={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Bot ID</Typography>
               <Typography sx={{ fontSize: 18, fontWeight: 700, color: '#ffd28a' }}>
                 {card.botId}
               </Typography>

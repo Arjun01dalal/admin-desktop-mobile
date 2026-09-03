@@ -40,19 +40,11 @@ function normalizeTopCasinoGames(data: unknown): TopCasinoGameRow[] {
     .map((item) => {
       const row = item as Record<string, unknown>;
       return {
-        providerName: String(
-          row.providerName ?? row.provider ?? row.provider_name ?? '',
-        ).trim(),
+        providerName: String(row.providerName ?? row.provider ?? row.provider_name ?? '').trim(),
         marketName: String(
-          row.marketName ??
-            row.market ??
-            row.market_name ??
-            row.gameName ??
-            row.name ??
-            '',
+          row.marketName ?? row.market ?? row.market_name ?? row.gameName ?? row.name ?? '',
         ).trim(),
-        playCount:
-          Number(row.playCount ?? row.count ?? row.play_count ?? 0) || 0,
+        playCount: Number(row.playCount ?? row.count ?? row.play_count ?? 0) || 0,
       };
     })
     .filter((item) => item.providerName || item.marketName);
@@ -197,9 +189,7 @@ export function TopCasinoGamesSection({ userId }: Props) {
               <CommonTable
                 columns={columns}
                 rows={rows}
-                getRowKey={(row, index) =>
-                  `${row.providerName}-${row.marketName}-${index}`
-                }
+                getRowKey={(row, index) => `${row.providerName}-${row.marketName}-${index}`}
                 dense
                 minWidth={520}
                 paper={false}

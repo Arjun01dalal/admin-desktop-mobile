@@ -1,10 +1,5 @@
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { useRequestGeneration } from '@/hooks/useRequestGeneration';
@@ -53,6 +48,17 @@ type Params = {
   canViewUserType: boolean;
 };
 
+type UsersLocationState = {
+  selectActiveCustomers?: boolean;
+  startDate?: string;
+  endDate?: string;
+};
+
+function readUsersNavState(state: unknown): UsersLocationState {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return {};
+  return state as UsersLocationState;
+}
+
 export function useUsersQuery({
   allottedApps,
   accessibleStates,
@@ -63,6 +69,9 @@ export function useUsersQuery({
   canViewSubAdmin,
   canViewUserType,
 }: Params) {
+  const location = useLocation();
+  const navState = readUsersNavState(location.state);
+
   const typeOptions = useMemo(() => {
     // Match laxminarayan Users select options (permission + caller gates)
     const values: UserType[] = [];
@@ -71,11 +80,7 @@ export function useUsersQuery({
     if (!isCaller) {
       values.push('Todays_Active', 'Active_User');
     }
-    values.push(
-      'Non_Performing_User',
-      'In_Active_Deposit',
-      'Non_Performing_Active_User',
-    );
+    values.push('Non_Performing_User', 'In_Active_Deposit', 'Non_Performing_Active_User');
     if (!isCaller) values.push('LAXMI_999_Users');
 
     // Fallback: always allow User so the page is never empty
@@ -84,9 +89,17 @@ export function useUsersQuery({
     return values.map((value) => ({ value, label: value }));
   }, [canViewSubAdmin, canViewUserType, isCaller]);
 
-  const [userType, setUserType] = useState<UserType>('User');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [userType, setUserType] = useState<UserType>(() => {
+    // Laxmi: dashboard Today's Active → /users with selectActiveCustomers → Todays_Active
+    if (navState.selectActiveCustomers && !isCaller) return 'Todays_Active';
+    return 'User';
+  });
+  const [startDate, setStartDate] = useState(() =>
+    navState.selectActiveCustomers && navState.startDate ? String(navState.startDate) : '',
+  );
+  const [endDate, setEndDate] = useState(() =>
+    navState.selectActiveCustomers && navState.endDate ? String(navState.endDate) : '',
+  );
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [clientName, setClientName] = useState('');
@@ -118,6 +131,16 @@ export function useUsersQuery({
     }
   }, [typeOptions, userType]);
 
+  // Dashboard → Users with selectActiveCustomers (also when already on /users)
+  useEffect(() => {
+    const next = readUsersNavState(location.state);
+    if (!next.selectActiveCustomers || isCaller) return;
+    setUserType('Todays_Active');
+    if (next.startDate) setStartDate(String(next.startDate));
+    if (next.endDate) setEndDate(String(next.endDate));
+    setPage(1);
+  }, [location.key, location.state, isCaller]);
+
   const load = useCallback(
     async (pageNo = page) => {
       const gen = next();
@@ -132,27 +155,20 @@ export function useUsersQuery({
         }
         const isNonPerfActive = userType === 'Non_Performing_Active_User';
         const applyEmpRules =
-          userType === 'User' ||
-          userType === 'Non_Performing_User' ||
-          isNonPerfActive;
+          userType === 'User' || userType === 'Non_Performing_User' || isNonPerfActive;
         // Non_Performing_Active only searches by empCode (laxminarayan always passes false)
         const otherSearch = isNonPerfActive
           ? false
           : hasOtherUserSearch(applied, clientName, playedIn);
-        let empResolved: Extract<
-          ReturnType<typeof resolveSearchEmpCode>,
-          { ok: true }
-        > = { ok: true };
+        let empResolved: Extract<ReturnType<typeof resolveSearchEmpCode>, { ok: true }> = {
+          ok: true,
+        };
 
         if (applyEmpRules) {
           if (isCaller) {
             empResolved = { ok: true, apiEmpCode: loginEmpCode };
           } else {
-            const resolved = resolveSearchEmpCode(
-              applied.empCode,
-              loginEmpCode,
-              otherSearch,
-            );
+            const resolved = resolveSearchEmpCode(applied.empCode, loginEmpCode, otherSearch);
             if (!resolved.ok) {
               toast.error(resolved.message);
               setRows([]);
@@ -180,9 +196,7 @@ export function useUsersQuery({
           endDate,
           allottedApps: userType === 'User' ? undefined : allottedApps,
           appWithState:
-            userType === 'User' || userType === 'Sub_Admin'
-              ? undefined
-              : adminAppWithState,
+            userType === 'User' || userType === 'Sub_Admin' ? undefined : adminAppWithState,
           selectedClientName: clientName || undefined,
           activeUserStart: applied.activeUserStart || undefined,
           activeUserEnd: applied.activeUserEnd || undefined,
@@ -217,9 +231,7 @@ export function useUsersQuery({
           list = list.filter((row) => empCodesEqual(row.empCode, loginEmpCode));
         } else if (isNonPerfActive && !loginEmpCode && trimmedEmp) {
           // Admin without login empCode: API may ignore filter — match client-side
-          list = list.filter((row) =>
-            empCodesEqual(row.empCode, trimmedEmp),
-          );
+          list = list.filter((row) => empCodesEqual(row.empCode, trimmedEmp));
         }
 
         if (accessibleStates.length > 0) {
@@ -259,13 +271,17 @@ export function useUsersQuery({
     ],
   );
 
+  const queryPage = isClientPagedType ? 0 : page;
+  const queryItemsPerPage = isClientPagedType ? 0 : itemsPerPage;
+
   useEffect(() => {
     // Non_Performing_Active_User has no server pagination — fetch once per filter set.
     void load(isClientPagedType ? 1 : page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    isClientPagedType ? 0 : page,
-    isClientPagedType ? 0 : itemsPerPage,
+    queryPage,
+    queryItemsPerPage,
+    isClientPagedType,
+    page,
     userType,
     applied,
     clientName,
@@ -274,11 +290,11 @@ export function useUsersQuery({
     startDate,
     endDate,
     appsKey,
+    load,
   ]);
 
   const setDraftField = useCallback(
-    (key: keyof UserFilters) => (value: string) =>
-      setDraft((prev) => ({ ...prev, [key]: value })),
+    (key: keyof UserFilters) => (value: string) => setDraft((prev) => ({ ...prev, [key]: value })),
     [],
   );
 
@@ -310,6 +326,13 @@ export function useUsersQuery({
     setPage(1);
   }, [draft]);
 
+  /** Optimistic remove after dump — avoids a full users.getAll that freezes the UI. */
+  const removeUserById = useCallback((userId: string) => {
+    setRows((prev) => prev.filter((row) => row._id !== userId));
+    setDialerData((prev) => prev.filter((row) => row._id !== userId));
+    setTotal((prev) => Math.max(0, prev - 1));
+  }, []);
+
   return {
     typeOptions,
     userType,
@@ -336,6 +359,7 @@ export function useUsersQuery({
     dialerData,
     setDialerData,
     total,
+    removeUserById,
     loading,
     totalPages,
     tableRows,

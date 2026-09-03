@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
+  FormControlLabel,
   MenuItem,
   Pagination,
   Stack,
@@ -16,15 +18,13 @@ import { hasPermission } from '@/auth/permissions';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
+import { TableSearchBar } from '@/components/TableSearchBar';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
-import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { dateTime, formatDisplayDate, formatDisplayTime, getStoredUser } from '@/utils/dates';
 import { PLAY_IN_CODES } from '@astro/shared/botIds';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
-import {
-  useReportQuery,
-  display,
-  maskMobile,
-} from './shared';
+import { useReportQuery, display, maskMobile } from './shared';
+import type { UsersAdmin } from './users/useUsersQuery';
 
 type TodaysActiveRow = {
   _id: string;
@@ -90,32 +90,6 @@ const orangeBtnSx = {
   '&:hover': { bgcolor: '#e08c00' },
 };
 
-function ColumnSearch({
-  value,
-  onChange,
-  onSearch,
-  placeholder,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  onSearch: () => void;
-  placeholder: string;
-}) {
-  return (
-    <TextField
-      size="small"
-      fullWidth
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onSearch();
-      }}
-      sx={filterFieldSx}
-    />
-  );
-}
-
 function ColumnSelect({
   value,
   onChange,
@@ -149,15 +123,20 @@ function ColumnSelect({
   );
 }
 
-/** Todays Active users — ops.activeCustomers. */
+/** Todays Active users — ops.activeCustomers (Laxmi onSearchNewActiveUsers). */
 export function TodaysActivePage() {
   const navigate = useNavigate();
+  const admin = getStoredUser<UsersAdmin>();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd, setAppliedEnd] = useState('');
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [clientName, setClientName] = useState('');
   const [playedIn, setPlayedIn] = useState('');
+  // Laxmi Users.tsx defaults uniqueUser to false (not always true).
+  const [uniqueUser, setUniqueUser] = useState(false);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
   const [appVersions, setAppVersions] = useState<Record<string, string>>({});
@@ -165,12 +144,16 @@ export function TodaysActivePage() {
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
 
+  const allottedApps = useMemo(
+    () => admin?.clientName || admin?.allotedApps || undefined,
+    [admin?.clientName, admin?.allotedApps],
+  );
+  const adminAppWithState = admin?.appWithState;
+
   const openUserReport = useCallback(
     (userId?: string, userName?: string) => {
       if (!userId) return;
-      navigate(
-        `/users/report/${userId}/${encodeURIComponent(userName || '')}`,
-      );
+      navigate(`/users/report/${userId}/${encodeURIComponent(userName || '')}`);
     },
     [navigate],
   );
@@ -196,7 +179,7 @@ export function TodaysActivePage() {
   }, []);
 
   const buildFilter = useCallback((): Record<string, unknown> => {
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { uniqueUser };
     if (applied.name.trim()) filter.name = applied.name.trim();
     if (applied.dpId.trim()) filter._id = applied.dpId.trim();
     if (applied.mobile.trim()) filter.mobile = applied.mobile.trim();
@@ -208,44 +191,112 @@ export function TodaysActivePage() {
     if (clientName) filter.clientName = clientName;
     if (playedIn) filter.played = playedIn;
     return filter;
-  }, [applied, clientName, playedIn]);
+  }, [applied, clientName, playedIn, uniqueUser]);
 
-  const { rows, totalPages, total, loading, error, load } =
-    useReportQuery<TodaysActiveRow>({
-      action: 'ops.activeCustomers',
-      buildPayload: () => ({
-        itemsPerPage,
-        pageNo: page,
-        ...(startDate && endDate ? { startDate, endDate } : {}),
-        filter: buildFilter(),
-      }),
-      unpack: (res) => {
-        const raw = res.data as
-          | { user?: TodaysActiveRow[]; totalPages?: number; count?: number }
-          | undefined;
-        return {
-          rows: Array.isArray(raw?.user) ? raw.user : [],
-          totalPages: Math.max(1, Number(raw?.totalPages ?? 1) || 1),
-          total: Number(raw?.count ?? 0) || 0,
-        };
-      },
-      autoDeps: [page, itemsPerPage, applied, clientName, playedIn],
-      errorMessage: 'Failed to load todays active users',
-    });
+  const buildScopedPayload = useCallback(() => {
+    const filter = buildFilter();
+    const payload: Record<string, unknown> = {
+      itemsPerPage,
+      pageNo: page,
+      filter,
+    };
+    if (appliedStart && appliedEnd) {
+      payload.startDate = dateTime(appliedStart);
+      payload.endDate = dateTime(appliedEnd);
+    }
+    if (allottedApps) payload.app = allottedApps;
+
+    // Match Laxmi / Users Todays_Active: appWithState from login user, optionally scoped.
+    if (adminAppWithState && typeof adminAppWithState === 'object') {
+      const stateWiseFilter: Record<string, string[]> = {};
+      if (clientName && Array.isArray(adminAppWithState[clientName])) {
+        stateWiseFilter[clientName] = [...adminAppWithState[clientName]];
+      } else {
+        Object.entries(adminAppWithState).forEach(([key, states]) => {
+          if (Array.isArray(states)) stateWiseFilter[key] = [...states];
+        });
+      }
+      if (Object.keys(stateWiseFilter).length > 0) {
+        payload.appWithState = stateWiseFilter;
+      }
+    }
+    return payload;
+  }, [
+    adminAppWithState,
+    allottedApps,
+    appliedEnd,
+    appliedStart,
+    buildFilter,
+    clientName,
+    itemsPerPage,
+    page,
+  ]);
+
+  const { rows, totalPages, total, loading, error, load } = useReportQuery<TodaysActiveRow>({
+    action: 'ops.activeCustomers',
+    buildPayload: buildScopedPayload,
+    unpack: (res) => {
+      const raw = res.data as
+        | {
+            user?: TodaysActiveRow[];
+            users?: TodaysActiveRow[];
+            items?: TodaysActiveRow[];
+            totalPages?: number;
+            count?: number;
+            total?: number;
+            payload?: {
+              user?: TodaysActiveRow[];
+              users?: TodaysActiveRow[];
+              items?: TodaysActiveRow[];
+              totalPages?: number;
+              count?: number;
+              total?: number;
+            };
+          }
+        | undefined;
+      const nested = raw?.payload && typeof raw.payload === 'object' ? raw.payload : raw;
+      const list =
+        (Array.isArray(nested?.user) && nested.user) ||
+        (Array.isArray(nested?.users) && nested.users) ||
+        (Array.isArray(nested?.items) && nested.items) ||
+        (Array.isArray(raw?.user) && raw.user) ||
+        [];
+      return {
+        rows: list,
+        totalPages: Math.max(1, Number(nested?.totalPages ?? raw?.totalPages ?? 1) || 1),
+        total: Number(nested?.count ?? nested?.total ?? raw?.count ?? raw?.total ?? list.length) || 0,
+      };
+    },
+    autoDeps: [
+      page,
+      itemsPerPage,
+      applied,
+      clientName,
+      playedIn,
+      uniqueUser,
+      appliedStart,
+      appliedEnd,
+      allottedApps,
+      adminAppWithState,
+    ],
+    cacheTtlMs: 0,
+    errorMessage: 'Failed to load todays active users',
+  });
 
   const search = useCallback(() => {
-    setApplied(draft);
+    setApplied({ ...draft });
     setPage(1);
   }, [draft]);
 
   const applyDates = useCallback(() => {
+    setApplied({ ...draft });
+    setAppliedStart(startDate);
+    setAppliedEnd(endDate);
     setPage(1);
-    void load();
-  }, [load]);
+  }, [draft, startDate, endDate]);
 
   const setDraftField = useCallback(
-    (key: keyof Filters) => (value: string) =>
-      setDraft((prev) => ({ ...prev, [key]: value })),
+    (key: keyof Filters) => (value: string) => setDraft((prev) => ({ ...prev, [key]: value })),
     [],
   );
 
@@ -261,11 +312,11 @@ export function TodaysActivePage() {
         id: 'name',
         label: 'Name',
         filter: (
-          <ColumnSearch
+          <TableSearchBar
             value={draft.name}
-            onChange={setDraftField('name')}
+            onChange={(e) => setDraftField('name')(e.target.value)}
             onSearch={search}
-            placeholder="Search name"
+            placeholder="Search by Name"
           />
         ),
         render: (row) => (
@@ -286,14 +337,7 @@ export function TodaysActivePage() {
       {
         id: 'dpId',
         label: 'Dp Id',
-        filter: (
-          <ColumnSearch
-            value={draft.dpId}
-            onChange={setDraftField('dpId')}
-            onSearch={search}
-            placeholder="Search Dp Id"
-          />
-        ),
+        filter: null,
         render: (row) => display(row._id),
       },
     ];
@@ -301,13 +345,13 @@ export function TodaysActivePage() {
     if (!hideContact) {
       cols.push({
         id: 'mobile',
-        label: 'Mobile',
+        label: 'Mobile Phone',
         filter: (
-          <ColumnSearch
+          <TableSearchBar
             value={draft.mobile}
-            onChange={setDraftField('mobile')}
+            onChange={(e) => setDraftField('mobile')(e.target.value)}
             onSearch={search}
-            placeholder="Search mobile"
+            placeholder="Search by Phone"
           />
         ),
         render: (row) => maskMobile(row.mobile, canShowMobile),
@@ -317,7 +361,7 @@ export function TodaysActivePage() {
     cols.push(
       {
         id: 'appName',
-        label: 'App Code',
+        label: 'App Name',
         filter: (
           <ColumnSelect
             value={clientName}
@@ -335,7 +379,7 @@ export function TodaysActivePage() {
       },
       {
         id: 'playIn',
-        label: 'In',
+        label: 'Play In',
         filter: (
           <ColumnSelect
             value={playedIn}
@@ -344,32 +388,33 @@ export function TodaysActivePage() {
               setPage(1);
             }}
             options={PLAY_IN_OPTIONS}
+            placeholder="Select play id..."
           />
         ),
         render: (row) => display(row.played),
       },
       {
         id: 'account',
-        label: 'Account',
+        label: 'Account Number',
         filter: (
-          <ColumnSearch
+          <TableSearchBar
             value={draft.accountNumber}
-            onChange={setDraftField('accountNumber')}
+            onChange={(e) => setDraftField('accountNumber')(e.target.value)}
             onSearch={search}
-            placeholder="Search account"
+            placeholder="Search by Acc No"
           />
         ),
         render: (row) => display(row.accountNumber),
       },
       {
         id: 'aadhar',
-        label: 'Aadhar',
+        label: 'Aadhar Number',
         filter: (
-          <ColumnSearch
+          <TableSearchBar
             value={draft.aadhaarNumber}
-            onChange={setDraftField('aadhaarNumber')}
+            onChange={(e) => setDraftField('aadhaarNumber')(e.target.value)}
             onSearch={search}
-            placeholder="Search aadhar"
+            placeholder="Search by Aadhar"
           />
         ),
         render: (row) => display(row.aadhaarNumber),
@@ -381,11 +426,11 @@ export function TodaysActivePage() {
         id: 'email',
         label: 'Email',
         filter: (
-          <ColumnSearch
+          <TableSearchBar
             value={draft.email}
-            onChange={setDraftField('email')}
+            onChange={(e) => setDraftField('email')(e.target.value)}
             onSearch={search}
-            placeholder="Search email"
+            placeholder="Search by Email"
           />
         ),
         render: (row) => (canShowMobile ? display(row.email) : '**********'),
@@ -397,11 +442,11 @@ export function TodaysActivePage() {
         id: 'city',
         label: 'City',
         filter: (
-          <ColumnSearch
+          <TableSearchBar
             value={draft.city}
-            onChange={setDraftField('city')}
+            onChange={(e) => setDraftField('city')(e.target.value)}
             onSearch={search}
-            placeholder="Search city"
+            placeholder="Search by City"
           />
         ),
         render: (row) => display(row.city),
@@ -410,20 +455,20 @@ export function TodaysActivePage() {
         id: 'state',
         label: 'State',
         filter: (
-          <ColumnSearch
+          <TableSearchBar
             value={draft.state}
-            onChange={setDraftField('state')}
+            onChange={(e) => setDraftField('state')(e.target.value)}
             onSearch={search}
-            placeholder="Search state"
+            placeholder="Search by State"
           />
         ),
         render: (row) => display(row.state),
       },
-      { id: 'device', label: 'Device', render: (row) => display(row.deviceType) },
+      { id: 'device', label: 'Device Type', render: (row) => display(row.deviceType) },
       { id: 'balance', label: 'Balance', render: (row) => Math.floor(Number(row.balance) || 0) },
       {
         id: 'playerAppVersion',
-        label: 'User App Version',
+        label: 'Player App Version',
         render: (row) => display(row.currentAppVersion),
       },
       {
@@ -547,6 +592,21 @@ export function TodaysActivePage() {
           >
             {loading ? <CircularProgress size={18} color="inherit" /> : 'Apply'}
           </Button>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={uniqueUser}
+                onChange={(e) => {
+                  setUniqueUser(e.target.checked);
+                  setPage(1);
+                }}
+                size="small"
+                sx={{ color: '#9aa3b5', '&.Mui-checked': { color: '#ff9f0a' } }}
+              />
+            }
+            label="Unique Users"
+            sx={{ flexShrink: 0, color: '#e8e8ea', ml: 0.5 }}
+          />
           <Typography
             variant="body2"
             fontWeight={700}

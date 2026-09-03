@@ -32,11 +32,7 @@ export function usePointsReportQuery(startDate: string, endDate: string) {
       }
 
       const raw = res.data;
-      const items = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.payload)
-          ? raw.payload
-          : [];
+      const items = Array.isArray(raw) ? raw : Array.isArray(raw?.payload) ? raw.payload : [];
 
       startTransition(() => setRows(items));
     } finally {

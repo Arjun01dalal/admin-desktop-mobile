@@ -37,8 +37,8 @@ export function parseMidGroupsPayload(raw: unknown): ParsedMidGroups {
   const root =
     raw && typeof raw === 'object'
       ? ((raw as { payload?: unknown; data?: unknown }).payload ??
-          (raw as { data?: unknown }).data ??
-          raw)
+        (raw as { data?: unknown }).data ??
+        raw)
       : {};
   const groups: MidGroupMap = {};
   const obj = root && typeof root === 'object' ? (root as Record<string, unknown>) : {};
@@ -85,10 +85,7 @@ export function parseMidGroupsPayload(raw: unknown): ParsedMidGroups {
   }
 
   const whatsapp = normalizeGroupMids(
-    obj.whatsappGlobalOnly ??
-      obj['whatsapp-global-only'] ??
-      obj.whatsappGlobal ??
-      obj.whatsapp,
+    obj.whatsappGlobalOnly ?? obj['whatsapp-global-only'] ?? obj.whatsappGlobal ?? obj.whatsapp,
   );
 
   return { groups, whatsapp };

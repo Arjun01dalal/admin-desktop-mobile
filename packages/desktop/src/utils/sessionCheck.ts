@@ -87,9 +87,7 @@ export async function checkSession(userId: string): Promise<SessionStatus> {
   }
 }
 
-export async function runTokenValidation(
-  opts?: { force?: boolean },
-): Promise<SessionStatus> {
+export async function runTokenValidation(opts?: { force?: boolean }): Promise<SessionStatus> {
   if (!shouldRunTokenCheck(Boolean(opts?.force))) return 'unknown';
 
   const token = getAuthToken();
@@ -134,9 +132,7 @@ export function scheduleSessionRecheck(): void {
 
   void runTokenValidation({ force: true }).then((status) => {
     if (status === 'invalid') {
-      notifySessionExpired(
-        'You were logged in elsewhere. Please login again.',
-      );
+      notifySessionExpired('You were logged in elsewhere. Please login again.');
     }
   });
 }

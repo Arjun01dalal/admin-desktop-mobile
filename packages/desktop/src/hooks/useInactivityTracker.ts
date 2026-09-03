@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
 import { secureApi } from '@/api/secureClient';
 
 const INACTIVITY_LIMIT = 30_000;
 const HEARTBEAT_INTERVAL = 30_000;
 const MAX_CHUNK = HEARTBEAT_INTERVAL + 2_000;
+/** Throttle pointer moves — raw mousemove floods the main thread on Windows. */
+const POINTER_THROTTLE_MS = 1_000;
 
 const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
-  'mousemove',
   'mousedown',
   'click',
   'scroll',
@@ -21,11 +21,11 @@ const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
  * Sends one active/inactive duration chunk every 30 seconds.
  */
 export function useInactivityTracker(userId?: string): void {
-  const location = useLocation();
   const inactivityTimer = useRef<number | null>(null);
   const heartbeatTimer = useRef<number | null>(null);
   const sessionStart = useRef(Date.now());
   const isInactive = useRef(false);
+  const lastPointerActivity = useRef(0);
 
   useEffect(() => {
     if (!userId) return;
@@ -47,15 +47,20 @@ export function useInactivityTracker(userId?: string): void {
       resetInactivityTimer();
     };
 
+    const handlePointerMove = () => {
+      const now = Date.now();
+      if (now - lastPointerActivity.current < POINTER_THROTTLE_MS) return;
+      lastPointerActivity.current = now;
+      handleActivity();
+    };
+
     const heartbeat = () => {
       const now = Date.now();
       const elapsed = now - sessionStart.current;
       sessionStart.current = now;
       if (elapsed <= 0 || elapsed > MAX_CHUNK) return;
 
-      const action = isInactive.current
-        ? 'auth.updateInactiveTime'
-        : 'auth.updateActiveTime';
+      const action = isInactive.current ? 'auth.updateInactiveTime' : 'auth.updateActiveTime';
       void secureApi(action, {
         _id: userId,
         minutes: Number((elapsed / 60_000).toFixed(2)),
@@ -68,8 +73,9 @@ export function useInactivityTracker(userId?: string): void {
     heartbeatTimer.current = window.setInterval(heartbeat, HEARTBEAT_INTERVAL);
 
     ACTIVITY_EVENTS.forEach((event) => {
-      window.addEventListener(event, handleActivity);
+      window.addEventListener(event, handleActivity, { passive: true });
     });
+    window.addEventListener('mousemove', handlePointerMove, { passive: true });
     window.addEventListener('beforeunload', heartbeat);
 
     return () => {
@@ -83,7 +89,10 @@ export function useInactivityTracker(userId?: string): void {
       ACTIVITY_EVENTS.forEach((event) => {
         window.removeEventListener(event, handleActivity);
       });
+      window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('beforeunload', heartbeat);
     };
-  }, [userId, location.pathname]);
+    // Intentionally not keyed on route — remounting every navigation sent extra heartbeats
+    // and re-bound listeners, which made Windows feel sticky during page switches.
+  }, [userId]);
 }

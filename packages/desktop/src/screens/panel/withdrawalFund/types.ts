@@ -93,7 +93,7 @@ export function transformWithdrawData(grouped: unknown): TypeGroup[] {
             {
               gatewayName: providerName,
               totalAmount: 0,
-                mids: Object.entries((midsObj as Record<string, unknown>) || {}).map(
+              mids: Object.entries((midsObj as Record<string, unknown>) || {}).map(
                 ([midName, midData]) => {
                   const md = midData as {
                     totalAmount?: number;
@@ -114,10 +114,7 @@ export function transformWithdrawData(grouped: unknown): TypeGroup[] {
             },
           ];
 
-          const totalAmount = gatewayNames[0].mids.reduce(
-            (sum, m) => sum + m.totalAmount,
-            0,
-          );
+          const totalAmount = gatewayNames[0].mids.reduce((sum, m) => sum + m.totalAmount, 0);
           gatewayNames[0].totalAmount = totalAmount;
 
           return {
@@ -157,27 +154,25 @@ export function sumGroupedTotal(grouped: unknown): number {
 
 export function parseAgentSummaries(agentWiseSummary: unknown): AgentSummary[] {
   if (!agentWiseSummary || typeof agentWiseSummary !== 'object') return [];
-  return Object.entries(agentWiseSummary as Record<string, unknown>).map(
-    ([name, summary]) => {
-      const s = summary as {
-        approvedCount?: number;
-        lockCount?: number;
-        totalApprovedAmount?: number;
-        approvedItems?: WithdrawalDoc[];
-        items?: WithdrawalDoc[];
-        withdrawals?: WithdrawalDoc[];
-        docs?: WithdrawalDoc[];
-      };
-      const withdrawals = pickDocList(s);
-      return {
-        name,
-        approvedCount: Number(s?.approvedCount ?? withdrawals.length ?? 0),
-        lockCount: Number(s?.lockCount ?? 0),
-        totalApprovedAmount: Number(s?.totalApprovedAmount ?? 0),
-        withdrawals,
-      };
-    },
-  );
+  return Object.entries(agentWiseSummary as Record<string, unknown>).map(([name, summary]) => {
+    const s = summary as {
+      approvedCount?: number;
+      lockCount?: number;
+      totalApprovedAmount?: number;
+      approvedItems?: WithdrawalDoc[];
+      items?: WithdrawalDoc[];
+      withdrawals?: WithdrawalDoc[];
+      docs?: WithdrawalDoc[];
+    };
+    const withdrawals = pickDocList(s);
+    return {
+      name,
+      approvedCount: Number(s?.approvedCount ?? withdrawals.length ?? 0),
+      lockCount: Number(s?.lockCount ?? 0),
+      totalApprovedAmount: Number(s?.totalApprovedAmount ?? 0),
+      withdrawals,
+    };
+  });
 }
 
 /** Prefer docs / approvedItems / items / withdrawals from API mid/agent blobs. */

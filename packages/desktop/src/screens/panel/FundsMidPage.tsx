@@ -34,7 +34,7 @@ const orangeBtnSx = {
 export function FundsMidPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = getSessionUser();
+  const user = useMemo(() => getSessionUser(), []);
   const gatewayOnly = hasPermission(Permissions.show_gateway_only);
   const canEditAccess = canShowFundEditBtn(user?.mobile);
 
@@ -52,7 +52,7 @@ export function FundsMidPage() {
           midID?: string;
         } | null) || null,
       ),
-    [location.state, location.key],
+    [location.state],
   );
 
   useEffect(() => {
@@ -220,8 +220,7 @@ export function FundsMidPage() {
     );
   }
 
-  const title =
-    drill.name === 'coinRemove' ? 'Other Removal' : display(drill.name);
+  const title = drill.name === 'coinRemove' ? 'Other Removal' : display(drill.name);
 
   return (
     <Box>
@@ -232,15 +231,15 @@ export function FundsMidPage() {
         Click a MID row to open the payment list
       </Typography>
       <TablePanel>
-<CommonTable
-        columns={columns}
-        rows={mids}
-        getRowKey={(row, i) => `${row.mid}-${i}`}
-        emptyMessage="No MID Data"
-        minWidth={canEditAccess ? 1220 : 1100}
-        onRowClick={gatewayOnly ? undefined : (row) => openPayin(row)}
-        maxHeight="100%"
-      />
+        <CommonTable
+          columns={columns}
+          rows={mids}
+          getRowKey={(row, i) => `${row.mid}-${i}`}
+          emptyMessage="No MID Data"
+          minWidth={canEditAccess ? 1220 : 1100}
+          onRowClick={gatewayOnly ? undefined : (row) => openPayin(row)}
+          maxHeight="100%"
+        />
       </TablePanel>
 
       <FundsEditAccessModal

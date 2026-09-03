@@ -16,28 +16,38 @@ type UpdatePayload = {
   message?: string;
 };
 
+/**
+ * Mandatory update UI — once an update is available / ready, the dialog cannot
+ * be dismissed without installing (except transient check errors).
+ */
 export function UpdateToast() {
   const [visible, setVisible] = useState(false);
   const [text, setText] = useState('A new update is available.');
   const [canInstall, setCanInstall] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
     const onAvailable = (d: UpdatePayload) => {
-      setText(`Downloading update ${d.version || ''}…`);
+      setText(`Downloading required update ${d.version || ''}…`);
       setCanInstall(false);
+      setIsError(false);
       setProgress(0);
       setVisible(true);
     };
     const onProgress = (d: UpdatePayload) => {
       const percent = Math.max(0, Math.min(100, Number(d.percent) || 0));
-      setText(`Downloading update… ${percent}%`);
+      setText(`Downloading required update… ${percent}%`);
       setProgress(percent);
+      setIsError(false);
       setVisible(true);
     };
     const onReady = (d: UpdatePayload) => {
-      setText(`Update ${d.version || ''} is ready to install.`);
+      setText(
+        `Update ${d.version || ''} is ready. You must restart to continue — the current version can no longer be used.`,
+      );
       setCanInstall(true);
+      setIsError(false);
       setProgress(100);
       setVisible(true);
     };
@@ -45,6 +55,7 @@ export function UpdateToast() {
       console.warn('[update]', d.message || 'Update failed');
       setText(d.message || 'Update failed. Please try again later.');
       setCanInstall(false);
+      setIsError(true);
       setProgress(null);
       setVisible(true);
     };
@@ -65,18 +76,26 @@ export function UpdateToast() {
   }, []);
 
   const title = canInstall
-    ? 'Update Ready'
+    ? 'Update Required'
     : progress !== null
       ? 'Updating App'
-      : 'Update Notice';
+      : isError
+        ? 'Update Notice'
+        : 'Update Required';
 
   if (!visible) return null;
 
   return (
     <Dialog
       open={visible}
-      onClose={() => {
-        if (!canInstall) setVisible(false);
+      // Mandatory while downloading / ready — only errors may be dismissed.
+      disableEscapeKeyDown={!isError}
+      onClose={(_event, reason) => {
+        if (isError) {
+          setVisible(false);
+          return;
+        }
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
       }}
       maxWidth="xs"
       fullWidth
@@ -98,17 +117,20 @@ export function UpdateToast() {
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={() => setVisible(false)} color="inherit">
-          {canInstall ? 'Later' : 'Hide'}
-        </Button>
-        {canInstall && (
-          <Button
-            variant="contained"
-            onClick={() => window.gcalc?.installUpdate?.()}
-          >
+        {isError ? (
+          <Button onClick={() => setVisible(false)} color="inherit">
+            Close
+          </Button>
+        ) : null}
+        {canInstall ? (
+          <Button variant="contained" onClick={() => window.gcalc?.installUpdate?.()} autoFocus>
             Restart &amp; Update
           </Button>
-        )}
+        ) : !isError ? (
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+            Please wait — update is required to continue
+          </Typography>
+        ) : null}
       </DialogActions>
     </Dialog>
   );

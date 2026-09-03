@@ -177,9 +177,7 @@ async function fetchAllTodayUsers(args: {
       count = parsed.count;
       totalPages = Math.max(
         1,
-        Number(parsed.totalPages) ||
-          Math.ceil(parsed.count / pageSize) ||
-          1,
+        Number(parsed.totalPages) || Math.ceil(parsed.count / pageSize) || 1,
       );
     }
     for (const row of parsed.users) {
@@ -368,9 +366,7 @@ export function CallerDetailsPage() {
     }
 
     const selected = rows.filter(
-      (r) =>
-        r.status === 'Warning' &&
-        selectedIds.has(String(r._id || r.userId || '')),
+      (r) => r.status === 'Warning' && selectedIds.has(String(r._id || r.userId || '')),
     );
     const leads = selected
       .map((item) => ({
@@ -449,10 +445,7 @@ export function CallerDetailsPage() {
       toast.error('User not found');
       return;
     }
-    if (
-      action === 'add' &&
-      alternateMobileList(altUser.alternateMobile).length >= 1
-    ) {
+    if (action === 'add' && alternateMobileList(altUser.alternateMobile).length >= 1) {
       toast.error('Only 1 alternate mobile is allowed');
       return;
     }
@@ -535,9 +528,7 @@ export function CallerDetailsPage() {
           <Checkbox
             size="small"
             checked={allWarningSelected}
-            indeterminate={
-              selectedIds.size > 0 && !allWarningSelected && filteredAll.length > 0
-            }
+            indeterminate={selectedIds.size > 0 && !allWarningSelected && filteredAll.length > 0}
             onChange={(e) => toggleSelectAllWarning(e.target.checked)}
             inputProps={{ 'aria-label': 'Select all non performing' }}
           />
@@ -562,8 +553,7 @@ export function CallerDetailsPage() {
         id: '#',
         label: '#',
         width: 64,
-        render: (_r, i) =>
-          tab === 'Today' ? (todayPage - 1) * todayPageSize + i + 1 : i + 1,
+        render: (_r, i) => (tab === 'Today' ? (todayPage - 1) * todayPageSize + i + 1 : i + 1),
       },
       {
         id: 'name',
@@ -582,9 +572,7 @@ export function CallerDetailsPage() {
               onClick={(e) => {
                 e.stopPropagation();
                 // Laxmi callerDetails: /user-report/:id/:name
-                navigate(
-                  `/users/report/${encodeURIComponent(id)}/${encodeURIComponent(label)}`,
-                );
+                navigate(`/users/report/${encodeURIComponent(id)}/${encodeURIComponent(label)}`);
               }}
               sx={{
                 all: 'unset',
@@ -689,17 +677,13 @@ export function CallerDetailsPage() {
         id: 'createdAt',
         label: 'Created At',
         width: 130,
-        render: (r) =>
-          formatDisplayDate(r.createdOn || r.createdAt) || '-',
+        render: (r) => formatDisplayDate(r.createdOn || r.createdAt) || '-',
       },
       {
         id: 'lastActivity',
         label: 'Last Activity',
         width: 130,
-        render: (r) =>
-          formatDisplayDate(
-            r.activeUser || r.lastActivity || r.lastActive,
-          ) || '-',
+        render: (r) => formatDisplayDate(r.activeUser || r.lastActivity || r.lastActive) || '-',
       },
       {
         id: 'city',
@@ -738,17 +722,14 @@ export function CallerDetailsPage() {
           Caller Details
         </Typography>
         <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
-          <Typography color="text.secondary">
-            No caller selected.
-          </Typography>
+          <Typography color="text.secondary">No caller selected.</Typography>
         </Paper>
       </Box>
     );
   }
 
   const ecs = nav.activePlayersECS || {};
-  const hasAlternateMobile =
-    alternateMobileList(altUser?.alternateMobile).length >= 1;
+  const hasAlternateMobile = alternateMobileList(altUser?.alternateMobile).length >= 1;
 
   return (
     <Box
@@ -772,8 +753,7 @@ export function CallerDetailsPage() {
             Caller Details — {empCode}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Deposit:{' '}
-            {nav.deposit != null ? formatMaskedAmount(nav.deposit) : '-'}
+            Deposit: {nav.deposit != null ? formatMaskedAmount(nav.deposit) : '-'}
             {' · '}
             E:{String(ecs.E ?? '-')} C:{String(ecs.C ?? '-')} S:
             {String(ecs.S ?? '-')}
@@ -834,11 +814,7 @@ export function CallerDetailsPage() {
               ))}
             </TextField>
           )}
-          <Button
-            variant="contained"
-            onClick={() => void load()}
-            disabled={loading}
-          >
+          <Button variant="contained" onClick={() => void load()} disabled={loading}>
             Apply
           </Button>
           <Button
@@ -880,11 +856,7 @@ export function CallerDetailsPage() {
               { key: 'Inactive', label: 'Inactive' },
             ] as const
           ).map((t) => (
-            <Tab
-              key={t.key}
-              value={t.key}
-              label={`${t.label} (${counts[t.key]})`}
-            />
+            <Tab key={t.key} value={t.key} label={`${t.label} (${counts[t.key]})`} />
           ))}
         </Tabs>
       </Box>

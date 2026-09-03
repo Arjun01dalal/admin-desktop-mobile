@@ -31,17 +31,12 @@ import { ProviderHistoryTab } from './ProviderHistoryTab';
 import { QtechBetDetailsTab } from './QtechBetDetailsTab';
 import { SettleJetfairModal } from './SettleJetfairModal';
 import { TopCasinoGamesSection } from './TopCasinoGamesSection';
-import {
-  canShowAddBonusCoinsTab,
-  canShowCoinsTab,
-} from './coinAccess';
-import {
-  USER_REPORT_TABS,
-  type EncryptedUser,
-  type UserReportTab,
-} from './types';
+import { canShowAddBonusCoinsTab, canShowCoinsTab } from './coinAccess';
+import { USER_REPORT_TABS, type EncryptedUser, type UserReportTab } from './types';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+
+type EncryptedUserResponse = EncryptedUser & { payload?: EncryptedUser };
 
 /** Short labels in the Back-adjacent dropdown. */
 const SHORT_LABEL: Partial<Record<UserReportTab, string>> = {
@@ -94,11 +89,7 @@ const PROVIDER_IDS: UserReportTab[] = [
   'qtech_bet_details',
 ];
 
-const ACTION_IDS: UserReportTab[] = [
-  'settle_sm',
-  'settle_jetfair',
-  'player_rtp',
-];
+const ACTION_IDS: UserReportTab[] = ['settle_sm', 'settle_jetfair', 'player_rtp'];
 
 function tabLabel(id: UserReportTab, fullLabel: string): string {
   return toDisplayText(SHORT_LABEL[id] || fullLabel);
@@ -151,11 +142,7 @@ function TabBody({
     case 'qtech_bet_details':
       return <QtechBetDetailsTab userId={userId} />;
     default:
-      return (
-        <Typography color="text.secondary">
-          Unknown tab: {tab}
-        </Typography>
-      );
+      return <Typography color="text.secondary">Unknown tab: {tab}</Typography>;
   }
 }
 
@@ -179,10 +166,7 @@ export function UserReportPage() {
       }),
     [showCoinsTab, showAddBonusTab],
   );
-  const byId = useMemo(
-    () => new Map(visibleTabs.map((t) => [t.id, t])),
-    [visibleTabs],
-  );
+  const byId = useMemo(() => new Map(visibleTabs.map((t) => [t.id, t])), [visibleTabs]);
 
   const pickGroup = useCallback(
     (ids: UserReportTab[]) =>
@@ -213,21 +197,16 @@ export function UserReportPage() {
     if (!userId) return;
     setLoading(true);
     try {
-      const res = await secureApi('userReport.encryptedId', { userId });
+      const res = await secureApi<EncryptedUserResponse>('userReport.encryptedId', { userId });
       if (!res.ok) {
         toast.error(res.message || 'Failed to load user');
         setEncrypted(null);
         return;
       }
-      const data = (res.data || {}) as {
-        payload?: EncryptedUser & Record<string, unknown>;
-      } & EncryptedUser &
-        Record<string, unknown>;
-      const nested = (data.payload || data) as EncryptedUser & Record<string, unknown>;
+      const data = res.data ?? {};
+      const nested = data.payload ?? data;
       setEncrypted({
-        encryptedUserName: nested.encryptedUserName
-          ? String(nested.encryptedUserName)
-          : undefined,
+        encryptedUserName: nested.encryptedUserName ? String(nested.encryptedUserName) : undefined,
         createdAt: nested.createdAt
           ? String(nested.createdAt)
           : nested.createdOn
@@ -259,21 +238,24 @@ export function UserReportPage() {
     void loadEncrypted();
   }, [canOpen, loadEncrypted, navigate]);
 
-  const onTabClick = (id: UserReportTab) => {
-    if (id === 'player_rtp') {
-      navigate('/playerRtp', { state: { id: userId, fromUserReport: true } });
-      return;
-    }
-    if (id === 'settle_sm') {
-      setSmSettleOpen(true);
-      return;
-    }
-    if (id === 'settle_jetfair') {
-      setJetfairSettleOpen(true);
-      return;
-    }
-    setTab(id);
-  };
+  const onTabClick = useCallback(
+    (id: UserReportTab) => {
+      if (id === 'player_rtp') {
+        navigate('/playerRtp', { state: { id: userId, fromUserReport: true } });
+        return;
+      }
+      if (id === 'settle_sm') {
+        setSmSettleOpen(true);
+        return;
+      }
+      if (id === 'settle_jetfair') {
+        setJetfairSettleOpen(true);
+        return;
+      }
+      setTab(id);
+    },
+    [navigate, userId],
+  );
 
   const settleSm = async () => {
     setSmBusy(true);
@@ -292,12 +274,7 @@ export function UserReportPage() {
 
   const decodedName = decodeURIComponent(userName || '');
 
-  if (!canOpen) return null;
-
-  const renderGroup = (
-    title: string,
-    items: { id: UserReportTab; label: string }[],
-  ) => {
+  const renderGroup = (title: string, items: { id: UserReportTab; label: string }[]) => {
     if (items.length === 0) return null;
     return [
       <ListSubheader
@@ -409,8 +386,10 @@ export function UserReportPage() {
       </TextField>
     ),
     // onTabClick closes over navigate/userId — intentional refresh when those change via tab/label/groups
-    [tab, currentLabel, historyTabs, walletTabs, providerTabs, actionTabs, userId],
+    [tab, currentLabel, historyTabs, walletTabs, providerTabs, actionTabs, onTabClick],
   );
+
+  if (!canOpen) return null;
 
   return (
     <Box sx={{ bgcolor: '#f4f6f8', minHeight: '100%', p: { xs: 0.5, md: 0.75 } }}>
@@ -429,9 +408,7 @@ export function UserReportPage() {
           User :{' '}
         </Box>
         / {decodedName}
-        {encrypted?.encryptedUserName
-          ? ` / ${encrypted.encryptedUserName}`
-          : ''}
+        {encrypted?.encryptedUserName ? ` / ${encrypted.encryptedUserName}` : ''}
       </Typography>
 
       {loading && !encrypted ? (
@@ -464,10 +441,7 @@ export function UserReportPage() {
         </DialogActions>
       </Dialog>
 
-      <SettleJetfairModal
-        open={jetfairSettleOpen}
-        onClose={() => setJetfairSettleOpen(false)}
-      />
+      <SettleJetfairModal open={jetfairSettleOpen} onClose={() => setJetfairSettleOpen(false)} />
     </Box>
   );
 }

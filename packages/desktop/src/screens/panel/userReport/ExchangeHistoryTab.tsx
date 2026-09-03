@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Pagination,
-  Stack,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Pagination, Stack } from '@mui/material';
 import { toast } from 'react-toastify';
 import type { SecureAction } from '@/api/secureActions';
 import { secureApi } from '@/api/secureClient';
@@ -14,12 +8,7 @@ import { UserReportTablePanel } from './UserReportTablePanel';
 import { formatAmount } from '@/utils/dates';
 import { laxmiActionBtnSx } from './laxmiButtonSx';
 import type { HistoryRow } from './HistoryTable';
-import {
-  HISTORY_PAGINATION_SX,
-  ItemsPerPageField,
-  SearchFilter,
-  formatDt,
-} from './historyFilters';
+import { HISTORY_PAGINATION_SX, ItemsPerPageField, SearchFilter, formatDt } from './historyFilters';
 
 type Props = { userId: string; variant: 'jetfair' | 'falcon' };
 
@@ -52,13 +41,10 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
     setLoading(true);
     try {
       const filter: Record<string, string> =
-        variant === 'jetfair'
-          ? { clientUsername: String(userId) }
-          : { userId: String(userId) };
+        variant === 'jetfair' ? { clientUsername: String(userId) } : { userId: String(userId) };
 
       if (transactionId.trim()) {
-        filter[variant === 'falcon' ? 'TransactionID' : 'transactionId'] =
-          transactionId.trim();
+        filter[variant === 'falcon' ? 'TransactionID' : 'transactionId'] = transactionId.trim();
       }
       if (transactionCode.trim()) {
         filter.transactionCode = transactionCode.trim();
@@ -71,12 +57,10 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
         filter[variant === 'falcon' ? 'MarketID' : 'marketId'] = marketId.trim();
       }
       if (marketName.trim()) {
-        filter[variant === 'falcon' ? 'Marketname' : 'marketName'] =
-          marketName.trim();
+        filter[variant === 'falcon' ? 'Marketname' : 'marketName'] = marketName.trim();
       }
       if (runnerName.trim()) {
-        filter[variant === 'falcon' ? 'Runnername' : 'runnerName'] =
-          runnerName.trim();
+        filter[variant === 'falcon' ? 'Runnername' : 'runnerName'] = runnerName.trim();
       }
       if (rate.trim()) {
         filter[variant === 'falcon' ? 'Rate' : 'rate'] = rate.trim();
@@ -88,8 +72,7 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
         filter[variant === 'falcon' ? 'BetType' : 'betType'] = betType.trim();
       }
       if (betStatus.trim()) {
-        filter[variant === 'falcon' ? 'betStatus' : 'betStatus'] =
-          betStatus.trim();
+        filter[variant === 'falcon' ? 'betStatus' : 'betStatus'] = betStatus.trim();
       }
 
       const res = await secureApi(ACTION[variant], {
@@ -134,10 +117,10 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
     void load();
   }, [load]);
 
-  const search = () => {
+  const search = useCallback(() => {
     if (page !== 1) setPage(1);
     else void load();
-  };
+  }, [load, page]);
 
   const pick = (r: HistoryRow, ...keys: string[]) => {
     for (const k of keys) {
@@ -322,12 +305,7 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
         filter: null,
         // Falcon API uses PascalCase `CommissionAmount` (Laxmi: Math.round).
         render: (r) => {
-          const raw = pick(
-            r,
-            'CommissionAmount',
-            'commissionAmount',
-            'commission',
-          );
+          const raw = pick(r, 'CommissionAmount', 'commissionAmount', 'commission');
           const n = Number(raw === '-' || raw == null ? 0 : raw);
           return formatAmount(Number.isFinite(n) ? Math.round(n) : 0);
         },
@@ -336,13 +314,15 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
         id: 'pl',
         label: 'Bet PL',
         filter: null,
-        render: (r) => formatAmount(pick(r, 'betPL', 'BetPL') === '-' ? 0 : pick(r, 'betPL', 'BetPL')),
+        render: (r) =>
+          formatAmount(pick(r, 'betPL', 'BetPL') === '-' ? 0 : pick(r, 'betPL', 'BetPL')),
       },
       {
         id: 'net',
         label: 'Net PL',
         filter: null,
-        render: (r) => formatAmount(pick(r, 'netPL', 'NetPL') === '-' ? 0 : pick(r, 'netPL', 'NetPL')),
+        render: (r) =>
+          formatAmount(pick(r, 'netPL', 'NetPL') === '-' ? 0 : pick(r, 'netPL', 'NetPL')),
       },
       {
         id: 'time',
@@ -365,19 +345,13 @@ export function ExchangeHistoryTab({ userId, variant }: Props) {
       transactionId,
       transactionType,
       variant,
+      search,
     ],
   );
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={1.25}
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        mb={1.5}
-      >
+      <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap mb={1.5}>
         <ItemsPerPageField
           value={itemsPerPage}
           onChange={(v) => {

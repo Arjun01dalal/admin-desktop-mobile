@@ -3,11 +3,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { CAMPAIGN_LIST } from '@/screens/panel/newRegisters/campaignList';
 import { pushToBotDialer } from '../shared/pushToBotDialer';
-import {
-  mapUsersToBotSettings,
-  mapUsersToDialerLeads,
-  reasonForUserType,
-} from './toolbarHelpers';
+import { mapUsersToBotSettings, mapUsersToDialerLeads, reasonForUserType } from './toolbarHelpers';
 import type { UserType } from './constants';
 import {
   actionForType,
@@ -90,12 +86,8 @@ export function useUsersDialer({
     const pageSize = Math.min(Math.max(total, itemsPerPage, current.length), 10_000);
     const isNonPerfActive = userType === 'Non_Performing_Active_User';
     const applyEmpRules =
-      userType === 'User' ||
-      userType === 'Non_Performing_User' ||
-      isNonPerfActive;
-    const otherSearch = isNonPerfActive
-      ? false
-      : hasOtherUserSearch(applied, clientName, playedIn);
+      userType === 'User' || userType === 'Non_Performing_User' || isNonPerfActive;
+    const otherSearch = isNonPerfActive ? false : hasOtherUserSearch(applied, clientName, playedIn);
 
     let empResolved: Extract<ReturnType<typeof resolveSearchEmpCode>, { ok: true }> = {
       ok: true,
@@ -191,26 +183,18 @@ export function useUsersDialer({
         return;
       }
       if (total > 0 && source.length < total) {
-        toast.warning(
-          `Loaded ${source.length} of ${total} users — pushing what is available.`,
-        );
+        toast.warning(`Loaded ${source.length} of ${total} users — pushing what is available.`);
       }
       const res = await pushToBotDialer({
         userId: admin?._id,
         created_by: admin?.name,
-        dialout_settings: mapUsersToBotSettings(
-          source,
-          botId,
-          reasonForUserType(userType),
-        ),
+        dialout_settings: mapUsersToBotSettings(source, botId, reasonForUserType(userType)),
       });
       if (!res.ok) {
         toast.error(res.message || 'Failed to add to bot');
         return;
       }
-      toast.success(
-        res.message || `Call Initiated Successfully (${res.pushed} leads).`,
-      );
+      toast.success(res.message || `Call Initiated Successfully (${res.pushed} leads).`);
     } finally {
       setDialerLoading(false);
     }

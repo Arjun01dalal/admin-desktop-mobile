@@ -1,25 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import {
-  Box,
-  Pagination,
-  Typography,
-} from '@mui/material';
+import { Box, Pagination, Typography } from '@mui/material';
 import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
-import {
-  asPaged,
-  display,
-  maskMobile,
-  useReportQuery,
-} from '@/screens/panel/shared';
-import {
-  formatDisplayTime,
-  formatLocalDate,
-  todayIST,
-} from '@/utils/dates';
+import { asPaged, display, maskMobile, useReportQuery } from '@/screens/panel/shared';
+import { formatDisplayTime, formatLocalDate, todayIST } from '@/utils/dates';
 import type { SecureAction } from '@/api/secureActions';
 
 type FundType = 'pending' | 'approved' | 'totalData';
@@ -106,9 +93,7 @@ export function BonusWalletFundRequestTablePage() {
   const location = useLocation();
   const navState = (location.state || {}) as LocationState;
   const type: FundType =
-    navState.type === 'pending' ||
-    navState.type === 'approved' ||
-    navState.type === 'totalData'
+    navState.type === 'pending' || navState.type === 'approved' || navState.type === 'totalData'
       ? navState.type
       : 'pending';
 
@@ -147,10 +132,7 @@ export function BonusWalletFundRequestTablePage() {
     };
   }, [navState.startDate, navState.endDate, navState.allData, page, filters]);
 
-  const unpack = useCallback(
-    (res: { data?: unknown }) => unpackDocuments(res),
-    [],
-  );
+  const unpack = useCallback((res: { data?: unknown }) => unpackDocuments(res), []);
 
   const { rows, totalPages, loading } = useReportQuery<FundRow>({
     action,

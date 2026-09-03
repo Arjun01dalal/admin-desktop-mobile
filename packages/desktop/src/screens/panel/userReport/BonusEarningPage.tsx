@@ -15,11 +15,7 @@ import {
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
-import {
-  formatAmount,
-  formatDisplayDate,
-  formatDisplayTime,
-} from '@/utils/dates';
+import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
 
 type BonusRow = {
@@ -361,12 +357,7 @@ export function BonusEarningPage() {
         </Stack>
       )}
 
-      <Dialog
-        open={detail != null}
-        onClose={() => setDetail(null)}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={detail != null} onClose={() => setDetail(null)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>{detail?.title ?? ''}</DialogTitle>
         <DialogContent dividers>
           {detail ? <FieldChips fields={detail.fields} /> : null}

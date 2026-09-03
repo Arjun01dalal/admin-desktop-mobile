@@ -12,16 +12,20 @@ import {
 import type {
   CallLogRow,
   CallLogsListResponse,
+  CallSummaryResponse,
   DialerConnectDetails,
 } from './types';
 import { MAX_COMMENT_LENGTH } from './types';
 
-type Admin = {
-  _id?: string;
-  name?: string;
-  extensionId?: string[];
-  serverId?: string | number;
-} | null | undefined;
+type Admin =
+  | {
+      _id?: string;
+      name?: string;
+      extensionId?: string[];
+      serverId?: string | number;
+    }
+  | null
+  | undefined;
 
 type Params = {
   admin: Admin;
@@ -41,9 +45,7 @@ export function useCallLogsActions({
   getDateRange,
 }: Params) {
   const [actionLoading, setActionLoading] = useState(false);
-  const [summaryData, setSummaryData] = useState<Record<string, unknown> | null>(
-    null,
-  );
+  const [summaryData, setSummaryData] = useState<CallSummaryResponse | null>(null);
 
   const botCall = useCallback(
     async (rows?: CallLogRow[]) => {
@@ -57,10 +59,7 @@ export function useCallLogsActions({
         const res = await pushToBotDialer({
           userId: admin?._id,
           created_by: admin?.name,
-          dialout_settings: target.map(mapRowToDialSetting) as Record<
-            string,
-            unknown
-          >[],
+          dialout_settings: target.map(mapRowToDialSetting) as Record<string, unknown>[],
         });
         if (!res.ok) {
           toast.error(res.message || 'Bot call failed');
@@ -182,25 +181,22 @@ export function useCallLogsActions({
     [admin?.name, load],
   );
 
-  const viewSummary = useCallback(
-    async (row: CallLogRow) => {
-      setActionLoading(true);
-      try {
-        const res = await secureApi<Record<string, unknown>>('callLogs.processCall', {
-          call_sid: row.call_sid,
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'Analysis is in progress.');
-          return false;
-        }
-        setSummaryData(res.data || null);
-        return true;
-      } finally {
-        setActionLoading(false);
+  const viewSummary = useCallback(async (row: CallLogRow) => {
+    setActionLoading(true);
+    try {
+      const res = await secureApi<CallSummaryResponse>('callLogs.processCall', {
+        call_sid: row.call_sid,
+      });
+      if (!res.ok) {
+        toast.error(res.message || 'Analysis is in progress.');
+        return false;
       }
-    },
-    [],
-  );
+      setSummaryData(res.data || null);
+      return true;
+    } finally {
+      setActionLoading(false);
+    }
+  }, []);
 
   const onUpload = useCallback(
     async (file?: File | null) => {
@@ -228,9 +224,7 @@ export function useCallLogsActions({
   );
 
   const reinitiateStatuses = useCallback(
-    async (
-      targets: Array<{ botId: number; status: 'deleted' | 'failed' | 'no-answer' }>,
-    ) => {
+    async (targets: Array<{ botId: number; status: 'deleted' | 'failed' | 'no-answer' }>) => {
       if (!targets.length) {
         toast.error('Select at least one bot status');
         return;

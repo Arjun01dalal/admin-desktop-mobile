@@ -1,8 +1,7 @@
 import { toast } from 'react-toastify';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
-const XLSX_MIME =
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 function toUint8Array(raw: unknown): Uint8Array {
   if (raw instanceof Uint8Array) return raw;
@@ -21,7 +20,9 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function fallbackAnchorDownload(bytes: Uint8Array, filename: string): boolean {
-  const blob = new Blob([bytes], { type: XLSX_MIME });
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const blob = new Blob([buffer], { type: XLSX_MIME });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -37,10 +38,7 @@ function fallbackAnchorDownload(bytes: Uint8Array, filename: string): boolean {
 
 export type SaveWorkbookResult = 'ok' | 'empty' | 'canceled' | 'error';
 
-async function persistSheetFile(
-  bytes: Uint8Array,
-  filename: string,
-): Promise<SaveWorkbookResult> {
+async function persistSheetFile(bytes: Uint8Array, filename: string): Promise<SaveWorkbookResult> {
   const save = window.gcalc?.saveDownload;
   if (typeof save === 'function') {
     try {
@@ -73,12 +71,14 @@ export async function saveWorkbook(
     return 'empty';
   }
   try {
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, opts.sheetName.slice(0, 31));
-    const bytes = toUint8Array(
-      XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }),
-    );
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(opts.sheetName.slice(0, 31));
+    const columns = Object.keys(rows[0]);
+    worksheet.addRow(columns);
+    rows.forEach((row) => {
+      worksheet.addRow(columns.map((column) => row[column] ?? ''));
+    });
+    const bytes = toUint8Array(await workbook.xlsx.writeBuffer());
     return persistSheetFile(bytes, opts.filename);
   } catch (err) {
     toast.error(err instanceof Error ? err.message : 'Failed to build sheet');
