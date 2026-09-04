@@ -403,16 +403,11 @@ function unpackList(data: unknown): {
 
 /** Dialer Push Data — lists SubAdmin/get-dialer-datas records. */
 export function DialerPushDataPage() {
-  // Full-access / dialer_push_data / call_logs (same audience that pushes to dialer).
-  const canView =
-    canAccessNavItem({
-      id: 'dialerPushData',
-      permission: Permissions.dialer_push_data,
-    }) ||
-    canAccessNavItem({
-      id: 'callLogs',
-      permission: Permissions.call_logs,
-    });
+  // Only dialer_push_data (full_access / dev_full_access still via isFullAccessNavRole).
+  const canView = canAccessNavItem({
+    id: 'dialerPushData',
+    permission: Permissions.dialer_push_data,
+  });
 
   const [listId, setListId] = useState('');
   const [listName, setListName] = useState('');

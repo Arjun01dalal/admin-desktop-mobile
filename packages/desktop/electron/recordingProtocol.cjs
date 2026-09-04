@@ -5,16 +5,38 @@
  * We download once to a disk cache (streamed, not held fully in RAM), then
  * serve with Content-Length + Range so seek/duration work.
  */
-const { app, protocol, net } = require('electron');
+const { app, net, session } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
-const { pathToFileURL } = require('node:url');
 const { getApiBaseUrl, optionalEnv } = require('./config.cjs');
 const { report: reportError } = require('./errorMonitor.cjs');
 const ctx = require('./ctx.cjs');
 
 const DIST_DIR = path.join(__dirname, '..', 'dist');
+/** Must match BrowserWindow webPreferences.partition in main.cjs */
+const PANEL_PARTITION = 'persist:skytalk';
+
+const DIST_MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.ico': 'image/x-icon',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+};
 const RECORDING_CACHE_MAX_ENTRIES = 6;
 const RECORDING_CACHE_TTL_MS = 5 * 60 * 1000;
 const RECORDING_MAX_BYTES = 80 * 1024 * 1024;
@@ -301,25 +323,65 @@ function buildRecordingResponse(entry, rangeHeader) {
   return new Response(chunk, { status, headers });
 }
 
+function isPathInsideDist(candidatePath) {
+  const distRoot = path.resolve(DIST_DIR);
+  const resolved = path.resolve(candidatePath);
+  const prefix = distRoot.endsWith(path.sep) ? distRoot : `${distRoot}${path.sep}`;
+  if (process.platform === 'win32') {
+    const lowerResolved = resolved.toLowerCase();
+    const lowerRoot = distRoot.toLowerCase();
+    const lowerPrefix = prefix.toLowerCase();
+    return lowerResolved === lowerRoot || lowerResolved.startsWith(lowerPrefix);
+  }
+  return resolved === distRoot || resolved.startsWith(prefix);
+}
+
+function resolveDistFile(relPath) {
+  const rel = String(relPath || '').replace(/^\/+/, '') || 'index.html';
+  const fullPath = path.normalize(path.join(DIST_DIR, rel));
+  if (!isPathInsideDist(fullPath)) return null;
+  if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) return null;
+  return fullPath;
+}
+
+/** Explicit MIME — net.fetch(file://) often returns octet-stream on Windows and ESM won't run. */
+function serveDistFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = DIST_MIME_TYPES[ext] || 'application/octet-stream';
+  return new Response(fs.readFileSync(filePath), {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 function registerAppProtocol() {
-  protocol.handle('app', (request) => {
+  // Panel windows use a persistent partition — protocol.handle on the default
+  // session does not apply there (Windows then prompts to open app:// externally).
+  const panelSession = session.fromPartition(PANEL_PARTITION);
+
+  panelSession.protocol.handle('app', (request) => {
     const { pathname } = new URL(request.url);
-    let rel = decodeURIComponent(pathname);
-    if (!rel || rel === '/') rel = '/index.html';
+    const rel = decodeURIComponent(pathname);
+    const filePath = resolveDistFile(!rel || rel === '/' ? 'index.html' : rel);
+    if (filePath) return serveDistFile(filePath);
 
-    const fullPath = path.normalize(path.join(DIST_DIR, rel));
-    if (!fullPath.startsWith(DIST_DIR)) {
-      return new Response('Forbidden', { status: 403 });
+    // SPA fallback only for navigation requests — missing hashed chunks must 404.
+    const accept = request.headers.get('Accept') || '';
+    if (accept.includes('text/html')) {
+      const indexPath = resolveDistFile('index.html');
+      if (indexPath) return serveDistFile(indexPath);
     }
 
-    if (!fs.existsSync(fullPath)) {
-      return new Response('Not found', { status: 404 });
-    }
-
-    return net.fetch(pathToFileURL(fullPath).toString());
+    return new Response('Not found', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   });
 
-  protocol.handle('astro-recording', async (request) => {
+  panelSession.protocol.handle('astro-recording', async (request) => {
     try {
       const requestUrl = new URL(request.url);
       const encodedTarget = requestUrl.pathname.replace(/^\/+/, '');
@@ -345,4 +407,4 @@ function registerAppProtocol() {
 
 ctx.registerAppProtocol = registerAppProtocol;
 ctx.DIST_DIR = DIST_DIR;
-module.exports = { registerAppProtocol, DIST_DIR };
+module.exports = { registerAppProtocol, DIST_DIR, PANEL_PARTITION };

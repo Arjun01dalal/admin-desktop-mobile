@@ -25,7 +25,7 @@ const {
 } = require('./securityPolicy.cjs');
 
 const ctx = require('./ctx.cjs');
-require('./recordingProtocol.cjs');
+const { PANEL_PARTITION } = require('./recordingProtocol.cjs');
 require('./siteBrowserView.cjs');
 require('./autoUpdateSetup.cjs');
 require('./ipcRegistry.cjs');
@@ -69,6 +69,7 @@ protocol.registerSchemesAsPrivileged([
       supportFetchAPI: true,
       corsEnabled: true,
       stream: true,
+      bypassCSP: true,
     },
   },
   {
@@ -496,7 +497,7 @@ function createWindow(opts = {}) {
       webSecurity: true,
       allowRunningInsecureContent: false,
       // Persist SkyTalk (and panel) session cookies across restarts.
-      partition: 'persist:skytalk',
+      partition: PANEL_PARTITION,
       // Never ship Inspect Element / DevTools to end users.
       devTools: allowDevTools(),
     },
@@ -749,6 +750,7 @@ app.whenReady().then(() => {
   enableGeolocationPermissions();
   // Reject cleartext HTTP for Chromium network (Vite localhost still allowed).
   enforceSessionHttpsOnly(session.defaultSession);
+  enforceSessionHttpsOnly(session.fromPartition(PANEL_PARTITION));
   createTray();
 
   // Cold-start deep link from argv (Windows / Linux).

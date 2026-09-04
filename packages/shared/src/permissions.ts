@@ -393,10 +393,6 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'Dialer_Push_Data',
     'Dialer Push Data',
     'dialerPushData',
-    // Same audience as Call Logs / Add to Dialer buttons.
-    'call_logs',
-    'Call_Logs',
-    'Call Logs',
   ],
   update_ludo_bets: ['update_ludo_bets', 'Update_Ludo_Bets', 'update_ludo_bet', 'Update Ludo Bets'],
   show_wining_btn: [
