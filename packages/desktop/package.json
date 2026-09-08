@@ -1,6 +1,6 @@
 {
   "name": "@astro/desktop",
-  "version": "1.1.5",
+  "version": "1.1.19",
   "description": "Astro CS Panel — Electron desktop app with secure admin login.",
   "type": "module",
   "main": "electron/main.cjs",
@@ -29,6 +29,7 @@
     "release:win": "node scripts/run-with-build-tmp.cjs \"npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --win --publish always\"",
     "release:mac": "node scripts/run-with-build-tmp.cjs \"npm run embed:env && npm run compile:bytecode && npm run build && electron-builder --mac --publish always\"",
     "release:all": "node scripts/run-with-build-tmp.cjs \"npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --mac --win --publish always\"",
+    "release:win:test": "node scripts/run-with-build-tmp.cjs \"npm run embed:env && npm run compile:bytecode:win && npm run build && electron-builder --win --publish always -c.publish.repo=astro-desktop-update-test\"",
     "sos-push": "node services/sos-push/server.cjs"
   },
   "build": {

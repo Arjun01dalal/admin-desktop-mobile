@@ -61,6 +61,7 @@ export function UsersPage() {
 
   const appsKey = stableKey(admin?.clientName ?? admin?.allotedApps);
   const statesKey = stableKey(admin?.accessibleStates);
+  const appWithStateKey = stableKey(admin?.appWithState);
   const allottedApps = useMemo(() => {
     const raw = admin?.clientName || admin?.allotedApps;
     return raw || undefined;
@@ -73,6 +74,15 @@ export function UsersPage() {
     return raw.map((s) => String(s).toLowerCase()).filter(Boolean);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statesKey]);
+  /** Parse once per content — getStoredUser() returns a new object every render. */
+  const adminAppWithState = useMemo(() => {
+    if (!appWithStateKey || appWithStateKey === 'null') return undefined;
+    try {
+      return JSON.parse(appWithStateKey) as Record<string, string[]>;
+    } catch {
+      return undefined;
+    }
+  }, [appWithStateKey]);
 
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
@@ -105,7 +115,7 @@ export function UsersPage() {
     accessibleStates,
     loginEmpCode,
     appsKey,
-    adminAppWithState: admin?.appWithState,
+    adminAppWithState,
     isCaller,
     canViewSubAdmin,
     canViewUserType,

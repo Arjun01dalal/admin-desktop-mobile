@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -17,6 +18,7 @@ import {
   Typography,
   Pagination,
 } from '@mui/material';
+import { toast } from 'react-toastify';
 import { todayIST, getStoredUser } from '@/utils/dates';
 import { CommonTable } from '@/components/CommonTable';
 import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
@@ -275,6 +277,23 @@ function CallLogsPageBody({
     [viewSummary],
   );
 
+  const navigate = useNavigate();
+  const openUserReport = useCallback(
+    (row: CallLogRow) => {
+      const userId = String(row.caller_user_id || '').trim();
+      if (!userId) {
+        toast.error('User ID is not available for this call');
+        return;
+      }
+      navigate(
+        `/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(
+          String(row.client_name || ''),
+        )}`,
+      );
+    },
+    [navigate],
+  );
+
   const columns = useCallLogsColumns({
     page,
     itemsPerPage,
@@ -283,6 +302,7 @@ function CallLogsPageBody({
     onConnectDialer: connectDialer,
     onOpenComment: openComment,
     onPlayRecording: setRecordingUrl,
+    onOpenUserReport: openUserReport,
   });
 
   const filtersValue = useMemo(

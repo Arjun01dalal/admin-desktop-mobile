@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   Box,
   Button,
@@ -9,23 +9,45 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Link,
   Paper,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import {
+  buildIncomingBotCreatePayload,
+  buildIncomingBotUserMapByPhone,
+  buildIncomingBotUserMapBySid,
+  enrichIncomingCallsWithUsers,
+  extractIncomingBotCallUsers,
+  extractIncomingBotDocId,
+  formatIncomingBotCommentAuthor,
+  formatIncomingBotCommentWhen,
+  getIncomingBotCallMobile,
+  getIncomingBotUntilFromSinceDate,
+  INCOMING_BOT_DIALER,
+  incomingBotPhoneMatchKey,
+  mergeIncomingBotCommentOntoCalls,
+  normalizeIncomingBotPhone,
+  type IncomingBotCallerComment,
+} from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
+import { getSessionUser, hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
-import { display, useReportQuery } from '@/screens/panel/shared';
+import { display } from '@/screens/panel/shared';
 import { todayIST } from '@/utils/dates';
 
 type IncomingCall = {
@@ -37,6 +59,14 @@ type IncomingCall = {
   start_time?: string;
   duration?: string | number;
   recording_url?: string | null;
+  name?: string;
+  state?: string;
+  city?: string;
+  dp_id?: string;
+  app_name?: string;
+  mobile?: string;
+  doc_id?: string;
+  comments?: IncomingBotCallerComment[];
 };
 
 type SummaryFlag = {
@@ -121,13 +151,19 @@ const dialogPaperSx = {
 };
 
 function getLast10Digits(value?: string | null): string {
-  return (value ?? '').replace(/\D/g, '').slice(-10);
+  return incomingBotPhoneMatchKey(value);
 }
 
-const ALLOWED_TO_SUFFIXES = ALLOWED_TO_NUMBERS.map(getLast10Digits);
+const ALLOWED_TO_NORMALIZED = new Set(ALLOWED_TO_NUMBERS.map((num) => normalizeIncomingBotPhone(num)));
 
 function isAllowedToNumber(to?: string | null): boolean {
-  return ALLOWED_TO_SUFFIXES.includes(getLast10Digits(to));
+  const normalized = normalizeIncomingBotPhone(to);
+  if (!normalized) return false;
+  if (ALLOWED_TO_NORMALIZED.has(normalized)) return true;
+  const last10 = getLast10Digits(to);
+  return Array.from(ALLOWED_TO_NORMALIZED).some(
+    (allowed) => allowed === last10 || getLast10Digits(allowed) === last10,
+  );
 }
 
 function startOfDayUtc(dateValue?: string): string {
@@ -257,6 +293,8 @@ function SectionCard({ title, children }: { title: string; children: React.React
 }
 
 export function IncomingBotCallPage() {
+  const navigate = useNavigate();
+  const canShowMobile = hasPermission('show_mobile');
   const [sinceDate, setSinceDate] = useState(() => todayIST());
   const [searchFrom, setSearchFrom] = useState('');
   const [searchTo, setSearchTo] = useState('');
@@ -264,28 +302,69 @@ export function IncomingBotCallPage() {
   const [appliedFrom, setAppliedFrom] = useState('');
   const [appliedTo, setAppliedTo] = useState('');
   const [appliedSid, setAppliedSid] = useState('');
+  const [rows, setRows] = useState<IncomingCall[]>([]);
+  const [loading, setLoading] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
   const [summaryCall, setSummaryCall] = useState<IncomingCall | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [dialerLoadingSid, setDialerLoadingSid] = useState('');
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentInput, setCommentInput] = useState('');
+  const [commentDocId, setCommentDocId] = useState('');
+  const [commentCallSid, setCommentCallSid] = useState('');
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [viewCommentsOpen, setViewCommentsOpen] = useState(false);
+  const [viewComments, setViewComments] = useState<IncomingBotCallerComment[]>([]);
+  const [viewCommentsName, setViewCommentsName] = useState('');
 
-  const buildPayload = useCallback(() => ({ since: startOfDayUtc(sinceDate) }), [sinceDate]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const since = startOfDayUtc(sinceDate);
+      const until = getIncomingBotUntilFromSinceDate(sinceDate);
+      const [listRes, usersRes] = await Promise.all([
+        secureApi<{ calls?: IncomingCall[] }>('incomingBot.list', { since, until }),
+        secureApi('incomingBot.getAll', {
+          pageNo: 1,
+          itemsPerPage: 500,
+          startDate: sinceDate,
+          endDate: sinceDate,
+          filter: {},
+        }),
+      ]);
 
-  const unpack = useCallback((res: { data?: unknown }) => {
-    const data = res.data as { calls?: IncomingCall[] } | undefined;
-    const calls = Array.isArray(data?.calls) ? data.calls : [];
-    return { rows: calls.filter((c) => isAllowedToNumber(c.to)) };
-  }, []);
+      if (!listRes.ok) {
+        toast.error(listRes.message || 'Failed to load incoming calls');
+        setRows([]);
+        return;
+      }
 
-  const { rows, loading, load } = useReportQuery<IncomingCall>({
-    action: 'incomingBot.list',
-    buildPayload,
-    unpack,
-    autoDeps: [sinceDate],
-    errorMessage: 'Failed to load incoming calls',
-    cacheTtlMs: 0,
-  });
+      const calls = Array.isArray(listRes.data?.calls) ? listRes.data.calls : [];
+      const filtered = calls.filter((c) => isAllowedToNumber(c.to));
+
+      let enriched = filtered;
+      if (usersRes.ok) {
+        const users = extractIncomingBotCallUsers(usersRes.data);
+        enriched = enrichIncomingCallsWithUsers(
+          filtered,
+          buildIncomingBotUserMapByPhone(users),
+          buildIncomingBotUserMapBySid(users),
+        );
+      } else if (usersRes.message) {
+        toast.error(usersRes.message || 'Failed to fetch user details for matching');
+      }
+
+      setRows(enriched);
+    } finally {
+      setLoading(false);
+    }
+  }, [sinceDate]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const applySearch = useCallback(() => {
     setAppliedFrom(searchFrom.trim());
@@ -350,6 +429,167 @@ export function IncomingBotCallPage() {
     }
   }, []);
 
+  const openUserReport = useCallback(
+    (call: IncomingCall) => {
+      const userId = String(call.dp_id || '').trim();
+      if (!userId) return;
+      navigate(
+        `/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(
+          String(call.name || userId),
+        )}`,
+      );
+    },
+    [navigate],
+  );
+
+  const connectToDialer = useCallback(async (call: IncomingCall) => {
+    const phone = getIncomingBotCallMobile(call);
+    if (!phone) {
+      toast.error('No phone number for this call');
+      return;
+    }
+    setDialerLoadingSid(call.sid);
+    try {
+      const res = await secureApi('callLogs.externalDialerBatch', {
+        campaignId: INCOMING_BOT_DIALER.campaignId,
+        serverId: INCOMING_BOT_DIALER.serverId,
+        listId: INCOMING_BOT_DIALER.listId,
+        listName: INCOMING_BOT_DIALER.listName,
+        leads: [
+          {
+            first_name: call.name || '',
+            last_name: '',
+            phone_number: phone,
+            city: call.city ?? '',
+            state: call.state ?? '',
+            email: call.app_name ?? '',
+            comments: call.app_name ?? '',
+            province: call.dp_id || '',
+          },
+        ],
+      });
+      if (!res.ok) toast.error(res.message || 'Dialer API failed');
+      else toast.success(res.message || 'Data sent successfully');
+    } finally {
+      setDialerLoadingSid('');
+    }
+  }, []);
+
+  const openAddComment = useCallback((call: IncomingCall) => {
+    const docId = String(call.doc_id || '').trim();
+    const sid = String(call.sid || '').trim();
+    if (!docId && !sid) {
+      toast.error('Unable to add comment for this call');
+      return;
+    }
+    setCommentDocId(docId);
+    setCommentCallSid(sid);
+    setCommentInput('');
+    setCommentOpen(true);
+  }, []);
+
+  const submitComment = useCallback(
+    async (e?: FormEvent) => {
+      e?.preventDefault();
+      const text = commentInput.trim();
+      if (!text) {
+        toast.error('Please enter a comment');
+        return;
+      }
+      if (!commentDocId && !commentCallSid) {
+        toast.error('Unable to add comment for this call');
+        return;
+      }
+
+      const user = getSessionUser();
+      const newComment: IncomingBotCallerComment = {
+        comment: text,
+        who: { userId: user?._id, userName: user?.name },
+        date: new Date().toISOString(),
+      };
+      const submittedDocId = commentDocId;
+      const submittedSid = commentCallSid;
+      const targetCall = rows.find(
+        (c) =>
+          (submittedSid && c.sid === submittedSid) ||
+          (submittedDocId && c.doc_id === submittedDocId),
+      );
+
+      setCommentBusy(true);
+      try {
+        let docIdForComment = submittedDocId;
+
+        // No doc_id → create record, then add-comment (Laxmi parity)
+        if (!docIdForComment) {
+          if (!targetCall) {
+            toast.error('Unable to add comment for this call');
+            return;
+          }
+          const createRes = await secureApi(
+            'incomingBot.create',
+            buildIncomingBotCreatePayload({
+              ...targetCall,
+              sid: targetCall.sid || submittedSid,
+            }),
+          );
+          if (!createRes.ok) {
+            toast.error(createRes.message || 'Failed to create comment record');
+            return;
+          }
+          docIdForComment = extractIncomingBotDocId(createRes.data);
+          if (!docIdForComment) {
+            toast.error('Failed to create comment record');
+            return;
+          }
+        }
+
+        const res = await secureApi('incomingBot.addComment', {
+          _id: docIdForComment,
+          comment: text,
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to add comment');
+          return;
+        }
+
+        setRows((prev) =>
+          mergeIncomingBotCommentOntoCalls(prev, {
+            sid: submittedSid,
+            docId: docIdForComment,
+            comment: newComment,
+          }),
+        );
+        toast.success('Comment added successfully');
+        setCommentOpen(false);
+        setCommentInput('');
+        setCommentDocId('');
+        setCommentCallSid('');
+
+        // Refresh getAll for doc_id, then re-apply local comment if server list lags
+        if (!submittedDocId) {
+          void load().then(() => {
+            setRows((prev) =>
+              mergeIncomingBotCommentOntoCalls(prev, {
+                sid: submittedSid,
+                docId: docIdForComment,
+                comment: newComment,
+              }),
+            );
+          });
+        }
+      } finally {
+        setCommentBusy(false);
+      }
+    },
+    [commentInput, commentDocId, commentCallSid, rows, load],
+  );
+
+  const openViewComments = useCallback((call: IncomingCall) => {
+    setViewCommentsName(String(call.name || call.dp_id || call.sid || ''));
+    setViewComments(call.comments || []);
+    setViewCommentsOpen(true);
+  }, []);
+
   const summaryView = useMemo(() => buildSummaryView(summaryData), [summaryData]);
 
   const columns = useMemo<CommonTableColumn<IncomingCall>[]>(
@@ -371,7 +611,70 @@ export function IncomingBotCallPage() {
             placeholder="From"
           />
         ),
-        render: (row) => display(row.from),
+        render: (row) => {
+          const mobile = getIncomingBotCallMobile(row);
+          const shown =
+            row.dp_id && !canShowMobile ? '**********' : display(mobile || row.from);
+          const busy = dialerLoadingSid === row.sid;
+          return (
+            <Stack alignItems="center" spacing={0.75} sx={{ py: 0.5 }}>
+              <Typography fontSize={13}>{shown}</Typography>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={busy || !mobile}
+                onClick={() => void connectToDialer(row)}
+                sx={{
+                  ...orangeBtnSx,
+                  minWidth: 72,
+                  py: 0.25,
+                  px: 1.25,
+                  fontSize: 12,
+                }}
+              >
+                {busy ? 'Sending…' : 'Call'}
+              </Button>
+            </Stack>
+          );
+        },
+      },
+      {
+        id: 'name',
+        label: 'Name',
+        render: (row) => display(row.name),
+      },
+      {
+        id: 'state',
+        label: 'State',
+        render: (row) => display(row.state),
+      },
+      {
+        id: 'city',
+        label: 'City',
+        render: (row) => display(row.city),
+      },
+      {
+        id: 'dpId',
+        label: 'DP ID',
+        render: (row) =>
+          row.dp_id ? (
+            <Link
+              component="button"
+              type="button"
+              onClick={() => openUserReport(row)}
+              underline="hover"
+              sx={{ fontSize: 13, fontWeight: 600 }}
+            >
+              {row.dp_id}
+            </Link>
+          ) : (
+            '—'
+          ),
+      },
+      {
+        id: 'appName',
+        label: 'App Name',
+        render: (row) => display(row.app_name),
       },
       {
         id: 'to',
@@ -420,6 +723,41 @@ export function IncomingBotCallPage() {
         render: (row) => formatDateTime(row.start_time),
       },
       {
+        id: 'comments',
+        label: 'Comment',
+        width: 170,
+        render: (row) => {
+          const count = row.comments?.length || 0;
+          return (
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+              <Tooltip title="Add Comment">
+                <IconButton
+                  size="small"
+                  onClick={() => openAddComment(row)}
+                  sx={{ color: '#ff9f0a' }}
+                >
+                  <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={count > 0 ? `View All (${count})` : 'View All'}>
+                <IconButton
+                  size="small"
+                  onClick={() => openViewComments(row)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <VisibilityOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              {count > 0 ? (
+                <Typography variant="caption" color="text.secondary">
+                  ({count})
+                </Typography>
+              ) : null}
+            </Stack>
+          );
+        },
+      },
+      {
         id: 'action',
         label: 'Action',
         width: 120,
@@ -451,7 +789,19 @@ export function IncomingBotCallPage() {
         ),
       },
     ],
-    [searchFrom, searchTo, searchSid, applySearch, openSummary],
+    [
+      searchFrom,
+      searchTo,
+      searchSid,
+      applySearch,
+      openSummary,
+      openUserReport,
+      canShowMobile,
+      dialerLoadingSid,
+      connectToDialer,
+      openAddComment,
+      openViewComments,
+    ],
   );
 
   return (
@@ -494,12 +844,98 @@ export function IncomingBotCallPage() {
           virtualize={false}
           stickyHeader
           dense
-          minWidth={1100}
+          minWidth={1700}
           maxHeight="100%"
         />
       </TablePanel>
 
       <RecordingPlayerDialog url={recordingUrl} onClose={() => setRecordingUrl(null)} />
+
+      <Dialog
+        open={commentOpen}
+        onClose={() => !commentBusy && setCommentOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Comment</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            label="Please enter Comment"
+            value={commentInput}
+            onChange={(e) => setCommentInput(e.target.value)}
+            disabled={commentBusy}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCommentOpen(false)} disabled={commentBusy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={commentBusy || !commentInput.trim()}
+            onClick={() => void submitComment()}
+          >
+            {commentBusy ? '…' : 'Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={viewCommentsOpen}
+        onClose={() => setViewCommentsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Comments{viewCommentsName ? ` — ${viewCommentsName}` : ''}
+        </DialogTitle>
+        <DialogContent>
+          {viewComments.length === 0 ? (
+            <Typography color="text.secondary" sx={{ py: 2 }}>
+              No Comments
+            </Typography>
+          ) : (
+            <Stack spacing={1.5} sx={{ py: 1 }}>
+              {viewComments.map((c, i) => {
+                const who = formatIncomingBotCommentAuthor(c);
+                const when = formatIncomingBotCommentWhen(c);
+                return (
+                  <Box
+                    key={`c-${i}`}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {String(c.comment || '—')}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mt: 0.75 }}
+                    >
+                      By: {who}
+                      {when ? ` · ${when}` : ''}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewCommentsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={summaryOpen}

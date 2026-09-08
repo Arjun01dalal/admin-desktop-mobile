@@ -117,6 +117,16 @@ export function useUsersQuery({
   const deferredRows = useDeferredValue(rows);
   const isClientPagedType = userType === 'Non_Performing_Active_User';
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage) || 1);
+  const adminAppWithStateKey = useMemo(
+    () => {
+      try {
+        return JSON.stringify(adminAppWithState ?? null);
+      } catch {
+        return '';
+      }
+    },
+    [adminAppWithState],
+  );
   const tableRows = useMemo(() => {
     // API returns the full list (no pageNo) — paginate on the client.
     if (!isClientPagedType) return deferredRows;
@@ -127,7 +137,7 @@ export function useUsersQuery({
   // Keep selection on allowed types (caller / permission gates)
   useEffect(() => {
     if (!typeOptions.some((opt) => opt.value === userType)) {
-      setUserType('User');
+      setUserType(typeOptions[0]?.value ?? 'User');
     }
   }, [typeOptions, userType]);
 
@@ -166,7 +176,10 @@ export function useUsersQuery({
 
         if (applyEmpRules) {
           if (isCaller) {
-            empResolved = { ok: true, apiEmpCode: loginEmpCode };
+            // Default list = own emp only; DP ID / name / etc. also allow unassigned 001.
+            empResolved = otherSearch
+              ? { ok: true, allowOwnAndDefault: true }
+              : { ok: true, apiEmpCode: loginEmpCode };
           } else {
             const resolved = resolveSearchEmpCode(applied.empCode, loginEmpCode, otherSearch);
             if (!resolved.ok) {
@@ -179,25 +192,32 @@ export function useUsersQuery({
           }
         }
 
+        const searchingDpId = Boolean(applied.dpId.trim());
+
         const filter = buildUserFilter(
           userType,
           applied,
-          clientName,
-          playedIn,
+          searchingDpId ? '' : clientName,
+          searchingDpId ? '' : playedIn,
           uniqueUser,
           applyEmpRules ? empResolved : undefined,
         );
 
+        // Exact DP ID lookup: do not scope by allotted app/state — otherwise 001
+        // leads outside the caller's appWithState never come back from the API.
         const payload = buildPayloadForType(userType, {
           pageNo,
           itemsPerPage,
           filter,
           startDate,
           endDate,
-          allottedApps: userType === 'User' ? undefined : allottedApps,
+          allottedApps:
+            userType === 'User' || searchingDpId ? undefined : allottedApps,
           appWithState:
-            userType === 'User' || userType === 'Sub_Admin' ? undefined : adminAppWithState,
-          selectedClientName: clientName || undefined,
+            userType === 'User' || userType === 'Sub_Admin' || searchingDpId
+              ? undefined
+              : adminAppWithState,
+          selectedClientName: searchingDpId ? undefined : clientName || undefined,
           activeUserStart: applied.activeUserStart || undefined,
           activeUserEnd: applied.activeUserEnd || undefined,
         });
@@ -218,12 +238,12 @@ export function useUsersQuery({
 
         const trimmedEmp = String(applied.empCode || '').trim();
         if (applyEmpRules && loginEmpCode) {
-          if (isCaller || empResolved.apiEmpCode) {
+          if (empResolved.allowOwnAndDefault || empResolved.matchDefault) {
+            list = filterSearchByEmpCode(list, loginEmpCode, empResolved);
+          } else if (isCaller || empResolved.apiEmpCode) {
             list = list.filter((row) =>
               empCodesEqual(row.empCode, empResolved.apiEmpCode || loginEmpCode),
             );
-          } else if (empResolved.allowOwnAndDefault || empResolved.matchDefault) {
-            list = filterSearchByEmpCode(list, loginEmpCode, empResolved);
           } else {
             list = filterListByLoginEmpCode(list, loginEmpCode);
           }
@@ -234,7 +254,7 @@ export function useUsersQuery({
           list = list.filter((row) => empCodesEqual(row.empCode, trimmedEmp));
         }
 
-        if (accessibleStates.length > 0) {
+        if (accessibleStates.length > 0 && !searchingDpId) {
           list = list.filter((row: UserRow) =>
             accessibleStates.includes(String(row.state || '').toLowerCase()),
           );
@@ -251,7 +271,7 @@ export function useUsersQuery({
     },
     [
       accessibleStates,
-      adminAppWithState,
+      adminAppWithStateKey,
       allottedApps,
       applied,
       begin,

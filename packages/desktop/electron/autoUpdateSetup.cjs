@@ -104,7 +104,7 @@ function setupAutoUpdate() {
   let lastCheckAt = 0;
 
   const MIN_CHECK_GAP_MS = 60 * 1000;
-  const PERIODIC_MS = 15 * 60 * 1000;
+  const PERIODIC_MS = 7 * 60 * 1000;
   const RETRY_BASE_MS = 8 * 1000;
   const RETRY_MAX_MS = 2 * 60 * 1000;
   const AUTO_INSTALL_DELAY_MS = 2500;

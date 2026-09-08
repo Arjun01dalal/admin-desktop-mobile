@@ -190,12 +190,28 @@ export type GCalcApi = {
     status?: number;
   }>;
   onUpdateAvailable: (cb: (d: { version: string }) => void) => void;
-  onUpdateProgress: (cb: (d: { percent: number }) => void) => void;
-  onUpdateReady: (cb: (d: { version: string }) => void) => void;
-  onUpdateError: (cb: (d: { message: string }) => void) => void;
+  onUpdateProgress: (cb: (d: { percent: number; version?: string }) => void) => void;
+  onUpdateReady: (cb: (d: { version: string; autoInstallMs?: number }) => void) => void;
+  onUpdateError: (cb: (d: { message: string; soft?: boolean }) => void) => void;
+  onUpdateRetrying: (
+    cb: (d: {
+      version?: string;
+      message?: string;
+      attempt?: number;
+      nextRetryMs?: number;
+      online?: boolean;
+    }) => void,
+  ) => void;
+  onUpdateInstalling: (cb: (d: { version?: string }) => void) => void;
   getUpdateStatus: () => Promise<{
     channel: string;
-    payload?: { version?: string; percent?: number; message?: string };
+    payload?: {
+      version?: string;
+      percent?: number;
+      message?: string;
+      soft?: boolean;
+      autoInstallMs?: number;
+    };
     at?: number;
   } | null>;
   installUpdate: () => void;

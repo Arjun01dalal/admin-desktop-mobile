@@ -33,6 +33,7 @@ import {
   getIncomingBotUntilFromSinceDate,
   INCOMING_BOT_DIALER,
   incomingBotPhoneMatchKey,
+  mergeIncomingBotCommentOntoCalls,
   normalizeIncomingBotPhone,
   type IncomingBotCallerComment,
 } from '@astro/shared';
@@ -216,7 +217,7 @@ export function IncomingBotCallScreen() {
       try {
         const usersRes = await secureApi('incomingBot.getAll', {
           pageNo: 1,
-          itemsPerPage: 100,
+          itemsPerPage: 500,
           startDate: sinceDate,
           endDate: sinceDate,
           filter: {},
@@ -470,27 +471,30 @@ export function IncomingBotCallScreen() {
         return;
       }
 
-      const patchCall = (call: IncomingCall): IncomingCall => {
-        const isTarget =
-          (submittedSid && call.sid === submittedSid) ||
-          (call.doc_id && call.doc_id === docIdForComment);
-        if (!isTarget) return call;
-        return {
-          ...call,
-          doc_id: call.doc_id || docIdForComment,
-          comments: [...(call.comments || []), newComment],
-        };
+      const patchOpts = {
+        sid: submittedSid,
+        docId: docIdForComment,
+        comment: newComment,
       };
 
-      setRows((prev) => prev.map(patchCall));
-      setSheetRow((prev) => (prev ? patchCall(prev) : prev));
+      setRows((prev) => mergeIncomingBotCommentOntoCalls(prev, patchOpts));
+      setSheetRow((prev) =>
+        prev ? mergeIncomingBotCommentOntoCalls([prev], patchOpts)[0] ?? prev : prev,
+      );
       setCommentOpen(false);
       setCommentInput('');
       setCommentDocId('');
       setCommentCallSid('');
       Alert.alert('Comment', 'Comment added successfully');
 
-      if (!submittedDocId) void load();
+      if (!submittedDocId) {
+        void load().then(() => {
+          setRows((prev) => mergeIncomingBotCommentOntoCalls(prev, patchOpts));
+          setSheetRow((prev) =>
+            prev ? mergeIncomingBotCommentOntoCalls([prev], patchOpts)[0] ?? prev : prev,
+          );
+        });
+      }
     } finally {
       setCommentBusy(false);
     }

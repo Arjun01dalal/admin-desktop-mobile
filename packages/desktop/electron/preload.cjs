@@ -166,6 +166,14 @@ const panelBridge = {
     if (typeof cb !== 'function') return;
     ipcRenderer.on('update:error', (_e, d) => cb(d));
   },
+  onUpdateRetrying: (cb) => {
+    if (typeof cb !== 'function') return;
+    ipcRenderer.on('update:retrying', (_e, d) => cb(d));
+  },
+  onUpdateInstalling: (cb) => {
+    if (typeof cb !== 'function') return;
+    ipcRenderer.on('update:installing', (_e, d) => cb(d));
+  },
   getUpdateStatus: () => safeInvoke('update:get-status'),
   installUpdate: () => ipcRenderer.send('update:install'),
 

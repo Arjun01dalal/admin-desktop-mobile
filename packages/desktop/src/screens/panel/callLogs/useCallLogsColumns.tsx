@@ -55,6 +55,7 @@ export type UseCallLogsColumnsParams = {
   onConnectDialer: (row: CallLogRow) => void;
   onOpenComment: (row: CallLogRow) => void;
   onPlayRecording?: (url: string) => void;
+  onOpenUserReport?: (row: CallLogRow) => void;
 };
 
 export function useCallLogsColumns({
@@ -65,6 +66,7 @@ export function useCallLogsColumns({
   onConnectDialer,
   onOpenComment,
   onPlayRecording,
+  onOpenUserReport,
 }: UseCallLogsColumnsParams): CommonTableColumn<CallLogRow>[] {
   const rowOffset = (page - 1) * itemsPerPage;
   const user = getStoredUser<{
@@ -99,7 +101,33 @@ export function useCallLogsColumns({
         width: 120,
         cellSx: { maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' },
         filter: null,
-        render: (row) => String(row.client_name || '-'),
+        render: (row) => {
+          const name = String(row.client_name || '-');
+          const userId = String(row.caller_user_id || '').trim();
+          if (!userId || !onOpenUserReport || name === '-') return name;
+          return (
+            <Typography
+              variant="body2"
+              component="button"
+              type="button"
+              onClick={() => onOpenUserReport(row)}
+              sx={{
+                all: 'unset',
+                cursor: 'pointer',
+                color: 'warning.main',
+                fontWeight: 600,
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                display: 'inline-block',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              {name}
+            </Typography>
+          );
+        },
       },
       {
         id: 'dpId',
@@ -374,5 +402,6 @@ export function useCallLogsColumns({
     onConnectDialer,
     onOpenComment,
     onPlayRecording,
+    onOpenUserReport,
   ]);
 }

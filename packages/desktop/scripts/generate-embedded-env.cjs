@@ -32,6 +32,9 @@ const OPTIONAL = [
   'FIREBASE_STORAGE_BUCKET',
   'FIREBASE_AUTH_DOMAIN',
   'FIREBASE_VAPID_KEY',
+  // Optional: test-only update feed (leave unset for production).
+  'UPDATE_FEED_OWNER',
+  'UPDATE_FEED_REPO',
 ];
 
 if (!fs.existsSync(ENV_PATH)) {

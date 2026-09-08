@@ -45,6 +45,13 @@ module.exports = {
   /** Optional runtime-only GitHub token; never read from embedded build config. */
   getGhUpdateToken: () =>
     process.env.GH_UPDATE_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
+  /**
+   * Optional update-feed override (test builds).
+   * Unset → use baked app-update.yml (production: admin-desktop-mobile).
+   * Set UPDATE_FEED_OWNER + UPDATE_FEED_REPO → that GitHub repo only.
+   */
+  getUpdateFeedOwner: () => optionalEnv('UPDATE_FEED_OWNER'),
+  getUpdateFeedRepo: () => optionalEnv('UPDATE_FEED_REPO'),
   /** ntfy topic for SOS push (optional — enables cross-device alerts). */
   getSosPushTopic: () => optionalEnv('SOS_PUSH_TOPIC'),
   getSosPushServer: () =>

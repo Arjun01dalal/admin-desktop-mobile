@@ -100,7 +100,8 @@ export function empCodesExact(a: unknown, b: unknown): boolean {
 
 export function isDefaultEmpCode(code: unknown): boolean {
   const c = trimCode(code);
-  return c === '' || c === DEFAULT_EMP_CODE;
+  // Empty / missing shows as "001" in the UI — treat "1" / "01" / "001" the same.
+  return c === '' || empCodesEqual(c, DEFAULT_EMP_CODE);
 }
 
 /** Default list: only login empCode (laxminarayan filterListByLoginEmpCode). */
@@ -145,7 +146,7 @@ export function resolveSearchEmpCode(
   if (trimmed && empCodesEqual(trimmed, mine)) {
     return { ok: true, apiEmpCode: mine };
   }
-  if (trimmed === DEFAULT_EMP_CODE) {
+  if (trimmed && empCodesEqual(trimmed, DEFAULT_EMP_CODE)) {
     return { ok: true, matchDefault: true };
   }
   if (trimmed) {
@@ -167,7 +168,7 @@ export function filterSearchByEmpCode(
 ): UserRow[] {
   const mine = trimCode(loginEmpCode);
   if (resolved.allowOwnAndDefault && mine) {
-    return rows.filter((row) => empCodesExact(row.empCode, mine) || isDefaultEmpCode(row.empCode));
+    return rows.filter((row) => empCodesEqual(row.empCode, mine) || isDefaultEmpCode(row.empCode));
   }
   if (resolved.matchDefault) {
     return rows.filter((row) => isDefaultEmpCode(row.empCode));

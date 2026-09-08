@@ -234,3 +234,35 @@ export function formatIncomingBotCommentWhen(c: IncomingBotCallerComment): strin
     return String(raw);
   }
 }
+
+/** After create+comment, keep local comment visible if getAll refresh lags. */
+export function mergeIncomingBotCommentOntoCalls<
+  T extends { sid?: string; doc_id?: string; comments?: IncomingBotCallerComment[] },
+>(
+  calls: T[],
+  opts: {
+    sid?: string;
+    docId?: string;
+    comment: IncomingBotCallerComment;
+  },
+): T[] {
+  const sid = String(opts.sid || '').trim();
+  const docId = String(opts.docId || '').trim();
+  const text = String(opts.comment.comment || '').trim();
+  if (!sid && !docId) return calls;
+
+  return calls.map((call) => {
+    const isTarget =
+      (sid && call.sid === sid) || (docId && call.doc_id && call.doc_id === docId);
+    if (!isTarget) return call;
+    const existing = Array.isArray(call.comments) ? call.comments : [];
+    const already = text
+      ? existing.some((c) => String(c.comment || '').trim() === text)
+      : false;
+    return {
+      ...call,
+      doc_id: call.doc_id || docId || undefined,
+      comments: already ? existing : [...existing, opts.comment],
+    };
+  });
+}

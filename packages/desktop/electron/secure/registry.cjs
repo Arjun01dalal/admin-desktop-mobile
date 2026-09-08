@@ -1105,6 +1105,13 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  /** Caller comment map — used by Incoming Bot Call "View All". */
+  'ops.getCaller': {
+    method: 'POST',
+    path: '/SubAdmin/get-caller',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'ops.myCustomersDeposit': {
     method: 'POST',
     path: '/SubAdmin/myCustomerDeposit',
@@ -1808,9 +1815,28 @@ module.exports = {
     decryptResponse: true,
   },
 
-  // Incoming Bot Call (external helper host)
+  // Incoming Bot Call (external helper host + backend user match)
   'incomingBot.list': { type: 'local' },
   'incomingBot.processCall': { type: 'local' },
+  'incomingBot.getAll': {
+    method: 'POST',
+    path: '/incoming-bot-call/getAll',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'incomingBot.create': {
+    method: 'POST',
+    path: '/incoming-bot-call',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'incomingBot.addComment': {
+    method: 'POST',
+    path: '/incoming-bot-call/add-comment',
+    encryptRequest: true,
+    // Laxmi does not decrypt this response — plain success body.
+    decryptResponse: false,
+  },
 
   // Roles & Responsibilities
   'roles.list': {

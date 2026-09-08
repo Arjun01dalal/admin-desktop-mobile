@@ -457,9 +457,11 @@ async function listIncomingBotCalls(payload = {}) {
   if (!since) {
     return { ok: false, message: 'since date is required' };
   }
+  const until = String(payload.until || '').slice(0, 64);
   try {
+    const params = until ? { since, until } : { since };
     const response = await http.get('https://helper.callingbot.live/incoming-calls', {
-      params: { since },
+      params,
       timeout: 60000,
       metadata: { action: 'incomingBot.list', start: Date.now() },
     });

@@ -347,10 +347,15 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
 
   const orderRef = useRef<string[]>([]);
   const firstLoad = useRef(true);
+  const fetchGenRef = useRef(0);
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [draftStart, setDraftStart] = useState(initialStart);
   const [draftEnd, setDraftEnd] = useState(initialEnd);
+  /** API filter — default `live`; All Data button toggles to `all`. */
+  const [bookType, setBookType] = useState<'all' | 'live'>('live');
+  const bookTypeRef = useRef<'all' | 'live'>(bookType);
+  bookTypeRef.current = bookType;
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -391,6 +396,8 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
   }, [groupedData, searchQuery]);
 
   const fetchAllData = useCallback(async () => {
+    const effectiveBookType = bookTypeRef.current;
+    const gen = ++fetchGenRef.current;
     try {
       if (firstLoad.current) setLoading(true);
 
@@ -413,10 +420,14 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         matches = [];
       }
 
+      if (gen !== fetchGenRef.current) return;
+
       const bookRes = await secureApi(BOOK_ACTION[variant], {
         startDate,
         endDate,
+        bookType: effectiveBookType,
       });
+      if (gen !== fetchGenRef.current) return;
       if (!bookRes.ok) {
         const msg = bookRes.message || 'Failed to load live match book';
         setError(msg);
@@ -441,7 +452,8 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
             ? finalBook
             : finalBook.filter((book) =>
                 filteredMatches.some(
-                  (match) => normalize(String(match.eventName || '')) === normalize(book.matchName),
+                  (match) =>
+                    normalize(String(match.eventName || '')) === normalize(book.matchName),
                 ),
               );
         oddsForMerge = matches.length === 0 ? [] : filteredMatches;
@@ -469,13 +481,26 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         );
       }
 
+      if (gen !== fetchGenRef.current) return;
       setError('');
       setGroupedData(sortSports(groupBySport(stableSorted)));
       firstLoad.current = false;
     } finally {
-      setLoading(false);
+      if (gen === fetchGenRef.current) setLoading(false);
     }
   }, [endDate, startDate, variant]);
+
+  const toggleAllDataBookType = useCallback(() => {
+    const next = bookTypeRef.current === 'all' ? 'live' : 'all';
+    bookTypeRef.current = next;
+    firstLoad.current = true;
+    orderRef.current = [];
+    setBookType(next);
+    setGroupedData([]);
+    setError('');
+    setLoading(true);
+    void fetchAllData();
+  }, [fetchAllData]);
 
   useEffect(() => {
     let mounted = true;
@@ -499,7 +524,6 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       mounted = false;
     };
   }, [fetchAllData, variant]);
-
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <Typography variant="h5" fontWeight={700} mb={0.5}>
@@ -507,6 +531,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         {startDate} → {endDate}
+        {bookType === 'all' ? ' · All data' : ' · Live only'}
       </Typography>
 
       <Stack
@@ -544,6 +569,15 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         >
           Apply
         </Button>
+        <Button
+          variant={bookType === 'all' ? 'contained' : 'outlined'}
+          color="warning"
+          onClick={toggleAllDataBookType}
+          disabled={loading && groupedData.length === 0}
+          sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+        >
+          All Data
+        </Button>
         <TextField
           size="small"
           value={searchQuery}
@@ -566,8 +600,8 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         </Alert>
       )}
 
-      {loading && groupedData.length === 0 && (
-        <Box display="flex" justifyContent="center" mt={5}>
+      {loading && (
+        <Box display="flex" justifyContent="center" mt={5} mb={2}>
           <CircularProgress size={28} />
         </Box>
       )}
@@ -591,7 +625,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
           </Paper>
         )}
 
-      {filteredGroupedData.length > 0 && (
+      {!loading && filteredGroupedData.length > 0 && (
         <Grid container spacing={2}>
           {filteredGroupedData.map(([sport, matches]) => (
             <Grid item xs={12} key={sport}>

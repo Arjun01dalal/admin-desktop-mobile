@@ -1,4 +1,4 @@
-import { CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
+import { CALLER_HEAD_ROLE_IDS, CALLER_ROLE_IDS } from '@/screens/panel/callerResponsibility/constants';
 
 export const MAX_REMARK = 200;
 
@@ -17,8 +17,10 @@ export function stableKey(value: unknown): string {
   }
 }
 
+/** Plain Caller only — Caller Head must not get caller empCode scoping. */
 export function isCallerRole(roleId?: string, roleName?: string): boolean {
   const id = String(roleId || localStorage.getItem('role_id') || '');
+  if (id && CALLER_HEAD_ROLE_IDS.has(id)) return false;
   if (id && CALLER_ROLE_IDS.has(id)) return true;
   const name = String(roleName || localStorage.getItem('role') || '')
     .trim()
