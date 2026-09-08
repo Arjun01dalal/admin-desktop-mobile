@@ -80,7 +80,7 @@ export default function App() {
 
   // Require AFTER theme apply, and on every render so Fast Refresh is not stuck
   // on a cached AppRoot instance (that used to keep the website WebView alive).
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+
   const AppRoot = require('./src/AppRoot').default as React.ComponentType;
   return <AppRoot />;
 }

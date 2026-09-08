@@ -33,6 +33,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
@@ -152,7 +153,13 @@ type MidReportPayload = {
   [key: string]: unknown;
 };
 
-type Bucket = { title: string; rows: WithdrawalDoc[]; totalAmount?: number; count?: number; lockCount?: number };
+type Bucket = {
+  title: string;
+  rows: WithdrawalDoc[];
+  totalAmount?: number;
+  count?: number;
+  lockCount?: number;
+};
 
 type MidSummaryState = {
   mid: string;
@@ -573,20 +580,51 @@ export function WithdrawalFundScreen() {
         width: 140,
         render: (r) => display(r.accountHolderName || r.userName || r.name),
       },
-      { key: 'amount', label: 'Amount', width: 100, align: 'right', render: (r) => formatAmount(r.amount ?? 0) },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: 100,
+        align: 'right',
+        render: (r) => formatAmount(r.amount ?? 0),
+      },
       {
         key: 'mobile',
         label: 'Mobile',
         width: 120,
-        render: (r) => (canShowMobile ? display(r.mobile ?? r.userMobile) : r.mobile || r.userMobile ? '**********' : '—'),
+        render: (r) =>
+          canShowMobile
+            ? display(r.mobile ?? r.userMobile)
+            : r.mobile || r.userMobile
+              ? '**********'
+              : '—',
       },
-      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
+      {
+        key: 'clientName',
+        label: 'App Code',
+        width: 90,
+        render: (r) => appCodeForName(r.clientName),
+      },
       { key: 'status', label: 'Status', width: 100, render: (r) => display(r.status) },
       { key: 'empCode', label: 'Emp Code', width: 90, render: (r) => display(r.empCode) },
-      { key: 'accountNo', label: 'Account No', width: 130, render: (r) => display(r.accountNo || r.accountNumber) },
-      { key: 'bankName', label: 'Bank Name', width: 130, render: (r) => display(r.bankName || r.userBankName) },
+      {
+        key: 'accountNo',
+        label: 'Account No',
+        width: 130,
+        render: (r) => display(r.accountNo || r.accountNumber),
+      },
+      {
+        key: 'bankName',
+        label: 'Bank Name',
+        width: 130,
+        render: (r) => display(r.bankName || r.userBankName),
+      },
       { key: 'ifsc', label: 'IFSC', width: 120, render: (r) => display(r.ifscCode || r.ifsc) },
-      { key: 'commissionAmount', label: 'Commission Amount', width: 120, render: (r) => display(r.commissionAmount) },
+      {
+        key: 'commissionAmount',
+        label: 'Commission Amount',
+        width: 120,
+        render: (r) => display(r.commissionAmount),
+      },
       { key: 'dp_id', label: 'DP ID', width: 110, render: (r) => display(r.dp_id) },
       {
         key: 'action',
@@ -595,15 +633,27 @@ export function WithdrawalFundScreen() {
         render: (r) => {
           const a = r.action;
           if (!a || typeof a !== 'object') return '—';
-          const parts = [display(a.name), display(a.status), a.date ? istDateTime(a.date) : ''].filter(
-            (p) => p && p !== '—',
-          );
+          const parts = [
+            display(a.name),
+            display(a.status),
+            a.date ? istDateTime(a.date) : '',
+          ].filter((p) => p && p !== '—');
           return parts.length ? parts.join(' · ') : '—';
         },
       },
-      { key: 'gatewayName', label: 'Given By (Bank)', width: 140, render: (r) => display(r.gatewayName) },
+      {
+        key: 'gatewayName',
+        label: 'Given By (Bank)',
+        width: 140,
+        render: (r) => display(r.gatewayName),
+      },
       { key: 'mid', label: 'MID', width: 90, render: (r) => display(r.mid) },
-      { key: 'transactionId', label: 'Transaction ID', width: 160, render: (r) => display(r.transactionId || r.orderId) },
+      {
+        key: 'transactionId',
+        label: 'Transaction ID',
+        width: 160,
+        render: (r) => display(r.transactionId || r.orderId),
+      },
       { key: 'comment', label: 'Comment', width: 150, render: (r) => display(r.comment) },
       {
         key: 'updatedOn',
@@ -649,7 +699,11 @@ export function WithdrawalFundScreen() {
   // ---------- Providers view ----------
   if (view === 'providers' && drillType) {
     return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <TouchableOpacity onPress={() => setView('report')}>
           <Text style={styles.backLink}>‹ Back to Withdrawal Fund</Text>
         </TouchableOpacity>
@@ -657,9 +711,7 @@ export function WithdrawalFundScreen() {
         <Text style={styles.sub}>
           {startDate} → {endDate} · {drillType.providers.length} providers
         </Text>
-        {drillType.providers.length === 0 ? (
-          <Text style={styles.hint}>No providers</Text>
-        ) : null}
+        {drillType.providers.length === 0 ? <Text style={styles.hint}>No providers</Text> : null}
         <View style={styles.list}>
           {drillType.providers.map((r, index) => (
             <TouchableOpacity
@@ -764,7 +816,11 @@ export function WithdrawalFundScreen() {
   // ---------- Withdrawal-doc list view ----------
   if (view === 'withdrawals' && bucket) {
     return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <TouchableOpacity
           onPress={() => {
             setBucket(null);
@@ -805,7 +861,11 @@ export function WithdrawalFundScreen() {
             <TouchableOpacity
               style={[styles.chip, styles.chipWarn]}
               onPress={() =>
-                openFilteredRecord(midSummary.payload, 'dbButNotInSheet', 'In System, not in Statement')
+                openFilteredRecord(
+                  midSummary.payload,
+                  'dbButNotInSheet',
+                  'In System, not in Statement',
+                )
               }
             >
               <Text style={styles.chipText}>In system not in sheet ({midSummary.dbNotSheet})</Text>
@@ -813,7 +873,11 @@ export function WithdrawalFundScreen() {
             <TouchableOpacity
               style={[styles.chip, styles.chipDanger]}
               onPress={() =>
-                openFilteredRecord(midSummary.payload, 'sheetButNotInDb', 'In Statement, not in System')
+                openFilteredRecord(
+                  midSummary.payload,
+                  'sheetButNotInDb',
+                  'In Statement, not in System',
+                )
               }
             >
               <Text style={styles.chipText}>In sheet not in system ({midSummary.sheetNotDb})</Text>
@@ -821,9 +885,7 @@ export function WithdrawalFundScreen() {
           </View>
         ) : null}
 
-        {bucket.rows.length === 0 ? (
-          <Text style={styles.hint}>No withdrawals found</Text>
-        ) : null}
+        {bucket.rows.length === 0 ? <Text style={styles.hint}>No withdrawals found</Text> : null}
 
         <View style={styles.list}>
           {bucket.rows.map((r, index) => {
@@ -884,7 +946,12 @@ export function WithdrawalFundScreen() {
           actions={rowActions}
         />
 
-        <Modal visible={commentOpen} transparent animationType="fade" onRequestClose={() => setCommentOpen(false)}>
+        <Modal
+          visible={commentOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCommentOpen(false)}
+        >
           <View style={styles.commentBackdrop}>
             <TouchableWithoutFeedback onPress={() => setCommentOpen(false)}>
               <View style={StyleSheet.absoluteFill} />
@@ -901,11 +968,17 @@ export function WithdrawalFundScreen() {
                 multiline
               />
               <View style={styles.commentBtnRow}>
-                <TouchableOpacity style={styles.commentCancelBtn} onPress={() => setCommentOpen(false)}>
+                <TouchableOpacity
+                  style={styles.commentCancelBtn}
+                  onPress={() => setCommentOpen(false)}
+                >
                   <Text style={styles.commentCancelText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.commentSaveBtn, !commentText.trim() && styles.commentSaveBtnDisabled]}
+                  style={[
+                    styles.commentSaveBtn,
+                    !commentText.trim() && styles.commentSaveBtnDisabled,
+                  ]}
                   onPress={saveComment}
                   disabled={!commentText.trim()}
                 >
@@ -926,7 +999,11 @@ export function WithdrawalFundScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>{toDisplayText('Refund Fund')}</Text>
@@ -935,7 +1012,11 @@ export function WithdrawalFundScreen() {
       </Text>
 
       {canViewChart ? (
-        <TouchableOpacity style={styles.chartBtn} onPress={openCurrentMonthChart} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.chartBtn}
+          onPress={openCurrentMonthChart}
+          activeOpacity={0.85}
+        >
           <Text style={styles.chartBtnText}>Current Month Chart</Text>
         </TouchableOpacity>
       ) : null}
@@ -1039,7 +1120,11 @@ export function WithdrawalFundScreen() {
   );
 
   // (Helpers below use closures; declared as function statements so they hoist.)
-  function openFilteredRecord(payload: MidReportPayload, key: keyof MidReportPayload, title: string) {
+  function openFilteredRecord(
+    payload: MidReportPayload,
+    key: keyof MidReportPayload,
+    title: string,
+  ) {
     const nested =
       payload && payload.payload && typeof payload.payload === 'object'
         ? (payload.payload as Record<string, unknown>)
@@ -1054,7 +1139,7 @@ export function WithdrawalFundScreen() {
   }
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   commentBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1098,10 +1183,6 @@ const styles = StyleSheet.create({
   },
   commentSaveBtnDisabled: { opacity: 0.5 },
   commentSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   chartBtn: {
     marginTop: spacing(3),
     marginBottom: spacing(1),
@@ -1175,63 +1256,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   kpiChipText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -1239,19 +1263,4 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

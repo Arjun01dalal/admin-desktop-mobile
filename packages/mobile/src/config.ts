@@ -35,21 +35,13 @@ export function getSslPinGenerateUrl(): string {
   return 'https://laxminarayan.live/api/generate';
 }
 
-/**
- * Header `stress-key` for `/api/generate`. Prefer env; fallback is the
- * production key used by the Android panel client.
- */
+/** Optional public compatibility header for `/api/generate`. */
 export function getSslStressKey(): string {
-  return (
-    process.env.EXPO_PUBLIC_SSL_STRESS_KEY?.trim() ||
-    'QhhgFGu6GTB/rOMC8AvoOh9eLuHZbke180e0hp7j4zI='
-  );
+  return process.env.EXPO_PUBLIC_SSL_STRESS_KEY?.trim() || '';
 }
 
 /** Optional Basic Auth username/password for protected call-recording URLs. */
-export function getRecordingAuthCredentials():
-  | { username: string; password: string }
-  | undefined {
+export function getRecordingAuthCredentials(): { username: string; password: string } | undefined {
   const username = process.env.EXPO_PUBLIC_RECORDING_BASIC_AUTH_USERNAME?.trim();
   const password = process.env.EXPO_PUBLIC_RECORDING_BASIC_AUTH_PASSWORD?.trim();
   if (!username || !password) return undefined;

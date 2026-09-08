@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import { colors, radius, spacing } from '../../theme';
 
@@ -48,7 +47,10 @@ export function TabSelect<T extends string>({ value, options, onChange }: Props<
                       setOpen(false);
                     }}
                   >
-                    <Text style={[styles.rowText, active && styles.rowTextActive]} numberOfLines={1}>
+                    <Text
+                      style={[styles.rowText, active && styles.rowTextActive]}
+                      numberOfLines={1}
+                    >
                       {opt}
                     </Text>
                   </TouchableOpacity>

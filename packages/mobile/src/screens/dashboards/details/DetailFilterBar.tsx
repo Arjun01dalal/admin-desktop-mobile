@@ -8,12 +8,12 @@ import React from 'react';
 import {
   ActivityIndicator,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { CLIENT_NAMES, appCodeForName, pickPageSizes } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { DateField } from '../../../components/DateField';
@@ -22,7 +22,6 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Mobile page-size chips — shared pagination, compact subset for small screens. */
 export const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
-
 
 /** One search field option; `key` is sent as the server-side filter key (mirrors desktop). */
 export type SearchFieldOption = { key: string; label: string };
@@ -155,9 +154,15 @@ export function DetailFilterBar(props: Props) {
                 placeholderTextColor={colors.muted}
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
+                keyboardType={
+                  searchField === 'mobile'
+                    ? 'phone-pad'
+                    : searchField === 'balance' || searchField === 'bonusBalance'
+                      ? 'numeric'
+                      : 'default'
+                }
               />
-              {Boolean(searchText?.trim()) ? (
+              {searchText?.trim() ? (
                 <TouchableOpacity
                   style={styles.clearSearchBtn}
                   onPress={() => onSearchTextChange('')}
@@ -219,7 +224,7 @@ export function DetailFilterBar(props: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   wrap: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -250,11 +255,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnDisabled: { opacity: 0.5 },
   applyText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   row: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
   searchWrap: { gap: spacing(2) },
-  searchRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
   searchInputWrap: {
     flex: 1,
     position: 'relative',
@@ -290,7 +293,5 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
 });

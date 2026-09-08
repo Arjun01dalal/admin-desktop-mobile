@@ -42,8 +42,7 @@ const CERT_HASHES = (process.env.EXPO_PUBLIC_ANDROID_CERT_HASHES ?? DEFAULT_ANDR
   .map((s: string) => s.trim())
   .filter(Boolean);
 
-export const RASP_IS_PROD =
-  process.env.EXPO_PUBLIC_RASP_PROD === '1' && CERT_HASHES.length > 0;
+export const RASP_IS_PROD = process.env.EXPO_PUBLIC_RASP_PROD === '1' && CERT_HASHES.length > 0;
 
 export const raspConfig = {
   androidConfig: {

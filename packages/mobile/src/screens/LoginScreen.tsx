@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { secureApi, type ApiResult } from '../api/client';
@@ -107,9 +106,10 @@ export function LoginScreen({
     setBusy(true);
     try {
       // Location can be slow on Android — bound so OTP flow doesn't feel stuck.
+      // resolveLocation itself caps GPS (~6s) + address (~3.5s); this is a safety net.
       const loc = await promiseWithUiTimeout(
         resolveLocation(),
-        12_000,
+        18_000,
         'Location is taking too long. Please try again.',
       );
       const res = await secureApiWithUiTimeout(
@@ -133,8 +133,8 @@ export function LoginScreen({
         setError(res.message || 'OTP verification failed');
         return;
       }
-      const raw = res.data as Record<string, unknown> | undefined;
-      const user = ((raw?.payload as AuthUser) ?? (raw as AuthUser)) || {};
+      const raw = res.data;
+      const user = raw?.payload ?? raw ?? ({} as AuthUser);
       const token = res.token || '';
       if (!token) {
         setError('Login succeeded but no session token was returned');
@@ -162,9 +162,7 @@ export function LoginScreen({
       setError('Please select a role');
       return;
     }
-    const role = getRoleOptions(pendingSession.user).find(
-      (item) => item.id === selectedRoleId,
-    );
+    const role = getRoleOptions(pendingSession.user).find((item) => item.id === selectedRoleId);
     if (!role) {
       setError('Selected role is not available');
       return;
@@ -172,11 +170,7 @@ export function LoginScreen({
     setBusy(true);
     setError(null);
     try {
-      const nextUser = await selectActiveRole(
-        pendingSession.user,
-        pendingSession.token,
-        role,
-      );
+      const nextUser = await selectActiveRole(pendingSession.user, pendingSession.token, role);
       await login(pendingSession.token, nextUser);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update role');
@@ -193,9 +187,7 @@ export function LoginScreen({
         style={styles.center}
       >
         <Card style={styles.card}>
-          <Text style={styles.title}>
-            {pendingSession ? 'Change Role' : 'Astro Admin'}
-          </Text>
+          <Text style={styles.title}>{pendingSession ? 'Change Role' : 'Astro Admin'}</Text>
           <Text style={styles.subtitle}>
             {pendingSession
               ? 'Select the role you want to use for this session'
@@ -306,5 +298,10 @@ const styles = StyleSheet.create({
   roleText: { color: colors.foreground, fontSize: 14, fontWeight: '600' },
   roleTextActive: { color: colors.primaryForeground },
   link: { color: colors.primary, fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  linkMuted: { color: colors.muted, fontSize: 13, textAlign: 'center', textDecorationLine: 'underline' },
+  linkMuted: {
+    color: colors.muted,
+    fontSize: 13,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
 });

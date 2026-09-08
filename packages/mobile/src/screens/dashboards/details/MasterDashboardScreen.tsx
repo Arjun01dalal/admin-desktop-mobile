@@ -4,13 +4,8 @@
  * Route params may include { startDate, endDate }.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { colors, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
@@ -122,9 +117,7 @@ export function MasterDashboardScreen() {
           row('Total Wins', wco.totalWins),
           {
             label: 'Net RTP',
-            value: Number.isFinite(toNum(wco.netRTP))
-              ? Number(toNum(wco.netRTP).toFixed(2))
-              : 0,
+            value: Number.isFinite(toNum(wco.netRTP)) ? Number(toNum(wco.netRTP).toFixed(2)) : 0,
           },
         ],
       },
@@ -215,10 +208,7 @@ export function MasterDashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   description: { color: colors.muted, fontSize: 13, marginTop: spacing(1) },
   dates: { color: colors.muted, fontSize: 13, marginBottom: spacing(3) },
   errorBox: {
@@ -229,5 +219,4 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
 });

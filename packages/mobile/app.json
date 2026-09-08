@@ -2,7 +2,7 @@
   "expo": {
     "name": "Astro",
     "slug": "astro",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "scheme": "myastroapp",
     "runtimeVersion": {
       "policy": "appVersion"
@@ -11,24 +11,26 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/676d4bd3-ff79-4e37-9694-dc2d6332a0e2"
+      "url": "https://u.expo.dev/676d4bd3-ff79-4e37-9694-dc2d6332a0e2",
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      }
     },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "vip.astrotalk.panel",
+      "deploymentTarget": "16.4",
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "requireFullScreen": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UISupportedInterfaceOrientations": [
-          "UIInterfaceOrientationPortrait"
-        ],
-        "UISupportedInterfaceOrientations~ipad": [
-          "UIInterfaceOrientationPortrait"
-        ],
+        "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
+        "UISupportedInterfaceOrientations~ipad": ["UIInterfaceOrientationPortrait"],
         "NSLocationWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app records your location while you are signed in for security and audit purposes.",
         "UIFileSharingEnabled": true,
@@ -107,9 +109,7 @@
       [
         "expo-notifications",
         {
-          "sounds": [
-            "./assets/siren.mp3"
-          ]
+          "sounds": ["./assets/siren.mp3"]
         }
       ]
     ],

@@ -17,7 +17,7 @@ function evaluate(expr: string): string {
   try {
     const js = expr.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-');
     if (!/^[\d+\-*/.%\s]+$/.test(js)) return 'Error';
-    // eslint-disable-next-line no-new-func
+
     const result = Function(`"use strict"; return (${js})`)() as number;
     if (!Number.isFinite(result)) return 'Error';
     return String(Math.round(result * 1e10) / 1e10);

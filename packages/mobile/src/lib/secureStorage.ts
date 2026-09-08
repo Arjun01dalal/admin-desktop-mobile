@@ -1,6 +1,6 @@
 /**
  * Session secrets — expo-secure-store (Keychain / EncryptedSharedPreferences).
- * Falls back to AsyncStorage on web or when SecureStore is unavailable.
+ * Uses memory-only behavior on web or when SecureStore is unavailable.
  *
  * Large values (e.g. user JSON) are split into chunks because SecureStore
  * rejects payloads over ~2048 bytes on some devices.
@@ -66,7 +66,9 @@ async function eraseChunks(storeKey: string): Promise<void> {
 
 async function readSecureValue(storeKey: string, asyncKey: string): Promise<string | null> {
   if (!(await secureStoreAvailable())) {
-    return readLegacy(asyncKey);
+    // Never treat AsyncStorage as a session-secret fallback.
+    await removeLegacy(asyncKey);
+    return null;
   }
 
   const single = await SecureStore.getItemAsync(storeKey, SECURE_OPTIONS);
@@ -97,11 +99,7 @@ async function readSecureValue(storeKey: string, asyncKey: string): Promise<stri
   return null;
 }
 
-async function writeSecureValue(
-  storeKey: string,
-  asyncKey: string,
-  value: string,
-): Promise<void> {
+async function writeSecureValue(storeKey: string, asyncKey: string, value: string): Promise<void> {
   const trimmed = String(value ?? '');
   if (!trimmed) {
     await eraseSecureValue(storeKey, asyncKey);
@@ -109,7 +107,9 @@ async function writeSecureValue(
   }
 
   if (!(await secureStoreAvailable())) {
-    await AsyncStorage.setItem(asyncKey, trimmed);
+    // The caller may keep the value in memory for this process, but it must
+    // not be persisted in ordinary app storage.
+    await removeLegacy(asyncKey);
     return;
   }
 
@@ -132,9 +132,11 @@ async function writeSecureValue(
     }
     await removeLegacy(asyncKey);
   } catch (err) {
-    console.warn(`[secureStorage] SecureStore write failed for ${asyncKey}; using AsyncStorage`, err);
+    console.warn(
+      `[secureStorage] SecureStore write failed for ${asyncKey}; value kept memory-only`,
+      err,
+    );
     await eraseSecureValue(storeKey, asyncKey);
-    await AsyncStorage.setItem(asyncKey, trimmed);
   }
 }
 

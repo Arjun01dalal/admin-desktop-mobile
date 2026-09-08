@@ -13,7 +13,11 @@ import {
 } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { colors, radius, spacing } from '../theme';
-import { normalizeRecordingUrl, prepareRecordingFile } from '../utils/recordingPlayback';
+import {
+  isAllowedRecordingUrl,
+  normalizeRecordingUrl,
+  prepareRecordingFile,
+} from '../utils/recordingPlayback';
 
 type Props = {
   visible: boolean;
@@ -122,7 +126,12 @@ export function RecordingPlayerModal({ visible, url, onClose }: Props) {
 
   const openExternal = () => {
     if (!url) return;
-    void Linking.openURL(normalizeRecordingUrl(url)).catch(() => undefined);
+    const normalized = normalizeRecordingUrl(url);
+    if (!isAllowedRecordingUrl(normalized)) {
+      setError('Recording host is not approved for external opening.');
+      return;
+    }
+    void Linking.openURL(normalized).catch(() => undefined);
   };
 
   return (

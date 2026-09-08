@@ -3,13 +3,8 @@
  * Jetfair / Falcon / AAA / Master AAA books for the selected date range.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { makeStyles } from '../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { CLIENT_NAMES } from '@astro/shared';
 import { colors, spacing } from '../../theme';
@@ -170,9 +165,7 @@ export function RiskAnalysisScreen() {
       }
     >
       <Text style={styles.title}>Risk Analysis</Text>
-      <Text style={styles.description}>
-        Gochar books and Exaltation risk metrics.
-      </Text>
+      <Text style={styles.description}>Gochar books and Exaltation risk metrics.</Text>
 
       <FilterBar
         startDate={startDate}
@@ -199,9 +192,7 @@ export function RiskAnalysisScreen() {
       <KpiGrid
         items={navCards}
         isItemTappable={(item) => canOpenPanelPath(item.href)}
-        onItemPress={(item) =>
-          openPanelTarget(navigation, { href: item.href, state: item.state })
-        }
+        onItemPress={(item) => openPanelTarget(navigation, { href: item.href, state: item.state })}
       />
 
       {platformCards.map((card) => (
@@ -224,11 +215,13 @@ export function RiskAnalysisScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  description: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
+const styles = makeStyles({
+  description: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: spacing(1),
+    marginBottom: spacing(3),
+  },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -237,5 +230,4 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
 });

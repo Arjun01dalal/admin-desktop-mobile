@@ -20,6 +20,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
   applyMidLimitUpsert,
@@ -49,11 +50,7 @@ import {
 } from '@astro/shared/midLimits';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-import {
-  canEditMidLimits,
-  canViewMidLimits,
-  getSessionUser,
-} from '../../../auth/permissions';
+import { canEditMidLimits, canViewMidLimits, getSessionUser } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
@@ -94,9 +91,7 @@ export function MidLimitsScreen() {
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [recipientsMsg, setRecipientsMsg] = useState('');
   const [alertRecipients, setAlertRecipients] = useState<RecipientsConfig | null>(null);
-  const [alertRecipientDisplays, setAlertRecipientDisplays] = useState<AlertRecipientDisplay[]>(
-    [],
-  );
+  const [alertRecipientDisplays, setAlertRecipientDisplays] = useState<AlertRecipientDisplay[]>([]);
 
   const genRef = useRef(0);
 
@@ -126,19 +121,13 @@ export function MidLimitsScreen() {
 
       const recipientsConfig = parseAlertRecipientsFromLimitsGet(limitsData);
       setAlertRecipients(recipientsConfig);
-      setAlertRecipientDisplays(
-        buildAlertRecipientDisplayList(recipientsConfig, subOptions),
-      );
+      setAlertRecipientDisplays(buildAlertRecipientDisplayList(recipientsConfig, subOptions));
 
       const options = parseMidOptions(midData);
-      const limitsMap = await collectMidLimitsMap(
-        limitsData,
-        options,
-        async (mid) => {
-          const res = await secureApi('midLimits.get', { mid });
-          return res.ok ? res.data : null;
-        },
-      );
+      const limitsMap = await collectMidLimitsMap(limitsData, options, async (mid) => {
+        const res = await secureApi('midLimits.get', { mid });
+        return res.ok ? res.data : null;
+      });
 
       const merged = mergeMidLimitRows(midData, limitsMap);
       setRows(merged);
@@ -152,10 +141,7 @@ export function MidLimitsScreen() {
     void load();
   }, [load]);
 
-  const filteredRows = useMemo(
-    () => filterMidLimitRows(rows, search),
-    [rows, search],
-  );
+  const filteredRows = useMemo(() => filterMidLimitRows(rows, search), [rows, search]);
 
   const openEdit = useCallback((row: MidLimitRow) => {
     setActiveRow(row);
@@ -324,9 +310,7 @@ export function MidLimitsScreen() {
       <View style={styles.deniedWrap}>
         <MaterialIcons name="lock-outline" size={40} color={colors.muted} />
         <Text style={styles.deniedTitle}>Access restricted</Text>
-        <Text style={styles.deniedText}>
-          You do not have permission to view MID Limits.
-        </Text>
+        <Text style={styles.deniedText}>You do not have permission to view MID Limits.</Text>
       </View>
     );
   }
@@ -348,9 +332,7 @@ export function MidLimitsScreen() {
       >
         <Text style={styles.overline}>Payin</Text>
         <Text style={styles.title}>MID Limits</Text>
-        <Text style={styles.subtitle}>
-          View all MIDs and set or update deposit limits.
-        </Text>
+        <Text style={styles.subtitle}>View all MIDs and set or update deposit limits.</Text>
 
         <View style={styles.toolbar}>
           <View style={styles.searchWrap}>
@@ -365,7 +347,10 @@ export function MidLimitsScreen() {
               autoCorrect={false}
             />
             {search ? (
-              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <MaterialIcons name="close" size={18} color={colors.muted} />
               </TouchableOpacity>
             ) : null}
@@ -472,20 +457,12 @@ export function MidLimitsScreen() {
                 <View style={styles.cardBottom}>
                   <View style={styles.limitBlock}>
                     <Text style={styles.limitLabel}>Limit</Text>
-                    <Text
-                      style={[
-                        styles.limitValue,
-                        row.limit == null && styles.limitUnset,
-                      ]}
-                    >
+                    <Text style={[styles.limitValue, row.limit == null && styles.limitUnset]}>
                       {formatMidLimitAmount(row.limit)}
                     </Text>
                   </View>
                   {canEdit ? (
-                    <TouchableOpacity
-                      style={styles.editBtn}
-                      onPress={() => openEdit(row)}
-                    >
+                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(row)}>
                       <MaterialIcons name="edit" size={16} color={colors.primary} />
                       <Text style={styles.editBtnText}>Edit</Text>
                     </TouchableOpacity>
@@ -518,7 +495,12 @@ export function MidLimitsScreen() {
         onClose={() => setSheetRow(null)}
       />
 
-      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => !saving && setEditOpen(false)}>
+      <Modal
+        visible={editOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !saving && setEditOpen(false)}
+      >
         <KeyboardAvoidingView
           style={styles.modalRoot}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -609,9 +591,7 @@ export function MidLimitsScreen() {
                   multiline
                   numberOfLines={2}
                 />
-                <Text style={styles.chatIdsHint}>
-                  Optional comma-separated numeric chat IDs
-                </Text>
+                <Text style={styles.chatIdsHint}>Optional comma-separated numeric chat IDs</Text>
 
                 <View style={styles.searchWrap}>
                   <MaterialIcons name="search" size={18} color={colors.muted} />
@@ -642,15 +622,8 @@ export function MidLimitsScreen() {
                           onPress={() => toggleSubAdminId(id)}
                           activeOpacity={0.8}
                         >
-                          <View
-                            style={[
-                              styles.checkbox,
-                              checked && styles.checkboxChecked,
-                            ]}
-                          >
-                            {checked ? (
-                              <MaterialIcons name="check" size={14} color="#fff" />
-                            ) : null}
+                          <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                            {checked ? <MaterialIcons name="check" size={14} color="#fff" /> : null}
                           </View>
                           <View style={styles.recipientInfo}>
                             <Text style={styles.recipientName} numberOfLines={1}>
@@ -669,9 +642,7 @@ export function MidLimitsScreen() {
                   )}
                 </ScrollView>
 
-                {recipientsMsg ? (
-                  <Text style={styles.modalMsg}>{recipientsMsg}</Text>
-                ) : null}
+                {recipientsMsg ? <Text style={styles.modalMsg}>{recipientsMsg}</Text> : null}
 
                 <View style={styles.modalActions}>
                   <TouchableOpacity
@@ -686,9 +657,7 @@ export function MidLimitsScreen() {
                     disabled={recipientsSaving || recipientsLoading}
                     onPress={() => void handleSaveRecipients()}
                   >
-                    <Text style={styles.saveBtnText}>
-                      {recipientsSaving ? 'Saving…' : 'Save'}
-                    </Text>
+                    <Text style={styles.saveBtnText}>{recipientsSaving ? 'Saving…' : 'Save'}</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -700,8 +669,7 @@ export function MidLimitsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+const styles = makeStyles({
   content: { padding: spacing(4), paddingBottom: spacing(12) },
   overline: {
     color: colors.muted,
@@ -803,15 +771,6 @@ const styles = StyleSheet.create({
   },
   statValue: { color: colors.foreground, fontSize: 20, fontWeight: '800' },
   statLabel: { color: colors.muted, fontSize: 11, marginTop: 2 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
   loadingWrap: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -914,7 +873,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(2.5),
   },
-  modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
   modalActions: {
     flexDirection: 'row',
     gap: spacing(2),

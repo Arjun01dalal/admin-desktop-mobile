@@ -1,6 +1,7 @@
 /** Active Exaltation panel — main Dashboard only (port of desktop ActiveExchangePanel). */
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../styles/common';
 import { secureApi } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
 import { Button } from '../../components/UI';
@@ -55,9 +56,7 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
       <Text style={styles.title}>{toDisplayText(PANEL_LABELS.title)}</Text>
       <Text style={styles.currentLabel}>
         {toDisplayText(PANEL_LABELS.activeName)}:{' '}
-        <Text style={styles.currentValue}>
-          {activeExchangeJyotishLabel(activeExchangeName)}
-        </Text>
+        <Text style={styles.currentValue}>{activeExchangeJyotishLabel(activeExchangeName)}</Text>
       </Text>
 
       <View style={styles.chipRow}>
@@ -126,7 +125,7 @@ export function ActiveExchangePanel({ activeExchangeName, onUpdated }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   panel: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -147,9 +146,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  chipTextActive: { color: colors.primaryForeground },
   confirmRow: { gap: spacing(2) },
   confirmText: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
   confirmButtons: { flexDirection: 'row', gap: spacing(2) },

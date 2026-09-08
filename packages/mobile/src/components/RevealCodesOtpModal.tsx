@@ -18,6 +18,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../styles/common';
 import { secureApi } from '../api/client';
 import { getSessionUser } from '../auth/permissions';
 import { activateRevealCodes, REVEAL_CODES_TTL_MS } from '../context/revealCodesStore';
@@ -145,7 +146,7 @@ export function RevealCodesOtpModal({ visible, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' },
   backdropTouch: { ...StyleSheet.absoluteFillObject },
   card: {
@@ -190,5 +191,4 @@ const styles = StyleSheet.create({
   btnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
   btnPrimary: { backgroundColor: colors.primary },
   btnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  btnDisabled: { opacity: 0.5 },
 });

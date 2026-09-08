@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 
@@ -50,8 +51,8 @@ function parseMidGroupsPayload(raw: unknown): { groups: MidGroupMap; whatsapp: s
   const root =
     raw && typeof raw === 'object'
       ? ((raw as { payload?: unknown; data?: unknown }).payload ??
-          (raw as { data?: unknown }).data ??
-          raw)
+        (raw as { data?: unknown }).data ??
+        raw)
       : {};
   const groups: MidGroupMap = {};
   const obj = root && typeof root === 'object' ? (root as Record<string, unknown>) : {};
@@ -97,10 +98,7 @@ function parseMidGroupsPayload(raw: unknown): { groups: MidGroupMap; whatsapp: s
   return {
     groups,
     whatsapp: normalizeGroupMids(
-      obj.whatsappGlobalOnly ??
-        obj['whatsapp-global-only'] ??
-        obj.whatsappGlobal ??
-        obj.whatsapp,
+      obj.whatsappGlobalOnly ?? obj['whatsapp-global-only'] ?? obj.whatsappGlobal ?? obj.whatsapp,
     ),
   };
 }
@@ -290,12 +288,15 @@ export function MidGroupsScreen() {
               <Text style={styles.midText}>{mid}</Text>
               <TouchableOpacity
                 onPress={() =>
-                  confirm('Remove MID?', `Remove WhatsApp global MID "${mid}"?`, () =>
-                    void runMutation(
-                      'funds.midGroupsWhatsappRemove',
-                      { mids: [mid] },
-                      'WhatsApp global MID removed',
-                    ),
+                  confirm(
+                    'Remove MID?',
+                    `Remove WhatsApp global MID "${mid}"?`,
+                    () =>
+                      void runMutation(
+                        'funds.midGroupsWhatsappRemove',
+                        { mids: [mid] },
+                        'WhatsApp global MID removed',
+                      ),
                   )
                 }
               >
@@ -349,9 +350,7 @@ export function MidGroupsScreen() {
                   placeholder="Add MID"
                   placeholderTextColor={colors.muted}
                   value={draftMids[groupName] || ''}
-                  onChangeText={(v) =>
-                    setDraftMids((prev) => ({ ...prev, [groupName]: v }))
-                  }
+                  onChangeText={(v) => setDraftMids((prev) => ({ ...prev, [groupName]: v }))}
                 />
                 <TouchableOpacity
                   style={styles.btn}
@@ -381,12 +380,15 @@ export function MidGroupsScreen() {
                     <Text style={styles.midText}>{mid}</Text>
                     <TouchableOpacity
                       onPress={() =>
-                        confirm('Remove MID?', `Remove MID "${mid}" from ${groupName}?`, () =>
-                          void runMutation(
-                            'funds.midGroupsRemoveMid',
-                            { group: groupName, mids: [mid] },
-                            `MID removed from ${groupName}`,
-                          ),
+                        confirm(
+                          'Remove MID?',
+                          `Remove MID "${mid}" from ${groupName}?`,
+                          () =>
+                            void runMutation(
+                              'funds.midGroupsRemoveMid',
+                              { group: groupName, mids: [mid] },
+                              `MID removed from ${groupName}`,
+                            ),
                         )
                       }
                     >
@@ -448,10 +450,9 @@ export function MidGroupsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing(4), paddingBottom: spacing(10), gap: spacing(2) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 13 },
   statsRow: { flexDirection: 'row', gap: spacing(2) },
   stat: {
@@ -524,11 +525,6 @@ const styles = StyleSheet.create({
   danger: { color: colors.destructive, fontWeight: '700' },
   hint: { color: colors.muted, fontSize: 12 },
   error: { color: colors.destructive },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,

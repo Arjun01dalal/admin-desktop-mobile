@@ -19,15 +19,10 @@ export function gameNames(raw: unknown): string[] {
 }
 
 /** Aggregate or pick one game — matches Indian Diva / Plutus card logic. */
-export function buildGameMetricRows(
-  raw: unknown,
-  selectedGame: string,
-): MetricRow[] {
+export function buildGameMetricRows(raw: unknown, selectedGame: string): MetricRow[] {
   const games = asGames(raw);
   const selected =
-    selectedGame && selectedGame !== 'All'
-      ? games.find((g) => g.gameName === selectedGame)
-      : null;
+    selectedGame && selectedGame !== 'All' ? games.find((g) => g.gameName === selectedGame) : null;
 
   if (selected) {
     const bet = toNum(selected.totalBetAmount);
@@ -74,8 +69,7 @@ export function buildGameMetricRows(
 export function parseLudoGameOptions(raw: unknown): { value: string; label: string }[] {
   const payload =
     raw && typeof raw === 'object'
-      ? ((raw as { payload?: unknown; gameIds?: unknown; games?: unknown })
-          .payload ?? raw)
+      ? ((raw as { payload?: unknown; gameIds?: unknown; games?: unknown }).payload ?? raw)
       : raw;
 
   const list = Array.isArray(payload)
@@ -94,8 +88,7 @@ export function parseLudoGameOptions(raw: unknown): { value: string; label: stri
       if (!item || typeof item !== 'object') return null;
       const obj = item as Record<string, unknown>;
       const value = obj.gameId ?? obj.id ?? obj.value ?? obj.gameName;
-      const label =
-        obj.gameName ?? obj.name ?? obj.label ?? obj.gameId ?? obj.id;
+      const label = obj.gameName ?? obj.name ?? obj.label ?? obj.gameId ?? obj.id;
       if (value == null) return null;
       return { value: String(value), label: String(label ?? value) };
     })
@@ -112,9 +105,7 @@ export type LudoGameStats = {
 
 export function parseLudoGameStats(raw: unknown): LudoGameStats {
   const obj =
-    raw && typeof raw === 'object' && !Array.isArray(raw)
-      ? (raw as Record<string, unknown>)
-      : {};
+    raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   return {
     uniquePlayers: Math.floor(toNum(obj.uniquePlayers)),
     bet: Math.floor(toNum(obj.playerBetAmount ?? obj.bet)),
@@ -122,5 +113,4 @@ export function parseLudoGameStats(raw: unknown): LudoGameStats {
     ggr: Math.round(toNum(obj.ggr)),
     rtp: Math.round(toNum(obj.rtp)),
   };
-};
-
+}

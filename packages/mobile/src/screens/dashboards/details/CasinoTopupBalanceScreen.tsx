@@ -10,20 +10,19 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { secureApi } from '../../../api/client';
 import { hasPermission, canAccessNavItem } from '../../../auth/permissions';
 import { NAV_ITEMS } from '../../../navigation/navItems';
 import {
-  type RemainingBreakdownRow,
   type QtechRemainingSummary,
   type RemainingFormState,
   type RemainingFormErrors,
@@ -426,7 +425,9 @@ export function CasinoTopupBalanceScreen() {
     return (
       <ScrollView
         showsVerticalScrollIndicator={false}
-        style={styles.screen} contentContainerStyle={styles.content}>
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+      >
         <Text style={styles.title}>{toDisplayText('Casino Top-up Balance')}</Text>
         <View style={styles.mutedBox}>
           <Text style={styles.mutedText}>You do not have permission to view this page.</Text>
@@ -502,9 +503,21 @@ export function CasinoTopupBalanceScreen() {
         ) : (
           <>
             <View style={styles.metricsGrid}>
-              <MetricChip label="Remaining (USD)" value={formatMoney(remaining.remainingUsd)} accent="#2dd4bf" />
-              <MetricChip label="Topped Up (USD)" value={formatMoney(remaining.toppedUpUsd)} accent="#60a5fa" />
-              <MetricChip label="Consumed (USD)" value={formatMoney(remaining.consumedUsd)} accent="#fbbf24" />
+              <MetricChip
+                label="Remaining (USD)"
+                value={formatMoney(remaining.remainingUsd)}
+                accent="#2dd4bf"
+              />
+              <MetricChip
+                label="Topped Up (USD)"
+                value={formatMoney(remaining.toppedUpUsd)}
+                accent="#60a5fa"
+              />
+              <MetricChip
+                label="Consumed (USD)"
+                value={formatMoney(remaining.consumedUsd)}
+                accent="#fbbf24"
+              />
               <MetricChip label="Currency" value={remaining.currency || 'USD'} />
               <MetricChip label="USD → INR" value={formatMoney(remaining.usdToInr)} />
               <MetricChip label="Fee (INR)" value={formatMoney(remaining.feeInr)} />
@@ -595,7 +608,12 @@ export function CasinoTopupBalanceScreen() {
         )}
       </View>
 
-      <Modal visible={historyOpen} transparent animationType="slide" onRequestClose={() => setHistoryOpen(false)}>
+      <Modal
+        visible={historyOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setHistoryOpen(false)}
+      >
         <View style={styles.backdrop}>
           <TouchableWithoutFeedback onPress={() => setHistoryOpen(false)}>
             <View style={styles.backdropTouch} />
@@ -607,8 +625,7 @@ export function CasinoTopupBalanceScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false}>
               {providers.qtech.loading && providers.qtech.records.length === 0 ? (
                 <Text style={styles.listHint}>Loading…</Text>
               ) : null}
@@ -658,9 +675,7 @@ export function CasinoTopupBalanceScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled">
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={styles.fieldLabel}>Amount *</Text>
               <TextInput
                 style={styles.input}
@@ -678,7 +693,9 @@ export function CasinoTopupBalanceScreen() {
                     style={[styles.chip, currency === c && styles.chipActive]}
                     onPress={() => setCurrency(c)}
                   >
-                    <Text style={[styles.chipText, currency === c && styles.chipTextActive]}>{c}</Text>
+                    <Text style={[styles.chipText, currency === c && styles.chipTextActive]}>
+                      {c}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -731,10 +748,7 @@ export function CasinoTopupBalanceScreen() {
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={styles.fieldLabel}>Amount *</Text>
               <TextInput
                 style={[styles.input, remainingFormErrors.amount && styles.inputError]}
@@ -787,10 +801,7 @@ export function CasinoTopupBalanceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   mutedBox: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -865,51 +876,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(2.5),
     gap: 2,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
   cardNote: { color: colors.muted, fontSize: 11, marginTop: spacing(0.5) },
   rangeText: { color: colors.muted, fontSize: 12, marginTop: spacing(2), marginBottom: spacing(1) },
   balanceBox: {
@@ -921,50 +887,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   balanceLabel: { color: colors.muted, fontSize: 12 },
-  balanceValue: { color: colors.foreground, fontSize: 24, fontWeight: '700', marginTop: spacing(1) },
-  balanceCurrency: { color: colors.muted, fontSize: 14, fontWeight: '500' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
-  modalSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.md * 2,
-    borderTopRightRadius: radius.md * 2,
-    padding: spacing(4),
-    maxHeight: '85%',
-  },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: {
+  balanceValue: {
     color: colors.foreground,
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
+    marginTop: spacing(1),
   },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
-  fieldLabel: { color: colors.muted, fontSize: 12, marginTop: spacing(3), marginBottom: spacing(1) },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-    fontSize: 14,
-  },
-  inputError: {
-    borderColor: colors.destructive,
-  },
+  balanceCurrency: { color: colors.muted, fontSize: 14, fontWeight: '500' },
   inputMultiline: { minHeight: 64, textAlignVertical: 'top' },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(2), marginBottom: spacing(1) },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -973,17 +903,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
-  modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
-  btnDisabled: { opacity: 0.5 },
-  submitBtn: {
-    marginTop: spacing(4),
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-  },
-  submitBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
 });

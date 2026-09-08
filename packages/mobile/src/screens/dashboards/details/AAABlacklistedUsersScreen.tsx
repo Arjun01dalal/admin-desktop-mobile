@@ -2,14 +2,8 @@
  * AAA Black Listed Users — mobile port of desktop AAABlacklistedUsersPage.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
@@ -255,7 +249,7 @@ export function AAABlacklistedUsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   root: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing(4), paddingBottom: spacing(10), flexGrow: 1 },
   toolbar: {
@@ -265,7 +259,6 @@ const styles = StyleSheet.create({
     gap: spacing(3),
   },
   heading: { flex: 1 },
-  title: { fontSize: 20, fontWeight: '700', color: colors.foreground },
   subtitle: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   btn: {
     backgroundColor: colors.primary,
@@ -335,45 +328,6 @@ const styles = StyleSheet.create({
   loadingTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700' },
   loadingText: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   list: { gap: spacing(2), marginTop: spacing(4) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
   cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', flex: 1 },
   detailsText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
 });

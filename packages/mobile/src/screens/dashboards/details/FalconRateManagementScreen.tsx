@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
@@ -35,13 +36,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 const SKIP_KEYS = new Set(['eventName', 'Eventname', '_id', 'id']);
 
-const HIGHLIGHT_KEYS = new Set([
-  'TotalGGR',
-  'totalGGR',
-  'final_ggr',
-  'finalGgr',
-  'netpl',
-]);
+const HIGHLIGHT_KEYS = new Set(['TotalGGR', 'totalGGR', 'final_ggr', 'finalGgr', 'netpl']);
 
 function labelFor(key: string): string {
   return (
@@ -115,9 +110,7 @@ export function FalconRateManagementScreen() {
     setLoading(true);
     setError(null);
     try {
-      const action = isJetfair
-        ? 'dashboard.jetfairByEvent'
-        : 'dashboard.falconByEvent';
+      const action = isJetfair ? 'dashboard.jetfairByEvent' : 'dashboard.falconByEvent';
       const res = await secureApi(action, { startDate, endDate });
       if (!res.ok) {
         setError(res.message || 'Failed to load event GGR');
@@ -140,9 +133,7 @@ export function FalconRateManagementScreen() {
     void load();
   }, [load]);
 
-  const title = isJetfair
-    ? 'Jetfair Platform Details'
-    : 'Falcon Platform Details';
+  const title = isJetfair ? 'Jetfair Platform Details' : 'Falcon Platform Details';
 
   return (
     <ScrollView
@@ -193,9 +184,7 @@ export function FalconRateManagementScreen() {
       ) : null}
 
       {events.map((event, index) => {
-        const name = String(
-          event.Eventname || event.eventName || `Event ${index + 1}`,
-        );
+        const name = String(event.Eventname || event.eventName || `Event ${index + 1}`);
         const entries = Object.entries(event).filter(([key]) => !SKIP_KEYS.has(key));
         return (
           <View key={`${name}-${index}`} style={styles.card}>
@@ -213,10 +202,7 @@ export function FalconRateManagementScreen() {
                     : styles.warning,
                 ];
                 return (
-                  <View
-                    key={key}
-                    style={[styles.row, i < entries.length - 1 && styles.rowBorder]}
-                  >
+                  <View key={key} style={[styles.row, i < entries.length - 1 && styles.rowBorder]}>
                     <Text style={styles.rowLabel}>{labelFor(key)}</Text>
                     <Text style={valueStyle}>{formatValue(key, value)}</Text>
                   </View>
@@ -230,10 +216,7 @@ export function FalconRateManagementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   description: {
     color: colors.muted,
     fontSize: 13,
@@ -248,7 +231,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   loadingBox: { paddingVertical: spacing(8), alignItems: 'center' },
   emptyBox: {
     backgroundColor: colors.surface,

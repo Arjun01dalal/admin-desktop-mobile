@@ -14,12 +14,7 @@ export type SecurityStatus = {
   refresh: () => Promise<void>;
 };
 
-const BLOCKING: ThreatKind[] = [
-  'privilegedAccess',
-  'hooks',
-  'appIntegrity',
-  'simulator',
-];
+const BLOCKING: ThreatKind[] = ['privilegedAccess', 'hooks', 'appIntegrity', 'simulator'];
 
 export function useSecurity(): SecurityStatus {
   useEffect(() => {

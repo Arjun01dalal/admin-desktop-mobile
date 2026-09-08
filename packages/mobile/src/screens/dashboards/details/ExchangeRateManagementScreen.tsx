@@ -6,11 +6,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
@@ -67,9 +67,7 @@ export function ExchangeRateManagementScreen() {
         return;
       }
       if (Array.isArray(raw)) {
-        setGames(
-          (raw as GameCard[]).map((g, i) => [String(g.gameId ?? i), g]),
-        );
+        setGames((raw as GameCard[]).map((g, i) => [String(g.gameId ?? i), g]));
         return;
       }
       setGames([]);
@@ -140,15 +138,11 @@ export function ExchangeRateManagementScreen() {
         return (
           <View key={gameId} style={styles.card}>
             <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>
-                {String(game.gameName || matchKey)}
-              </Text>
+              <Text style={styles.cardTitle}>{String(game.gameName || matchKey)}</Text>
               {game.tournamentName ? (
                 <Text style={styles.tournament}>
                   Tournament:{' '}
-                  <Text style={styles.tournamentStrong}>
-                    {String(game.tournamentName)}
-                  </Text>
+                  <Text style={styles.tournamentStrong}>{String(game.tournamentName)}</Text>
                 </Text>
               ) : null}
             </View>
@@ -158,10 +152,7 @@ export function ExchangeRateManagementScreen() {
               return (
                 <View key={`${gameId}-mkt-${i}`} style={styles.market}>
                   <Text style={styles.marketName}>
-                    Market Name:{' '}
-                    <Text style={styles.strong}>
-                      {String(mkt.marketName || '—')}
-                    </Text>
+                    Market Name: <Text style={styles.strong}>{String(mkt.marketName || '—')}</Text>
                   </Text>
                   <Text style={styles.marketMeta}>
                     Market Profit/Loss:{' '}
@@ -176,8 +167,7 @@ export function ExchangeRateManagementScreen() {
                   </Text>
                   {mkt.settleDateTime ? (
                     <Text style={styles.marketMeta}>
-                      Settled On:{' '}
-                      {new Date(mkt.settleDateTime).toLocaleString()}
+                      Settled On: {new Date(mkt.settleDateTime).toLocaleString()}
                     </Text>
                   ) : null}
                 </View>
@@ -186,15 +176,11 @@ export function ExchangeRateManagementScreen() {
 
             {markets.length > 4 ? (
               <TouchableOpacity
-                onPress={() =>
-                  setExpanded((prev) => ({ ...prev, [gameId]: !isOpen }))
-                }
+                onPress={() => setExpanded((prev) => ({ ...prev, [gameId]: !isOpen }))}
                 style={styles.moreBtn}
               >
                 <Text style={styles.moreBtnText}>
-                  {isOpen
-                    ? 'Show Less ↑'
-                    : `Show More (${markets.length - 3}) ↓`}
+                  {isOpen ? 'Show Less ↑' : `Show More (${markets.length - 3}) ↓`}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -218,10 +204,7 @@ export function ExchangeRateManagementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   description: {
     color: colors.muted,
     fontSize: 13,
@@ -236,7 +219,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   loadingBox: { paddingVertical: spacing(8), alignItems: 'center' },
   emptyBox: {
     backgroundColor: colors.surface,

@@ -9,8 +9,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-const cleanUtr = (value: string): string =>
-  value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+const cleanUtr = (value: string): string => value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
 
 /** PhonePe/GPay app txn ids (e.g. T260718...) — not bank UTR */
 const isAppTransactionId = (value: string): boolean =>
@@ -25,10 +24,10 @@ export function extractUtrFromText(text: string): string {
 
   // 1) Prefer explicitly labeled UTR
   const utrLabelPatterns = [
-    /\bUTR\b(?:\s*(?:No\.?|Number|#))?\s*[:\-]?\s*([0-9]{10,22})/i,
-    /\bUTR\b(?:\s*(?:No\.?|Number|#))?\s*[:\-]?\s*([A-Z0-9]{10,22})/i,
-    /UPI\s*Ref(?:erence)?\s*(?:No\.?)?\s*[:\-]?\s*([0-9]{10,22})/i,
-    /UPI\s*Ref(?:erence)?\s*(?:No\.?)?\s*[:\-]?\s*([A-Z0-9]{10,22})/i,
+    /\bUTR\b(?:\s*(?:No\.?|Number|#))?\s*[:-]?\s*([0-9]{10,22})/i,
+    /\bUTR\b(?:\s*(?:No\.?|Number|#))?\s*[:-]?\s*([A-Z0-9]{10,22})/i,
+    /UPI\s*Ref(?:erence)?\s*(?:No\.?)?\s*[:-]?\s*([0-9]{10,22})/i,
+    /UPI\s*Ref(?:erence)?\s*(?:No\.?)?\s*[:-]?\s*([A-Z0-9]{10,22})/i,
   ];
   for (const pattern of utrLabelPatterns) {
     const match = normalized.match(pattern);
@@ -50,7 +49,7 @@ export function extractUtrFromText(text: string): string {
     if (!/\bUTR\b|UPI\s*Ref/i.test(line)) continue;
 
     const sameLine = line.match(
-      /(?:UTR|UPI\s*Ref(?:erence)?(?:\s*No\.?)?)\s*[:\-]?\s*([A-Z0-9]{10,22})/i,
+      /(?:UTR|UPI\s*Ref(?:erence)?(?:\s*No\.?)?)\s*[:-]?\s*([A-Z0-9]{10,22})/i,
     );
     if (sameLine?.[1] && !isAppTransactionId(sameLine[1])) {
       return cleanUtr(sameLine[1]);
@@ -84,10 +83,7 @@ type Props = {
 export function SlipOcrWebView({ imageBase64, onText, onError }: Props) {
   // Strict allowlist: only valid base64 characters may reach the HTML string,
   // so the interpolation below cannot break out of the script literal.
-  const safeBase64 = useMemo(
-    () => imageBase64.replace(/[^A-Za-z0-9+/=]/g, ''),
-    [imageBase64],
-  );
+  const safeBase64 = useMemo(() => imageBase64.replace(/[^A-Za-z0-9+/=]/g, ''), [imageBase64]);
   const html = useMemo(
     () => `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"

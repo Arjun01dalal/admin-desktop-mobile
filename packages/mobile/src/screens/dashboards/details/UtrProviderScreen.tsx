@@ -18,6 +18,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -221,7 +222,12 @@ export function UtrProviderScreen() {
         render: (r) => display(r.accountNumber),
       },
       { key: 'ifsc', label: 'IFSC', width: 120, render: (r) => display(r.ifsc) },
-      { key: 'status', label: 'Status', width: 90, render: (r) => (r.status ? 'Enabled' : 'Disabled') },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 90,
+        render: (r) => (r.status ? 'Enabled' : 'Disabled'),
+      },
       {
         key: 'pendingTotal',
         label: 'Pending Total',
@@ -244,7 +250,11 @@ export function UtrProviderScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <View style={styles.headerRow}>
@@ -355,7 +365,12 @@ export function UtrProviderScreen() {
       />
 
       {/* Add UTR account modal */}
-      <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
+      <Modal
+        visible={addOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddOpen(false)}
+      >
         <KeyboardAvoidingView
           style={styles.backdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -426,15 +441,7 @@ export function UtrProviderScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-  },
+const styles = makeStyles({
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700', flex: 1 },
   addBtn: {
     backgroundColor: colors.primary,
@@ -443,49 +450,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
   },
   addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -496,29 +460,6 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   backdrop: {
     flex: 1,
     justifyContent: 'center',
@@ -538,9 +479,6 @@ const styles = StyleSheet.create({
   },
   modalScroll: { flexGrow: 0 },
   modalScrollContent: { gap: spacing(2), paddingBottom: spacing(1) },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1, marginRight: spacing(2) },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -558,6 +496,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing(1),
   },
-  btnDisabled: { opacity: 0.5 },
   saveBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
 });

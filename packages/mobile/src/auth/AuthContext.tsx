@@ -1,23 +1,53 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
+import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 import { secureApi, setAuthFailureHandler } from '../api/client';
-import { eraseSessionSecrets, eraseToken, persistToken, persistUser } from '../lib/secureStorage';
+import { eraseSessionSecrets, persistToken, persistUser } from '../lib/secureStorage';
 import { appStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
 import { clearLlmChatStorage } from '@astro/shared';
-import { registerSosPush } from '../push/sosPush';
 import { registerSubAdminFcmToken } from './registerFcmToken';
 import { resetTokenValidationThrottle } from './sessionCheck';
 import { useTokenValidator } from './useTokenValidator';
 import type { AuthUser } from '../types/auth';
 import { getRoleOptions, selectActiveRole } from './roleSelection';
+
+/** Login defaults — same fallbacks LoginScreen / desktop verify-otp use. */
+const FALLBACK_STATE = 'Madhya Pradesh';
+const FALLBACK_CITY = 'Jabalpur';
+const FALLBACK_LAT = 23.1815;
+const FALLBACK_LNG = 79.9864;
+
+const POSITION_TIMEOUT_MS = 6_000;
+const ADDRESS_BUDGET_MS = 3_500;
+const LAST_KNOWN_MAX_AGE_MS = 15 * 60_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const id = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(`${label} timed out`));
+    }, ms);
+
+    promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(id);
+        resolve(value);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(id);
+        reject(err);
+      },
+    );
+  });
+}
 
 type AuthState = {
   ready: boolean;
@@ -40,9 +70,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const raw = appStorage.getItem('user');
     if (t && raw) {
       try {
-        setUser(JSON.parse(raw) as AuthUser);
+        const restoredUser = JSON.parse(raw) as AuthUser;
+        setUser(restoredUser);
         setToken(t);
-        void registerSosPush(); // APK builds: closed-app SOS siren push.
+        void registerSubAdminFcmToken(restoredUser);
       } catch {
         /* corrupted session — stay logged out */
       }
@@ -64,7 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setToken(newToken);
     setUser(newUser);
-    void registerSosPush(); // APK builds: enable closed-app SOS siren push.
     void registerSubAdminFcmToken(newUser);
   }, []);
 
@@ -122,7 +152,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
@@ -130,7 +159,15 @@ export function useAuth(): AuthState {
 }
 
 /** Mirrors desktop AddressInfo — the API's verify-otp expects `address` to be an OBJECT. */
-export type AddressInfo = Record<string, unknown>;
+export type AddressInfo = {
+  city?: string;
+  state?: string;
+  country?: string;
+  district?: string;
+  region?: string;
+  postalCode?: string;
+  source?: string;
+};
 
 export type OtpLocation = {
   lat: string;
@@ -142,43 +179,102 @@ export type OtpLocation = {
 
 /** Get device location + reverse-geocoded address (uses API getAddress like desktop). */
 export async function resolveLocation(): Promise<OtpLocation> {
+  // Emulator: skip native GPS (hangs / "Array already consumed").
+  if (Platform.OS !== 'web' && !Device.isDevice) {
+    return {
+      lat: String(FALLBACK_LAT),
+      long: String(FALLBACK_LNG),
+      state: FALLBACK_STATE,
+      city: FALLBACK_CITY,
+      address: { state: FALLBACK_STATE, city: FALLBACK_CITY, source: 'emulator' },
+    };
+  }
+
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') throw new Error('Location permission is required to log in');
-  const pos = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  });
-  const lat = pos.coords.latitude;
-  const lng = pos.coords.longitude;
+
+  let lat = FALLBACK_LAT;
+  let lng = FALLBACK_LNG;
+  let gotFix = false;
+
+  try {
+    const last = await Location.getLastKnownPositionAsync({
+      maxAge: LAST_KNOWN_MAX_AGE_MS,
+      requiredAccuracy: 5_000,
+    });
+    if (last) {
+      lat = last.coords.latitude;
+      lng = last.coords.longitude;
+      gotFix = true;
+    }
+  } catch {
+    /* continue */
+  }
+
+  if (!gotFix) {
+    try {
+      const pos = await withTimeout(
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+        }),
+        POSITION_TIMEOUT_MS,
+        'loginLocation',
+      );
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+      gotFix = true;
+    } catch {
+      // GPS flakes are common indoors — proceed with city defaults so OTP login
+      // isn't blocked (desktop falls back to network/IP location).
+      gotFix = false;
+    }
+  }
 
   let state = '';
   let city = '';
   let address: AddressInfo = {};
-  try {
-    const places = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-    const p = places[0];
-    if (p) {
-      state = p.region ?? '';
-      city = p.city ?? p.district ?? '';
-    }
-  } catch {
-    /* fall through to API address resolution */
-  }
 
-  // Desktop sends the getAddress API result object as `address` — the API
-  // rejects string addresses ("address must be of type object").
-  try {
-    const res = await secureApi<Record<string, unknown>>('auth.getAddress', { lat, lng });
-    if (res.ok && res.data && typeof res.data === 'object') {
-      address = res.data as AddressInfo;
-      state = state || (address.state as string) || '';
-      city = city || (address.city as string) || '';
-    }
-  } catch {
-    /* keep local geocode values */
-  }
+  // Cap address work so geocode / getAddress cannot push past the login UI timeout.
+  await Promise.race([
+    (async () => {
+      try {
+        const places = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        const p = places[0];
+        if (p) {
+          state = p.region ?? '';
+          city = p.city ?? p.district ?? '';
+        }
+      } catch {
+        /* fall through */
+      }
+
+      try {
+        const res = await secureApi<AddressInfo>('auth.getAddress', { lat, lng });
+        if (res.ok && res.data && typeof res.data === 'object') {
+          address = res.data;
+          state = state || address.state || '';
+          city = city || address.city || '';
+        }
+      } catch {
+        /* keep local geocode values */
+      }
+    })(),
+    new Promise<void>((resolve) => setTimeout(resolve, ADDRESS_BUDGET_MS)),
+  ]);
+
   if (!address || Object.keys(address).length === 0) {
-    address = { state, city, source: 'device' };
+    address = {
+      state: state || FALLBACK_STATE,
+      city: city || FALLBACK_CITY,
+      source: gotFix ? 'device' : 'fallback',
+    };
   }
 
-  return { lat: String(lat), long: String(lng), state, city, address };
+  return {
+    lat: String(lat),
+    long: String(lng),
+    state: state || FALLBACK_STATE,
+    city: city || FALLBACK_CITY,
+    address,
+  };
 }

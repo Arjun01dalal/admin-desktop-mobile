@@ -5,15 +5,8 @@
  * Block/Unblock and Caller Report dialogs stay desktop-only.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -174,7 +167,12 @@ export function CustomerAllotmentScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: 44,
+        render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1),
+      },
       { key: 'name', label: 'Name', width: 130, render: (r) => display(r.name) },
       {
         key: 'mobile',
@@ -207,7 +205,12 @@ export function CustomerAllotmentScreen() {
         render: (r) => String(r.allotedCustomer?.length ?? 0),
       },
       { key: 'block', label: 'Status', width: 90, render: (r) => (r.block ? 'Blocked' : 'Active') },
-      { key: 'blockReason', label: 'Block Reason', width: 130, render: (r) => display(r.blockReason) },
+      {
+        key: 'blockReason',
+        label: 'Block Reason',
+        width: 130,
+        render: (r) => display(r.blockReason),
+      },
     ],
     [page, canShowMobile, depositMap],
   );
@@ -218,7 +221,11 @@ export function CustomerAllotmentScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Customer Allotment</Text>
@@ -226,7 +233,11 @@ export function CustomerAllotmentScreen() {
 
       {/* Search (no date filter on this page, matching desktop) */}
       <View style={styles.searchWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
           <Text style={styles.rowLabel}>Search by</Text>
           {SEARCH_FIELDS.map((f) => (
             <TouchableOpacity
@@ -320,11 +331,7 @@ export function CustomerAllotmentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   searchWrap: { marginTop: spacing(3) },
   chipRow: { alignItems: 'center', paddingVertical: spacing(1) },
   rowLabel: { color: colors.muted, fontSize: 12, marginRight: spacing(2) },
@@ -337,9 +344,7 @@ const styles = StyleSheet.create({
     marginRight: spacing(2),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(2) },
   searchInput: {
     flex: 1,
@@ -358,30 +363,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2.5),
     paddingHorizontal: spacing(4),
   },
-  btnDisabled: { opacity: 0.5 },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
 });

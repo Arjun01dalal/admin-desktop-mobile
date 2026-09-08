@@ -11,13 +11,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -189,28 +189,25 @@ export function PercentageScreen() {
     }
   }, [form, load]);
 
-  const toggleStatus = useCallback(
-    (row: Row) => {
-      if (!row.type) return;
-      const next = !row.status;
-      void (async () => {
-        const res = await secureApi<unknown>('ops.percentageChangeStatus', {
-          type: row.type,
-          status: next,
-        });
-        if (res.ok) {
-          setSheetRow(null);
-          setRows((prev) =>
-            prev.map((item) => (item._id === row._id ? { ...item, status: next } : item)),
-          );
-        } else {
-          setError(res.message || 'Failed to update status');
-          setSheetRow(null);
-        }
-      })();
-    },
-    [],
-  );
+  const toggleStatus = useCallback((row: Row) => {
+    if (!row.type) return;
+    const next = !row.status;
+    void (async () => {
+      const res = await secureApi<unknown>('ops.percentageChangeStatus', {
+        type: row.type,
+        status: next,
+      });
+      if (res.ok) {
+        setSheetRow(null);
+        setRows((prev) =>
+          prev.map((item) => (item._id === row._id ? { ...item, status: next } : item)),
+        );
+      } else {
+        setError(res.message || 'Failed to update status');
+        setSheetRow(null);
+      }
+    })();
+  }, []);
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
@@ -259,7 +256,11 @@ export function PercentageScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <View style={styles.headerRow}>
@@ -411,12 +412,8 @@ export function PercentageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   addBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
@@ -424,34 +421,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(4),
   },
   addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
-  modalSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.md * 2,
-    borderTopRightRadius: radius.md * 2,
-    padding: spacing(4),
-    maxHeight: '85%',
-  },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
-  },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
-  fieldLabel: { color: colors.muted, fontSize: 12, marginTop: spacing(3), marginBottom: spacing(1) },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -462,14 +431,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   modalInputDisabled: { opacity: 0.5 },
-  modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
-  submitBtn: {
-    marginTop: spacing(4),
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-  },
-  btnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
 });

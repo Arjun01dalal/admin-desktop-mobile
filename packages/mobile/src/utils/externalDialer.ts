@@ -69,12 +69,16 @@ function toLead(item: DialerLeadSource) {
       province: String(item.province || item._id || '').slice(0, 80),
     };
   }
-  const name = String(item.name || '').replace(/_/g, ' ').trim();
+  const name = String(item.name || '')
+    .replace(/_/g, ' ')
+    .trim();
   const [first = name, ...rest] = name.split(' ');
   return {
     first_name: first.slice(0, 120),
     last_name: rest.join(' ').slice(0, 120),
-    phone_number: String(item.mobile || '').replace(/\D/g, '').slice(0, 20),
+    phone_number: String(item.mobile || '')
+      .replace(/\D/g, '')
+      .slice(0, 20),
     city: String(item.city ?? '').slice(0, 80),
     state: String(item.state ?? '').slice(0, 80),
     email: String(item.clientName || '').slice(0, 120),
@@ -86,7 +90,9 @@ function toLead(item: DialerLeadSource) {
 function isDialerSuccess(data: Record<string, unknown> | null): boolean {
   if (!data || typeof data !== 'object') return false;
   if (data.success === true || data.success === 'true' || data.success === 1) return true;
-  const status = String(data.status || '').trim().toLowerCase();
+  const status = String(data.status || '')
+    .trim()
+    .toLowerCase();
   return status === 'success' || status === 'ok';
 }
 
@@ -209,5 +215,60 @@ export async function addToDialerBatch(args: {
     return { ok: false, message: String(data?.message || 'Failed to add to dialer') };
   } catch {
     return { ok: false, message: 'Could not reach the dialer server' };
+  }
+}
+
+/** Send a KYC callback request through the fixed, allowlisted dialer service. */
+export async function sendKycCallToDialer(args: {
+  id?: string;
+  name?: string;
+  mobile?: string;
+  clientName?: string;
+}): Promise<{ ok: boolean; message: string }> {
+  const mobile = String(args.mobile || '')
+    .replace(/\D/g, '')
+    .slice(0, 20);
+  if (!mobile) return { ok: false, message: 'No valid phone number' };
+
+  const body = {
+    list_id: '800001',
+    list_name: 'KYC UPDATION',
+    campaign_id: 'KYC',
+    leads: [
+      {
+        first_name: String(args.name || '').slice(0, 120),
+        last_name: '',
+        phone_number: mobile,
+        city: '',
+        state: '',
+        email: String(args.clientName || '').slice(0, 120),
+        comments: String(args.clientName || '').slice(0, 200),
+        province: String(args.id || '').slice(0, 80),
+      },
+    ],
+  };
+
+  const url = 'https://api2.ganesha999.com/API/';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    const ok = response.ok && (isDialerSuccess(data) || data?.success !== false);
+    return {
+      ok,
+      message: String(
+        data?.message || (ok ? 'Data sent successfully' : 'Failed to send call request'),
+      ),
+    };
+  } catch {
+    return { ok: false, message: 'Could not reach the dialer server' };
+  } finally {
+    clearTimeout(timer);
   }
 }

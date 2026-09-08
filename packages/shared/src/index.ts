@@ -21,6 +21,7 @@ export * from './ludoRtp';
 export * from './walletOtp';
 export * from './subAdminFcm';
 export * from './depositWithdrawalReport';
+export * from './incomingBotMatch';
 export * from './llmChat';
 export * from './casinoTopup';
 export * from './gameUserStats';

@@ -11,14 +11,14 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
-import { pickPageSizes, asPaged, unpackPayload } from '@astro/shared';
+import { asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -47,7 +47,6 @@ type Summary = {
 
 type ActionStatus = 'approve' | 'reject' | 'remove';
 
-const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 const STATUS_OPTIONS = ['', 'pending', 'approve', 'reject', 'remove'] as const;
 
 const SEARCH_FIELDS = [
@@ -75,10 +74,7 @@ function formatIN(value: unknown): string {
 export function BonusWalletRequestsScreen() {
   const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   // Read once — getSessionUser returns a fresh object each call.
-  const admin = useMemo(
-    () => getSessionUser() as { _id?: string; name?: string } | null,
-    [],
-  );
+  const admin = useMemo(() => getSessionUser() as { _id?: string; name?: string } | null, []);
   const canShowMobile = hasPermission('show_mobile');
 
   const [draftStart, setDraftStart] = useState(todayIST);
@@ -258,7 +254,12 @@ export function BonusWalletRequestsScreen() {
 
   const columns = useMemo<DataTableColumn<BonusRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: IDX_W,
+        render: (_r, i) => String((page - 1) * pageSize + i + 1),
+      },
       {
         key: 'name',
         label: 'User Name',
@@ -273,11 +274,32 @@ export function BonusWalletRequestsScreen() {
         },
       },
       { key: 'transactionId', label: 'Transaction Id', width: 200, render: (r) => display(r._id) },
-      { key: 'amount', label: 'Amount', width: w.amount, align: 'right', render: (r) => formatIN(r.amount) },
-      { key: 'mobile', label: 'Mobile', width: 130, render: (r) => maskMobile(r.mobile, canShowMobile) },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: w.amount,
+        align: 'right',
+        render: (r) => formatIN(r.amount),
+      },
+      {
+        key: 'mobile',
+        label: 'Mobile',
+        width: 130,
+        render: (r) => maskMobile(r.mobile, canShowMobile),
+      },
       { key: 'status', label: 'Status', width: w.status, render: (r) => display(r.status) },
-      { key: 'date', label: 'Date', width: 110, render: (r) => formatDisplayDate(r.updatedOn) || '—' },
-      { key: 'time', label: 'Time', width: 100, render: (r) => formatDisplayTime(r.updatedOn) || '—' },
+      {
+        key: 'date',
+        label: 'Date',
+        width: 110,
+        render: (r) => formatDisplayDate(r.updatedOn) || '—',
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        width: 100,
+        render: (r) => formatDisplayTime(r.updatedOn) || '—',
+      },
       {
         key: 'updatedBy',
         label: 'Updated By',
@@ -319,13 +341,20 @@ export function BonusWalletRequestsScreen() {
         },
       });
     }
-    const pending = String(sheetRow.status || '').trim().toLowerCase() === 'pending';
+    const pending =
+      String(sheetRow.status || '')
+        .trim()
+        .toLowerCase() === 'pending';
     if (!pending) return acts;
     const busy = Boolean(actingId);
     acts.push(
       ...(['approve', 'reject', 'remove'] as ActionStatus[]).map((a) => ({
         label: actingId === `${sheetRow._id}:${a}` ? '…' : a[0].toUpperCase() + a.slice(1),
-        tone: (a === 'approve' ? 'primary' : a === 'reject' ? 'warning' : 'default') as SheetAction['tone'],
+        tone: (a === 'approve'
+          ? 'primary'
+          : a === 'reject'
+            ? 'warning'
+            : 'default') as SheetAction['tone'],
         disabled: busy,
         onPress: () => handleAction(sheetRow, a),
       })),
@@ -377,7 +406,11 @@ export function BonusWalletRequestsScreen() {
         onSearchSubmit={search}
       />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipsRow}
+      >
         <Text style={styles.chipsLabel}>Status</Text>
         {STATUS_OPTIONS.map((s) => (
           <TouchableOpacity
@@ -469,7 +502,9 @@ export function BonusWalletRequestsScreen() {
               </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardLabel}>Transaction ID</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>{display(row._id)}</Text>
+                <Text style={styles.cardValue} numberOfLines={1}>
+                  {display(row._id)}
+                </Text>
               </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardLabel}>Mobile</Text>
@@ -518,11 +553,7 @@ export function BonusWalletRequestsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
   chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   chip: {
@@ -533,9 +564,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(3) },
   summaryChip: {
     backgroundColor: 'rgba(255,159,10,0.15)',
@@ -544,49 +573,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
   },
   summaryText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   reportBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
@@ -594,20 +580,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1),
   },
   reportBtnText: { color: colors.primaryForeground, fontSize: 10, fontWeight: '700' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -615,34 +587,4 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
 });

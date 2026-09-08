@@ -87,10 +87,7 @@ export function normalizeActivityList(payload: unknown): ActivityRow[] {
   return [];
 }
 
-export function sortActivityRows(
-  rows: ActivityRow[],
-  sort: SortConfig | null,
-): ActivityRow[] {
+export function sortActivityRows(rows: ActivityRow[], sort: SortConfig | null): ActivityRow[] {
   if (!sort) return rows;
   const { key, direction } = sort;
   return [...rows].sort((a, b) => {

@@ -29,6 +29,7 @@ import {
   isPathAllowed,
   isSosExemptRole as sharedIsSosExemptRole,
   canShowUniqueDepositEmpCode as sharedCanShowUniqueDepositEmpCode,
+  canUpdateCallerAllotmentEmpCode as sharedCanUpdateCallerAllotmentEmpCode,
 } from '@astro/shared/permissions';
 
 export {
@@ -46,6 +47,7 @@ type StoredUser = AuthUser & PermissionUser;
 const storage: PermissionStorage = {
   getRoleId: () => appStorage.getItem('role_id'),
   getRoleName: () => appStorage.getItem('role'),
+  getItem: (key) => appStorage.getItem(key),
 };
 
 export function getSessionUser(): StoredUser | null {
@@ -78,9 +80,7 @@ export function updateStoredResponsibilities(next: string[]): void {
   void persistUser(userJson);
 }
 
-export function getResponsibilities(
-  user: StoredUser | null = getSessionUser(),
-): string[] {
+export function getResponsibilities(user: StoredUser | null = getSessionUser()): string[] {
   return sharedGetResponsibilities(user);
 }
 
@@ -91,15 +91,11 @@ export function hasPermission(
   return sharedHasPermission(permission, user);
 }
 
-export function canUseAdminLlmChat(
-  user: StoredUser | null = getSessionUser(),
-): boolean {
+export function canUseAdminLlmChat(user: StoredUser | null = getSessionUser()): boolean {
   return sharedCanUseAdminLlmChat(user, storage);
 }
 
-export function canAccessDashboard(
-  user: StoredUser | null = getSessionUser(),
-): boolean {
+export function canAccessDashboard(user: StoredUser | null = getSessionUser()): boolean {
   return sharedCanAccessDashboard(user, storage);
 }
 
@@ -119,16 +115,14 @@ export function canViewMidLimits(user: StoredUser | null = getSessionUser()): bo
 }
 
 export function canEditMidLimits(user: StoredUser | null = getSessionUser()): boolean {
-  return sharedCanEditMidLimits(user, storage);
+  return sharedCanEditMidLimits(user);
 }
 
 export function canShowSos(user: StoredUser | null = getSessionUser()): boolean {
   return sharedCanShowSos(user);
 }
 
-export function getSosTypeForRole(
-  user: StoredUser | null = getSessionUser(),
-): SosFlagType {
+export function getSosTypeForRole(user: StoredUser | null = getSessionUser()): SosFlagType {
   return sharedGetSosTypeForRole(user, storage);
 }
 
@@ -138,14 +132,16 @@ export function buildSosEnablePayload(
   return sharedBuildSosEnablePayload(user, storage);
 }
 
-export function isSosExemptRole(
-  user: StoredUser | null = getSessionUser(),
-): boolean {
+export function isSosExemptRole(user: StoredUser | null = getSessionUser()): boolean {
   return sharedIsSosExemptRole(user, storage);
 }
 
-export function canShowUniqueDepositEmpCode(
+export function canShowUniqueDepositEmpCode(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanShowUniqueDepositEmpCode(user, storage);
+}
+
+export function canUpdateCallerAllotmentEmpCode(
   user: StoredUser | null = getSessionUser(),
 ): boolean {
-  return sharedCanShowUniqueDepositEmpCode(user, storage);
+  return sharedCanUpdateCallerAllotmentEmpCode(user, storage);
 }

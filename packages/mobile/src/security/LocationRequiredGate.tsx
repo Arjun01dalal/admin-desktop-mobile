@@ -3,14 +3,7 @@
  * Mirrors desktop LocationEnableDialog — panel stays blocked until location works.
  */
 import React from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, radius, spacing } from '../theme';
 
 type Props = {
@@ -21,13 +14,7 @@ type Props = {
   onOpenSettings: () => void;
 };
 
-export function LocationRequiredGate({
-  open,
-  loading,
-  error,
-  onRetry,
-  onOpenSettings,
-}: Props) {
+export function LocationRequiredGate({ open, loading, error, onRetry, onOpenSettings }: Props) {
   return (
     <Modal
       visible={open}
@@ -43,9 +30,9 @@ export function LocationRequiredGate({
           </View>
           <Text style={styles.title}>Location Required</Text>
           <Text style={styles.body}>
-            Location is turned off. You cannot use the panel until Location is ON.
-            Turn it on in System Settings — this alert will close automatically once
-            location is available.
+            Location is required to use the panel. Make sure Location Services are ON and Astro has
+            Location permission (While Using / Allow). This alert closes automatically once a fix is
+            available.
           </Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
 

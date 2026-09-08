@@ -5,16 +5,10 @@
  * provider name opens the per-game breakdown (GameActivityDetailsScreen).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
+import { makeStyles } from '../../../styles/common';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import {
@@ -125,7 +119,13 @@ export function GameActivityScreen() {
         render: (r) => providerLabel(r),
         onCellPress: openProvider,
       },
-      { key: 'gameCount', label: 'Game Count', width: 80, align: 'right', render: (r) => String(gameCount(r)) },
+      {
+        key: 'gameCount',
+        label: 'Game Count',
+        width: 80,
+        align: 'right',
+        render: (r) => String(gameCount(r)),
+      },
     ];
     if (isQtech) {
       cols.push({
@@ -144,7 +144,13 @@ export function GameActivityScreen() {
         render: (r) => fmt(getMetric(r, 'betAmount')),
         ...sortable('betAmount', 'Bet Amount'),
       },
-      { key: 'betCount', label: 'Bet Count', width: 80, align: 'right', render: (r) => fmt(getMetric(r, 'betCount')) },
+      {
+        key: 'betCount',
+        label: 'Bet Count',
+        width: 80,
+        align: 'right',
+        render: (r) => fmt(getMetric(r, 'betCount')),
+      },
       {
         key: 'commissionAmount',
         width: 100,
@@ -181,7 +187,13 @@ export function GameActivityScreen() {
         render: (r) => fmt(getMetric(r, 'winAmount')),
         ...sortable('winAmount', 'Win'),
       },
-      { key: 'winCount', label: 'Win Count', width: 80, align: 'right', render: (r) => fmt(winCount(r)) },
+      {
+        key: 'winCount',
+        label: 'Win Count',
+        width: 80,
+        align: 'right',
+        render: (r) => fmt(winCount(r)),
+      },
       {
         key: 'rollbackCount',
         label: 'Rollback Count',
@@ -217,7 +229,11 @@ export function GameActivityScreen() {
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>{toDisplayText('Games Activity')}</Text>
@@ -294,7 +310,12 @@ export function GameActivityScreen() {
               </View>
               <View style={styles.cardSplitRow}>
                 <Text style={styles.cardSplitLeft}>Bet: {fmt(getMetric(row, 'betAmount'))}</Text>
-                <Text style={[styles.cardSplitRight, { color: ggr < 0 ? colors.destructive : colors.success }]}>
+                <Text
+                  style={[
+                    styles.cardSplitRight,
+                    { color: ggr < 0 ? colors.destructive : colors.success },
+                  ]}
+                >
                   GGR: {fmt(ggr)}
                 </Text>
               </View>
@@ -342,71 +363,9 @@ export function GameActivityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   toggleRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
-  chip: {
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   lockedLabel: { color: colors.primary, fontSize: 13, fontWeight: '700', marginTop: spacing(3) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  cardTitleLink: {
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
   cardCheck: {
     width: 28,
     height: 28,
@@ -420,38 +379,6 @@ const styles = StyleSheet.create({
   cardCheckOn: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
   cardCheckText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
   cardCheckTextOn: { color: colors.primary },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    maxWidth: '40%',
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -468,13 +395,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   selectAllText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
-  totalsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-    marginBottom: spacing(1),
-  },
+  // Wider two-up cards than the shared three-up default.
   totalsCard: {
     flexGrow: 1,
     flexBasis: '46%',

@@ -12,6 +12,7 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 .metro-health-check*
+.metro-tmp/
 npm-debug.*
 yarn-debug.*
 yarn-error.*

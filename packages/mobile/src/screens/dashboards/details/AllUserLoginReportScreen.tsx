@@ -3,17 +3,14 @@
  * Calls reports.allUserLoginLogout with { page, limit, filter:{ startDate, endDate, ... } }.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import {
-  DetailFilterBar,
-  type SearchFieldKey,
-  type SearchFieldOption,
-} from './DetailFilterBar';
+import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 
 type ActionItem = { action?: string; timestamp?: string; [key: string]: unknown };
@@ -104,7 +101,12 @@ export function AllUserLoginReportScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: 44,
+        render: (_r, i) => String((page - 1) * PAGE_SIZE + i + 1),
+      },
       { key: 'name', label: 'Panel Name', width: 130, render: (r) => String(r.name || '—') },
       { key: 'realName', label: 'Real Name', width: 130, render: (r) => String(r.realName || '—') },
       { key: 'userId', label: 'User ID', width: 150, render: (r) => String(r._id || '—') },
@@ -150,7 +152,11 @@ export function AllUserLoginReportScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>All User Login Report</Text>
@@ -186,22 +192,33 @@ export function AllUserLoginReportScreen() {
       ) : null}
 
       {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No login records found</Text> : null}
+      {!loading && rows.length === 0 ? (
+        <Text style={styles.hint}>No login records found</Text>
+      ) : null}
       <View style={styles.list}>
         {rows.map((row, index) => {
           const login = getActionStats(row.actionHistory, 'login');
           const logout = getActionStats(row.actionHistory, 'logout');
           return (
-            <TouchableOpacity key={`row-${index}-${String(row._id ?? '')}`} style={styles.card} activeOpacity={0.75} onPress={() => setSelected(row)}>
+            <TouchableOpacity
+              key={`row-${index}-${String(row._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSelected(row)}
+            >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>{String(row.name || '—')}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {String(row.name || '—')}
+                </Text>
               </View>
               <View style={styles.cardSplitRow}>
                 <Text style={styles.cardSplitLeft}>Logins: {login.count}</Text>
                 <Text style={styles.cardSplitRight}>Logouts: {logout.count}</Text>
               </View>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>Last login: {formatTs(login.last?.timestamp)}</Text>
+              <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                Last login: {formatTs(login.last?.timestamp)}
+              </Text>
               <Text style={styles.cardHint}>Tap card for details</Text>
             </TouchableOpacity>
           );
@@ -242,11 +259,7 @@ export function AllUserLoginReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -255,30 +268,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginTop: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), marginBottom: spacing(1) },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', flex: 1, minWidth: 0 },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -289,23 +278,4 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing(2), paddingVertical: 1 },
-  cardSplitLeft: { color: colors.foreground, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'left' },
-  cardSplitRight: { color: colors.foreground, fontSize: 11, fontWeight: '700', flexShrink: 0, maxWidth: '48%', textAlign: 'right' },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
 });

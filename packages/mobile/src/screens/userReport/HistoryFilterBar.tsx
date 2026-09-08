@@ -3,7 +3,8 @@
  * Desktop puts these under table headers; on mobile they sit above the cards.
  */
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../styles/common';
 import { DateField } from '../../components/DateField';
 import { colors, radius, spacing } from '../../theme';
 
@@ -144,7 +145,7 @@ export function HistoryFilterBar({ fields, values, onChange, onSearch }: Props) 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   collapseWrap: { marginBottom: spacing(2) },
   collapseHeader: {
     flexDirection: 'row',
@@ -190,9 +191,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   searchBtn: {
     marginTop: spacing(1.5),
     alignSelf: 'flex-start',
@@ -201,5 +200,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(4),
     paddingVertical: spacing(1.75),
   },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
 });

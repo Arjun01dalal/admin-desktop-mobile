@@ -4,7 +4,8 @@
  * (JSON-encoded) and isQtech flag as route params from PlayerActivityScreen.
  */
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
@@ -127,11 +128,35 @@ export function PlayerActivityDetailsScreen() {
         render: (r) => r.label,
         color: (r) => (r.kind === 'game' ? colors.muted : colors.foreground),
       },
-      { key: 'betAmount', label: 'Bet Amount', width: 100, align: 'right', render: (r) => r.betAmount },
-      { key: 'winAmount', label: 'Win Amount', width: 100, align: 'right', render: (r) => r.winAmount },
-      { key: 'commission', label: 'Commission', width: 100, align: 'right', render: (r) => r.commission },
+      {
+        key: 'betAmount',
+        label: 'Bet Amount',
+        width: 100,
+        align: 'right',
+        render: (r) => r.betAmount,
+      },
+      {
+        key: 'winAmount',
+        label: 'Win Amount',
+        width: 100,
+        align: 'right',
+        render: (r) => r.winAmount,
+      },
+      {
+        key: 'commission',
+        label: 'Commission',
+        width: 100,
+        align: 'right',
+        render: (r) => r.commission,
+      },
       { key: 'rtp', label: 'RTP', width: 70, align: 'right', render: (r) => r.rtp },
-      { key: 'rollbackCount', label: 'Rollback Count', width: 100, align: 'right', render: (r) => r.rollbackCount },
+      {
+        key: 'rollbackCount',
+        label: 'Rollback Count',
+        width: 100,
+        align: 'right',
+        render: (r) => r.rollbackCount,
+      },
       {
         key: 'totalRollbackAmount',
         label: 'Rollback Amount',
@@ -185,11 +210,8 @@ export function PlayerActivityDetailsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   centerBox: { justifyContent: 'center', alignItems: 'center', padding: spacing(6) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   empty: {
     color: colors.muted,
     textAlign: 'center',

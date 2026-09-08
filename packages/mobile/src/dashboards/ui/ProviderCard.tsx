@@ -1,12 +1,6 @@
 /** Provider metric card — mirrors desktop ProviderMetricCard. */
 import React from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, radius, spacing } from '../../theme';
 import { toDisplayText } from '../jyotish/jyotishMapping';
 import type { ProviderCardModel } from '../types';
@@ -41,16 +35,12 @@ export function ProviderCard({
   return (
     <Wrapper
       style={styles.card}
-      {...(onPress
-        ? { onPress, activeOpacity: 0.75, accessibilityRole: 'button' as const }
-        : {})}
+      {...(onPress ? { onPress, activeOpacity: 0.75, accessibilityRole: 'button' as const } : {})}
     >
       <View style={styles.headerRow}>
         <Text style={styles.title}>{toDisplayText(card.title)}</Text>
         {onPress ? <Text style={styles.chevron}>›</Text> : null}
-        {card.loading ? (
-          <ActivityIndicator size="small" color={colors.primary} />
-        ) : null}
+        {card.loading ? <ActivityIndicator size="small" color={colors.primary} /> : null}
       </View>
 
       {useLudoTable ? (
@@ -63,9 +53,7 @@ export function ProviderCard({
             onGgrPress={card.onSelectGgrPress}
           />
         </View>
-      ) : card.selectOptions &&
-        card.selectOptions.length > 0 &&
-        card.onSelectChange ? (
+      ) : card.selectOptions && card.selectOptions.length > 0 && card.onSelectChange ? (
         <View style={styles.selectRow}>
           {card.selectOptions.map((opt) => {
             const active = (card.selectValue ?? 'All') === opt.value;
@@ -75,12 +63,7 @@ export function ProviderCard({
                 onPress={() => card.onSelectChange?.(opt.value)}
                 style={[styles.selChip, active && styles.selChipActive]}
               >
-                <Text
-                  style={[
-                    styles.selChipText,
-                    active && styles.selChipTextActive,
-                  ]}
-                >
+                <Text style={[styles.selChipText, active && styles.selChipTextActive]}>
                   {toDisplayText(opt.label)}
                 </Text>
               </TouchableOpacity>
@@ -96,12 +79,7 @@ export function ProviderCard({
           style={styles.activeRow}
         >
           <Text style={styles.rowLabel}>{toDisplayText(activeLabel)}:</Text>
-          <Text
-            style={[
-              styles.rowValue,
-              onActiveCustomersPress ? styles.activeLink : null,
-            ]}
-          >
+          <Text style={[styles.rowValue, onActiveCustomersPress ? styles.activeLink : null]}>
             {card.activeCustomerCount.toLocaleString('en-IN')}
           </Text>
         </TouchableOpacity>
@@ -144,9 +122,7 @@ export function ProviderCard({
         <View style={styles.actionsRow}>
           {card.actions.map((action, ai) => (
             <TouchableOpacity key={`action-${ai}-${action.label}`} onPress={action.onClick}>
-              <Text style={styles.actionLink}>
-                {toDisplayText(action.label)}
-              </Text>
+              <Text style={styles.actionLink}>{toDisplayText(action.label)}</Text>
             </TouchableOpacity>
           ))}
         </View>

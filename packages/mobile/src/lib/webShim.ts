@@ -22,6 +22,7 @@ const listeners = new Map<string, Set<Listener>>();
 let hydrated = false;
 
 const SECURE_CACHE_KEYS = new Set([SECURE_TOKEN_KEY, SECURE_USER_KEY]);
+const LEGACY_SITE_ACCESS_TOKEN_KEY = 'astro_site_access_token_v1';
 
 function persistSecureKey(key: string, value: string): void {
   if (key === SECURE_TOKEN_KEY) void persistToken(value);
@@ -35,8 +36,11 @@ function eraseSecureKey(key: string): void {
 
 export async function hydrateStorage(): Promise<void> {
   const keys = await AsyncStorage.getAllKeys();
+  // Customer SSO is intentionally memory-only. Remove copies written by
+  // older versions before any ordinary-storage values are cached.
+  await AsyncStorage.removeItem(LEGACY_SITE_ACCESS_TOKEN_KEY);
   for (const k of keys) {
-    if (SECURE_CACHE_KEYS.has(k)) continue;
+    if (SECURE_CACHE_KEYS.has(k) || k === LEGACY_SITE_ACCESS_TOKEN_KEY) continue;
     const v = await AsyncStorage.getItem(k);
     if (v != null) cache.set(k, v);
   }

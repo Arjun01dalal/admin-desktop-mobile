@@ -3,7 +3,8 @@
  * Calls reports.checkersData with { startDate, endDate }.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -72,7 +73,13 @@ export function CheckersReportScreen() {
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
       { key: 'name', label: 'Name', width: 150, render: (r) => r.name },
-      { key: 'checkBy', label: 'Check By', width: 90, align: 'center', render: (r) => String(r.checkBy) },
+      {
+        key: 'checkBy',
+        label: 'Check By',
+        width: 90,
+        align: 'center',
+        render: (r) => String(r.checkBy),
+      },
       {
         key: 'crossCheckBy',
         label: 'Cross Check By',
@@ -90,7 +97,11 @@ export function CheckersReportScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Checkers Report</Text>
@@ -119,10 +130,17 @@ export function CheckersReportScreen() {
       {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
       <View style={styles.list}>
         {rows.map((row, index) => (
-          <TouchableOpacity key={`row-${index}-${String(row.name ?? '')}`} style={styles.card} activeOpacity={0.75} onPress={() => setSelected(row)}>
+          <TouchableOpacity
+            key={`row-${index}-${String(row.name ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSelected(row)}
+          >
             <View style={styles.cardHeader}>
               <Text style={styles.cardIndex}>#{index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>{row.name}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {row.name}
+              </Text>
             </View>
             <View style={styles.cardSplitRow}>
               <Text style={styles.cardSplitLeft}>Check By: {row.checkBy}</Text>
@@ -147,11 +165,7 @@ export function CheckersReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -160,30 +174,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginTop: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), marginBottom: spacing(1) },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', flex: 1, minWidth: 0 },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -194,8 +184,4 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing(2), paddingVertical: 1 },
-  cardSplitLeft: { color: colors.foreground, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'left' },
-  cardSplitRight: { color: colors.foreground, fontSize: 11, fontWeight: '700', flexShrink: 0, maxWidth: '48%', textAlign: 'right' },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

@@ -18,6 +18,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../styles/common';
 import { secureApi } from '../api/client';
 import { getSessionUser } from '../auth/permissions';
 import { colors, radius, spacing } from '../theme';
@@ -185,9 +186,7 @@ export function SheetDownloadOtpModal({ visible, filter, onClose, onVerified }: 
                 onPress={() => void downloadSheet()}
                 disabled={saving}
               >
-                <Text style={styles.btnPrimaryText}>
-                  {saving ? 'Saving…' : 'Download Sheet'}
-                </Text>
+                <Text style={styles.btnPrimaryText}>{saving ? 'Saving…' : 'Download Sheet'}</Text>
               </TouchableOpacity>
             ) : (
               <>
@@ -199,7 +198,11 @@ export function SheetDownloadOtpModal({ visible, filter, onClose, onVerified }: 
                   <Text style={styles.btnGhostText}>{sending ? '…' : 'Resend'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.btn, styles.btnPrimary, (verifying || !sent) && styles.btnDisabled]}
+                  style={[
+                    styles.btn,
+                    styles.btnPrimary,
+                    (verifying || !sent) && styles.btnDisabled,
+                  ]}
                   onPress={() => void verify()}
                   disabled={verifying || !sent || otp.trim().length !== 4}
                 >
@@ -214,7 +217,7 @@ export function SheetDownloadOtpModal({ visible, filter, onClose, onVerified }: 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' },
   backdropTouch: { ...StyleSheet.absoluteFillObject },
   card: {
@@ -227,7 +230,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing(6),
   },
   title: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   sendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -260,5 +262,4 @@ const styles = StyleSheet.create({
   btnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 12 },
   btnPrimary: { backgroundColor: colors.primary },
   btnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 12 },
-  btnDisabled: { opacity: 0.5 },
 });

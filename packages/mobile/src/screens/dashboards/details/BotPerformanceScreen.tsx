@@ -9,14 +9,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useIsFocused } from '@react-navigation/native';
-import { pickPageSizes, appCodeForName, asPaged } from '@astro/shared';
+import { appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
@@ -51,8 +51,6 @@ const TYPE_OPTIONS = [
   'inactive',
   'active_by_bot',
 ] as const;
-
-const PAGE_SIZES = pickPageSizes([10, 25, 50, 100, 200, 500]);
 
 /** Columns kept in the list; everything else shows in the bottom sheet. */
 
@@ -112,8 +110,30 @@ export function BotPerformanceScreen() {
 
   const genRef = React.useRef(0);
   // Text filters are read at load time (like desktop: applied on Apply).
-  const draftRef = React.useRef({ name, mobile, city, stateFilter, empCode, botIdsText, minBal, maxBal, appName, type });
-  draftRef.current = { name, mobile, city, stateFilter, empCode, botIdsText, minBal, maxBal, appName, type };
+  const draftRef = React.useRef({
+    name,
+    mobile,
+    city,
+    stateFilter,
+    empCode,
+    botIdsText,
+    minBal,
+    maxBal,
+    appName,
+    type,
+  });
+  draftRef.current = {
+    name,
+    mobile,
+    city,
+    stateFilter,
+    empCode,
+    botIdsText,
+    minBal,
+    maxBal,
+    appName,
+    type,
+  };
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -162,11 +182,11 @@ export function BotPerformanceScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [startDate, endDate, page, pageSize, applyTick]);
+  }, [startDate, endDate, page, pageSize]);
 
   useEffect(() => {
     if (isFocused) void load();
-  }, [isFocused, load]);
+  }, [isFocused, load, applyTick]);
 
   const applyFilters = useCallback(() => {
     setStartDate(draftStart);
@@ -276,13 +296,28 @@ export function BotPerformanceScreen() {
         align: 'right',
         render: (r) => formatBalance(r.balance),
       },
-      { key: 'createdAt', label: 'Created At', width: 110, render: (r) => formatDisplayDate(r.createdOn) || '—' },
-      { key: 'lastActivity', label: 'Last Activity', width: 110, render: (r) => formatDisplayDate(r.activeUser) || '—' },
+      {
+        key: 'createdAt',
+        label: 'Created At',
+        width: 110,
+        render: (r) => formatDisplayDate(r.createdOn) || '—',
+      },
+      {
+        key: 'lastActivity',
+        label: 'Last Activity',
+        width: 110,
+        render: (r) => formatDisplayDate(r.activeUser) || '—',
+      },
     ],
     [rowOffset, canShowMobile, allSelected, selectedIds, toggleSelect, toggleAll],
   );
 
-  const textFilters: Array<{ label: string; value: string; set: (v: string) => void; keyboard?: 'phone-pad' | 'number-pad' | 'numeric' }> = [
+  const textFilters: Array<{
+    label: string;
+    value: string;
+    set: (v: string) => void;
+    keyboard?: 'phone-pad' | 'number-pad' | 'numeric';
+  }> = [
     { label: 'Name', value: name, set: setName },
     { label: 'Mobile', value: mobile, set: setMobile, keyboard: 'phone-pad' },
     { label: 'City', value: city, set: setCity },
@@ -299,7 +334,11 @@ export function BotPerformanceScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Bot Performance</Text>
@@ -400,11 +439,12 @@ export function BotPerformanceScreen() {
               );
             })}
           </ScrollView>
-          <Text style={styles.dialerHint}>
-            Tick cards (☐), pick a campaign, then push.
-          </Text>
+          <Text style={styles.dialerHint}>Tick cards (☐), pick a campaign, then push.</Text>
           <TouchableOpacity
-            style={[styles.searchBtn, (pushing || !selectedIds.size || !campaignId) && styles.btnDisabled]}
+            style={[
+              styles.searchBtn,
+              (pushing || !selectedIds.size || !campaignId) && styles.btnDisabled,
+            ]}
             onPress={() => void addToDialer()}
             disabled={pushing || !selectedIds.size || !campaignId}
           >
@@ -423,9 +463,7 @@ export function BotPerformanceScreen() {
         </View>
       ) : (
         <>
-          {!loading && rows.length === 0 ? (
-            <Text style={styles.hint}>No records found</Text>
-          ) : null}
+          {!loading && rows.length === 0 ? <Text style={styles.hint}>No records found</Text> : null}
           {rows.length > 0 ? (
             <View style={styles.selectAllRow}>
               <TouchableOpacity style={styles.selectAllBtn} onPress={toggleAll}>
@@ -532,11 +570,7 @@ export function BotPerformanceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   chipScroll: { marginTop: spacing(3), flexGrow: 0 },
   chip: {
     backgroundColor: colors.surfaceAlt,
@@ -547,9 +581,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
     marginRight: spacing(2),
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   collapseHeader: {
     marginTop: spacing(3),
     backgroundColor: colors.surface,
@@ -587,8 +619,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   filterBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(1) },
-  btnDisabled: { opacity: 0.5 },
-  dialerHint: { color: colors.muted, fontSize: 11, marginTop: spacing(2), marginBottom: spacing(2) },
+  dialerHint: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: spacing(2),
+    marginBottom: spacing(2),
+  },
   dialerMsg: { color: colors.foreground, fontSize: 12, marginTop: spacing(2), textAlign: 'center' },
   searchBtn: {
     flex: 1,
@@ -597,7 +633,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2.5),
     alignItems: 'center',
   },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   clearBtn: {
     flex: 1,
     backgroundColor: colors.surfaceAlt,
@@ -616,43 +651,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   loadingBox: { alignItems: 'center', paddingVertical: spacing(10), gap: spacing(3) },
   loadingText: { color: colors.muted, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   cardCheck: {
     width: 28,
     height: 28,
@@ -666,38 +666,6 @@ const styles = StyleSheet.create({
   cardCheckOn: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
   cardCheckText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
   cardCheckTextOn: { color: colors.primary },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    maxWidth: '40%',
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -12,27 +12,23 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { appCodeForName, CLIENT_NAMES } from '@astro/shared';
 import { secureApi } from '../../../api/client';
-import {
-  CALLER_ROLE_IDS,
-  RESP_SHOW_MOBILE,
-  type CallerRow,
-} from '../../../auth/callerRoles';
+import { CALLER_ROLE_IDS, RESP_SHOW_MOBILE, type CallerRow } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
 import { singleCallToDialer } from '../../../utils/externalDialer';
 import { colors, radius, spacing } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
@@ -66,12 +62,24 @@ function pickItems(data: unknown): CallerRow[] {
   if (Array.isArray(data)) return data as CallerRow[];
   if (!data || typeof data !== 'object') return [];
   const obj = data as CallerRow;
-  if (Array.isArray(obj.items)) return obj.items as CallerRow[];
-  if (Array.isArray(obj.data)) return obj.data as CallerRow[];
+  const candidates = [
+    obj.items,
+    obj.data,
+    obj.users,
+    obj.deposits,
+    obj.transactions,
+    obj.list,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate as CallerRow[];
+  }
   if (obj.payload && typeof obj.payload === 'object') {
-    const inner = obj.payload as CallerRow;
-    if (Array.isArray(inner.items)) return inner.items as CallerRow[];
     if (Array.isArray(obj.payload)) return obj.payload as CallerRow[];
+    const inner = obj.payload as CallerRow;
+    for (const key of ['items', 'data', 'users', 'deposits', 'transactions', 'list'] as const) {
+      const nested = inner[key];
+      if (Array.isArray(nested)) return nested as CallerRow[];
+    }
   }
   return [];
 }
@@ -79,8 +87,7 @@ function pickItems(data: unknown): CallerRow[] {
 function pickTotalPages(data: unknown): number {
   if (!data || typeof data !== 'object') return 1;
   const obj = data as CallerRow;
-  const nested =
-    obj.payload && typeof obj.payload === 'object' ? (obj.payload as CallerRow) : null;
+  const nested = obj.payload && typeof obj.payload === 'object' ? (obj.payload as CallerRow) : null;
   return Number(obj.totalPages ?? nested?.totalPages ?? 1) || 1;
 }
 
@@ -102,16 +109,14 @@ function pickWithdrawalTotals(data: unknown): {
           typeof (obj.payload as CallerRow).totals === 'object'
         ? (obj.payload as CallerRow).totals
         : null
-  ) as
-    | {
-        all?: StatusTotal;
-        byStatus?: {
-          Approved?: StatusTotal;
-          Cancel?: StatusTotal;
-          Pending?: StatusTotal;
-        };
-      }
-    | null;
+  ) as {
+    all?: StatusTotal;
+    byStatus?: {
+      Approved?: StatusTotal;
+      Cancel?: StatusTotal;
+      Pending?: StatusTotal;
+    };
+  } | null;
 
   return {
     all: totals?.all ?? empty,
@@ -245,8 +250,10 @@ export function CallerDepositListScreen() {
     const max = Number(maxAmount);
     return next.filter((r) => {
       const amt = Number(r.amount ?? r.Amount);
-      if (minAmount.trim() && Number.isFinite(min) && Number.isFinite(amt) && amt < min) return false;
-      if (maxAmount.trim() && Number.isFinite(max) && Number.isFinite(amt) && amt > max) return false;
+      if (minAmount.trim() && Number.isFinite(min) && Number.isFinite(amt) && amt < min)
+        return false;
+      if (maxAmount.trim() && Number.isFinite(max) && Number.isFinite(amt) && amt > max)
+        return false;
       if (checkedFilter !== 'all') {
         const checked = !!(r.checkBy || r.checkedBy);
         if (checkedFilter === 'yes' && !checked) return false;
@@ -333,6 +340,7 @@ export function CallerDepositListScreen() {
     void loadRemote();
   }, [loadRemote]);
 
+  /** Full column set for the detail sheet (card list shows a compact summary). */
   const columns = useMemo<DataTableColumn<CallerRow>[]>(() => {
     const sr: DataTableColumn<CallerRow> = {
       key: 'sr',
@@ -351,11 +359,7 @@ export function CallerDepositListScreen() {
       label: 'DP ID',
       width: 140,
       render: (r) =>
-        display(
-          isWithdrawal
-            ? r.dp_id || r.Dp_ID || r.userId
-            : r.userId || r.dp_id || r.Dp_ID,
-        ),
+        display(isWithdrawal ? r.dp_id || r.Dp_ID || r.userId : r.userId || r.dp_id || r.Dp_ID),
     };
     const appCol: DataTableColumn<CallerRow> = {
       key: 'app',
@@ -363,9 +367,7 @@ export function CallerDepositListScreen() {
       width: 88,
       render: (r) =>
         display(
-          appCodeForName(
-            r.clientName || r.appName || r.app_name || r.AppName || r.subDomain,
-          ),
+          appCodeForName(r.clientName || r.appName || r.app_name || r.AppName || r.subDomain),
         ),
     };
     const mobileCol: DataTableColumn<CallerRow> = {
@@ -427,7 +429,13 @@ export function CallerDepositListScreen() {
         );
       }
       cols.push(
-        { key: 'bonus', label: 'Bonus Laps', width: 100, align: 'right', render: (r) => formatAmount(r.bonusLaps) },
+        {
+          key: 'bonus',
+          label: 'Bonus Laps',
+          width: 100,
+          align: 'right',
+          render: (r) => formatAmount(r.bonusLaps),
+        },
         {
           key: 'comm',
           label: 'Commission',
@@ -461,20 +469,27 @@ export function CallerDepositListScreen() {
 
     // Deposit + Unique Pending share most detail columns.
     const cols: DataTableColumn<CallerRow>[] = [sr, nameCol, dpCol, appCol];
-    if (!isCaller) cols.push(mobileCol);
+    if (isUniquePending || !isCaller) cols.push(mobileCol);
     cols.push(createdCol, amountCol);
-    if (!isCaller) {
-      cols.push(orderCol, {
+    if (!isCaller) cols.push(orderCol);
+    // Callers on Unique Pending also need gateway + payment type.
+    if (!isCaller || isUniquePending) {
+      cols.push({
         key: 'gateway',
         label: 'Payment Gateway',
         width: 140,
         render: (r) => display(r.paymentGatewayName || r.gateway),
       });
     }
-    if (!(isCaller && isUniquePending)) cols.push(ptypeCol);
+    cols.push(ptypeCol);
     if (isUniquePending) {
       cols.push(
-        { key: 'state', label: 'State', width: 100, render: (r) => display(r.state || r.userState) },
+        {
+          key: 'state',
+          label: 'State',
+          width: 100,
+          render: (r) => display(r.state || r.userState),
+        },
         { key: 'city', label: 'City', width: 100, render: (r) => display(r.city || r.userCity) },
         { key: 'emp', label: 'Emp Code', width: 100, render: (r) => display(r.empCode) },
       );
@@ -494,23 +509,6 @@ export function CallerDepositListScreen() {
     }
     return cols;
   }, [isWithdrawal, isUniquePending, isCaller, canShowMobile, addToDialer]);
-
-  /** Compact table columns — full set stays in the row detail sheet. */
-  const mainColumns = useMemo<DataTableColumn<CallerRow>[]>(() => {
-    if (isWithdrawal) {
-      return columns.filter((c) =>
-        ['sr', 'name', 'dp', 'app', 'amount', 'status'].includes(c.key),
-      );
-    }
-    if (isUniquePending) {
-      return columns.filter((c) =>
-        ['sr', 'name', 'amount', 'status', 'call'].includes(c.key),
-      );
-    }
-    return columns.filter((c) =>
-      ['sr', 'name', 'amount', 'status'].includes(c.key),
-    );
-  }, [columns, isWithdrawal, isUniquePending]);
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!selected) return [];
@@ -590,7 +588,11 @@ export function CallerDepositListScreen() {
               void loadRemote();
             }}
           />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusChipScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.statusChipScroll}
+          >
             <View style={styles.chipRow}>
               <Text style={styles.chipLabel}>Status</Text>
               {STATUS_CHIPS.map((s) => (
@@ -621,7 +623,9 @@ export function CallerDepositListScreen() {
                     setPage(1);
                   }}
                 >
-                  <Text style={[styles.chipText, checkedFilter === c.value && styles.chipTextActive]}>
+                  <Text
+                    style={[styles.chipText, checkedFilter === c.value && styles.chipTextActive]}
+                  >
                     {c.label}
                   </Text>
                 </TouchableOpacity>
@@ -704,7 +708,9 @@ export function CallerDepositListScreen() {
                   setPage(1);
                 }}
               >
-                <Text style={[styles.chipText, clientName === '' && styles.chipTextActive]}>All</Text>
+                <Text style={[styles.chipText, clientName === '' && styles.chipTextActive]}>
+                  All
+                </Text>
               </TouchableOpacity>
               {appOptions.map((app) => (
                 <TouchableOpacity
@@ -746,14 +752,76 @@ export function CallerDepositListScreen() {
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
-        <DataTable
-          columns={mainColumns}
-          rows={rows}
-          keyFor={(r, i) => String(r._id || r.orderId || i)}
-          emptyMessage="No records"
-          onRowPress={(row, index) => setSelected({ row, index })}
-          hint="Tap a row for full details"
-        />
+        <View style={styles.list}>
+          {rows.length === 0 ? (
+            <Text style={styles.emptyList}>No records</Text>
+          ) : (
+            rows.map((row, index) => {
+              const userName = display(row.userName || row.name);
+              const amount = formatAmount(row.amount || row.Amount);
+              const statusVal = display(row.status);
+              const app = display(
+                appCodeForName(
+                  row.clientName || row.appName || row.app_name || row.AppName || row.subDomain,
+                ),
+              );
+              const mobileVal = maskMobile(
+                isWithdrawal ? row.mobile || row.userMobile : row.userMobile || row.mobile,
+                canShowMobile,
+              );
+              const created =
+                formatDisplayDate(row.createdOn || row.createdAt || row.created_at) ||
+                display(row.createdOn || row.createdAt);
+              const hasMobile = Boolean(row.userMobile || row.mobile);
+              return (
+                <TouchableOpacity
+                  key={String(row._id || row.orderId || index)}
+                  style={styles.card}
+                  activeOpacity={0.75}
+                  onPress={() => setSelected({ row, index })}
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardIndex}>#{index + 1}</Text>
+                    <Text style={styles.cardTitle} numberOfLines={1}>
+                      {userName}
+                    </Text>
+                    {app !== '—' ? (
+                      <Text style={styles.cardApp} numberOfLines={1}>
+                        {app}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.cardSplitRow}>
+                    <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                      Amount: ₹{amount}
+                    </Text>
+                    <Text style={styles.cardSplitRight} numberOfLines={1}>
+                      {statusVal}
+                    </Text>
+                  </View>
+                  <View style={styles.cardSplitRow}>
+                    <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                      Mobile: {mobileVal}
+                    </Text>
+                    <Text style={styles.cardSplitRight} numberOfLines={1}>
+                      {created}
+                    </Text>
+                  </View>
+                  {isUniquePending && hasMobile ? (
+                    <TouchableOpacity
+                      style={styles.callBtn}
+                      onPress={() => addToDialer(row)}
+                      disabled={calling}
+                    >
+                      <Text style={styles.callBtnText}>{calling ? 'Calling…' : 'Call'}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <Text style={styles.cardHint}>Tap card for all details</Text>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
       )}
 
       {(isWithdrawal || isUniquePending) && totalPages > 1 ? (
@@ -789,9 +857,7 @@ export function CallerDepositListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   emptyWrap: { flex: 1, padding: spacing(4) },
   backRow: {
     flexDirection: 'row',
@@ -816,9 +882,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   input: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -859,8 +923,23 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   loadingBox: { paddingVertical: spacing(10), alignItems: 'center' },
+  emptyList: { color: colors.muted, textAlign: 'center', marginTop: spacing(4) },
+  cardApp: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    maxWidth: 72,
+  },
+  callBtn: {
+    alignSelf: 'flex-start',
+    marginTop: spacing(1.5),
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  },
+  callBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
   pager: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -17,13 +17,13 @@ import {
   RefreshControl,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
@@ -207,7 +207,11 @@ export function SocialMediaScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <View style={styles.headerRow}>
@@ -251,7 +255,12 @@ export function SocialMediaScreen() {
         onClose={() => setSheetRow(null)}
       />
 
-      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
+      <Modal
+        visible={formOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFormOpen(false)}
+      >
         <KeyboardAvoidingView
           style={styles.backdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -305,16 +314,13 @@ export function SocialMediaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing(3),
   },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   addBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
@@ -330,7 +336,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
   card: {
     width: '48%',
@@ -345,8 +350,6 @@ const styles = StyleSheet.create({
   },
   cardName: { color: colors.foreground, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   hint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: spacing(3) },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  backdropTouch: { flex: 1 },
   formSheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
@@ -356,7 +359,12 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     gap: spacing(1),
   },
-  formTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700', marginBottom: spacing(2) },
+  formTitle: {
+    color: colors.foreground,
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: spacing(2),
+  },
   fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: spacing(2) },
   input: {
     backgroundColor: colors.surfaceAlt,
@@ -381,5 +389,4 @@ const styles = StyleSheet.create({
   formBtnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
   formBtnPrimary: { backgroundColor: colors.primary },
   formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  btnDisabled: { opacity: 0.5 },
 });

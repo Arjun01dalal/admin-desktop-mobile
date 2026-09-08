@@ -4,14 +4,8 @@
  * into per-match team totals across MATCH_ODDS / Bookmaker / BookmakerAndMatchOdds.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { secureApi } from '../../../api/client';
 import { toNum } from '../../../dashboards/mergeMetrics';
 import { colors, radius, spacing } from '../../../theme';
@@ -44,10 +38,7 @@ type RiskGame = {
   }>;
 };
 
-function calculateTeamWiseTotals(
-  obj1: unknown[],
-  obj2: unknown[],
-): MatchTotals[] {
+function calculateTeamWiseTotals(obj1: unknown[], obj2: unknown[]): MatchTotals[] {
   const result: MatchTotals[] = [];
 
   obj1.forEach((game1Raw) => {
@@ -96,8 +87,7 @@ function calculateTeamWiseTotals(
     processMarkets(game2.markets);
 
     Object.values(teamMap).forEach((team) => {
-      team.total =
-        team.MATCH_ODDS + team.Bookmaker + team.BookmakerAndMatchOdds;
+      team.total = team.MATCH_ODDS + team.Bookmaker + team.BookmakerAndMatchOdds;
     });
 
     result.push({ match: matchName, teams: Object.values(teamMap) });
@@ -128,9 +118,7 @@ function TeamRow({ label, value }: { label: string; value: number }) {
   return (
     <View style={styles.teamRow}>
       <Text style={styles.teamLabel}>{label}</Text>
-      <Text style={[styles.teamValue, value < 0 && styles.negative]}>
-        {fmt(value)}
-      </Text>
+      <Text style={[styles.teamValue, value < 0 && styles.negative]}>{fmt(value)}</Text>
     </View>
   );
 }
@@ -148,9 +136,7 @@ export function BothMasterAddScreen() {
         secureApi('dashboard.zehnRiskVip', {}),
       ]);
       if (!res1.ok || !res2.ok) {
-        setError(
-          res1.message || res2.message || 'Failed to load AAA / Master AAA risk',
-        );
+        setError(res1.message || res2.message || 'Failed to load AAA / Master AAA risk');
         setCommonData([]);
         return;
       }
@@ -170,11 +156,7 @@ export function BothMasterAddScreen() {
     void load();
   }, [load]);
 
-  const cards = useMemo(
-    () =>
-      commonData.filter((m) => m.teams[0] && m.teams[1]),
-    [commonData],
-  );
+  const cards = useMemo(() => commonData.filter((m) => m.teams[0] && m.teams[1]), [commonData]);
 
   return (
     <ScrollView
@@ -240,9 +222,7 @@ export function BothMasterAddScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   title: {
     color: colors.foreground,
     fontSize: 20,
@@ -258,7 +238,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   emptyBox: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

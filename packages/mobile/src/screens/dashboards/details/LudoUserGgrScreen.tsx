@@ -4,20 +4,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { parseLudoGameOptions } from '../../../dashboards/gameMetrics';
 import { toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import {
-  DataTable,
-  type DataTableColumn,
-} from '../../../dashboards/ui/DataTable';
+import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { colors, radius, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -42,17 +39,13 @@ function parseResponse(raw: unknown): {
   const payload = asRecord(raw);
   const rows = ['data', 'users', 'rounds', 'list'].reduce<ReportRow[]>(
     (found, key) =>
-      found.length || !Array.isArray(payload[key])
-        ? found
-        : (payload[key] as ReportRow[]),
+      found.length || !Array.isArray(payload[key]) ? found : (payload[key] as ReportRow[]),
     [],
   );
   return {
     rows,
     summary:
-      payload.summary &&
-      typeof payload.summary === 'object' &&
-      !Array.isArray(payload.summary)
+      payload.summary && typeof payload.summary === 'object' && !Array.isArray(payload.summary)
         ? (payload.summary as Record<string, unknown>)
         : null,
   };
@@ -76,10 +69,7 @@ function isPrimitive(value: unknown): boolean {
   return value === null || typeof value !== 'object';
 }
 
-function resolveGameId(
-  preferred: string | undefined,
-  options: GameOption[],
-): string {
+function resolveGameId(preferred: string | undefined, options: GameOption[]): string {
   if (preferred && preferred !== 'All') return preferred;
   return options[0]?.value || '';
 }
@@ -92,8 +82,7 @@ export function LudoUserGgrScreen() {
       : typeof params.startDate === 'string'
         ? params.startDate
         : todayIST();
-  const paramGameId =
-    typeof params.gameId === 'string' ? params.gameId : 'All';
+  const paramGameId = typeof params.gameId === 'string' ? params.gameId : 'All';
   const initialGgr: GgrType = params.ggr === 'minus' ? 'minus' : 'plus';
   const initialOptions = Array.isArray(params.gameOptions)
     ? (params.gameOptions as GameOption[])
@@ -107,12 +96,8 @@ export function LudoUserGgrScreen() {
   const [draftDate, setDraftDate] = useState(initialDate);
   const [date, setDate] = useState(initialDate);
   const [gameOptions, setGameOptions] = useState<GameOption[]>(initialOptions);
-  const [draftGameId, setDraftGameId] = useState(
-    resolveGameId(paramGameId, initialOptions),
-  );
-  const [gameId, setGameId] = useState(
-    resolveGameId(paramGameId, initialOptions),
-  );
+  const [draftGameId, setDraftGameId] = useState(resolveGameId(paramGameId, initialOptions));
+  const [gameId, setGameId] = useState(resolveGameId(paramGameId, initialOptions));
   const [draftGgr, setDraftGgr] = useState<GgrType>(initialGgr);
   const [ggr, setGgr] = useState<GgrType>(initialGgr);
   const [rows, setRows] = useState<ReportRow[]>([]);
@@ -186,15 +171,12 @@ export function LudoUserGgrScreen() {
         key,
         label: labelFor(key),
         width: key.toLowerCase().includes('name') ? 140 : 110,
-        align:
-          typeof rows[0]?.[key] === 'number'
-            ? ('right' as const)
-            : ('left' as const),
+        align: typeof rows[0]?.[key] === 'number' ? ('right' as const) : ('left' as const),
         render: (row: ReportRow) => displayValue(row[key]),
-        color: key.toLowerCase() === 'ggr'
-          ? (row: ReportRow) =>
-              toNum(row[key]) < 0 ? colors.destructive : colors.success
-          : undefined,
+        color:
+          key.toLowerCase() === 'ggr'
+            ? (row: ReportRow) => (toNum(row[key]) < 0 ? colors.destructive : colors.success)
+            : undefined,
       })),
     [columnKeys, rows],
   );
@@ -216,8 +198,7 @@ export function LudoUserGgrScreen() {
     }));
   }, [columns, rows, selected]);
 
-  const selectedLabel =
-    gameOptions.find((option) => option.value === gameId)?.label || gameId;
+  const selectedLabel = gameOptions.find((option) => option.value === gameId)?.label || gameId;
 
   return (
     <ScrollView
@@ -329,9 +310,7 @@ export function LudoUserGgrScreen() {
         <DataTable
           columns={compactColumns}
           rows={rows}
-          keyFor={(row, index) =>
-            String(row._id ?? row.userId ?? row.roundId ?? index)
-          }
+          keyFor={(row, index) => String(row._id ?? row.userId ?? row.roundId ?? index)}
           emptyMessage="No Ludo GGR users found"
           onRowPress={setSelected}
           hint="Tap a row to see all details"
@@ -340,9 +319,7 @@ export function LudoUserGgrScreen() {
 
       <RowDetailSheet
         visible={selected !== null}
-        title={String(
-          selected?.name ?? selected?.userName ?? selected?.userId ?? 'Details',
-        )}
+        title={String(selected?.name ?? selected?.userName ?? selected?.userId ?? 'Details')}
         fields={sheetFields}
         onClose={() => setSelected(null)}
       />
@@ -350,10 +327,7 @@ export function LudoUserGgrScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: {
     color: colors.muted,
     fontSize: 13,
@@ -379,9 +353,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   emptyChip: { color: colors.muted, fontSize: 12 },
   summary: {
     flexDirection: 'row',

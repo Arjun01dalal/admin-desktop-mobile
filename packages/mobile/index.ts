@@ -1,6 +1,5 @@
 import { registerRootComponent } from 'expo';
 
-/* eslint-disable @typescript-eslint/no-var-requires */
 // TEMPORARY boot tracing: the app crashed on some devices with
 // "Exception in HostFunction" during module load ("App entry not found").
 // These breadcrumbs pinpoint which module throws — remove once diagnosed.

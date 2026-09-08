@@ -66,7 +66,12 @@ export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', style }
         />
       ) : null}
       {Platform.OS === 'ios' ? (
-        <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Modal
+          visible={open}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpen(false)}
+        >
           <View style={styles.backdrop}>
             <View style={styles.pickerCard}>
               <DateTimePicker

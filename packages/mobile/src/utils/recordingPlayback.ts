@@ -1,14 +1,40 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import CryptoJS from 'crypto-js';
-import { getRecordingAuthCredentials } from '../config';
+import { getApiBaseUrl, getRecordingAuthCredentials } from '../config';
 
 const DOWNLOAD_TIMEOUT_MS = 120_000;
 const MIN_BYTES = 64;
 
+function recordingAllowedOrigins(): Set<string> {
+  const configured = (process.env.EXPO_PUBLIC_RECORDING_ALLOWED_HOSTS || '')
+    .split(',')
+    .map((value: string) => value.trim())
+    .filter(Boolean);
+  const values = configured.length
+    ? configured
+    : (() => {
+        try {
+          return [getApiBaseUrl()];
+        } catch {
+          return [];
+        }
+      })();
+  const origins = new Set<string>();
+  for (const value of values) {
+    try {
+      const target = new URL(/^https:\/\//i.test(value) ? value : `https://${value}`);
+      if (target.protocol === 'https:' && !target.username && !target.password && !target.port) {
+        origins.add(target.origin);
+      }
+    } catch {
+      // Ignore malformed allowlist entries.
+    }
+  }
+  return origins;
+}
+
 function basicAuthHeader(username: string, password: string): string {
-  const token = CryptoJS.enc.Base64.stringify(
-    CryptoJS.enc.Utf8.parse(`${username}:${password}`),
-  );
+  const token = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(`${username}:${password}`));
   return `Basic ${token}`;
 }
 
@@ -26,6 +52,23 @@ export function normalizeRecordingUrl(raw: string): string {
   return `https://${trimmed}`;
 }
 
+export function isAllowedRecordingUrl(rawUrl: string): boolean {
+  const normalized = normalizeRecordingUrl(rawUrl);
+  if (!normalized) return false;
+  try {
+    const target = new URL(normalized);
+    return (
+      target.protocol === 'https:' &&
+      !target.username &&
+      !target.password &&
+      !target.port &&
+      recordingAllowedOrigins().has(target.origin)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function withPlayableMediaPath(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
@@ -38,19 +81,13 @@ function withPlayableMediaPath(rawUrl: string): string {
   }
 }
 
-function splitUrlAuth(rawUrl: string): { url: string; authorization?: string } {
+function sanitizeRecordingUrl(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
-    const username = decodeURIComponent(parsed.username || '');
-    const password = decodeURIComponent(parsed.password || '');
-    parsed.username = '';
-    parsed.password = '';
-    if (username || password) {
-      return { url: parsed.toString(), authorization: basicAuthHeader(username, password) };
-    }
-    return { url: parsed.toString() };
+    if (parsed.username || parsed.password) return '';
+    return parsed.toString();
   } catch {
-    return { url: rawUrl };
+    return '';
   }
 }
 
@@ -106,12 +143,15 @@ async function downloadToFile(
 export async function prepareRecordingFile(remoteUrl: string): Promise<string> {
   const normalized = withPlayableMediaPath(normalizeRecordingUrl(remoteUrl));
   if (!normalized) throw new Error('Recording URL is not available.');
-  if (!/^https:/i.test(normalized)) throw new Error('Only HTTPS recordings are supported.');
+  if (!isAllowedRecordingUrl(normalized)) {
+    throw new Error('Recording host is not approved.');
+  }
 
   const cacheDir = FileSystem.cacheDirectory;
   if (!cacheDir) throw new Error('No cache directory available.');
 
-  const { url, authorization: urlAuth } = splitUrlAuth(normalized);
+  const url = sanitizeRecordingUrl(normalized);
+  if (!url) throw new Error('Recording URL contains unsupported credentials.');
   const envAuth = getEnvAuthHeader();
   const dest = `${cacheDir}call-recording-${Date.now()}.mp3`;
 
@@ -119,18 +159,15 @@ export async function prepareRecordingFile(remoteUrl: string): Promise<string> {
 
   // Desktop Electron always sends env Basic Auth when configured.
   if (envAuth) attempts.push({ label: 'env', headers: authHeaders(envAuth) });
-  if (urlAuth && urlAuth !== envAuth) {
-    attempts.push({ label: 'url', headers: authHeaders(urlAuth) });
-  }
   // Signed / public URLs last — extra Authorization can break Twilio tokens.
-  if (!envAuth && !urlAuth) attempts.push({ label: 'plain' });
+  if (!envAuth) attempts.push({ label: 'plain' });
 
   for (const attempt of attempts) {
     const local = await downloadToFile(url, dest, attempt.headers);
     if (local) return local;
   }
 
-  if (envAuth || urlAuth) {
+  if (envAuth) {
     throw new Error('Recording server rejected the credentials.');
   }
 

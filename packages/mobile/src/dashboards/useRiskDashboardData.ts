@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { secureApi } from '../api/client';
 import type { SecureAction } from '../api/registry.generated';
+import { normalizeProviderMetrics } from './mergeMetrics';
 
 export type RiskFilters = {
   startDate: string;
@@ -57,8 +58,8 @@ export function useRiskDashboardData(filters: RiskFilters) {
 
       if (gen !== genRef.current) return;
       setBundle({
-        jetfair: asRecord(jetfair),
-        falcon: asRecord(falcon),
+        jetfair: normalizeProviderMetrics(jetfair),
+        falcon: normalizeProviderMetrics(falcon),
         aaa: asRecord(aaa),
         masterAaa: asRecord(masterAaa),
       });

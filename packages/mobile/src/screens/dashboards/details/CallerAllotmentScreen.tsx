@@ -7,19 +7,16 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-import {
-  CALLER_HEAD_ROLE_IDS,
-  CALLER_ROLE_IDS,
-  OFFICE_LOCATIONS,
-} from '../../../auth/callerRoles';
+import { CALLER_HEAD_ROLE_IDS, CALLER_ROLE_IDS, OFFICE_LOCATIONS } from '../../../auth/callerRoles';
+import { canUpdateCallerAllotmentEmpCode } from '../../../auth/permissions';
 import { RowDetailSheet } from './RowDetailSheet';
 
 type SubAdmin = {
@@ -61,7 +58,7 @@ type EditDraft = {
   telegramUserId: string;
 };
 
-type EditMode = 'location' | 'ids' | 'head' | null;
+type EditMode = 'location' | 'ids' | 'head' | 'empCode' | null;
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -123,11 +120,11 @@ export function CallerAllotmentScreen() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [selected, setSelected] = useState<{ row: CallerRow; index: number } | null>(
-    null,
-  );
+  const [selected, setSelected] = useState<{ row: CallerRow; index: number } | null>(null);
   const [pickedHeadIds, setPickedHeadIds] = useState<string[]>([]);
   const [editMode, setEditMode] = useState<EditMode>(null);
+  const [empCodeDraft, setEmpCodeDraft] = useState('');
+  const canEditEmpCode = canUpdateCallerAllotmentEmpCode();
   const [draft, setDraft] = useState<EditDraft>({
     location: '',
     extensionNo: '',
@@ -157,9 +154,7 @@ export function CallerAllotmentScreen() {
         .map((h) => ({ id: h._id, name: h.name || h._id }));
       const callers = byRole
         .filter((g) => CALLER_ROLE_IDS.has(g.roleId))
-        .flatMap((g) =>
-          (g.subAdmins ?? []).map((s) => toRow(s, g.block)),
-        )
+        .flatMap((g) => (g.subAdmins ?? []).map((s) => toRow(s, g.block)))
         .sort((a, b) => Number(a.block) - Number(b.block));
       setHeadOptions(heads);
       setRows(callers);
@@ -176,13 +171,12 @@ export function CallerAllotmentScreen() {
     setSelected({ row, index });
     setPickedHeadIds([]);
     setEditMode(null);
+    setEmpCodeDraft(String(row.empCode || ''));
     setDraft(draftFromRow(row));
   }, []);
 
   const toggleHead = useCallback((id: string) => {
-    setPickedHeadIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setPickedHeadIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
 
   const selectedHeads = useMemo(
@@ -248,61 +242,90 @@ export function CallerAllotmentScreen() {
     }
   }, [selected, selectedHeads, load]);
 
-  const updateOtherData = useCallback(async (scope: 'location' | 'ids') => {
+  const updateEmpCode = useCallback(async () => {
     if (!selected) return;
+    const updatedEmpCode = empCodeDraft.trim();
+    if (!updatedEmpCode) {
+      Alert.alert('Caller Allotment', 'Please enter emp code');
+      return;
+    }
     setBusy(true);
     try {
-      const requests: Promise<{ ok: boolean; message?: string }>[] = [];
-
-      if (scope === 'location' && draft.location.trim()) {
-        requests.push(
-          secureApi('ops.updateOfficeLocation', {
-            _id: selected.row._id,
-            officeLocation: draft.location.trim(),
-          }),
-        );
-      }
-
-      if (scope === 'ids') {
-        const extensionId = parseExtensionIds(draft.extensionNo);
-        const botIds = parseBotIds(draft.botNo);
-        const attrPayload: Record<string, unknown> = { userId: selected.row._id };
-        if (extensionId.length) attrPayload.extensionId = extensionId;
-        if (draft.serverIds.trim()) attrPayload.serverId = draft.serverIds.trim();
-        if (botIds.length) attrPayload.botIds = botIds;
-        if (draft.telegramUserId.trim()) {
-          attrPayload.telegramUsername = draft.telegramUserId.trim();
-        }
-
-        if (Object.keys(attrPayload).length > 1) {
-          requests.push(secureApi('ops.updateSubadminAttributes', attrPayload));
-        }
-      }
-
-      if (requests.length === 0) {
-        Alert.alert(
-          'Caller Allotment',
-          scope === 'location'
-            ? 'Select a caller location'
-            : 'Enter Extension ID, Bot ID, Server ID, or Telegram ID',
-        );
-        return;
-      }
-
-      const results = await Promise.all(requests);
-      const failed = results.find((r) => !r.ok);
-      if (failed) {
-        Alert.alert('Failed', failed.message || 'Some updates failed to save');
-      } else {
-        Alert.alert('Updated', 'Data updated successfully');
-        setEditMode(null);
+      const res = await secureApi('ops.assignSubadminEmpcode', {
+        _id: selected.row._id,
+        empCode: updatedEmpCode,
+      });
+      Alert.alert(
+        res.ok ? 'Updated' : 'Failed',
+        res.message || (res.ok ? 'Emp code updated successfully' : 'Failed to update emp code'),
+      );
+      if (res.ok) {
         setSelected(null);
+        void load();
       }
-      void load();
     } finally {
       setBusy(false);
     }
-  }, [selected, draft, load]);
+  }, [selected, empCodeDraft, load]);
+
+  const updateOtherData = useCallback(
+    async (scope: 'location' | 'ids') => {
+      if (!selected) return;
+      setBusy(true);
+      try {
+        const requests: Promise<{ ok: boolean; message?: string }>[] = [];
+
+        if (scope === 'location' && draft.location.trim()) {
+          requests.push(
+            secureApi('ops.updateOfficeLocation', {
+              _id: selected.row._id,
+              officeLocation: draft.location.trim(),
+            }),
+          );
+        }
+
+        if (scope === 'ids') {
+          const extensionId = parseExtensionIds(draft.extensionNo);
+          const botIds = parseBotIds(draft.botNo);
+          const attrPayload: Record<string, unknown> = { userId: selected.row._id };
+          if (extensionId.length) attrPayload.extensionId = extensionId;
+          if (draft.serverIds.trim()) attrPayload.serverId = draft.serverIds.trim();
+          if (botIds.length) attrPayload.botIds = botIds;
+          if (draft.telegramUserId.trim()) {
+            attrPayload.telegramUsername = draft.telegramUserId.trim();
+          }
+
+          if (Object.keys(attrPayload).length > 1) {
+            requests.push(secureApi('ops.updateSubadminAttributes', attrPayload));
+          }
+        }
+
+        if (requests.length === 0) {
+          Alert.alert(
+            'Caller Allotment',
+            scope === 'location'
+              ? 'Select a caller location'
+              : 'Enter Extension ID, Bot ID, Server ID, or Telegram ID',
+          );
+          return;
+        }
+
+        const results = await Promise.all(requests);
+        const failed = results.find((r) => !r.ok);
+        if (failed) {
+          Alert.alert('Failed', failed.message || 'Some updates failed to save');
+        } else {
+          Alert.alert('Updated', 'Data updated successfully');
+          setEditMode(null);
+          setSelected(null);
+        }
+        void load();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [selected, draft, load],
+  );
 
   return (
     <ScrollView
@@ -318,9 +341,7 @@ export function CallerAllotmentScreen() {
       }
     >
       <Text style={styles.title}>Caller Allotment</Text>
-      <Text style={styles.hint}>
-        Tap a caller, then choose what you want to update
-      </Text>
+      <Text style={styles.hint}>Tap a caller, then choose what you want to update</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading && rows.length === 0 ? <Text style={styles.emptyHint}>Loading…</Text> : null}
@@ -342,7 +363,9 @@ export function CallerAllotmentScreen() {
                 <Text style={styles.cardTitle} numberOfLines={1}>
                   {display(row.name)}
                 </Text>
-                <Text style={[styles.statusPill, blocked ? styles.statusBlocked : styles.statusActive]}>
+                <Text
+                  style={[styles.statusPill, blocked ? styles.statusBlocked : styles.statusActive]}
+                >
                   {blocked ? 'Blocked' : 'Active'}
                 </Text>
               </View>
@@ -407,6 +430,19 @@ export function CallerAllotmentScreen() {
               <Text style={styles.editHint}>Choose one section at a time</Text>
 
               <View style={styles.menuGrid}>
+                {canEditEmpCode ? (
+                  <TouchableOpacity
+                    style={[styles.menuBtn, editMode === 'empCode' && styles.menuBtnActive]}
+                    onPress={() => setEditMode(editMode === 'empCode' ? null : 'empCode')}
+                  >
+                    <Text style={styles.menuIcon}>✎</Text>
+                    <Text
+                      style={[styles.menuText, editMode === 'empCode' && styles.menuTextActive]}
+                    >
+                      Emp Code
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity
                   style={[styles.menuBtn, editMode === 'location' && styles.menuBtnActive]}
                   onPress={() => setEditMode(editMode === 'location' ? null : 'location')}
@@ -435,6 +471,30 @@ export function CallerAllotmentScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {editMode === 'empCode' && canEditEmpCode ? (
+                <View style={styles.editorCard}>
+                  <Text style={styles.editorTitle}>Update emp code</Text>
+                  <Text style={styles.currentText}>
+                    Current: {display(selected.row.empCode)}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={empCodeDraft}
+                    onChangeText={setEmpCodeDraft}
+                    placeholder="Emp Code"
+                    placeholderTextColor={colors.muted}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    style={[styles.saveBtn, busy && styles.btnDisabled]}
+                    disabled={busy || !empCodeDraft.trim()}
+                    onPress={() => void updateEmpCode()}
+                  >
+                    <Text style={styles.saveBtnText}>{busy ? 'Saving…' : 'Update Emp Code'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
 
               {editMode === 'location' ? (
                 <View style={styles.editorCard}>
@@ -465,9 +525,7 @@ export function CallerAllotmentScreen() {
                     disabled={busy || !draft.location}
                     onPress={() => void updateOtherData('location')}
                   >
-                    <Text style={styles.saveBtnText}>
-                      {busy ? 'Saving…' : 'Save Location'}
-                    </Text>
+                    <Text style={styles.saveBtnText}>{busy ? 'Saving…' : 'Save Location'}</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -525,9 +583,7 @@ export function CallerAllotmentScreen() {
                     disabled={busy}
                     onPress={() => void updateOtherData('ids')}
                   >
-                    <Text style={styles.saveBtnText}>
-                      {busy ? 'Saving…' : 'Save IDs'}
-                    </Text>
+                    <Text style={styles.saveBtnText}>{busy ? 'Saving…' : 'Save IDs'}</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -558,16 +614,22 @@ export function CallerAllotmentScreen() {
                   </ScrollView>
                   <View style={styles.headActions}>
                     <TouchableOpacity
-                      style={[styles.saveBtn, styles.flexBtn, (busy || !selectedHeads.length) && styles.btnDisabled]}
+                      style={[
+                        styles.saveBtn,
+                        styles.flexBtn,
+                        (busy || !selectedHeads.length) && styles.btnDisabled,
+                      ]}
                       disabled={busy || !selectedHeads.length}
                       onPress={() => void updateCallerHead()}
                     >
-                      <Text style={styles.saveBtnText}>
-                        {busy ? 'Saving…' : 'Assign'}
-                      </Text>
+                      <Text style={styles.saveBtnText}>{busy ? 'Saving…' : 'Assign'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.removeBtn, styles.flexBtn, (busy || !selectedHeads.length) && styles.btnDisabled]}
+                      style={[
+                        styles.removeBtn,
+                        styles.flexBtn,
+                        (busy || !selectedHeads.length) && styles.btnDisabled,
+                      ]}
                       disabled={busy || !selectedHeads.length}
                       onPress={() => void removeCallerHead()}
                     >
@@ -584,7 +646,7 @@ export function CallerAllotmentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing(2), paddingBottom: spacing(6), gap: spacing(1.5) },
   title: { color: colors.foreground, fontSize: 22, fontWeight: '800' },
@@ -592,40 +654,8 @@ const styles = StyleSheet.create({
   error: { color: '#ef5350', fontSize: 13 },
   emptyHint: { color: colors.muted, marginTop: spacing(2) },
   list: { gap: spacing(2), marginTop: spacing(1) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
   cardBlocked: {
     opacity: 0.55,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
   },
   statusPill: {
     fontSize: 10,
@@ -643,40 +673,12 @@ const styles = StyleSheet.create({
     color: '#991b1b',
     backgroundColor: 'rgba(220,38,38,0.18)',
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
     fontWeight: '700',
     flexShrink: 0,
     maxWidth: '55%',
-    textAlign: 'right',
-  },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
     textAlign: 'right',
   },
   idBlock: {
@@ -686,7 +688,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     gap: 2,
   },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   editBlock: { gap: spacing(1.5), marginBottom: spacing(2) },
   editTitle: { color: colors.foreground, fontWeight: '800', fontSize: 16 },
   editHint: { color: colors.muted, fontSize: 12, marginTop: -spacing(1) },
@@ -727,7 +728,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(0.75),
     backgroundColor: colors.surface,
   },
-  chipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: '#fff' },
   input: {

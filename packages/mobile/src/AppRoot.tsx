@@ -11,10 +11,8 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { SITE_ACCESS_TOKEN_KEY } from './api/astroSiteAuth';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AppNavigator } from './navigation/AppNavigator';
 import { AstroLoginScreen } from './screens/AstroLoginScreen';
@@ -32,14 +30,7 @@ import { UpdateGate } from './updates/UpdateGate';
 import { colors, isDarkTheme } from './theme';
 import { parseAstroDeepLink } from './utils/astroDeepLink';
 
-type GateScreen =
-  | 'splash'
-  | 'astro-login'
-  | 'site'
-  | 'login'
-  | 'panel'
-  | 'forgot'
-  | 'terms';
+type GateScreen = 'splash' | 'astro-login' | 'site' | 'login' | 'panel' | 'forgot' | 'terms';
 
 function OfflineHost() {
   const { offline, checking, refresh } = useNetworkStatus();
@@ -55,7 +46,6 @@ function Root() {
 
   const goAstroLogin = useCallback(() => {
     setSiteAccessToken('');
-    void AsyncStorage.removeItem(SITE_ACCESS_TOKEN_KEY).catch(() => undefined);
     setScreen('astro-login');
   }, []);
 
@@ -66,11 +56,6 @@ function Root() {
       if (payload.raw && appliedDeepLinkRaw.current === payload.raw) return;
       if (payload.raw) appliedDeepLinkRaw.current = payload.raw;
 
-      try {
-        await AsyncStorage.removeItem(SITE_ACCESS_TOKEN_KEY);
-      } catch {
-        /* ignore */
-      }
       setSiteAccessToken('');
       if (token) {
         await logout();

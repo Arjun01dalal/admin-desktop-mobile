@@ -3,14 +3,8 @@
  * ops.activeCustomers with startDate/endDate. Card list + detail sheet.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
@@ -19,11 +13,8 @@ import { pickLastActivity } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import {
-  DetailFilterBar,
-  type SearchFieldKey,
-  type SearchFieldOption,
-} from './DetailFilterBar';
+import { getStoredUser } from '../../../lib/webShim';
+import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 /** Search fields mirroring desktop TodaysActivePage per-column filters. */
@@ -85,6 +76,7 @@ export function TodaysActiveScreen() {
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
+  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
 
   const openUserReport = useCallback(
     (userId?: string, userName?: string) => {
@@ -122,31 +114,77 @@ export function TodaysActiveScreen() {
     setLoading(true);
     setError(null);
     try {
-      const filter: Record<string, unknown> = {};
-      if (appClientName) filter.clientName = appClientName;
-      if (appliedSearch.text.trim()) filter[appliedSearch.field] = appliedSearch.text.trim();
-      const res = await secureApi('ops.activeCustomers', {
+      // Laxmi Users Todays_Active: uniqueUser defaults false; send app + appWithState.
+      // Exact DP ID lookup skips app/state scope so leads outside appWithState still resolve.
+      const searchText = appliedSearch.text.trim();
+      const searchingDpId =
+        Boolean(searchText) &&
+        (appliedSearch.field === '_id' || appliedSearch.field === 'dpId');
+
+      const filter: Record<string, unknown> = { uniqueUser: false };
+      if (!searchingDpId && appClientName) filter.clientName = appClientName;
+      if (searchText) {
+        const field = appliedSearch.field === 'dpId' ? '_id' : appliedSearch.field;
+        filter[field] = searchText;
+      }
+
+      const allottedApps = (admin?.clientName || admin?.allotedApps) as
+        | string
+        | string[]
+        | undefined;
+      const payload: Record<string, unknown> = {
         itemsPerPage: pageSize,
         pageNo: page,
-        ...(startDate && endDate ? { startDate, endDate } : {}),
         filter,
-      });
+        ...(startDate && endDate ? { startDate, endDate } : {}),
+        ...(!searchingDpId && allottedApps ? { app: allottedApps } : {}),
+      };
+
+      const aws = admin?.appWithState;
+      if (!searchingDpId && aws && typeof aws === 'object' && !Array.isArray(aws)) {
+        const map = aws as Record<string, unknown>;
+        const scoped: Record<string, string[]> = {};
+        if (appClientName && Array.isArray(map[appClientName])) {
+          scoped[appClientName] = [...(map[appClientName] as string[])];
+        } else {
+          for (const [key, states] of Object.entries(map)) {
+            if (Array.isArray(states)) scoped[key] = [...(states as string[])];
+          }
+        }
+        if (Object.keys(scoped).length > 0) payload.appWithState = scoped;
+      }
+
+      const res = await secureApi('ops.activeCustomers', payload);
       if (!res.ok) {
         setError(res.message || 'Failed to load todays active users');
         setRows([]);
         return;
       }
       const raw = res.data as
-        | { user?: Row[]; totalPages?: number; count?: number }
+        | {
+            user?: Row[];
+            users?: Row[];
+            items?: Row[];
+            totalPages?: number;
+            count?: number;
+            payload?: { user?: Row[]; users?: Row[]; items?: Row[]; count?: number; totalPages?: number };
+          }
         | undefined;
+      const nested = raw?.payload && typeof raw.payload === 'object' ? raw.payload : raw;
+      const list =
+        (Array.isArray(nested?.user) && nested.user) ||
+        (Array.isArray(nested?.users) && nested.users) ||
+        (Array.isArray(nested?.items) && nested.items) ||
+        (Array.isArray(raw?.user) && raw.user) ||
+        [];
       setSelected(null);
-      setRows(Array.isArray(raw?.user) ? raw!.user! : []);
-      setTotalPages(Math.max(1, Number(raw?.totalPages ?? 1) || 1));
-      setTotal(Number(raw?.count ?? 0) || 0);
+      setRows(list);
+      setTotalPages(Math.max(1, Number(nested?.totalPages ?? raw?.totalPages ?? 1) || 1));
+      setTotal(Number(nested?.count ?? raw?.count ?? list.length) || 0);
     } finally {
       setLoading(false);
     }
-  }, [appClientName, appliedSearch, endDate, page, pageSize, startDate]);
+  }, [admin, appClientName, appliedSearch, endDate, page, pageSize, startDate]);
 
   useEffect(() => {
     void load();
@@ -239,7 +277,11 @@ export function TodaysActiveScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Todays Active</Text>
@@ -313,6 +355,12 @@ export function TodaysActiveScreen() {
             </View>
 
             <View style={styles.cardRow}>
+              <Text style={styles.cardLabel}>Dp Id</Text>
+              <Text style={styles.cardValue} numberOfLines={1} selectable>
+                {display(row._id)}
+              </Text>
+            </View>
+            <View style={styles.cardRow}>
               <Text style={styles.cardLabel}>App</Text>
               <Text style={styles.cardValue}>{appCodeForName(row.clientName)}</Text>
             </View>
@@ -370,54 +418,7 @@ export function TodaysActiveScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
+const styles = makeStyles({
   reportBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
@@ -430,28 +431,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
   cardValue: { color: colors.foreground, fontSize: 11, flex: 1, textAlign: 'right' },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
 });

@@ -13,12 +13,12 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, radius, spacing } from '../../../theme';
@@ -87,8 +87,7 @@ function formatWhatsappTo(phone: string): string {
 function groupChats(messages: WhatsappMessage[]): GroupedChats {
   const grouped: GroupedChats = {};
   for (const message of messages) {
-    const raw =
-      message.callback_type === 'incoming_message' ? message.from : message.to;
+    const raw = message.callback_type === 'incoming_message' ? message.from : message.to;
     if (!raw) continue;
     const phone = normalizePhone(raw);
     (grouped[phone] ||= []).push(message);
@@ -107,11 +106,7 @@ function getProfileName(messages: WhatsappMessage[], phone: string): string {
   const withName = [...messages]
     .reverse()
     .find((message) => message.profile_name || message.content?.profile_name);
-  return (
-    withName?.profile_name ||
-    withName?.content?.profile_name ||
-    phone
-  );
+  return withName?.profile_name || withName?.content?.profile_name || phone;
 }
 
 function messagePreview(message: WhatsappMessage): string {
@@ -139,10 +134,7 @@ function buildSummaries(records: GroupedChats): ChatSummary[] {
       };
     })
     .filter((item): item is ChatSummary => item !== null)
-    .sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    );
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
 function formatTime(timestamp: string | undefined): string {
@@ -223,10 +215,7 @@ export function WhatsappScreen() {
     };
   }, [fetchWhatsappData]);
 
-  const summaries = useMemo(
-    () => (records ? buildSummaries(records) : []),
-    [records],
-  );
+  const summaries = useMemo(() => (records ? buildSummaries(records) : []), [records]);
 
   const filteredChats = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -359,9 +348,7 @@ export function WhatsappScreen() {
           }
         >
           {!loading && filteredChats.length === 0 ? (
-            <Text style={styles.emptyText}>
-              {records ? 'No chats found' : 'Loading chats…'}
-            </Text>
+            <Text style={styles.emptyText}>{records ? 'No chats found' : 'Loading chats…'}</Text>
           ) : null}
           {filteredChats.map((chat, ci) => (
             <TouchableOpacity
@@ -433,17 +420,14 @@ export function WhatsappScreen() {
         style={styles.messages}
         contentContainerStyle={styles.messagesContent}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() =>
-          messagesRef.current?.scrollToEnd({ animated: false })
-        }
+        onContentSizeChange={() => messagesRef.current?.scrollToEnd({ animated: false })}
       >
         {activeMessages.length === 0 ? (
           <Text style={styles.emptyText}>No messages in this chat.</Text>
         ) : null}
         {activeMessages.map((item, index) => {
           const incoming = item.callback_type === 'incoming_message';
-          const imageContent =
-            item.content?.type === 'image' ? item.content.image : null;
+          const imageContent = item.content?.type === 'image' ? item.content.image : null;
           return (
             <View
               key={`${item.timestamp || 'message'}-${item.callback_type || 'unknown'}-${index}`}
@@ -453,15 +437,10 @@ export function WhatsappScreen() {
               ]}
             >
               <View
-                style={[
-                  styles.bubble,
-                  incoming ? styles.bubbleIncoming : styles.bubbleOutgoing,
-                ]}
+                style={[styles.bubble, incoming ? styles.bubbleIncoming : styles.bubbleOutgoing]}
               >
                 {item.content?.type === 'text' ? (
-                  <Text style={styles.messageText}>
-                    {String(item.content.text.body || '')}
-                  </Text>
+                  <Text style={styles.messageText}>{String(item.content.text.body || '')}</Text>
                 ) : null}
                 {imageContent?.s3_url || imageContent?.url ? (
                   <Image
@@ -524,7 +503,7 @@ export function WhatsappScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   screen: { flex: 1, backgroundColor: colors.background },
   listHeader: {
     flexDirection: 'row',
@@ -565,7 +544,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   chatList: { padding: spacing(4), paddingTop: spacing(1), gap: spacing(2) },
   emptyText: {
     color: colors.muted,

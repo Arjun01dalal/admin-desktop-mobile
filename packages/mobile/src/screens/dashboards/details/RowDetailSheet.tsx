@@ -5,6 +5,7 @@
  */
 import React, { type ReactNode } from 'react';
 import {
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -14,6 +15,9 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 
@@ -27,6 +31,10 @@ export type SheetField = {
   multiline?: boolean;
   /** Allow OS text selection / long-press copy. Defaults to true. */
   selectable?: boolean;
+  /** Show a copy icon next to the value; copies `copyValue` or `value`. */
+  copyable?: boolean;
+  /** Optional raw string to copy (defaults to `value`). */
+  copyValue?: string;
 };
 
 export type SheetAction = {
@@ -53,6 +61,37 @@ type Props = {
   footer?: ReactNode;
 };
 
+function canCopy(field: SheetField): boolean {
+  if (!field.copyable) return false;
+  const raw = String(field.copyValue ?? field.value ?? '').trim();
+  return Boolean(raw) && raw !== '—';
+}
+
+async function copyField(field: SheetField): Promise<void> {
+  const raw = String(field.copyValue ?? field.value ?? '').trim();
+  if (!raw || raw === '—') return;
+  try {
+    await Clipboard.setStringAsync(raw);
+    Alert.alert('Copied', `${toDisplayText(field.label)} copied`);
+  } catch {
+    Alert.alert('Copy failed', 'Unable to copy to clipboard');
+  }
+}
+
+function CopyButton({ field }: { field: SheetField }) {
+  if (!canCopy(field)) return null;
+  return (
+    <TouchableOpacity
+      onPress={() => void copyField(field)}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityLabel={`Copy ${field.label}`}
+      style={styles.copyBtn}
+    >
+      <MaterialCommunityIcons name="content-copy" size={16} color={colors.muted} />
+    </TouchableOpacity>
+  );
+}
+
 export function RowDetailSheet({
   visible,
   title,
@@ -76,7 +115,10 @@ export function RowDetailSheet({
             <Text style={styles.title} numberOfLines={1}>
               {toDisplayText(title)}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.close}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -124,7 +166,10 @@ export function RowDetailSheet({
             {fields.map((f, fi) =>
               f.multiline ? (
                 <View key={`field-${fi}-${f.label}`} style={styles.fieldBlock}>
-                  <Text style={styles.label}>{toDisplayText(f.label)}</Text>
+                  <View style={styles.fieldLabelRow}>
+                    <Text style={styles.label}>{toDisplayText(f.label)}</Text>
+                    <CopyButton field={f} />
+                  </View>
                   <Text
                     style={[styles.blockValue, f.color ? { color: f.color } : null]}
                     selectable={f.selectable !== false}
@@ -133,23 +178,29 @@ export function RowDetailSheet({
                   </Text>
                 </View>
               ) : (
-              <View key={`field-${fi}-${f.label}`} style={styles.fieldRow}>
-                <Text style={styles.label}>{toDisplayText(f.label)}</Text>
-                {f.badgeColor ? (
-                  <View style={[styles.valueBadge, { backgroundColor: f.badgeColor }]}>
-                    <Text style={styles.valueBadgeText}>
-                      {f.value ? toDisplayText(f.value) : '—'}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text
-                    style={[styles.value, f.color ? { color: f.color } : null]}
-                    selectable={f.selectable !== false}
-                  >
-                    {f.value ? toDisplayText(f.value) : '—'}
-                  </Text>
-                )}
-              </View>
+                <View key={`field-${fi}-${f.label}`} style={styles.fieldRow}>
+                  <Text style={styles.label}>{toDisplayText(f.label)}</Text>
+                  {f.badgeColor ? (
+                    <View style={styles.valueSide}>
+                      <View style={[styles.valueBadge, { backgroundColor: f.badgeColor }]}>
+                        <Text style={styles.valueBadgeText}>
+                          {f.value ? toDisplayText(f.value) : '—'}
+                        </Text>
+                      </View>
+                      <CopyButton field={f} />
+                    </View>
+                  ) : (
+                    <View style={styles.valueSide}>
+                      <Text
+                        style={[styles.value, f.color ? { color: f.color } : null]}
+                        selectable={f.selectable !== false}
+                      >
+                        {f.value ? toDisplayText(f.value) : '—'}
+                      </Text>
+                      <CopyButton field={f} />
+                    </View>
+                  )}
+                </View>
               ),
             )}
             {action ? (
@@ -164,7 +215,7 @@ export function RowDetailSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   backdropTouch: { flex: 1 },
   sheet: {
@@ -235,6 +286,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+  },
   blockValue: {
     color: colors.foreground,
     fontSize: 13,
@@ -245,18 +302,30 @@ const styles = StyleSheet.create({
   fieldRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     gap: spacing(3),
     paddingVertical: spacing(2),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  label: { color: colors.muted, fontSize: 13, flexShrink: 0, maxWidth: '45%' },
+  label: { color: colors.muted, fontSize: 13, flexShrink: 0, maxWidth: '40%' },
+  valueSide: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing(1.5),
+    minWidth: 0,
+  },
   value: {
     color: colors.foreground,
     fontSize: 13,
     fontWeight: '600',
-    flex: 1,
+    flexShrink: 1,
     textAlign: 'right',
+  },
+  copyBtn: {
+    padding: spacing(0.5),
   },
   valueBadge: {
     borderRadius: radius.sm,

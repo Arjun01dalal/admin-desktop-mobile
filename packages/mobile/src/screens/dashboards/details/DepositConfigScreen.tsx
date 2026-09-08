@@ -10,13 +10,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -40,7 +40,12 @@ type FormState = {
   allowedAmounts: string;
 };
 
-const EMPTY_FORM: FormState = { clientName: '', minDeposit: '', maxDeposit: '', allowedAmounts: '' };
+const EMPTY_FORM: FormState = {
+  clientName: '',
+  minDeposit: '',
+  maxDeposit: '',
+  allowedAmounts: '',
+};
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -191,7 +196,11 @@ export function DepositConfigScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <View style={styles.headerRow}>
@@ -210,9 +219,7 @@ export function DepositConfigScreen() {
       ) : null}
 
       {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No deposit config</Text>
-      ) : null}
+      {!loading && rows.length === 0 ? <Text style={styles.hint}>No deposit config</Text> : null}
 
       <View style={styles.list}>
         {rows.map((row, index) => (
@@ -264,7 +271,9 @@ export function DepositConfigScreen() {
         }
         actions={
           sheetRow && canEdit
-            ? ([{ label: 'Edit', tone: 'primary', onPress: () => openEdit(sheetRow) }] satisfies SheetAction[])
+            ? ([
+                { label: 'Edit', tone: 'primary', onPress: () => openEdit(sheetRow) },
+              ] satisfies SheetAction[])
             : []
         }
         onClose={() => setSheetRow(null)}
@@ -347,15 +356,7 @@ export function DepositConfigScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-  },
+const styles = makeStyles({
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700', flex: 1 },
   addBtn: {
     backgroundColor: colors.primary,
@@ -364,49 +365,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
   },
   addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   editBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
@@ -419,20 +377,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -440,23 +384,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
   cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '28%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
   modalSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.md * 2,
@@ -464,9 +392,6 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     gap: spacing(2),
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1, marginRight: spacing(2) },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -485,6 +410,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing(1),
   },
-  btnDisabled: { opacity: 0.5 },
   saveBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
 });

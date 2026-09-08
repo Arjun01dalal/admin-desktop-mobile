@@ -43,7 +43,7 @@ export function SecurityGate({ children }: { children: React.ReactNode }) {
       <View style={styles.list}>
         {(reasons.length ? reasons : ['Security policy violation']).map((r) => (
           <Text key={r} style={styles.reason}>
-            •  {r}
+            • {r}
           </Text>
         ))}
       </View>

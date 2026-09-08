@@ -8,22 +8,29 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  StyleSheet,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import { appCodeForName, asPaged } from '@astro/shared';
+import { makeStyles } from '../../../styles/common';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { INDIA_STATES, appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
-import { DetailFilterBar, type SearchFieldKey } from './DetailFilterBar';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import {
+  DetailFilterBar,
+  SEARCH_FIELDS,
+  type SearchFieldKey,
+  type SearchFieldOption,
+} from './DetailFilterBar';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type Kind = 'balance' | 'bonus' | 'registered';
+type UserTypeFilter = '' | 'Active' | 'InActive';
 
 type UserRow = {
   _id?: string;
@@ -35,6 +42,15 @@ type UserRow = {
   city?: string;
   state?: string;
   [key: string]: unknown;
+};
+
+type DashboardUsersResponse = {
+  users?: UserRow[];
+  items?: UserRow[];
+  totalBalance?: number;
+  totalBonusBalance?: number;
+  total?: number;
+  totalPages?: number;
 };
 
 const META: Record<
@@ -52,6 +68,19 @@ const META: Record<
 
 const PAGE_SIZE = 25;
 
+const USER_TYPE_OPTIONS: { value: UserTypeFilter; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'Active', label: 'Active' },
+  { value: 'InActive', label: 'InActive' },
+];
+
+const BALANCE_SEARCH_FIELDS: readonly SearchFieldOption[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'balance', label: 'Balance' },
+  { key: 'city', label: 'City' },
+];
+
 function maskMobile(value: unknown, canShow: boolean): string {
   if (!value) return '—';
   return canShow ? String(value) : '**********';
@@ -63,17 +92,24 @@ function display(value: unknown): string {
 
 export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   const meta = META[kind];
+  const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
   const initialEnd = typeof params.endDate === 'string' ? params.endDate : todayIST();
   const canShowMobile = hasPermission('show_mobile');
   const hideContact = hasPermission('contact_visibility_none');
+  const canOpenReport = hasPermission('wallet_history');
+  const showUserTypeFilter = kind === 'balance' || kind === 'bonus';
+  const showStateFilter = kind === 'balance' || kind === 'bonus';
+  const searchFields = kind === 'registered' ? SEARCH_FIELDS : BALANCE_SEARCH_FIELDS;
 
   const [draftStart, setDraftStart] = useState(initialStart);
   const [draftEnd, setDraftEnd] = useState(initialEnd);
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [appClientName, setAppClientName] = useState('');
+  const [userType, setUserType] = useState<UserTypeFilter>('');
+  const [stateFilter, setStateFilter] = useState('');
   const [searchField, setSearchField] = useState<SearchFieldKey>('name');
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState<{ field: SearchFieldKey; text: string }>({
@@ -88,6 +124,17 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   const [totalPages, setTotalPages] = useState(1);
   const [totalBalance, setTotalBalance] = useState(0);
   const [selected, setSelected] = useState<UserRow | null>(null);
+
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId || !canOpenReport) return;
+      navigation.navigate('/user-report', {
+        userId: String(userId),
+        userName: String(userName || ''),
+      });
+    },
+    [canOpenReport, navigation],
+  );
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!selected) return [];
@@ -144,13 +191,42 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
     return fields;
   }, [selected, canShowMobile, hideContact, kind]);
 
+  const sheetActions = useMemo<SheetAction[] | undefined>(() => {
+    if (!selected?._id || !canOpenReport) return undefined;
+    return [
+      {
+        label: 'View Details',
+        tone: 'primary',
+        onPress: () => {
+          const id = selected._id;
+          const name = selected.name;
+          setSelected(null);
+          openUserReport(id, name);
+        },
+      },
+    ];
+  }, [selected, canOpenReport, openUserReport]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const filter: Record<string, unknown> = {};
       if (appClientName) filter.clientName = appClientName;
-      if (appliedSearch.text.trim()) filter[appliedSearch.field] = appliedSearch.text.trim();
+      if (stateFilter) filter.state = stateFilter;
+      if (userType === 'Active') filter.active = true;
+      if (userType === 'InActive') filter.inActive = true;
+
+      const searchText = appliedSearch.text.trim();
+      if (searchText) {
+        if (appliedSearch.field === 'balance') {
+          const n = Number(searchText);
+          if (Number.isFinite(n)) filter.balance = n;
+        } else {
+          filter[appliedSearch.field] = searchText;
+        }
+      }
+
       const payload: Record<string, unknown> = {
         startDate,
         endDate,
@@ -160,7 +236,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       };
       if (meta.decreasing) payload.decreasing = true;
 
-      const res = await secureApi(meta.action, payload);
+      const res = await secureApi<DashboardUsersResponse | UserRow[]>(meta.action, payload);
       if (!res.ok) {
         setError(res.message || 'Failed to load users');
         setRows([]);
@@ -171,17 +247,26 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       setRows(paged.rows);
       setTotalPages(Math.max(1, paged.totalPages || 1));
 
-      const envelope =
-        res.data && typeof res.data === 'object'
-          ? (res.data as Record<string, unknown>)
-          : {};
-      const total =
-        Number(envelope.totalBalance ?? envelope.totalBonusBalance ?? envelope.total ?? 0) || 0;
+      const envelope = Array.isArray(res.data) ? {} : (res.data ?? {});
+      const total = Number(
+        envelope.totalBalance ?? envelope.totalBonusBalance ?? envelope.total ?? 0,
+      ) || 0;
       setTotalBalance(total);
     } finally {
       setLoading(false);
     }
-  }, [appClientName, appliedSearch, endDate, meta.action, meta.decreasing, page, pageSize, startDate]);
+  }, [
+    appClientName,
+    appliedSearch,
+    endDate,
+    meta.action,
+    meta.decreasing,
+    page,
+    pageSize,
+    startDate,
+    stateFilter,
+    userType,
+  ]);
 
   useEffect(() => {
     void load();
@@ -217,6 +302,7 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
             setPageSize(v);
             setPage(1);
           }}
+          searchFields={searchFields}
           searchField={searchField}
           onSearchFieldChange={setSearchField}
           searchText={searchDraft}
@@ -226,6 +312,63 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
             setPage(1);
           }}
         />
+        {showUserTypeFilter ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            <Text style={styles.filterLabel}>User Type</Text>
+            {USER_TYPE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.label}
+                style={[styles.chip, userType === opt.value && styles.chipActive]}
+                onPress={() => {
+                  setUserType(opt.value);
+                  setPage(1);
+                }}
+              >
+                <Text style={[styles.chipText, userType === opt.value && styles.chipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
+        {showStateFilter ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            <Text style={styles.filterLabel}>State</Text>
+            <TouchableOpacity
+              style={[styles.chip, !stateFilter && styles.chipActive]}
+              onPress={() => {
+                setStateFilter('');
+                setPage(1);
+              }}
+            >
+              <Text style={[styles.chipText, !stateFilter && styles.chipTextActive]}>All</Text>
+            </TouchableOpacity>
+            {INDIA_STATES.map((state) => (
+              <TouchableOpacity
+                key={state}
+                style={[styles.chip, stateFilter === state && styles.chipActive]}
+                onPress={() => {
+                  setStateFilter(state);
+                  setPage(1);
+                }}
+              >
+                <Text
+                  style={[styles.chipText, stateFilter === state && styles.chipTextActive]}
+                >
+                  {state}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
         {totalBalance > 0 ? (
           <Text style={styles.total}>Total: ₹{totalBalance.toLocaleString('en-IN')}</Text>
         ) : null}
@@ -245,9 +388,14 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       draftEnd,
       loading,
       appClientName,
+      searchFields,
       searchField,
       searchDraft,
       pageSize,
+      showUserTypeFilter,
+      showStateFilter,
+      userType,
+      stateFilter,
       totalBalance,
       error,
     ],
@@ -344,27 +492,23 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         title={selected ? display(selected.name) : ''}
         fields={sheetFields}
         onClose={() => setSelected(null)}
+        actions={sheetActions}
       />
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   total: { color: colors.primary, fontSize: 14, fontWeight: '700', marginTop: spacing(2) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
   hint: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: spacing(2) },
+  filterRow: {
+    flexDirection: 'row',
+    gap: spacing(2),
+    alignItems: 'center',
+    marginTop: spacing(2),
+    paddingRight: spacing(2),
+  },
+  filterLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -427,19 +571,4 @@ const styles = StyleSheet.create({
   },
   cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(2) },
   empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
 });

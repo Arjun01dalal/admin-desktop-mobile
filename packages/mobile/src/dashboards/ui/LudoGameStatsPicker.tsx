@@ -46,22 +46,14 @@ function fmt(n: number | string | undefined): string {
   return n.toLocaleString('en-IN');
 }
 
-export function LudoGameStatsPicker({
-  value,
-  options,
-  statsMap,
-  onChange,
-  onGgrPress,
-}: Props) {
+export function LudoGameStatsPicker({ value, options, statsMap, onChange, onGgrPress }: Props) {
   const [open, setOpen] = useState(false);
   const { width } = useWindowDimensions();
   const compact = width < 380;
   const headerScrollRef = useRef<ScrollView>(null);
 
   const selectedLabel =
-    value === 'All'
-      ? 'All'
-      : options.find((o) => o.value === value)?.label || value;
+    value === 'All' ? 'All' : options.find((o) => o.value === value)?.label || value;
   const selectedStats = statsMap?.[value];
 
   const rows = useMemo(
@@ -87,33 +79,19 @@ export function LudoGameStatsPicker({
 
   return (
     <>
-      <TouchableOpacity
-        onPress={() => setOpen(true)}
-        style={styles.trigger}
-        activeOpacity={0.75}
-      >
+      <TouchableOpacity onPress={() => setOpen(true)} style={styles.trigger} activeOpacity={0.75}>
         <Text style={styles.triggerLabel} numberOfLines={1}>
           {toDisplayText(selectedLabel)}
         </Text>
         {selectedStats ? (
-          <Text
-            style={[
-              styles.triggerGgr,
-              selectedStats.ggr < 0 ? styles.ggrNeg : styles.ggrPos,
-            ]}
-          >
+          <Text style={[styles.triggerGgr, selectedStats.ggr < 0 ? styles.ggrNeg : styles.ggrPos]}>
             ({selectedStats.ggr})
           </Text>
         ) : null}
         <Text style={styles.chevron}>▾</Text>
       </TouchableOpacity>
 
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-      >
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <Pressable
             style={[styles.sheet, compact && styles.sheetCompact]}
@@ -194,15 +172,9 @@ export function LudoGameStatsPicker({
                             <Text style={[styles.td, styles.colNum]}>
                               {fmt(row.stats?.uniquePlayers)}
                             </Text>
-                            <Text style={[styles.td, styles.colNum]}>
-                              {fmt(row.stats?.bet)}
-                            </Text>
-                            <Text style={[styles.td, styles.colNum]}>
-                              {fmt(row.stats?.win)}
-                            </Text>
-                            <Text style={[styles.td, styles.colNum]}>
-                              {fmt(row.stats?.rtp)}
-                            </Text>
+                            <Text style={[styles.td, styles.colNum]}>{fmt(row.stats?.bet)}</Text>
+                            <Text style={[styles.td, styles.colNum]}>{fmt(row.stats?.win)}</Text>
+                            <Text style={[styles.td, styles.colNum]}>{fmt(row.stats?.rtp)}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => {
@@ -216,17 +188,15 @@ export function LudoGameStatsPicker({
                             activeOpacity={0.7}
                           >
                             <Text
-                            style={[
-                              styles.td,
-                              styles.colNum,
-                              styles.ggrCell,
-                              typeof ggr === 'number' && ggr < 0
-                                ? styles.ggrNeg
-                                : styles.ggrPos,
-                            ]}
-                          >
-                            {fmt(ggr)}
-                          </Text>
+                              style={[
+                                styles.td,
+                                styles.colNum,
+                                styles.ggrCell,
+                                typeof ggr === 'number' && ggr < 0 ? styles.ggrNeg : styles.ggrPos,
+                              ]}
+                            >
+                              {fmt(ggr)}
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       );
@@ -236,10 +206,7 @@ export function LudoGameStatsPicker({
               </View>
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setOpen(false)}
-            >
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setOpen(false)}>
               <Text style={styles.closeText}>Close</Text>
             </TouchableOpacity>
           </Pressable>

@@ -3,6 +3,8 @@
  * card models) to mobile detail screens pushed on the root stack.
  */
 import React from 'react';
+import { canAccessNavItem, Permissions, type Permission } from '../auth/permissions';
+import type { AuthUser } from '../types/auth';
 import { LiveMatchTotalScreen } from '../screens/dashboards/details/LiveMatchTotalScreen';
 import { BothMasterAddScreen } from '../screens/dashboards/details/BothMasterAddScreen';
 import { FalconRateManagementScreen } from '../screens/dashboards/details/FalconRateManagementScreen';
@@ -10,6 +12,7 @@ import { ExchangeRateManagementScreen } from '../screens/dashboards/details/Exch
 import { MasterDashboardScreen } from '../screens/dashboards/details/MasterDashboardScreen';
 import { DashboardUsersListScreen } from '../screens/dashboards/details/DashboardUsersListScreen';
 import { TodaysActiveScreen } from '../screens/dashboards/details/TodaysActiveScreen';
+import { UsersScreen } from '../screens/UsersScreen';
 import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersScreen';
 import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
 import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/PlayerActivityDetailsScreen';
@@ -17,12 +20,14 @@ import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameAct
 import { GameUserStatsScreen } from '../screens/dashboards/details/GameUserStatsScreen';
 import { BetConstructGamesListScreen } from '../screens/dashboards/details/BetConstructGamesListScreen';
 import { LudoUserGgrScreen } from '../screens/dashboards/details/LudoUserGgrScreen';
+import { LudoPlayerWiseRtpScreen } from '../screens/dashboards/details/LudoPlayerWiseRtpScreen';
 import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
 import { UserReportScreen } from '../screens/UserReportScreen';
 import { UserExposureScreen } from '../screens/UserExposureScreen';
 import { BonusEarningScreen } from '../screens/BonusEarningScreen';
 import { CallerDepositListScreen } from '../screens/dashboards/details/CallerDepositListScreen';
 import { CallerDetailsScreen } from '../screens/dashboards/details/CallerDetailsScreen';
+import { ActiveBotUsersScreen } from '../screens/dashboards/details/ActiveBotUsersScreen';
 import { ActiveUserDataScreen } from '../screens/dashboards/details/ActiveUserDataScreen';
 import { MidGroupsScreen } from '../screens/dashboards/details/MidGroupsScreen';
 
@@ -40,6 +45,38 @@ export type PanelDetailRoute = {
   path: string;
   title: string;
   Component: React.ComponentType<Record<string, unknown>>;
+};
+
+const DETAIL_PERMISSION_BY_PATH: Readonly<Record<string, Permission>> = {
+  '/liveMatchTotal': Permissions.View_Dashboard,
+  '/masterLiveMatchTotal': Permissions.View_Dashboard,
+  '/bothLiveMatchTotal': Permissions.View_Dashboard,
+  '/bothMasterAddPage': Permissions.View_Dashboard,
+  '/falconRateManagement': Permissions.View_Dashboard,
+  '/exchangeRateManagement': Permissions.View_Dashboard,
+  '/activeUserData': Permissions.View_Dashboard,
+  '/masterDashboard': Permissions.View_Dashboard,
+  '/balance-f': Permissions.View_Dashboard,
+  '/total-bonus-users-p': Permissions.View_Dashboard,
+  '/registered-users': Permissions.View_Dashboard,
+  '/users': Permissions.View_Users,
+  '/todays-active': Permissions.todays_active,
+  '/new-registers': Permissions.new_registrations,
+  '/game-activity': Permissions.game_activity,
+  '/player-activity/details': Permissions.player_activity,
+  '/game-activity/details': Permissions.game_activity,
+  '/game-activity/user-stats': Permissions.game_activity,
+  '/betConstructGamesList': Permissions.View_Games,
+  '/ludo-user-ggr-by-round': Permissions.house_game,
+  '/ludo-player-wise-rtp': Permissions.house_game,
+  '/leaderboardCustomerCount': Permissions.caller_leaderboard_tab,
+  '/user-report': Permissions.View_Users,
+  '/user_exposure': Permissions.View_Users,
+  '/bonus-wallet-referral-earning': Permissions.View_Users,
+  '/caller-responsibility/deposit-list': Permissions.caller_responsibility,
+  '/caller-responsibility/details': Permissions.caller_responsibility,
+  '/caller-responsibility/bot-users': Permissions.caller_responsibility,
+  '/funds/mid-groups': Permissions.Deposit_Config,
 };
 
 export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
@@ -99,6 +136,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     Component: () => <DashboardUsersListScreen kind="registered" />,
   },
   {
+    path: '/users',
+    title: 'Users',
+    Component: UsersScreen as PanelDetailRoute['Component'],
+  },
+  {
     path: '/todays-active',
     title: "Today's Active Users",
     Component: TodaysActiveScreen as PanelDetailRoute['Component'],
@@ -139,6 +181,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     Component: LudoUserGgrScreen as PanelDetailRoute['Component'],
   },
   {
+    path: '/ludo-player-wise-rtp',
+    title: 'Player Wise RTP',
+    Component: LudoPlayerWiseRtpScreen as PanelDetailRoute['Component'],
+  },
+  {
     path: '/leaderboardCustomerCount',
     title: 'Caller Customers',
     Component: LeaderboardCustomerListScreen as PanelDetailRoute['Component'],
@@ -169,6 +216,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     Component: CallerDetailsScreen as PanelDetailRoute['Component'],
   },
   {
+    path: '/caller-responsibility/bot-users',
+    title: 'Active Bot Users',
+    Component: ActiveBotUsersScreen as PanelDetailRoute['Component'],
+  },
+  {
     path: '/funds/mid-groups',
     title: 'MID Groups',
     Component: MidGroupsScreen as PanelDetailRoute['Component'],
@@ -176,6 +228,16 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
 ];
 
 const ROUTES_BY_PATH = new Map(PANEL_DETAIL_ROUTES.map((r) => [r.path, r]));
+
+/**
+ * Detail routes are registered on the root stack, so menu filtering alone
+ * cannot protect them from deep links or stale navigation state.
+ */
+export function canAccessPanelDetail(path: string, user: AuthUser | null | undefined): boolean {
+  const permission = DETAIL_PERMISSION_BY_PATH[path];
+  if (!permission || !user) return false;
+  return canAccessNavItem({ id: `detail:${path}`, permission }, user);
+}
 
 /** True when a card target resolves to an implemented mobile detail screen. */
 export function canOpenPanelPath(href?: string): boolean {
@@ -220,7 +282,7 @@ export function openPanelTarget(
   let root: NavNode = navigation;
   while (nav) {
     root = nav;
-    const parent = nav.getParent?.();
+    const parent: unknown = nav.getParent?.();
     nav = parent && typeof parent === 'object' ? (parent as NavNode) : null;
   }
   root.navigate(target.href, params);

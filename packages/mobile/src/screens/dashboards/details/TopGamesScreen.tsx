@@ -9,12 +9,12 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import {
   buildUpdateGameImagePayload,
   type GameImageUpdateTarget,
@@ -89,9 +89,7 @@ function unpackDoc(data: unknown): Record<string, Item[]> {
     const looksLikeCategoryMap = Object.values(innerObj).every(
       (val) => Array.isArray(val) || val == null,
     );
-    return looksLikeCategoryMap
-      ? (innerObj as Record<string, Item[]>)
-      : { All: [inner as Item] };
+    return looksLikeCategoryMap ? (innerObj as Record<string, Item[]>) : { All: [inner as Item] };
   }
   return { All: inner as Item[] };
 }
@@ -153,31 +151,27 @@ export function TopGamesScreen() {
   const toggleStatus = useCallback(
     (row: GameRow) => {
       const next = !row.status;
-      Alert.alert(
-        next ? 'Show game' : 'Hide game',
-        `${next ? 'Show' : 'Hide'} ${gameName(row)}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Confirm',
-            onPress: () => {
-              void (async () => {
-                const res = await secureApi<unknown>('topGames.updateStatus', {
-                  category: row._categoryKey,
-                  gameId: row.gameId,
-                  status: next,
-                });
-                if (res.ok) {
-                  setSheetRow(null);
-                  void load();
-                } else {
-                  setError(res.message || 'Failed to update status');
-                }
-              })();
-            },
+      Alert.alert(next ? 'Show game' : 'Hide game', `${next ? 'Show' : 'Hide'} ${gameName(row)}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            void (async () => {
+              const res = await secureApi<unknown>('topGames.updateStatus', {
+                category: row._categoryKey,
+                gameId: row.gameId,
+                status: next,
+              });
+              if (res.ok) {
+                setSheetRow(null);
+                void load();
+              } else {
+                setError(res.message || 'Failed to update status');
+              }
+            })();
           },
-        ],
-      );
+        },
+      ]);
     },
     [load],
   );
@@ -260,10 +254,26 @@ export function TopGamesScreen() {
       { key: 'name', label: 'Name', width: 150, render: (r) => gameName(r) },
       { key: 'gameId', label: 'Game ID', width: 110, render: (r) => display(r.gameId) },
       { key: 'provider', label: 'Provider', width: 120, render: (r) => providerName(r) },
-      { key: 'categoryGroup', label: 'Category Group', width: 120, render: (r) => display(r._categoryKey) },
+      {
+        key: 'categoryGroup',
+        label: 'Category Group',
+        width: 120,
+        render: (r) => display(r._categoryKey),
+      },
       { key: 'category', label: 'Game Category', width: 120, render: (r) => display(r.category) },
-      { key: 'position', label: 'Position', width: 80, align: 'center', render: (r) => String(r._position) },
-      { key: 'status', label: 'Status', width: 80, render: (r) => (r.status ? 'Showing' : 'Hidden') },
+      {
+        key: 'position',
+        label: 'Position',
+        width: 80,
+        align: 'center',
+        render: (r) => String(r._position),
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 80,
+        render: (r) => (r.status ? 'Showing' : 'Hidden'),
+      },
       {
         key: 'updatedOn',
         label: 'Updated On',
@@ -283,7 +293,11 @@ export function TopGamesScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Top Games</Text>
@@ -291,7 +305,11 @@ export function TopGamesScreen() {
         {rows.length} games · {rows.filter((r) => r.status).length} showing
       </Text>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipRow}
+      >
         {categories.map((cat) => (
           <TouchableOpacity
             key={cat}
@@ -416,11 +434,7 @@ export function TopGamesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   chipRow: { alignItems: 'center', paddingVertical: spacing(2), marginTop: spacing(2) },
   chip: {
     borderWidth: 1,
@@ -431,9 +445,7 @@ const styles = StyleSheet.create({
     marginRight: spacing(2),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(2) },
   searchInput: {
     flex: 1,
@@ -452,51 +464,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2.5),
     paddingHorizontal: spacing(4),
   },
-  btnDisabled: { opacity: 0.5 },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -507,27 +474,4 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

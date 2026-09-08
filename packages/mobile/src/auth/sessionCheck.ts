@@ -86,11 +86,7 @@ async function checkSession(userId: string): Promise<SessionStatus> {
   try {
     // Call with an explicit token; client auth-failure handler is skipped for
     // this action via SKIP in client — we interpret the payload ourselves.
-    const res = await secureApi<unknown>(
-      'auth.checkTokenBlacklisted',
-      { _id: userId },
-      token,
-    );
+    const res = await secureApi<unknown>('auth.checkTokenBlacklisted', { _id: userId }, token);
 
     return parseTokenBlacklistStatus(res.data, {
       httpStatus: res.status,
@@ -102,9 +98,7 @@ async function checkSession(userId: string): Promise<SessionStatus> {
   }
 }
 
-export async function runTokenValidation(
-  opts?: { force?: boolean },
-): Promise<SessionStatus> {
+export async function runTokenValidation(opts?: { force?: boolean }): Promise<SessionStatus> {
   if (!shouldRunTokenCheck(Boolean(opts?.force))) return 'unknown';
 
   const token = appStorage.getItem('token');

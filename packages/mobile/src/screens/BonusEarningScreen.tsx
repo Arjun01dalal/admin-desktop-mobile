@@ -121,7 +121,7 @@ export function BonusEarningScreen() {
   const passedItems = Array.isArray(params.items) ? (params.items as Rec[]) : undefined;
   const canShowMobile = hasPermission('show_mobile');
 
-  const [rows, setRows] = useState<Rec[]>(kind === 'availedBonus' ? passedItems ?? [] : []);
+  const [rows, setRows] = useState<Rec[]>(kind === 'availedBonus' ? (passedItems ?? []) : []);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(kind !== 'availedBonus');
@@ -268,9 +268,7 @@ export function BonusEarningScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {rows.length ? (
-            <Text style={styles.cardHint}>Tap a card to see all details</Text>
-          ) : null}
+          {rows.length ? <Text style={styles.cardHint}>Tap a card to see all details</Text> : null}
           {kind !== 'availedBonus' && totalPages > 1 ? (
             <View style={styles.pagerRow}>
               <TouchableOpacity

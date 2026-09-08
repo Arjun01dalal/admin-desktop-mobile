@@ -5,15 +5,8 @@
  * (client name) filter and a local name search over the loaded page.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { appCodeForName, CLIENT_NAMES } from '@astro/shared';
 import { secureApi } from '../../../api/client';
@@ -138,7 +131,11 @@ export function LeaderboardCustomerListScreen() {
   const visibleRows = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((r) => String(r.name || '').toLowerCase().includes(q));
+    return rows.filter((r) =>
+      String(r.name || '')
+        .toLowerCase()
+        .includes(q),
+    );
   }, [rows, nameQuery]);
 
   const columns = useMemo<DataTableColumn<CustomerRow>[]>(() => {
@@ -189,15 +186,23 @@ export function LeaderboardCustomerListScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
-      <Text style={styles.title}>{callerName ? `${callerName} — Customers` : 'Caller Customers'}</Text>
+      <Text style={styles.title}>
+        {callerName ? `${callerName} — Customers` : 'Caller Customers'}
+      </Text>
       <Text style={styles.sub}>Tap a row to see all details</Text>
 
       {!callerId ? (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>No caller selected. Open this page from the Leaderboard.</Text>
+          <Text style={styles.errorText}>
+            No caller selected. Open this page from the Leaderboard.
+          </Text>
         </View>
       ) : (
         <>
@@ -211,8 +216,19 @@ export function LeaderboardCustomerListScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-              <Chip label="All Apps" active={!clientName} onPress={() => { setClientName(''); setPage(1); }} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.row}
+            >
+              <Chip
+                label="All Apps"
+                active={!clientName}
+                onPress={() => {
+                  setClientName('');
+                  setPage(1);
+                }}
+              />
               {CLIENT_NAMES.map((name) => (
                 <Chip
                   key={name}
@@ -225,7 +241,11 @@ export function LeaderboardCustomerListScreen() {
                 />
               ))}
             </ScrollView>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.row}
+            >
               <Text style={styles.rowLabel}>Per page</Text>
               {PER_PAGE_OPTIONS.map((n) => (
                 <Chip
@@ -297,11 +317,7 @@ export function LeaderboardCustomerListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   filterCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -331,31 +347,5 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
 });

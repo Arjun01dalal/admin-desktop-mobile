@@ -12,13 +12,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { pickPageSizes, CLIENT_NAMES, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -323,7 +323,12 @@ export function UpiPaymentsScreen() {
       { key: 'mid', label: 'MID', width: 120, render: (r) => display(r.mid) },
       { key: 'updatedOn', label: 'Updated On', width: 150, render: (r) => dt(r.updatedOn) },
       { key: 'reason', label: 'Mis Match Info', width: 160, render: (r) => display(r.reason) },
-      { key: 'updatedByName', label: 'Updated By', width: 120, render: (r) => display(r.updatedByName) },
+      {
+        key: 'updatedByName',
+        label: 'Updated By',
+        width: 120,
+        render: (r) => display(r.updatedByName),
+      },
       {
         key: 'status',
         label: 'Status',
@@ -351,7 +356,13 @@ export function UpiPaymentsScreen() {
         render: (r) => (canShowMobile ? display(r.userMobile) : r.userMobile ? '**********' : '—'),
       },
       { key: 'clientName', label: 'App', width: 90, render: (r) => display(r.clientName) },
-      { key: 'amount', label: 'Amount', width: 90, align: 'right', render: (r) => display(r.amount) },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: 90,
+        align: 'right',
+        render: (r) => display(r.amount),
+      },
       { key: 'orderId', label: 'Transaction ID', width: 180, render: (r) => display(r.orderId) },
       { key: 'userState', label: 'State', width: 110, render: (r) => display(r.userState) },
       { key: 'userCity', label: 'City', width: 110, render: (r) => display(r.userCity) },
@@ -369,7 +380,12 @@ export function UpiPaymentsScreen() {
         render: (r) => display(r.status),
         badge: (r) => statusBadge(r.status),
       },
-      { key: 'updatedByName', label: 'Updated By', width: 120, render: (r) => display(r.updatedBy?.name) },
+      {
+        key: 'updatedByName',
+        label: 'Updated By',
+        width: 120,
+        render: (r) => display(r.updatedBy?.name),
+      },
       { key: 'createdOn', label: 'Created On', width: 150, render: (r) => dt(r.createdOn) },
     ],
     [reqPage, pageSize, canShowMobile],
@@ -430,7 +446,11 @@ export function UpiPaymentsScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>UPI Payments</Text>
@@ -473,24 +493,25 @@ export function UpiPaymentsScreen() {
       {tab === 'requests' && gateways.length > 0 ? (
         <View style={styles.chipsRow}>
           <Text style={styles.chipsLabel}>Gateway:</Text>
-          {[{ mid: '', label: 'All' }, ...gateways.map((g) => ({ mid: g.mid || '', label: g.mid || '—' }))].map(
-            (g) => (
-              <TouchableOpacity
-                key={g.label}
-                style={[styles.chip, gatewayMid === g.mid && styles.chipActive]}
-                onPress={() => {
-                  if (gatewayMid !== g.mid) {
-                    setGatewayMid(g.mid);
-                    setReqPage(1);
-                  }
-                }}
-              >
-                <Text style={[styles.chipText, gatewayMid === g.mid && styles.chipTextActive]}>
-                  {g.label}
-                </Text>
-              </TouchableOpacity>
-            ),
-          )}
+          {[
+            { mid: '', label: 'All' },
+            ...gateways.map((g) => ({ mid: g.mid || '', label: g.mid || '—' })),
+          ].map((g) => (
+            <TouchableOpacity
+              key={g.label}
+              style={[styles.chip, gatewayMid === g.mid && styles.chipActive]}
+              onPress={() => {
+                if (gatewayMid !== g.mid) {
+                  setGatewayMid(g.mid);
+                  setReqPage(1);
+                }
+              }}
+            >
+              <Text style={[styles.chipText, gatewayMid === g.mid && styles.chipTextActive]}>
+                {g.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       ) : null}
 
@@ -536,16 +557,16 @@ export function UpiPaymentsScreen() {
                   onPress={() => setNotifSheet(row)}
                 >
                   <View style={styles.cardHeader}>
-                    <Text style={styles.cardIndex}>
-                      #{(notifPage - 1) * pageSize + index + 1}
-                    </Text>
+                    <Text style={styles.cardIndex}>#{(notifPage - 1) * pageSize + index + 1}</Text>
                     <Text style={styles.cardTitle} numberOfLines={1}>
                       {display(row.title)}
                     </Text>
                     <Text
                       style={[
                         styles.statusPill,
-                        badge ? { color: badge, backgroundColor: `${badge}22` } : styles.statusNeutral,
+                        badge
+                          ? { color: badge, backgroundColor: `${badge}22` }
+                          : styles.statusNeutral,
                       ]}
                     >
                       {display(row.status)}
@@ -589,7 +610,9 @@ export function UpiPaymentsScreen() {
                     <Text
                       style={[
                         styles.statusPill,
-                        badge ? { color: badge, backgroundColor: `${badge}22` } : styles.statusNeutral,
+                        badge
+                          ? { color: badge, backgroundColor: `${badge}22` }
+                          : styles.statusNeutral,
                       ]}
                     >
                       {display(row.status)}
@@ -671,7 +694,9 @@ export function UpiPaymentsScreen() {
             </View>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+              style={{ maxHeight: 380 }}
+              keyboardShouldPersistTaps="handled"
+            >
               <Text style={styles.modalLabel}>Status</Text>
               <View style={styles.chipsWrap}>
                 {['Approved', 'Failed', 'Hold'].map((s) => (
@@ -762,9 +787,7 @@ export function UpiPaymentsScreen() {
               </TouchableOpacity>
             </View>
             <Text style={styles.modalLabel}>Amount</Text>
-            <Text style={styles.modalNote}>
-              ₹{approveItem?.amount ?? '—'}
-            </Text>
+            <Text style={styles.modalNote}>₹{approveItem?.amount ?? '—'}</Text>
             <Text style={styles.modalLabel}>Select Reason</Text>
             <View style={styles.chipsWrap}>
               {['Deposit Failure', 'deposit-manual'].map((r) => (
@@ -864,11 +887,7 @@ export function UpiPaymentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   tabsRow: { flexDirection: 'row', marginTop: spacing(3), gap: spacing(2) },
   tabBtn: {
     flex: 1,
@@ -904,52 +923,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -960,46 +934,12 @@ const styles = StyleSheet.create({
     maxWidth: '36%',
   },
   statusNeutral: { color: colors.muted, backgroundColor: 'rgba(148,163,184,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
   modalSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.md * 2,
     borderTopRightRadius: radius.md * 2,
     padding: spacing(4),
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
-  },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   modalLabel: { color: colors.muted, fontSize: 12, marginTop: spacing(3) },
   modalNote: { color: colors.muted, fontSize: 13, marginTop: spacing(2) },
   modalInput: {
@@ -1012,29 +952,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: spacing(2),
   },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  btnDisabled: { opacity: 0.5 },
   submitText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
-  modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
 });

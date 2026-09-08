@@ -54,10 +54,7 @@ if (!base || !entk) {
 }
 
 const out = path.join(ROOT, 'packages', 'mobile', '.env');
-const lines = [
-  `EXPO_PUBLIC_API_BASE_URL=${base}`,
-  `EXPO_PUBLIC_ENTK_VALUE=${entk}`,
-];
+const lines = [`EXPO_PUBLIC_API_BASE_URL=${base}`, `EXPO_PUBLIC_ENTK_VALUE=${entk}`];
 if (recordingUser) lines.push(`EXPO_PUBLIC_RECORDING_BASIC_AUTH_USERNAME=${recordingUser}`);
 if (recordingPass) lines.push(`EXPO_PUBLIC_RECORDING_BASIC_AUTH_PASSWORD=${recordingPass}`);
 fs.writeFileSync(out, `${lines.join('\n')}\n`);

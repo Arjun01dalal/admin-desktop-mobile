@@ -11,11 +11,11 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
@@ -135,6 +135,7 @@ export function CallerResponsibilityScreen() {
   const [callerRows, setCallerRows] = useState<CallerRow[]>([]);
   const [locationRows, setLocationRows] = useState<CallerRow[]>([]);
   const [payload, setPayload] = useState<CallerRow>({});
+  const [botUsers, setBotUsers] = useState<CallerRow[]>([]);
   const [botCount, setBotCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -224,6 +225,7 @@ export function CallerResponsibilityScreen() {
 
       if (botRes.ok && botRes.success !== false) {
         const bot = botRes.data as { users?: CallerRow[]; total?: number } | undefined;
+        setBotUsers(bot?.users || []);
         setBotCount(Number(bot?.total ?? bot?.users?.length ?? 0));
       }
     } finally {
@@ -243,11 +245,22 @@ export function CallerResponsibilityScreen() {
   }, [loadMain]);
 
   const displayedBotCount = isCaller ? 0 : botCount;
-  const summary = (payload.summary || {}) as CallerRow;
+
+  const openBotUsers = useCallback(() => {
+    if (isCaller || displayedBotCount <= 0) return;
+    openPanelTarget(navigation, {
+      href: '/caller-responsibility/bot-users',
+      state: { activeBotUsers: botUsers, startDate, endDate },
+    });
+  }, [isCaller, displayedBotCount, navigation, botUsers, startDate, endDate]);
 
   const summaryItems = useMemo(() => {
+    const summary = (payload.summary || {}) as CallerRow;
     const items: { label: string; value: string }[] = [
-      { label: "Total Employee (Caller's)", value: cellText(isCallerOrHead ? 0 : summary.totalEmpCodes) },
+      {
+        label: "Total Employee (Caller's)",
+        value: cellText(isCallerOrHead ? 0 : summary.totalEmpCodes),
+      },
     ];
     if (showLocation) {
       items.push({
@@ -256,25 +269,87 @@ export function CallerResponsibilityScreen() {
       });
     }
     items.push(
-      { label: 'Total Transaction', value: cellText(isCallerOrHead ? 0 : summary.totalTransactions) },
-      { label: 'Total Active Customers', value: cellText(isCallerOrHead ? 0 : payload.totalActiveUsers) },
-      { label: 'Total Transaction Count', value: String(isCallerOrHead ? 0 : roundAmt(payload.totalDeposit)) },
+      {
+        label: 'Total Transaction',
+        value: cellText(isCallerOrHead ? 0 : summary.totalTransactions),
+      },
+      {
+        label: 'Total Active Customers',
+        value: cellText(isCallerOrHead ? 0 : payload.totalActiveUsers),
+      },
+      {
+        label: 'Total Transaction Count',
+        value: String(isCallerOrHead ? 0 : roundAmt(payload.totalDeposit)),
+      },
       { label: 'Active Customers By Bot', value: String(displayedBotCount) },
     );
     return items;
-  }, [isCallerOrHead, summary, payload, displayedBotCount, showLocation]);
+  }, [isCallerOrHead, payload, displayedBotCount, showLocation]);
 
   const locationColumns = useMemo<DataTableColumn<CallerRow>[]>(
     () => [
-      { key: 'office', label: 'Office Location', width: 120, render: (r) => cellText(r.officeLocation) },
-      { key: 'txn', label: 'Txn Count', width: 90, align: 'right', render: (r) => cellText(r.transactionCount) },
-      { key: 'active', label: 'Active Customers', width: 110, align: 'right', render: (r) => cellText(r.activeUserCount) },
-      { key: 'deposit', label: 'Total Deposit', width: 110, align: 'right', render: (r) => roundAmt(r.totalDeposit) },
-      { key: 'wApp', label: 'Refund Approved Amt', width: 130, align: 'right', render: (r) => roundAmt(r.withdrawalApprovedAmount) },
-      { key: 'pnl', label: 'PNL', width: 100, align: 'right', render: (r) => pnl(r.totalDeposit, r.withdrawalApprovedAmount) },
-      { key: 'wPend', label: 'Refund Pending Amt', width: 130, align: 'right', render: (r) => roundAmt(r.withdrawalPendingAmount) },
-      { key: 'wAppC', label: 'Refund Approved Count', width: 130, align: 'right', render: (r) => cellText(r.withdrawalApprovedCount) },
-      { key: 'wPendC', label: 'Refund Pending Count', width: 130, align: 'right', render: (r) => cellText(r.withdrawalPendingCount) },
+      {
+        key: 'office',
+        label: 'Office Location',
+        width: 120,
+        render: (r) => cellText(r.officeLocation),
+      },
+      {
+        key: 'txn',
+        label: 'Txn Count',
+        width: 90,
+        align: 'right',
+        render: (r) => cellText(r.transactionCount),
+      },
+      {
+        key: 'active',
+        label: 'Active Customers',
+        width: 110,
+        align: 'right',
+        render: (r) => cellText(r.activeUserCount),
+      },
+      {
+        key: 'deposit',
+        label: 'Total Deposit',
+        width: 110,
+        align: 'right',
+        render: (r) => roundAmt(r.totalDeposit),
+      },
+      {
+        key: 'wApp',
+        label: 'Refund Approved Amt',
+        width: 130,
+        align: 'right',
+        render: (r) => roundAmt(r.withdrawalApprovedAmount),
+      },
+      {
+        key: 'pnl',
+        label: 'PNL',
+        width: 100,
+        align: 'right',
+        render: (r) => pnl(r.totalDeposit, r.withdrawalApprovedAmount),
+      },
+      {
+        key: 'wPend',
+        label: 'Refund Pending Amt',
+        width: 130,
+        align: 'right',
+        render: (r) => roundAmt(r.withdrawalPendingAmount),
+      },
+      {
+        key: 'wAppC',
+        label: 'Refund Approved Count',
+        width: 130,
+        align: 'right',
+        render: (r) => cellText(r.withdrawalApprovedCount),
+      },
+      {
+        key: 'wPendC',
+        label: 'Refund Pending Count',
+        width: 130,
+        align: 'right',
+        render: (r) => cellText(r.withdrawalPendingCount),
+      },
     ],
     [],
   );
@@ -282,7 +357,12 @@ export function CallerResponsibilityScreen() {
   const callerColumns = useMemo<DataTableColumn<CallerRow>[]>(() => {
     const cols: DataTableColumn<CallerRow>[] = [
       { key: 'sr', label: 'SR. No', width: 60, render: (_r, i) => String(i + 1) },
-      { key: 'pseudo', label: 'Pseudo Name', width: 130, render: (r) => String(r.subAdminName ?? 'Company') },
+      {
+        key: 'pseudo',
+        label: 'Pseudo Name',
+        width: 130,
+        render: (r) => String(r.subAdminName ?? 'Company'),
+      },
     ];
     // Callers must not see employee real names — Pseudo Name only.
     if (!isCaller) {
@@ -294,21 +374,80 @@ export function CallerResponsibilityScreen() {
       });
     }
     if (showLocation) {
-      cols.push({ key: 'office', label: 'Office Location', width: 110, render: (r) => cellText(r.officeLocation) });
+      cols.push({
+        key: 'office',
+        label: 'Office Location',
+        width: 110,
+        render: (r) => cellText(r.officeLocation),
+      });
     }
     cols.push(
-      { key: 'deposit', label: 'Total Deposit', width: 110, align: 'right', render: (r) => roundAmt(r.totalDeposit) },
-      { key: 'wAppAmt', label: 'Refund Approved Amt', width: 130, align: 'right', render: (r) => roundAmt(r.withdrawalApprovedAmount) },
-      { key: 'pnl', label: 'PNL', width: 100, align: 'right', render: (r) => pnl(r.totalDeposit, r.withdrawalApprovedAmount) },
-      { key: 'wPendAmt', label: 'Refund Pending Amt', width: 130, align: 'right', render: (r) => roundAmt(r.withdrawalPendingAmount) },
-      { key: 'wAppCnt', label: 'Refund Approved Count', width: 130, align: 'right', render: (r) => cellText(r.withdrawalApprovedCount) },
-      { key: 'wPendCnt', label: 'Refund Pending Count', width: 130, align: 'right', render: (r) => cellText(r.withdrawalPendingCount) },
-      { key: 'activeCust', label: 'Active Customers', width: 110, align: 'right', render: (r) => cellText(r.transactionCount) },
-      { key: 'ex', label: 'E', width: 60, align: 'right', render: (r) => cellText(r.activeUserCount) },
+      {
+        key: 'deposit',
+        label: 'Total Deposit',
+        width: 110,
+        align: 'right',
+        render: (r) => roundAmt(r.totalDeposit),
+      },
+      {
+        key: 'wAppAmt',
+        label: 'Refund Approved Amt',
+        width: 130,
+        align: 'right',
+        render: (r) => roundAmt(r.withdrawalApprovedAmount),
+      },
+      {
+        key: 'pnl',
+        label: 'PNL',
+        width: 100,
+        align: 'right',
+        render: (r) => pnl(r.totalDeposit, r.withdrawalApprovedAmount),
+      },
+      {
+        key: 'wPendAmt',
+        label: 'Refund Pending Amt',
+        width: 130,
+        align: 'right',
+        render: (r) => roundAmt(r.withdrawalPendingAmount),
+      },
+      {
+        key: 'wAppCnt',
+        label: 'Refund Approved Count',
+        width: 130,
+        align: 'right',
+        render: (r) => cellText(r.withdrawalApprovedCount),
+      },
+      {
+        key: 'wPendCnt',
+        label: 'Refund Pending Count',
+        width: 130,
+        align: 'right',
+        render: (r) => cellText(r.withdrawalPendingCount),
+      },
+      {
+        key: 'activeCust',
+        label: 'Active Customers',
+        width: 110,
+        align: 'right',
+        render: (r) => cellText(r.transactionCount),
+      },
+      {
+        key: 'ex',
+        label: 'E',
+        width: 60,
+        align: 'right',
+        render: (r) => cellText(r.activeUserCount),
+      },
       { key: 'casino', label: 'C', width: 60, align: 'right', render: (r) => cellText(ecs(r).E) },
       { key: 'matka', label: 'S', width: 60, align: 'right', render: (r) => cellText(ecs(r).C) },
     );
-    cols.push({ key: 'daily', label: 'Daily Deposit', width: 100, align: 'right', render: (r) => roundAmt(ecs(r).S) });
+    cols.push({
+      key: 'daily',
+      label: 'Daily Deposit',
+      width: 100,
+      align: 'right',
+      render: (r) => roundAmt(ecs(r).S),
+    });
     if (!isCaller) {
       cols.push({ key: 'status', label: 'Status', width: 100, render: (r) => cellText(r.time) });
     }
@@ -333,127 +472,157 @@ export function CallerResponsibilityScreen() {
 
   const header = useMemo(
     () => (
-    <View>
-      <Text style={styles.title}>Caller Responsibility</Text>
-      <Text style={styles.sub}>
-        {isCaller
-          ? 'Tap a caller row for details & view lists'
-          : `${startDate} → ${endDate} · Tap a caller row for details & view lists`}
-      </Text>
+      <View>
+        <Text style={styles.title}>Caller Responsibility</Text>
+        <Text style={styles.sub}>
+          {isCaller
+            ? 'Tap a caller row for details & view lists'
+            : `${startDate} → ${endDate} · Tap a caller row for details & view lists`}
+        </Text>
 
-      {!isCaller ? (
-        <DetailFilterBar
-          startDate={draftStart}
-          endDate={draftEnd}
-          loading={loading}
-          onStartDateChange={setDraftStart}
-          onEndDateChange={setDraftEnd}
-          onApply={applyAll}
-        />
-      ) : null}
+        {!isCaller ? (
+          <DetailFilterBar
+            startDate={draftStart}
+            endDate={draftEnd}
+            loading={loading}
+            onStartDateChange={setDraftStart}
+            onEndDateChange={setDraftEnd}
+            onApply={applyAll}
+          />
+        ) : null}
 
-      {!isCaller && (
-        <>
-          {showCallerHead && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              <View style={styles.chipRow}>
-                <Text style={styles.chipRowLabel}>Caller Head</Text>
-                <TouchableOpacity
-                  style={[styles.chip, callerHead === '' && styles.chipActive]}
-                  onPress={() => setCallerHead('')}
-                >
-                  <Text style={[styles.chipText, callerHead === '' && styles.chipTextActive]}>All</Text>
-                </TouchableOpacity>
-                {heads.map((h) => {
-                  const name = String(h.name || '');
-                  return (
+        {!isCaller && (
+          <>
+            {showCallerHead && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chipScroll}
+              >
+                <View style={styles.chipRow}>
+                  <Text style={styles.chipRowLabel}>Caller Head</Text>
+                  <TouchableOpacity
+                    style={[styles.chip, callerHead === '' && styles.chipActive]}
+                    onPress={() => setCallerHead('')}
+                  >
+                    <Text style={[styles.chipText, callerHead === '' && styles.chipTextActive]}>
+                      All
+                    </Text>
+                  </TouchableOpacity>
+                  {heads.map((h) => {
+                    const name = String(h.name || '');
+                    return (
+                      <TouchableOpacity
+                        key={String(h._id || name)}
+                        style={[styles.chip, callerHead === name && styles.chipActive]}
+                        onPress={() => setCallerHead(name)}
+                      >
+                        <Text
+                          style={[styles.chipText, callerHead === name && styles.chipTextActive]}
+                        >
+                          {name || cellText(h.empCode)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
+
+            {showLocation && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chipScroll}
+              >
+                <View style={styles.chipRow}>
+                  <Text style={styles.chipRowLabel}>Location</Text>
+                  <TouchableOpacity
+                    style={[styles.chip, office === '' && styles.chipActive]}
+                    onPress={() => setOffice('')}
+                  >
+                    <Text style={[styles.chipText, office === '' && styles.chipTextActive]}>
+                      All
+                    </Text>
+                  </TouchableOpacity>
+                  {OFFICE_LOCATIONS.map((o) => (
                     <TouchableOpacity
-                      key={String(h._id || name)}
-                      style={[styles.chip, callerHead === name && styles.chipActive]}
-                      onPress={() => setCallerHead(name)}
+                      key={o}
+                      style={[styles.chip, office === o && styles.chipActive]}
+                      onPress={() => setOffice(o)}
                     >
-                      <Text style={[styles.chipText, callerHead === name && styles.chipTextActive]}>
-                        {name || cellText(h.empCode)}
+                      <Text style={[styles.chipText, office === o && styles.chipTextActive]}>
+                        {o}
                       </Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          )}
+                  ))}
+                </View>
+              </ScrollView>
+            )}
 
-          {showLocation && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              <View style={styles.chipRow}>
-                <Text style={styles.chipRowLabel}>Location</Text>
-                <TouchableOpacity
-                  style={[styles.chip, office === '' && styles.chipActive]}
-                  onPress={() => setOffice('')}
-                >
-                  <Text style={[styles.chipText, office === '' && styles.chipTextActive]}>All</Text>
-                </TouchableOpacity>
-                {OFFICE_LOCATIONS.map((o) => (
-                  <TouchableOpacity
-                    key={o}
-                    style={[styles.chip, office === o && styles.chipActive]}
-                    onPress={() => setOffice(o)}
-                  >
-                    <Text style={[styles.chipText, office === o && styles.chipTextActive]}>{o}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          )}
+            <TouchableOpacity
+              onPress={openBotUsers}
+              disabled={isCaller || displayedBotCount <= 0}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.botLine}>
+                Active Customer (By Bots):{' '}
+                <Text style={styles.botCount}>{displayedBotCount}</Text>
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
-          <Text style={styles.botLine}>
-            Active Customer (By Bots): <Text style={styles.botCount}>{displayedBotCount}</Text>
-          </Text>
-        </>
-      )}
-
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-
-      {loading ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading data…</Text>
-        </View>
-      ) : null}
-
-      {!loading && showTotalDeposit && (
-        <>
-          <Text style={styles.sectionTitle}>Summary</Text>
-          <View style={styles.summaryGrid}>
-            {summaryItems.map((it) => (
-              <View key={it.label} style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>{it.label}</Text>
-                <Text style={styles.summaryValue}>{it.value}</Text>
-              </View>
-            ))}
+        {error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
           </View>
-        </>
-      )}
+        ) : null}
 
-      {!loading && showTotalDeposit && showLocation && (
-        <>
-          <Text style={styles.sectionTitle}>By Office Location</Text>
-          <DataTable
-            columns={locationColumns}
-            rows={locationRows}
-            keyFor={(r, i) => String(r.officeLocation || i)}
-            emptyMessage={loading ? 'Loading…' : 'No office data'}
-          />
-        </>
-      )}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading data…</Text>
+          </View>
+        ) : null}
 
-      {!loading && (
-        <Text style={styles.sectionTitle}>Caller Data</Text>
-      )}
-    </View>
+        {!loading && showTotalDeposit && (
+          <>
+            <Text style={styles.sectionTitle}>Summary</Text>
+            <View style={styles.summaryGrid}>
+              {summaryItems.map((it) => {
+                const isBot = it.label === 'Active Customers By Bot';
+                const Card = isBot ? TouchableOpacity : View;
+                return (
+                  <Card
+                    key={it.label}
+                    style={styles.summaryCard}
+                    onPress={isBot ? openBotUsers : undefined}
+                    activeOpacity={isBot ? 0.7 : undefined}
+                  >
+                    <Text style={styles.summaryLabel}>{it.label}</Text>
+                    <Text style={[styles.summaryValue, isBot && styles.botCount]}>{it.value}</Text>
+                  </Card>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {!loading && showTotalDeposit && showLocation && (
+          <>
+            <Text style={styles.sectionTitle}>By Office Location</Text>
+            <DataTable
+              columns={locationColumns}
+              rows={locationRows}
+              keyFor={(r, i) => String(r.officeLocation || i)}
+              emptyMessage={loading ? 'Loading…' : 'No office data'}
+            />
+          </>
+        )}
+
+        {!loading && <Text style={styles.sectionTitle}>Caller Data</Text>}
+      </View>
     ),
     [
       startDate,
@@ -469,6 +638,7 @@ export function CallerResponsibilityScreen() {
       showLocation,
       office,
       displayedBotCount,
+      openBotUsers,
       error,
       showTotalDeposit,
       summaryItems,
@@ -488,21 +658,23 @@ export function CallerResponsibilityScreen() {
         ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={() => void loadMain()} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => void loadMain()}
+            tintColor={colors.primary}
+          />
         }
-        ListEmptyComponent={
-          loading ? null : <Text style={styles.emptyList}>No caller data</Text>
-        }
+        ListEmptyComponent={loading ? null : <Text style={styles.emptyList}>No caller data</Text>}
         renderItem={({ item, index }) => {
           const deposit = Number(item.totalDeposit);
           const withdraw = Number(item.withdrawalApprovedAmount);
           const pnlNum =
-            Number.isFinite(deposit) && Number.isFinite(withdraw) ? Math.round(deposit - withdraw) : null;
+            Number.isFinite(deposit) && Number.isFinite(withdraw)
+              ? Math.round(deposit - withdraw)
+              : null;
           return (
             <Pressable
               onPress={() => onCallerPress(item, index)}
-              delayPressIn={0}
-              unstable_pressDelay={0}
               style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             >
               <View style={styles.cardHeader}>
@@ -593,10 +765,7 @@ export function CallerResponsibilityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
   chipScroll: { marginTop: spacing(3) },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(2) },
@@ -609,9 +778,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   botLine: { color: colors.foreground, fontSize: 13, marginTop: spacing(3) },
   botCount: { fontWeight: '700', color: colors.primary },
   sectionTitle: {
@@ -632,7 +799,12 @@ const styles = StyleSheet.create({
     padding: spacing(3),
   },
   summaryLabel: { color: colors.muted, fontSize: 11 },
-  summaryValue: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginTop: spacing(1) },
+  summaryValue: {
+    color: colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: spacing(1),
+  },
   loadingBox: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -643,15 +815,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
   },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
   emptyList: { color: colors.muted, textAlign: 'center', marginTop: spacing(4) },
   card: {
     backgroundColor: colors.surface,
@@ -664,29 +827,6 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   cardPressed: { backgroundColor: colors.surfaceAlt },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   cardMeta: {
     color: colors.muted,
     fontSize: 11,
@@ -700,27 +840,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: spacing(1),
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

@@ -8,12 +8,12 @@ import {
   Alert,
   Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getSessionUser } from '../auth/permissions';
 import { colors, radius, spacing } from '../theme';
@@ -25,12 +25,7 @@ import { formatDisplayDate, formatDisplayTime } from '../utils/dates';
 
 type Rec = Record<string, unknown>;
 type ExposureProvider =
-  | 'SattaMatka'
-  | 'Falcon'
-  | 'Jetfair'
-  | 'WCO'
-  | 'AAA Exchange'
-  | 'Plutus Gaming';
+  'SattaMatka' | 'Falcon' | 'Jetfair' | 'WCO' | 'AAA Exchange' | 'Plutus Gaming';
 
 const display = (v: unknown): string => {
   if (v === null || v === undefined || v === '') return '—';
@@ -234,8 +229,7 @@ function exposureCell(row: Rec, col: ExposureColDef): string {
     raw !== '' &&
     typeof raw !== 'object' &&
     !Number.isNaN(Number(raw)) &&
-    (typeof raw === 'number' ||
-      (typeof raw === 'string' && /^-?\d+(\.\d+)?$/.test(raw.trim())))
+    (typeof raw === 'number' || (typeof raw === 'string' && /^-?\d+(\.\d+)?$/.test(raw.trim())))
   ) {
     return String(Math.round(Number(raw)));
   }
@@ -246,14 +240,7 @@ function exposureCell(row: Rec, col: ExposureColDef): string {
   return display(raw);
 }
 
-const PLUTUS_SKIP_KEYS = new Set([
-  'txnState',
-  'age',
-  'rawPayload',
-  '__v',
-  '_v',
-  '_id',
-]);
+const PLUTUS_SKIP_KEYS = new Set(['txnState', 'age', 'rawPayload', '__v', '_v', '_id']);
 
 const PLUTUS_DATE_KEYS = new Set([
   'createdOn',
@@ -287,65 +274,6 @@ function mergePlutusRow(row: Rec): Rec {
     Object.assign(merged, raw as Rec);
   }
   return merged;
-}
-
-function plutusCardFields(row: Rec): { label: string; value: string }[] {
-  const merged = mergePlutusRow(row);
-  const preferred = [
-    'gameName',
-    'gameId',
-    'transactionId',
-    'roundId',
-    'amount',
-    'betAmount',
-    'stake',
-    'winAmount',
-    'status',
-    'betStatus',
-    'createdOn',
-    'updatedOn',
-    'createdAt',
-    'updatedAt',
-  ];
-  const keys = [
-    ...preferred.filter((k) => merged[k] != null && merged[k] !== ''),
-    ...Object.keys(merged).filter(
-      (k) =>
-        !PLUTUS_SKIP_KEYS.has(k) &&
-        !preferred.includes(k) &&
-        merged[k] != null &&
-        merged[k] !== '',
-    ),
-  ];
-  return keys.map((key) => {
-    const kind: ExposureColDef['kind'] = PLUTUS_DATE_KEYS.has(key)
-      ? 'date'
-      : PLUTUS_AMOUNT_KEYS.has(key)
-        ? 'amount'
-        : undefined;
-    return {
-      label: humanizePlutusKey(key),
-      value: exposureCell(merged, { label: key, key, kind }),
-    };
-  });
-}
-
-function plutusCardSummary(fields: { label: string; value: string }[]): {
-  title: string;
-  subtitle: string;
-} {
-  const pick = (...labels: string[]) =>
-    fields.find((f) => labels.includes(f.label.toLowerCase()))?.value;
-  const title =
-    pick('game name', 'gamename') ||
-    pick('transaction id', 'transactionid') ||
-    fields[0]?.value ||
-    'Bet';
-  const parts = [
-    pick('amount', 'bet amount', 'betamount', 'stake'),
-    pick('status', 'bet status', 'betstatus'),
-  ].filter((v) => v && v !== '—');
-  return { title: String(title), subtitle: parts.join(' · ') || `${fields.length} fields` };
 }
 
 function buildPlutusCols(rows: Rec[]): ExposureColDef[] {
@@ -430,8 +358,7 @@ export function UserExposureScreen() {
             : next === 'AAA Exchange'
               ? 'userReport.exchangePendingBet'
               : 'userReport.userExposureLists';
-        const payload =
-          next === 'WCO' || next === 'AAA Exchange' ? { userId } : { _id: userId };
+        const payload = next === 'WCO' || next === 'AAA Exchange' ? { userId } : { _id: userId };
         const res = await secureApi(action, payload);
         if (!res.ok) {
           setRows([]);
@@ -540,9 +467,7 @@ export function UserExposureScreen() {
   }, [edit, load, provider, userId]);
 
   const isPlutus = provider === 'Plutus Gaming';
-  const totalPages = isPlutus
-    ? Math.max(1, Math.ceil(rows.length / plutusPerPage))
-    : 1;
+  const totalPages = isPlutus ? Math.max(1, Math.ceil(rows.length / plutusPerPage)) : 1;
   const pageRows = isPlutus
     ? rows.slice((plutusPage - 1) * plutusPerPage, plutusPage * plutusPerPage)
     : rows;
@@ -577,7 +502,9 @@ export function UserExposureScreen() {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      style={styles.wrap} contentContainerStyle={styles.content}>
+      style={styles.wrap}
+      contentContainerStyle={styles.content}
+    >
       {userName ? <Text style={styles.pageTitle}>{userName}</Text> : null}
       {userId ? <Text style={styles.sub}>ID: {userId}</Text> : null}
 
@@ -653,7 +580,12 @@ export function UserExposureScreen() {
         </View>
       ) : null}
 
-      <Modal visible={edit != null} transparent animationType="fade" onRequestClose={() => setEdit(null)}>
+      <Modal
+        visible={edit != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEdit(null)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Update {provider}</Text>
@@ -665,7 +597,9 @@ export function UserExposureScreen() {
                   style={[styles.chip, edit?.status === opt.value && styles.chipActive]}
                   onPress={() => setEdit((prev) => (prev ? { ...prev, status: opt.value } : prev))}
                 >
-                  <Text style={[styles.chipText, edit?.status === opt.value && styles.chipTextActive]}>
+                  <Text
+                    style={[styles.chipText, edit?.status === opt.value && styles.chipTextActive]}
+                  >
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
@@ -714,7 +648,7 @@ export function UserExposureScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   wrap: { flex: 1 },
   content: { padding: spacing(3), paddingBottom: spacing(8) },
   pageTitle: {
@@ -740,9 +674,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.75),
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   plutusList: { gap: spacing(2) },
   plutusCard: {
     backgroundColor: colors.surface,
@@ -832,7 +764,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: spacing(2),
   },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(3) },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
   pagerBtn: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
@@ -864,5 +801,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing(4),
   },
-  modalTitle: { color: colors.foreground, fontSize: 18, fontWeight: '700', marginBottom: spacing(3) },
+  modalTitle: {
+    color: colors.foreground,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing(3),
+  },
 });

@@ -73,163 +73,163 @@ export function DataTable<Row>({
   const needsHScroll = contentW > innerW + 1;
   const table = (
     <View>
-          <View style={[styles.row, styles.headRow]}>
-            {columns.map((col) =>
-              col.onHeaderPress ? (
+      <View style={[styles.row, styles.headRow]}>
+        {columns.map((col) =>
+          col.onHeaderPress ? (
+            <TouchableOpacity
+              key={col.key}
+              onPress={col.onHeaderPress}
+              style={{ width: col.width }}
+            >
+              <Text
+                style={[
+                  styles.headText,
+                  col.align === 'right' && styles.right,
+                  col.align === 'center' && styles.center,
+                ]}
+                numberOfLines={2}
+              >
+                {toDisplayText(col.label)}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text
+              key={col.key}
+              style={[
+                styles.headText,
+                { width: col.width },
+                col.align === 'right' && styles.right,
+                col.align === 'center' && styles.center,
+              ]}
+              numberOfLines={2}
+            >
+              {toDisplayText(col.label)}
+            </Text>
+          ),
+        )}
+      </View>
+
+      {columns.some((c) => c.filter != null) ? (
+        <View style={[styles.row, styles.filterRow]}>
+          {columns.map((col) => (
+            <View key={col.key} style={[styles.filterCell, { width: col.width }]}>
+              {col.filter ?? null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {loading && rows.length === 0 ? (
+        <ActivityIndicator style={styles.spinner} color={colors.primary} />
+      ) : rows.length === 0 ? (
+        <Text style={styles.empty}>{toDisplayText(emptyMessage)}</Text>
+      ) : (
+        rows.map((row, index) => {
+          const cells = columns.map((col) => {
+            const value = toDisplayText(col.render(row, index));
+            const color = col.color?.(row);
+            const badgeBg = col.badge?.(row);
+            const sub = col.subtext?.(row);
+            const subMapped = sub ? toDisplayText(sub) : undefined;
+            const textStyle = [
+              styles.cell,
+              { width: col.width },
+              col.align === 'right' && styles.right,
+              col.align === 'center' && styles.center,
+              color ? { color, fontWeight: '700' as const } : null,
+            ];
+            if (badgeBg) {
+              return (
+                <View key={col.key} style={[styles.badgeCell, { width: col.width }]}>
+                  <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+                    <Text style={styles.badgeText} numberOfLines={1}>
+                      {value}
+                    </Text>
+                    {subMapped ? (
+                      <Text style={styles.badgeSub} numberOfLines={1}>
+                        {subMapped}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            }
+            if (col.onCellPress) {
+              return (
                 <TouchableOpacity
                   key={col.key}
-                  onPress={col.onHeaderPress}
+                  onPress={() => col.onCellPress?.(row)}
                   style={{ width: col.width }}
                 >
                   <Text
-                    style={[styles.headText, col.align === 'right' && styles.right, col.align === 'center' && styles.center]}
+                    style={[textStyle, styles.link, { width: undefined }, color ? { color } : null]}
                     numberOfLines={2}
                   >
-                    {toDisplayText(col.label)}
+                    {value}
                   </Text>
                 </TouchableOpacity>
-              ) : (
-                <Text
-                  key={col.key}
-                  style={[
-                    styles.headText,
-                    { width: col.width },
-                    col.align === 'right' && styles.right,
-                    col.align === 'center' && styles.center,
-                  ]}
-                  numberOfLines={2}
-                >
-                  {toDisplayText(col.label)}
-                </Text>
-              ),
-            )}
-          </View>
-
-          {columns.some((c) => c.filter != null) ? (
-            <View style={[styles.row, styles.filterRow]}>
-              {columns.map((col) => (
-                <View key={col.key} style={[styles.filterCell, { width: col.width }]}>
-                  {col.filter ?? null}
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {loading && rows.length === 0 ? (
-            <ActivityIndicator style={styles.spinner} color={colors.primary} />
-          ) : rows.length === 0 ? (
-            <Text style={styles.empty}>{toDisplayText(emptyMessage)}</Text>
-          ) : (
-            rows.map((row, index) => {
-              const cells = columns.map((col) => {
-                  const value = toDisplayText(col.render(row, index));
-                  const color = col.color?.(row);
-                  const badgeBg = col.badge?.(row);
-                  const sub = col.subtext?.(row);
-                  const subMapped = sub ? toDisplayText(sub) : undefined;
-                  const textStyle = [
-                    styles.cell,
-                    { width: col.width },
-                    col.align === 'right' && styles.right,
-                    col.align === 'center' && styles.center,
-                    color ? { color, fontWeight: '700' as const } : null,
-                  ];
-                  if (badgeBg) {
-                    return (
-                      <View key={col.key} style={[styles.badgeCell, { width: col.width }]}>
-                        <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-                          <Text style={styles.badgeText} numberOfLines={1}>
-                            {value}
-                          </Text>
-                          {subMapped ? (
-                            <Text style={styles.badgeSub} numberOfLines={1}>
-                              {subMapped}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </View>
-                    );
-                  }
-                  if (col.onCellPress) {
-                    return (
-                      <TouchableOpacity
-                        key={col.key}
-                        onPress={() => col.onCellPress?.(row)}
-                        style={{ width: col.width }}
-                      >
-                        <Text
-                          style={[textStyle, styles.link, { width: undefined }, color ? { color } : null]}
-                          numberOfLines={2}
-                        >
-                          {value}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  }
-                  return (
-                    <Text key={col.key} style={textStyle} numberOfLines={1}>
-                      {value}
-                    </Text>
-                  );
-                });
-              const bg = rowBg?.(row);
-              const rowStyle = [styles.row, bg ? { backgroundColor: bg } : null];
-              if (onRowPress) {
-                return (
-                  <Pressable
-                    key={keyFor(row, index)}
-                    style={rowStyle}
-                    onPress={() => onRowPress(row, index)}
-                    delayPressIn={0}
-                    unstable_pressDelay={0}
-                  >
-                    {cells}
-                  </Pressable>
-                );
-              }
-              return (
-                <View key={keyFor(row, index)} style={rowStyle}>
-                  {cells}
-                </View>
               );
-            })
-          )}
-
-          {footer && rows.length > 0 ? (
-            <View style={[styles.row, styles.footerRow]}>
-              {columns.map((col, i) => (
-                <Text
-                  key={col.key}
-                  style={[
-                    styles.headText,
-                    { width: col.width },
-                    col.align === 'right' && styles.right,
-                    col.align === 'center' && styles.center,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {i === 0 ? toDisplayText(footer.label) : toDisplayText(footer.cells[col.key] ?? '')}
-                </Text>
-              ))}
+            }
+            return (
+              <Text key={col.key} style={textStyle} numberOfLines={1}>
+                {value}
+              </Text>
+            );
+          });
+          const bg = rowBg?.(row);
+          const rowStyle = [styles.row, bg ? { backgroundColor: bg } : null];
+          if (onRowPress) {
+            return (
+              <Pressable
+                key={keyFor(row, index)}
+                style={rowStyle}
+                onPress={() => onRowPress(row, index)}
+              >
+                {cells}
+              </Pressable>
+            );
+          }
+          return (
+            <View key={keyFor(row, index)} style={rowStyle}>
+              {cells}
             </View>
-          ) : null}
+          );
+        })
+      )}
+
+      {footer && rows.length > 0 ? (
+        <View style={[styles.row, styles.footerRow]}>
+          {columns.map((col, i) => (
+            <Text
+              key={col.key}
+              style={[
+                styles.headText,
+                { width: col.width },
+                col.align === 'right' && styles.right,
+                col.align === 'center' && styles.center,
+              ]}
+              numberOfLines={1}
+            >
+              {i === 0 ? toDisplayText(footer.label) : toDisplayText(footer.cells[col.key] ?? '')}
+            </Text>
+          ))}
         </View>
+      ) : null}
+    </View>
   );
 
   return (
     <View style={styles.card} onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}>
       {needsHScroll ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator
-          keyboardShouldPersistTaps="handled"
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator keyboardShouldPersistTaps="handled">
           {table}
         </ScrollView>
       ) : (
         <View style={styles.tableClip}>{table}</View>
       )}
-      <Text style={styles.hint}>{hint ?? (needsHScroll ? 'Swipe sideways to see all columns →' : '')}</Text>
+      <Text style={styles.hint}>
+        {hint ?? (needsHScroll ? 'Swipe sideways to see all columns →' : '')}
+      </Text>
     </View>
   );
 }
@@ -273,7 +273,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingHorizontal: spacing(1),
   },
-  cell: { color: colors.foreground, fontSize: 12, paddingHorizontal: spacing(1), overflow: 'hidden' },
+  cell: {
+    color: colors.foreground,
+    fontSize: 12,
+    paddingHorizontal: spacing(1),
+    overflow: 'hidden',
+  },
   right: { textAlign: 'right' },
   center: { textAlign: 'center' },
   link: { color: colors.primary, textDecorationLine: 'underline' },

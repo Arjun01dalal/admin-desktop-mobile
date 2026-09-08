@@ -19,19 +19,19 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, pickPageSizes } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
-import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { DateField } from '../../../components/DateField';
@@ -144,10 +144,11 @@ export function DepositListScreen() {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [appliedStart, setAppliedStart] = useState('');
-  const [appliedEnd, setAppliedEnd] = useState('');
+  const today = todayIST();
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [appliedStart, setAppliedStart] = useState(today);
+  const [appliedEnd, setAppliedEnd] = useState(today);
   const [mid, setMid] = useState('');
   const [midOptions, setMidOptions] = useState<string[]>([]);
 
@@ -243,11 +244,20 @@ export function DepositListScreen() {
     setPage(1);
   }, [startDate, endDate]);
 
-  const clearFilters = useCallback(() => {
+  const clearDateFilter = useCallback(() => {
     setStartDate('');
     setEndDate('');
     setAppliedStart('');
     setAppliedEnd('');
+    setPage(1);
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    const today = todayIST();
+    setStartDate(today);
+    setEndDate(today);
+    setAppliedStart(today);
+    setAppliedEnd(today);
     setMid('');
     setDraftText('');
     setApplied(EMPTY_SEARCH);
@@ -285,7 +295,12 @@ export function DepositListScreen() {
   // ---- Detail sheet columns (full field set) ----
   const columns = useMemo<DataTableColumn<DepositListRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: 34, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: 34,
+        render: (_r, i) => String((page - 1) * pageSize + i + 1),
+      },
       { key: 'name', label: 'Name', width: 140, render: (r) => display(r.name) },
       { key: 'userId', label: 'User Id', width: 160, render: (r) => display(r.userId) },
       {
@@ -296,8 +311,18 @@ export function DepositListScreen() {
       },
       { key: 'city', label: 'City', width: 110, render: (r) => display(r.city) },
       { key: 'state', label: 'State', width: 120, render: (r) => display(r.state) },
-      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
-      { key: 'lastActivity', label: 'Last Activity', width: 160, render: (r) => lastActivity(r.activeUser) },
+      {
+        key: 'clientName',
+        label: 'App Code',
+        width: 90,
+        render: (r) => appCodeForName(r.clientName),
+      },
+      {
+        key: 'lastActivity',
+        label: 'Last Activity',
+        width: 160,
+        render: (r) => lastActivity(r.activeUser),
+      },
       {
         key: 'ratio',
         label: 'Ratio',
@@ -310,8 +335,7 @@ export function DepositListScreen() {
         label: 'Dep-With Ratio',
         width: 120,
         align: 'right',
-        render: (r) =>
-          formatAmt(num(r.approvedDepositAmount) - num(r.approvedWithdrawalAmount)),
+        render: (r) => formatAmt(num(r.approvedDepositAmount) - num(r.approvedWithdrawalAmount)),
       },
       {
         key: 'deposit',
@@ -355,7 +379,7 @@ export function DepositListScreen() {
       value: String(normalizeMids(sheetRow.approvedDepositAmountByMid).length),
     });
     fields.push({
-      label: 'Refund MID Count',
+      label: 'Withdrawal MID Count',
       value: String(normalizeMids(sheetRow.approvedWithdrawalAmountByMid).length),
     });
     return fields;
@@ -363,17 +387,15 @@ export function DepositListScreen() {
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
-    const acts: SheetAction[] = [
+    const dep = normalizeMids(sheetRow.approvedDepositAmountByMid);
+    const wit = normalizeMids(sheetRow.approvedWithdrawalAmountByMid);
+    return [
       {
         label: 'User Details',
         tone: 'primary',
         onPress: () => openUserDetails(sheetRow),
       },
-    ];
-    const dep = normalizeMids(sheetRow.approvedDepositAmountByMid);
-    const wit = normalizeMids(sheetRow.approvedWithdrawalAmountByMid);
-    if (dep.length) {
-      acts.push({
+      {
         label: `Deposit MIDs (${dep.length})`,
         tone: 'primary',
         onPress: () =>
@@ -381,20 +403,17 @@ export function DepositListScreen() {
             `${display(sheetRow.name)} — Deposit MIDs`,
             sheetRow.approvedDepositAmountByMid,
           ),
-      });
-    }
-    if (wit.length) {
-      acts.push({
-        label: `Refund MIDs (${wit.length})`,
+      },
+      {
+        label: `Withdrawal MIDs (${wit.length})`,
         tone: 'default',
         onPress: () =>
           openMidBreakdown(
-            `${display(sheetRow.name)} — Refund MIDs`,
+            `${display(sheetRow.name)} — Withdrawal MIDs`,
             sheetRow.approvedWithdrawalAmountByMid,
           ),
-      });
-    }
-    return acts;
+      },
+    ];
   }, [sheetRow, openMidBreakdown, openUserDetails]);
 
   // ---------- MID breakdown sub-view (desktop /depositList/user-wise) ----------
@@ -440,7 +459,11 @@ export function DepositListScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Deposit List</Text>
@@ -476,6 +499,13 @@ export function DepositListScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.clearBtn, styles.actionBtnFlex]}
+            onPress={clearDateFilter}
+            disabled={loading}
+          >
+            <Text style={styles.clearBtnText}>Clear Date</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.clearBtn, styles.actionBtnFlex]}
             onPress={clearFilters}
             disabled={loading}
           >
@@ -491,7 +521,11 @@ export function DepositListScreen() {
         </View>
 
         {/* Search field chips + input */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
           <Text style={styles.chipsLabel}>Search by</Text>
           {SEARCH_FIELDS.map((f) => (
             <TouchableOpacity
@@ -519,7 +553,7 @@ export function DepositListScreen() {
               autoCorrect={false}
               keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
             />
-            {Boolean(draftText.trim()) ? (
+            {draftText.trim() ? (
               <TouchableOpacity
                 style={styles.clearSearchBtn}
                 onPress={() => setDraftText('')}
@@ -542,7 +576,11 @@ export function DepositListScreen() {
 
         {/* MID selector */}
         {midOptions.length ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
             <Text style={styles.chipsLabel}>Mid</Text>
             <TouchableOpacity
               style={[styles.chip, mid === '' && styles.chipActive]}
@@ -631,7 +669,9 @@ export function DepositListScreen() {
               </Text>
             </View>
             <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Deposit: {formatAmt(row.approvedDepositAmount)}</Text>
+              <Text style={styles.cardSplitLeft}>
+                Deposit: {formatAmt(row.approvedDepositAmount)}
+              </Text>
               <Text style={styles.cardSplitRight}>
                 Refund: {formatAmt(row.approvedWithdrawalAmount)}
               </Text>
@@ -680,11 +720,7 @@ export function DepositListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
   sectionLabel: {
     color: colors.foreground,
@@ -771,10 +807,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
-  searchRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
   searchInputWrap: {
     flex: 1,
     position: 'relative',
@@ -808,16 +841,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 16,
   },
-  searchBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnDisabled: { opacity: 0.5 },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   perPageRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -825,49 +848,8 @@ const styles = StyleSheet.create({
     gap: spacing(2),
     marginTop: spacing(3),
   },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
   hint: { color: colors.muted, marginTop: spacing(2), marginBottom: spacing(1) },
   list: { gap: spacing(2), marginTop: spacing(2) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   reportBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
@@ -880,20 +862,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -901,34 +869,4 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
 });

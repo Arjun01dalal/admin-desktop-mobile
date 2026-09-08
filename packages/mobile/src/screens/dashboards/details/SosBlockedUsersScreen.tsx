@@ -3,7 +3,8 @@
  * Calls auth.getAllSosBlocks ({}); read-only listing with pull-to-refresh.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -88,11 +89,26 @@ export function SosBlockedUsersScreen() {
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'blockedByName', label: 'Blocked By', width: 130, render: (r) => display(r.blockedByName) },
-      { key: 'blockedById', label: 'Blocked By ID', width: 150, render: (r) => display(r.blockedById) },
+      {
+        key: 'blockedByName',
+        label: 'Blocked By',
+        width: 130,
+        render: (r) => display(r.blockedByName),
+      },
+      {
+        key: 'blockedById',
+        label: 'Blocked By ID',
+        width: 150,
+        render: (r) => display(r.blockedById),
+      },
       { key: 'type', label: 'Type', width: 90, render: (r) => display(r.type) },
       { key: 'location', label: 'Location', width: 120, render: (r) => display(r.location) },
-      { key: 'targetCallerId', label: 'Target Caller ID', width: 150, render: (r) => display(r.targetCallerId) },
+      {
+        key: 'targetCallerId',
+        label: 'Target Caller ID',
+        width: 150,
+        render: (r) => display(r.targetCallerId),
+      },
       {
         key: 'status',
         label: 'Status',
@@ -111,7 +127,11 @@ export function SosBlockedUsersScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>SOS Blocked Users</Text>
@@ -149,11 +169,7 @@ export function SosBlockedUsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -162,5 +178,4 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginTop: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
 });

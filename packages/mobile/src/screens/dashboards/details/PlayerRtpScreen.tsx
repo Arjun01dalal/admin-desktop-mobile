@@ -7,15 +7,8 @@
  * Qtech the per-game breakdown is listed there (desktop opens a details route).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
@@ -59,10 +52,7 @@ type ExchangeRow = {
 
 type PlayerRtpRow = QtechRow | ExchangeRow;
 
-type SheetState =
-  | { kind: 'qtech'; row: QtechRow }
-  | { kind: 'exchange'; row: ExchangeRow }
-  | null;
+type SheetState = { kind: 'qtech'; row: QtechRow } | { kind: 'exchange'; row: ExchangeRow } | null;
 
 const TYPE_OPTIONS: RtpType[] = [
   'Qtech',
@@ -288,7 +278,11 @@ export function PlayerRtpScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>{toDisplayText('Players RTP')}</Text>
@@ -397,7 +391,12 @@ export function PlayerRtpScreen() {
                       <Text style={styles.cardTitle} numberOfLines={1}>
                         {display(row.userId)}
                       </Text>
-                      <Text style={[styles.winPill, badge ? { color: badge, borderColor: badge } : null]}>
+                      <Text
+                        style={[
+                          styles.winPill,
+                          badge ? { color: badge, borderColor: badge } : null,
+                        ]}
+                      >
                         Win%: {display(winPct ?? 0)}
                       </Text>
                     </View>
@@ -405,9 +404,7 @@ export function PlayerRtpScreen() {
                       <Text style={styles.cardSplitLeft}>
                         Amount: {formatAmount(row.combined?.totalAmount ?? 0)}
                       </Text>
-                      <Text style={styles.cardSplitRight}>
-                        Games: {row.games?.length || 0}
-                      </Text>
+                      <Text style={styles.cardSplitRight}>Games: {row.games?.length || 0}</Text>
                     </View>
                     <View style={styles.cardSplitRow}>
                       <Text style={styles.cardSplitLeft}>
@@ -454,12 +451,8 @@ export function PlayerRtpScreen() {
                       </Text>
                     </View>
                     <View style={styles.cardSplitRow}>
-                      <Text style={styles.cardSplitLeft}>
-                        Amount: {formatAmount(row.amount)}
-                      </Text>
-                      <Text style={styles.cardSplitRight}>
-                        Bets: {display(row.totalBets)}
-                      </Text>
+                      <Text style={styles.cardSplitLeft}>Amount: {formatAmount(row.amount)}</Text>
+                      <Text style={styles.cardSplitRight}>Bets: {display(row.totalBets)}</Text>
                     </View>
                     <View style={styles.cardRow}>
                       <Text style={styles.cardLabel}>User ID</Text>
@@ -494,11 +487,7 @@ export function PlayerRtpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   chipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -513,9 +502,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(2), marginTop: spacing(3) },
   searchInput: {
     flex: 1,
@@ -527,15 +514,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     fontSize: 14,
   },
-  searchBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   unavailableCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -545,40 +523,6 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(6) },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   winPill: {
     fontSize: 10,
     fontWeight: '800',
@@ -590,20 +534,6 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     overflow: 'hidden',
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -611,30 +541,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
   infoBox: {
     backgroundColor: 'rgba(59,130,246,0.12)',
     borderWidth: 1,

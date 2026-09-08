@@ -16,12 +16,12 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { CLIENT_NAMES, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
@@ -81,6 +81,8 @@ type FundRequestCoinSummary = {
     totalcasinoCreditCount?: number;
     totalexchangeCredit?: number;
     totalexchangeCreditCount?: number;
+    totalsattaMatkaCredit?: number;
+    totalsattaMatkaCreditCount?: number;
     totalscannerDepositCount?: number;
   };
 };
@@ -124,7 +126,15 @@ type TxnRow = {
 type DrillType = 'deposit' | 'withdrawal';
 type ApprovedDateScope = 'yes' | 'no' | null;
 
-const DEPOSIT_STATUSES = ['', 'Pending', 'Approved', 'Rejected', 'Reverse', 'on hold', 'Processing'] as const;
+const DEPOSIT_STATUSES = [
+  '',
+  'Pending',
+  'Approved',
+  'Rejected',
+  'Reverse',
+  'on hold',
+  'Processing',
+] as const;
 const WITHDRAWAL_STATUSES = [
   '',
   'Pending',
@@ -172,18 +182,19 @@ function withdrawalBucket(
   summary: DepositFundSummary,
   countKey: keyof NonNullable<DepositFundSummary['WithdrawalData']>,
   amountKey: keyof NonNullable<DepositFundSummary['WithdrawalData']>,
-  nested?: FundSummaryBucket,
 ): FundSummaryBucket {
   const w = summary.WithdrawalData;
   return {
-    count: num(w?.[countKey] ?? nested?.count),
-    totalAmount: num(w?.[amountKey] ?? nested?.totalAmount),
+    count: num(w?.[countKey]),
+    totalAmount: Math.round(num(w?.[amountKey])),
   };
 }
 
 export function FundRequestScreen() {
   const canViewDeposit =
-    hasPermission('View_Fund_Deposit') || hasPermission('View_Deposits') || hasPermission('Fund_Request');
+    hasPermission('View_Fund_Deposit') ||
+    hasPermission('View_Deposits') ||
+    hasPermission('Fund_Request');
   const canViewWithdrawal = hasPermission('View_Withdrawals') || hasPermission('Fund_Request');
   const canPencil = hasPermission('Deposit_Pensil');
   const canShowMobile = hasPermission('show_mobile');
@@ -239,12 +250,14 @@ export function FundRequestScreen() {
       setHoldWithdrawal({});
       setDepositWithdrawTotal(0);
       try {
-        const datePayload = useAll
-          ? {}
-          : { startDate: startDate || todayIST(), endDate: endDate || todayIST() };
+        const start = startDate || todayIST();
+        const end = endDate || todayIST();
+        const datePayload = useAll ? {} : { startDate: start, endDate: end };
         const bonusPayload = useAll
           ? { allData: true }
-          : { startDate: startDate || todayIST(), endDate: endDate || todayIST(), allData: false };
+          : { startDate: start, endDate: end, allData: false };
+        // admin-panel-domains: deposit-withdrawal always uses picker dates
+        const depositWithdrawalPayload = { startDate: start, endDate: end };
 
         const [sumRes, coinRes, holdRes, bonusRes, dwRes] = await Promise.all([
           secureApi<unknown>('fundRequests.summary', datePayload),
@@ -253,7 +266,7 @@ export function FundRequestScreen() {
           canViewBonusWallet
             ? secureApi<unknown>('bonusWallet.fundRequestSummary', bonusPayload)
             : Promise.resolve({ ok: true as const, data: {} as unknown }),
-          secureApi<unknown>('fundRequests.depositWithdrawal', datePayload),
+          secureApi<unknown>('fundRequests.depositWithdrawal', depositWithdrawalPayload),
         ]);
 
         if (gen !== summaryGenRef.current) return;
@@ -264,7 +277,9 @@ export function FundRequestScreen() {
         } else {
           setSummary(unpackPayload(sumRes.data) as DepositFundSummary);
         }
-        setCoinSummary(!apiFailed(coinRes) ? (unpackPayload(coinRes.data) as FundRequestCoinSummary) : {});
+        setCoinSummary(
+          !apiFailed(coinRes) ? (unpackPayload(coinRes.data) as FundRequestCoinSummary) : {},
+        );
         if (!apiFailed(holdRes)) {
           const body = unpackPayload(holdRes.data);
           setHoldWithdrawal({
@@ -274,8 +289,12 @@ export function FundRequestScreen() {
         } else {
           setHoldWithdrawal({});
         }
-        setBonusSummary(!apiFailed(bonusRes) ? (unpackPayload(bonusRes.data) as BonusWalletSummary) : {});
-        setDepositWithdrawTotal(!apiFailed(dwRes) ? num(unpackPayload(dwRes.data).totalDeposit) : 0);
+        setBonusSummary(
+          !apiFailed(bonusRes) ? (unpackPayload(bonusRes.data) as BonusWalletSummary) : {},
+        );
+        setDepositWithdrawTotal(
+          !apiFailed(dwRes) ? num(unpackPayload(dwRes.data).totalDeposit) : 0,
+        );
         setAllData(useAll);
       } finally {
         if (gen === summaryGenRef.current) setSummaryLoading(false);
@@ -432,21 +451,19 @@ export function FundRequestScreen() {
     [reloadDrill],
   );
 
-  // ---- KPI buckets ----
+  // ---- KPI buckets (admin-panel-domains FundRequest.tsx field sources) ----
   const scannerCount = num(
-    summary.coinScannerData?.totalscannerDepositCount ?? coinSummary.coinData?.totalscannerDepositCount,
+    summary.coinScannerData?.totalscannerDepositCount ??
+      coinSummary.coinData?.totalscannerDepositCount,
   );
   const depositApproved: FundSummaryBucket = {
     count: num(summary.depositData?.depositApprovedCount) + scannerCount,
-    totalAmount: depositWithdrawTotal || num(summary.depositData?.depositApprovedTotal),
+    totalAmount: num(depositWithdrawTotal),
   };
-  const depositPending: FundSummaryBucket = summary.depositePendingData &&
-    (summary.depositePendingData.count != null || summary.depositePendingData.totalAmount != null)
-    ? summary.depositePendingData
-    : {
-        count: num(summary.depositData?.depositPendingCount),
-        totalAmount: num(summary.depositData?.depositPendingTotal),
-      };
+  const depositPending: FundSummaryBucket = {
+    count: num(summary.depositData?.depositPendingCount),
+    totalAmount: Math.round(num(summary.depositData?.depositPendingTotal)),
+  };
   const uniquePending: FundSummaryBucket = {
     count: num(summary.uniquePendingDetail?.pendingCount),
     totalAmount: num(summary.uniquePendingDetail?.pendingAmount),
@@ -471,16 +488,24 @@ export function FundRequestScreen() {
     count: num(bonusSummary.totalBonusWalletCount),
     totalAmount: Math.round(num(bonusSummary.totalBonusWallet)),
   };
-  const wApproved = withdrawalBucket(summary, 'totalApprovedCount', 'totalApprovedAmount', summary.totalApprovedWithdrawalData);
-  const wTodayApproved = withdrawalBucket(summary, 'todaysTotalApprovedCount', 'todaysTotalApprovedAmount');
-  const wOldApproved = withdrawalBucket(summary, 'previousTotalApprovedCount', 'previousTotalApprovedAmount');
-  const wPending = withdrawalBucket(summary, 'totalPendingCount', 'totalPendingAmount', summary.totalPendingWithdrawalData);
-  const wRejected = withdrawalBucket(summary, 'totalRejectedCount', 'totalRejectedAmount', summary.totalWithdrawalRejected);
-  const wReverse = withdrawalBucket(summary, 'totalReversedCount', 'totalReversedAmount', summary.totalReverseWithdrawalData);
+  const wApproved = withdrawalBucket(summary, 'totalApprovedCount', 'totalApprovedAmount');
+  const wTodayApproved = withdrawalBucket(
+    summary,
+    'todaysTotalApprovedCount',
+    'todaysTotalApprovedAmount',
+  );
+  const wOldApproved = withdrawalBucket(
+    summary,
+    'previousTotalApprovedCount',
+    'previousTotalApprovedAmount',
+  );
+  const wPending = withdrawalBucket(summary, 'totalPendingCount', 'totalPendingAmount');
+  const wRejected = withdrawalBucket(summary, 'totalRejectedCount', 'totalRejectedAmount');
+  const wReverse = withdrawalBucket(summary, 'totalReversedCount', 'totalReversedAmount');
   const wCanceled = withdrawalBucket(summary, 'totalCanceledCount', 'totalCanceledAmount');
   const wOnHold: FundSummaryBucket = {
-    count: holdWithdrawal.count ?? num(summary.WithdrawalData?.totalOnholdCount),
-    totalAmount: holdWithdrawal.totalAmount ?? num(summary.WithdrawalData?.totalOnholdAmount),
+    count: num(holdWithdrawal.count),
+    totalAmount: Math.round(num(holdWithdrawal.totalAmount)),
   };
   const casinoDeposit: FundSummaryBucket = {
     count: num(coinSummary.coinData?.totalcasinoCreditCount),
@@ -489,6 +514,10 @@ export function FundRequestScreen() {
   const jetfairDeposit: FundSummaryBucket = {
     count: num(coinSummary.coinData?.totalexchangeCreditCount),
     totalAmount: num(coinSummary.coinData?.totalexchangeCredit),
+  };
+  const sattaMatkaDeposit: FundSummaryBucket = {
+    count: num(coinSummary.coinData?.totalsattaMatkaCreditCount),
+    totalAmount: num(coinSummary.coinData?.totalsattaMatkaCredit),
   };
 
   type KpiItem = {
@@ -502,24 +531,174 @@ export function FundRequestScreen() {
   };
 
   const kpiItems: KpiItem[] = [
-    { key: 'dep-approved', label: 'Deposit Approved', bucket: depositApproved, tone: 'green', show: canViewDeposit, active: drillType === 'deposit' && statusFilter === 'Approved', onPress: () => openDrill('deposit', 'Approved', { label: 'Deposit Approved' }) },
-    { key: 'app-dep', label: 'App Deposit Approved', bucket: appDeposit, tone: 'green', show: canViewDeposit },
-    { key: 'new-user', label: 'New User Deposit', bucket: newUserDeposit, tone: 'green', show: canViewDeposit },
-    { key: 'old-user', label: 'Old User Deposit', bucket: oldUserDeposit, tone: 'green', show: canViewDeposit },
-    { key: 'transfer-main', label: 'Transfer to Main Wallet', bucket: transferMainWallet, tone: 'green', show: canViewBonusWallet },
-    { key: 'w-hold', label: 'Refund on Hold', bucket: wOnHold, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'on hold' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'on hold', { label: 'Refund on Hold' }) },
-    { key: 'w-approved', label: 'Refund Approved', bucket: wApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Approved', { label: 'Refund Approved' }) },
-    { key: 'w-today', label: "Today's Withdrawal Approved", bucket: wTodayApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === 'yes', onPress: () => openDrill('withdrawal', 'Approved', { isTodaysData: 'yes', label: "Today's Withdrawal Approved" }) },
-    { key: 'w-old', label: 'Old Withdrawal Approved', bucket: wOldApproved, tone: 'blue', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === 'no', onPress: () => openDrill('withdrawal', 'Approved', { isTodaysData: 'no', label: 'Old Withdrawal Approved' }) },
-    { key: 'unique', label: 'Unique Deposit Pending', bucket: uniquePending, tone: 'yellow', show: canViewDeposit },
-    { key: 'dep-pending', label: 'Total Deposit Pending', bucket: depositPending, tone: 'yellow', show: canViewDeposit, active: drillType === 'deposit' && statusFilter === 'Pending', onPress: () => openDrill('deposit', 'Pending', { label: 'Total Deposit Pending' }) },
-    { key: 'w-pending', label: 'Withdrawal Pending', bucket: wPending, tone: 'yellow', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Pending' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Pending', { label: 'Withdrawal Pending' }) },
-    { key: 'bonus', label: 'Total Bonus Wallet', bucket: totalBonusWallet, tone: 'orange', show: canViewBonusWallet },
-    { key: 'w-reverse', label: 'Withdrawal Reverse', bucket: wReverse, tone: 'orange', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Reverse' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Reverse', { label: 'Withdrawal Reverse' }) },
-    { key: 'w-rejected', label: 'Withdrawal Rejected', bucket: wRejected, tone: 'red', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Rejected' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Rejected', { label: 'Withdrawal Rejected' }) },
-    { key: 'w-cancel', label: 'Withdrawal Cancelled', bucket: wCanceled, tone: 'red', show: canViewWithdrawal, active: drillType === 'withdrawal' && statusFilter === 'Cancel' && approvedDateScope === null, onPress: () => openDrill('withdrawal', 'Cancel', { label: 'Withdrawal Cancelled' }) },
-    { key: 'casino', label: 'Total Casino Deposit', bucket: casinoDeposit, tone: 'gray', show: canViewDeposit },
-    { key: 'jetfair', label: 'Total Jetfair Deposit', bucket: jetfairDeposit, tone: 'gray', show: canViewDeposit },
+    {
+      key: 'dep-approved',
+      label: 'Deposit Approved',
+      bucket: depositApproved,
+      tone: 'green',
+      show: canViewDeposit,
+      active: drillType === 'deposit' && statusFilter === 'Approved',
+      onPress: () => openDrill('deposit', 'Approved', { label: 'Deposit Approved' }),
+    },
+    {
+      key: 'app-dep',
+      label: 'App Deposit Approved',
+      bucket: appDeposit,
+      tone: 'green',
+      show: canViewDeposit,
+    },
+    {
+      key: 'new-user',
+      label: 'New User Deposit',
+      bucket: newUserDeposit,
+      tone: 'green',
+      show: canViewDeposit,
+    },
+    {
+      key: 'old-user',
+      label: 'Old User Deposit',
+      bucket: oldUserDeposit,
+      tone: 'green',
+      show: canViewDeposit,
+    },
+    {
+      key: 'transfer-main',
+      label: 'Transfer to Main Wallet',
+      bucket: transferMainWallet,
+      tone: 'green',
+      show: canViewBonusWallet,
+    },
+    {
+      key: 'w-hold',
+      label: 'Refund on Hold',
+      bucket: wOnHold,
+      tone: 'blue',
+      show: canViewWithdrawal,
+      active:
+        drillType === 'withdrawal' && statusFilter === 'on hold' && approvedDateScope === null,
+      onPress: () => openDrill('withdrawal', 'on hold', { label: 'Refund on Hold' }),
+    },
+    {
+      key: 'w-approved',
+      label: 'Refund Approved',
+      bucket: wApproved,
+      tone: 'blue',
+      show: canViewWithdrawal,
+      active:
+        drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === null,
+      onPress: () => openDrill('withdrawal', 'Approved', { label: 'Refund Approved' }),
+    },
+    {
+      key: 'w-today',
+      label: "Today's Withdrawal Approved",
+      bucket: wTodayApproved,
+      tone: 'blue',
+      show: canViewWithdrawal,
+      active:
+        drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === 'yes',
+      onPress: () =>
+        openDrill('withdrawal', 'Approved', {
+          isTodaysData: 'yes',
+          label: "Today's Withdrawal Approved",
+        }),
+    },
+    {
+      key: 'w-old',
+      label: 'Old Withdrawal Approved',
+      bucket: wOldApproved,
+      tone: 'blue',
+      show: canViewWithdrawal,
+      active:
+        drillType === 'withdrawal' && statusFilter === 'Approved' && approvedDateScope === 'no',
+      onPress: () =>
+        openDrill('withdrawal', 'Approved', {
+          isTodaysData: 'no',
+          label: 'Old Withdrawal Approved',
+        }),
+    },
+    {
+      key: 'unique',
+      label: 'Unique Deposit Pending',
+      bucket: uniquePending,
+      tone: 'yellow',
+      show: canViewDeposit,
+    },
+    {
+      key: 'dep-pending',
+      label: 'Total Deposit Pending',
+      bucket: depositPending,
+      tone: 'yellow',
+      show: canViewDeposit,
+      active: drillType === 'deposit' && statusFilter === 'Pending',
+      onPress: () => openDrill('deposit', 'Pending', { label: 'Total Deposit Pending' }),
+    },
+    {
+      key: 'w-pending',
+      label: 'Withdrawal Pending',
+      bucket: wPending,
+      tone: 'yellow',
+      show: canViewWithdrawal,
+      active:
+        drillType === 'withdrawal' && statusFilter === 'Pending' && approvedDateScope === null,
+      onPress: () => openDrill('withdrawal', 'Pending', { label: 'Withdrawal Pending' }),
+    },
+    {
+      key: 'bonus',
+      label: 'Total Bonus Wallet',
+      bucket: totalBonusWallet,
+      tone: 'orange',
+      show: canViewBonusWallet,
+    },
+    {
+      key: 'w-reverse',
+      label: 'Withdrawal Reverse',
+      bucket: wReverse,
+      tone: 'orange',
+      show: canViewWithdrawal,
+      active:
+        drillType === 'withdrawal' && statusFilter === 'Reverse' && approvedDateScope === null,
+      onPress: () => openDrill('withdrawal', 'Reverse', { label: 'Withdrawal Reverse' }),
+    },
+    {
+      key: 'w-rejected',
+      label: 'Withdrawal Rejected',
+      bucket: wRejected,
+      tone: 'red',
+      show: canViewWithdrawal,
+      active:
+        drillType === 'withdrawal' && statusFilter === 'Rejected' && approvedDateScope === null,
+      onPress: () => openDrill('withdrawal', 'Rejected', { label: 'Withdrawal Rejected' }),
+    },
+    {
+      key: 'w-cancel',
+      label: 'Withdrawal Cancelled',
+      bucket: wCanceled,
+      tone: 'red',
+      show: canViewWithdrawal,
+      active: drillType === 'withdrawal' && statusFilter === 'Cancel' && approvedDateScope === null,
+      onPress: () => openDrill('withdrawal', 'Cancel', { label: 'Withdrawal Cancelled' }),
+    },
+    {
+      key: 'casino',
+      label: 'Total Casino Deposit',
+      bucket: casinoDeposit,
+      tone: 'gray',
+      show: canViewDeposit,
+    },
+    {
+      key: 'jetfair',
+      label: 'Total Jetfair Deposit',
+      bucket: jetfairDeposit,
+      tone: 'gray',
+      show: canViewDeposit,
+    },
+    {
+      key: 'satta',
+      label: 'Total Satta Matka Deposit',
+      bucket: sattaMatkaDeposit,
+      tone: 'gray',
+      show: canViewDeposit,
+    },
   ];
 
   const statusOptions = drillType === 'withdrawal' ? WITHDRAWAL_STATUSES : DEPOSIT_STATUSES;
@@ -579,7 +758,10 @@ export function FundRequestScreen() {
       { label: 'State', value: display(r.userState || r.state) },
       { label: 'City', value: display(r.userCity || r.city) },
       { label: 'Txn Id', value: display(r.orderId || r.transactionId), multiline: true },
-      { label: 'Date', value: `${formatDisplayDate(r.createdOn) || '—'} ${formatDisplayTime(r.createdOn) || ''}` },
+      {
+        label: 'Date',
+        value: `${formatDisplayDate(r.createdOn) || '—'} ${formatDisplayTime(r.createdOn) || ''}`,
+      },
     ];
     if (drillType === 'withdrawal') {
       base.push(
@@ -649,29 +831,29 @@ export function FundRequestScreen() {
               <Text style={styles.hint}>Loading…</Text>
             </View>
           ) : (
-          <View style={styles.kpiGrid}>
-            {kpiItems
-              .filter((c) => c.show !== false)
-              .map((c) => {
-                const color = TONE_COLOR[c.tone];
-                return (
-                  <TouchableOpacity
-                    key={c.key}
-                    style={[styles.kpiCard, { borderColor: c.active ? color : colors.border }]}
-                    activeOpacity={c.onPress ? 0.7 : 1}
-                    onPress={c.onPress}
-                    disabled={!c.onPress || summaryLoading}
-                  >
-                    <Text style={[styles.kpiLabel, { color }]} numberOfLines={2}>
-                      {c.label}
-                    </Text>
-                    <Text style={styles.kpiValue}>
-                      ({c.bucket.count ?? 0}) : {c.bucket.totalAmount ?? 0}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-          </View>
+            <View style={styles.kpiGrid}>
+              {kpiItems
+                .filter((c) => c.show !== false)
+                .map((c) => {
+                  const color = TONE_COLOR[c.tone];
+                  return (
+                    <TouchableOpacity
+                      key={c.key}
+                      style={[styles.kpiCard, { borderColor: c.active ? color : colors.border }]}
+                      activeOpacity={c.onPress ? 0.7 : 1}
+                      onPress={c.onPress}
+                      disabled={!c.onPress || summaryLoading}
+                    >
+                      <Text style={[styles.kpiLabel, { color }]} numberOfLines={2}>
+                        {c.label}
+                      </Text>
+                      <Text style={styles.kpiValue}>
+                        ({c.bucket.count ?? 0}) : {c.bucket.totalAmount ?? 0}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
           )}
         </>
       ) : null}
@@ -685,11 +867,18 @@ export function FundRequestScreen() {
             {drillLabel || (drillType === 'deposit' ? 'Deposit' : 'Refund')} ({total})
           </Text>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing(2) }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: spacing(2) }}
+          >
             {statusOptions.map((s) => (
               <TouchableOpacity
                 key={s || 'all'}
-                style={[styles.chip, statusFilter === s && approvedDateScope === null && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  statusFilter === s && approvedDateScope === null && styles.chipActive,
+                ]}
                 onPress={() => applyStatusChip(s)}
               >
                 <Text
@@ -722,12 +911,18 @@ export function FundRequestScreen() {
             />
           </View>
           {drillType === 'deposit' ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing(2) }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: spacing(2) }}
+            >
               <TouchableOpacity
                 style={[styles.chip, appFilter === '' && styles.chipActive]}
                 onPress={() => setAppFilter('')}
               >
-                <Text style={[styles.chipText, appFilter === '' && styles.chipTextActive]}>All Apps</Text>
+                <Text style={[styles.chipText, appFilter === '' && styles.chipTextActive]}>
+                  All Apps
+                </Text>
               </TouchableOpacity>
               {CLIENT_NAMES.map((name) => (
                 <TouchableOpacity
@@ -754,7 +949,9 @@ export function FundRequestScreen() {
                     reloadDrill({ itemsPerPage: n, pageNo: 1 });
                   }}
                 >
-                  <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>{n}</Text>
+                  <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>
+                    {n}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -771,7 +968,9 @@ export function FundRequestScreen() {
           </View>
 
           {tableLoading ? <Text style={styles.empty}>Loading…</Text> : null}
-          {!tableLoading && rows.length === 0 ? <Text style={styles.empty}>No transactions found</Text> : null}
+          {!tableLoading && rows.length === 0 ? (
+            <Text style={styles.empty}>No transactions found</Text>
+          ) : null}
 
           {rows.map((r, i) => {
             const st = String(r.status || '').toLowerCase();
@@ -807,11 +1006,15 @@ export function FundRequestScreen() {
                   </View>
                   <View style={styles.cardCell}>
                     <Text style={styles.cardLabel}>App</Text>
-                    <Text style={styles.cardValue}>{display(appCodeForName(r.clientName) || r.clientName)}</Text>
+                    <Text style={styles.cardValue}>
+                      {display(appCodeForName(r.clientName) || r.clientName)}
+                    </Text>
                   </View>
                   <View style={styles.cardCell}>
                     <Text style={styles.cardLabel}>Mobile</Text>
-                    <Text style={styles.cardValue}>{maskMobile(r.userMobile || r.mobile, canShowMobile)}</Text>
+                    <Text style={styles.cardValue}>
+                      {maskMobile(r.userMobile || r.mobile, canShowMobile)}
+                    </Text>
                   </View>
                   <View style={styles.cardCell}>
                     <Text style={styles.cardLabel}>Date</Text>
@@ -862,7 +1065,10 @@ export function FundRequestScreen() {
                 Page {page} / {totalPages}
               </Text>
               <Text
-                style={[styles.pagerBtn, (page >= totalPages || tableLoading) && styles.pagerDisabled]}
+                style={[
+                  styles.pagerBtn,
+                  (page >= totalPages || tableLoading) && styles.pagerDisabled,
+                ]}
                 onPress={() => page < totalPages && !tableLoading && goPage(page + 1)}
               >
                 Next ›
@@ -895,14 +1101,20 @@ export function FundRequestScreen() {
         >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Change Deposit Status</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing(2) }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: spacing(2) }}
+            >
               {DEPOSIT_STATUSES.filter(Boolean).map((s) => (
                 <TouchableOpacity
                   key={s}
                   style={[styles.chip, editStatus === s && styles.chipActive]}
                   onPress={() => setEditStatus(s)}
                 >
-                  <Text style={[styles.chipText, editStatus === s && styles.chipTextActive]}>{s}</Text>
+                  <Text style={[styles.chipText, editStatus === s && styles.chipTextActive]}>
+                    {s}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -915,7 +1127,11 @@ export function FundRequestScreen() {
               onChangeText={setEditRemark}
             />
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.cancelBtn} disabled={editSaving} onPress={() => setEditRow(null)}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                disabled={editSaving}
+                onPress={() => setEditRow(null)}
+              >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -933,8 +1149,7 @@ export function FundRequestScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+const styles = makeStyles({
   centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
   empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(4) },
   hint: { color: colors.muted, textAlign: 'center', marginTop: spacing(4), fontSize: 12 },
@@ -962,7 +1177,12 @@ const styles = StyleSheet.create({
   },
   kpiLabel: { fontSize: 12, fontWeight: '800' },
   kpiValue: { color: colors.foreground, fontSize: 14, fontWeight: '700', marginTop: spacing(1) },
-  sectionTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginBottom: spacing(2) },
+  sectionTitle: {
+    color: colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing(2),
+  },
   chip: {
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.border,
@@ -972,10 +1192,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.25),
     marginRight: spacing(1.5),
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12 },
   chipTextActive: { color: colors.primaryForeground, fontWeight: '700' },
-  filterRow: { flexDirection: 'row', gap: spacing(2), marginBottom: spacing(2), alignItems: 'center' },
+  filterRow: {
+    flexDirection: 'row',
+    gap: spacing(2),
+    marginBottom: spacing(2),
+    alignItems: 'center',
+  },
   input: {
     flex: 1,
     backgroundColor: colors.surfaceAlt,
@@ -1002,8 +1226,19 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(2),
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(2) },
-  cardName: { color: colors.foreground, fontSize: 15, fontWeight: '700', flex: 1, marginRight: spacing(2) },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing(2),
+  },
+  cardName: {
+    color: colors.foreground,
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: spacing(2),
+  },
   pill: { borderRadius: 999, paddingHorizontal: spacing(2.5), paddingVertical: spacing(0.75) },
   pillText: { fontSize: 11, fontWeight: '700' },
   cardGrid: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -1019,7 +1254,12 @@ const styles = StyleSheet.create({
     marginTop: spacing(1),
   },
   editBtnText: { color: '#d97706', fontSize: 12, fontWeight: '700' },
-  pager: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing(2) },
+  pager: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing(2),
+  },
   pagerBtn: { color: colors.primary, fontWeight: '700', padding: spacing(2) },
   pagerDisabled: { color: colors.muted },
   pagerLabel: { color: colors.foreground, fontSize: 13 },
@@ -1037,8 +1277,18 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     paddingBottom: spacing(6),
   },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginBottom: spacing(3) },
-  modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(3) },
+  modalTitle: {
+    color: colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing(3),
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
   cancelBtn: {
     borderColor: colors.border,
     borderWidth: 1,

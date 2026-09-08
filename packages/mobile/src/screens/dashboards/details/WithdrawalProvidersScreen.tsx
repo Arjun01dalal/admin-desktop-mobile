@@ -13,13 +13,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -99,10 +99,7 @@ export function WithdrawalProvidersScreen() {
   const canToggle = hasPermission('Toggle_PayOut_Account');
   const canDelete = hasPermission('Delete_PayOut_Account');
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
-  const updatedBy = useMemo(
-    () => ({ userId: admin?._id, userName: admin?.name }),
-    [admin],
-  );
+  const updatedBy = useMemo(() => ({ userId: admin?._id, userName: admin?.name }), [admin]);
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -183,7 +180,12 @@ export function WithdrawalProvidersScreen() {
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
       { key: 'name', label: 'Gateway Name', width: 130, render: (r) => display(r.name) },
-      { key: 'displayName', label: 'Display Name', width: 130, render: (r) => display(r.displayName) },
+      {
+        key: 'displayName',
+        label: 'Display Name',
+        width: 130,
+        render: (r) => display(r.displayName),
+      },
       {
         key: 'status',
         label: 'Status',
@@ -387,13 +389,18 @@ export function WithdrawalProvidersScreen() {
             <Text style={styles.modalTitle} numberOfLines={1}>
               {title}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.modalClose}>✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+            style={{ maxHeight: 420 }}
+            keyboardShouldPersistTaps="handled"
+          >
             {children}
             {modalMsg ? <Text style={styles.modalMsg}>{modalMsg}</Text> : null}
           </ScrollView>
@@ -408,7 +415,11 @@ export function WithdrawalProvidersScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>{toDisplayText('Refund Providers')}</Text>
@@ -533,32 +544,30 @@ export function WithdrawalProvidersScreen() {
           setAddOpen(false);
           setFormRow(null);
         },
-        (
-          <View>
-            {FORM_FIELDS.map(([key, label, multiline]) => (
-              <TextInput
-                key={key}
-                style={[styles.modalInput, multiline && styles.modalInputMultiline]}
-                value={form[key]}
-                onChangeText={(v) => setForm((f) => ({ ...f, [key]: v }))}
-                placeholder={label}
-                placeholderTextColor={colors.muted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                multiline={multiline}
-              />
-            ))}
-            <TouchableOpacity
-              style={[styles.submitBtn, busy && styles.btnDisabled]}
-              disabled={busy}
-              onPress={() => void submitForm()}
-            >
-              <Text style={styles.submitText}>
-                {busy ? 'Saving…' : addOpen ? 'Add provider' : 'Update'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ),
+        <View>
+          {FORM_FIELDS.map(([key, label, multiline]) => (
+            <TextInput
+              key={key}
+              style={[styles.modalInput, multiline && styles.modalInputMultiline]}
+              value={form[key]}
+              onChangeText={(v) => setForm((f) => ({ ...f, [key]: v }))}
+              placeholder={label}
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              multiline={multiline}
+            />
+          ))}
+          <TouchableOpacity
+            style={[styles.submitBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => void submitForm()}
+          >
+            <Text style={styles.submitText}>
+              {busy ? 'Saving…' : addOpen ? 'Add provider' : 'Update'}
+            </Text>
+          </TouchableOpacity>
+        </View>,
       )}
 
       {/* Single-field update modal */}
@@ -566,54 +575,48 @@ export function WithdrawalProvidersScreen() {
         updateRow !== null,
         `Update field — ${updateRow?.name || ''}`,
         () => setUpdateRow(null),
-        (
-          <View>
-            <View style={styles.chipsWrap}>
-              {UPDATE_FIELDS.map((f) => (
-                <TouchableOpacity
-                  key={f.key}
-                  style={[styles.chip, updateKey === f.key && styles.chipActive]}
-                  onPress={() => {
-                    setUpdateKey(f.key);
-                    setUpdateText(
-                      String((updateRow as Record<string, unknown> | null)?.[f.prop] ?? ''),
-                    );
-                  }}
-                >
-                  <Text style={[styles.chipText, updateKey === f.key && styles.chipTextActive]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              style={styles.modalInput}
-              value={updateText}
-              onChangeText={setUpdateText}
-              placeholder="New value…"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={[styles.submitBtn, busy && styles.btnDisabled]}
-              disabled={busy}
-              onPress={() => void submitUpdateField()}
-            >
-              <Text style={styles.submitText}>{busy ? 'Saving…' : 'Update'}</Text>
-            </TouchableOpacity>
+        <View>
+          <View style={styles.chipsWrap}>
+            {UPDATE_FIELDS.map((f) => (
+              <TouchableOpacity
+                key={f.key}
+                style={[styles.chip, updateKey === f.key && styles.chipActive]}
+                onPress={() => {
+                  setUpdateKey(f.key);
+                  setUpdateText(
+                    String((updateRow as Record<string, unknown> | null)?.[f.prop] ?? ''),
+                  );
+                }}
+              >
+                <Text style={[styles.chipText, updateKey === f.key && styles.chipTextActive]}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ),
+          <TextInput
+            style={styles.modalInput}
+            value={updateText}
+            onChangeText={setUpdateText}
+            placeholder="New value…"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TouchableOpacity
+            style={[styles.submitBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => void submitUpdateField()}
+          >
+            <Text style={styles.submitText}>{busy ? 'Saving…' : 'Update'}</Text>
+          </TouchableOpacity>
+        </View>,
       )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(3) },
   searchInput: {
     flex: 1,
@@ -647,52 +650,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -703,60 +661,13 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
   cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '28%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
   modalSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.md * 2,
     borderTopRightRadius: radius.md * 2,
     padding: spacing(4),
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
-  },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -768,14 +679,5 @@ const styles = StyleSheet.create({
     marginTop: spacing(2.5),
   },
   modalInputMultiline: { minHeight: 64, textAlignVertical: 'top' },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  btnDisabled: { opacity: 0.5 },
   submitText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
-  modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
 });

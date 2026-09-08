@@ -4,13 +4,7 @@
  * so the site reloads, matching desktop iframe key remount.
  */
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
 import { colors, radius, spacing } from '../../../theme';
@@ -92,7 +86,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
   },
   refreshText: {
     color: colors.foreground,
@@ -106,7 +100,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
   },
   webview: {
     flex: 1,
@@ -117,6 +111,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
   },
 });

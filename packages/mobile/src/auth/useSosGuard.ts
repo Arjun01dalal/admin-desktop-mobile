@@ -13,7 +13,6 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { getSosBlock, isSosFlagEnabled, type SosBlockInfo } from '@astro/shared';

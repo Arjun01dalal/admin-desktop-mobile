@@ -13,17 +13,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useIsFocused } from '@react-navigation/native';
-import { CAMPAIGN_LIST, buildExtensionAssigneeMap, dialerCampaignLabel, pickPageSizes } from '@astro/shared';
+import {
+  CAMPAIGN_LIST,
+  buildExtensionAssigneeMap,
+  dialerCampaignLabel,
+  pickPageSizes,
+} from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { canAccessNavItem, Permissions } from '../../../auth/permissions';
 import { DateField } from '../../../components/DateField';
 import { colors, radius, spacing } from '../../../theme';
-import {
-  formatDisplayDate,
-  formatDisplayTime,
-  todayIST,
-} from '../../../utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 
 type Row = Record<string, unknown>;
 
@@ -53,16 +55,7 @@ function pickField(row: Row, ...keys: string[]): unknown {
 
 function userIdOf(row: Row): string {
   return display(
-    pickField(
-      row,
-      'province',
-      'Province',
-      'provience',
-      'Provience',
-      'userId',
-      'user_id',
-      'UserId',
-    ),
+    pickField(row, 'province', 'Province', 'provience', 'Provience', 'userId', 'user_id', 'UserId'),
   );
 }
 
@@ -165,21 +158,13 @@ function extractCampaignMap(obj: Record<string, unknown>): Row[] {
     if (!value || typeof value !== 'object') continue;
     const group = value as Record<string, unknown>;
     const nested =
-      group.data ??
-      group.items ??
-      group.leads ??
-      group.records ??
-      group.docs ??
-      group.list;
+      group.data ?? group.items ?? group.leads ?? group.records ?? group.docs ?? group.list;
 
     if (Array.isArray(nested)) {
       for (const item of nested) {
         if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
         out.push(
-          withCampaign(
-            item as Row,
-            (group.campaign_id as string | number | undefined) ?? key,
-          ),
+          withCampaign(item as Row, (group.campaign_id as string | number | undefined) ?? key),
         );
       }
       continue;
@@ -221,10 +206,7 @@ function isCampaignMapObject(obj: Record<string, unknown>): boolean {
   return hits > 0 && hits >= Math.ceil(keys.length * 0.5);
 }
 
-function flattenDialerRows(
-  list: unknown[],
-  inheritedCampaign?: string | number,
-): Row[] {
+function flattenDialerRows(list: unknown[], inheritedCampaign?: string | number): Row[] {
   const out: Row[] = [];
 
   for (const entry of list) {
@@ -259,9 +241,7 @@ function flattenDialerRows(
       row.results;
 
     const campaignHint =
-      row.campaign_id != null
-        ? (row.campaign_id as string | number)
-        : inheritedCampaign;
+      row.campaign_id != null ? (row.campaign_id as string | number) : inheritedCampaign;
 
     if (Array.isArray(nested)) {
       out.push(...flattenDialerRows(nested, campaignHint));
@@ -295,13 +275,9 @@ function unpackRows(data: unknown): { rows: Row[]; total: number; pages: number 
       ? (data as Record<string, unknown>)
       : {};
   const metaPayload =
-    metaRoot.payload &&
-    typeof metaRoot.payload === 'object' &&
-    !Array.isArray(metaRoot.payload)
+    metaRoot.payload && typeof metaRoot.payload === 'object' && !Array.isArray(metaRoot.payload)
       ? (metaRoot.payload as Record<string, unknown>)
-      : metaRoot.data &&
-          typeof metaRoot.data === 'object' &&
-          !Array.isArray(metaRoot.data)
+      : metaRoot.data && typeof metaRoot.data === 'object' && !Array.isArray(metaRoot.data)
         ? (metaRoot.data as Record<string, unknown>)
         : metaRoot;
 
@@ -381,15 +357,11 @@ function unpackRows(data: unknown): { rows: Row[]; total: number; pages: number 
 
 export function DialerPushDataScreen() {
   const isFocused = useIsFocused();
-  const canView =
-    canAccessNavItem({
-      id: 'dialerPushData',
-      permission: Permissions.dialer_push_data,
-    }) ||
-    canAccessNavItem({
-      id: 'callLogs',
-      permission: Permissions.call_logs,
-    });
+  // Only dialer_push_data (full_access / dev_full_access still via isFullAccessNavRole).
+  const canView = canAccessNavItem({
+    id: 'dialerPushData',
+    permission: Permissions.dialer_push_data,
+  });
 
   const [startDate, setStartDate] = useState(todayIST());
   const [endDate, setEndDate] = useState(todayIST());
@@ -407,9 +379,7 @@ export function DialerPushDataScreen() {
   const [error, setError] = useState('');
   const aliveRef = useRef(true);
   /** extension / dialer id → assignee name (Caller Allotment). */
-  const [extensionAssigneeMap, setExtensionAssigneeMap] = useState<
-    Record<string, string>
-  >({});
+  const [extensionAssigneeMap, setExtensionAssigneeMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     aliveRef.current = true;
@@ -423,10 +393,9 @@ export function DialerPushDataScreen() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await secureApi<{ byRole?: unknown[] }>(
-          'ops.callerAllotmentSubadmins',
-          { filter: {} },
-        );
+        const res = await secureApi<{ byRole?: unknown[] }>('ops.callerAllotmentSubadmins', {
+          filter: {},
+        });
         if (cancelled || !aliveRef.current || !res.ok) return;
         const raw = (res.data ?? {}) as Record<string, unknown>;
         const byRole = (raw.byRole ??
@@ -463,133 +432,133 @@ export function DialerPushDataScreen() {
     subAdminId,
   };
 
-  const load = useCallback(async (page?: number, opts?: { pull?: boolean }) => {
-    if (!canView) return;
-    const f = filtersRef.current;
-    const pageToLoad = page ?? f.pageNo;
-    if (f.startDate && f.endDate && f.startDate > f.endDate) {
-      setError('From date cannot be greater than To date');
-      return;
-    }
-
-    if (opts?.pull) setRefreshing(true);
-    else setLoading(true);
-    setError('');
-
-    try {
-      const buildBody = (page: number, pageSize: number): Record<string, unknown> => {
-        // Match admin-panel DialerPushData — only known keys (Joi rejects extras).
-        const body: Record<string, unknown> = {
-          pageNo: page,
-          itemsPerPage: pageSize,
-          startDate: f.startDate,
-          endDate: f.endDate,
-        };
-        if (f.listId.trim()) body.list_id = Number(f.listId.trim()) || f.listId.trim();
-        if (f.campaignId.trim()) body.campaign_id = f.campaignId.trim();
-        if (f.subAdminId.trim()) body.subAdminId = f.subAdminId.trim();
-        return body;
-      };
-
-      const res = await secureApi(
-        'callLogs.getDialerDatas',
-        buildBody(pageToLoad, f.itemsPerPage),
-      );
-      if (!aliveRef.current) return;
-
-      if (!res.ok) {
-        setError(res.message || 'Failed to load dialer push data');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
+  const load = useCallback(
+    async (page?: number, opts?: { pull?: boolean }) => {
+      if (!canView) return;
+      const f = filtersRef.current;
+      const pageToLoad = page ?? f.pageNo;
+      if (f.startDate && f.endDate && f.startDate > f.endDate) {
+        setError('From date cannot be greater than To date');
         return;
       }
 
-      let unpacked: { rows: Row[]; total: number; pages: number };
-      try {
-        unpacked = unpackRows(res.data);
-      } catch {
-        setError('Failed to parse dialer push data');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        return;
-      }
-
-      // API often returns totalCount > listed leads (and may ignore itemsPerPage).
-      // Retry larger page size, then walk pages using the actual returned page length.
-      if (unpacked.total > unpacked.rows.length) {
-        const bigger = Math.min(Math.max(unpacked.total, f.itemsPerPage, 500), 2000);
-        if (bigger > f.itemsPerPage) {
-          const retry = await secureApi('callLogs.getDialerDatas', buildBody(1, bigger));
-          if (aliveRef.current && retry.ok) {
-            try {
-              const again = unpackRows(retry.data);
-              if (again.rows.length > unpacked.rows.length) unpacked = again;
-            } catch {
-              /* keep first */
-            }
-          }
-        }
-
-        if (unpacked.rows.length < unpacked.total) {
-          const merged = [...unpacked.rows];
-          const seen = new Set(merged.map(rowDedupeKey));
-          const returnedLen = Math.max(1, unpacked.rows.length);
-          const pagesNeeded = Math.max(
-            unpacked.pages > 0 ? unpacked.pages : 1,
-            Math.ceil(unpacked.total / returnedLen),
-          );
-          const maxPages = Math.min(pagesNeeded, 40);
-          // Page 1 already in `merged`; fetch 2..N
-          for (let p = 2; p <= maxPages; p++) {
-            if (merged.length >= unpacked.total) break;
-            const pageRes = await secureApi(
-              'callLogs.getDialerDatas',
-              buildBody(p, f.itemsPerPage),
-            );
-            if (!aliveRef.current || !pageRes.ok) break;
-            try {
-              const pageUnpacked = unpackRows(pageRes.data);
-              if (pageUnpacked.rows.length === 0) break;
-              let added = 0;
-              for (const row of pageUnpacked.rows) {
-                const id = rowDedupeKey(row);
-                if (seen.has(id)) continue;
-                seen.add(id);
-                merged.push(row);
-                added += 1;
-              }
-              if (added === 0) break;
-            } catch {
-              break;
-            }
-          }
-          unpacked = { ...unpacked, rows: merged };
-        }
-      }
-
-      setRows(unpacked.rows);
-      setTotal(Math.max(unpacked.total, unpacked.rows.length));
-      const pagesFromCount = Math.max(
-        1,
-        Math.ceil(unpacked.total / Math.max(1, f.itemsPerPage)),
-      );
-      setTotalPages(unpacked.pages > 0 ? unpacked.pages : pagesFromCount);
+      if (opts?.pull) setRefreshing(true);
+      else setLoading(true);
       setError('');
-    } catch (err) {
-      if (!aliveRef.current) return;
-      setError(err instanceof Error ? err.message : 'Failed to load dialer push data');
-      setRows([]);
-      setTotal(0);
-      setTotalPages(1);
-    } finally {
-      if (aliveRef.current) {
-        setLoading(false);
-        setRefreshing(false);
+
+      try {
+        const buildBody = (page: number, pageSize: number): Record<string, unknown> => {
+          // Match admin-panel DialerPushData — only known keys (Joi rejects extras).
+          const body: Record<string, unknown> = {
+            pageNo: page,
+            itemsPerPage: pageSize,
+            startDate: f.startDate,
+            endDate: f.endDate,
+          };
+          if (f.listId.trim()) body.list_id = Number(f.listId.trim()) || f.listId.trim();
+          if (f.campaignId.trim()) body.campaign_id = f.campaignId.trim();
+          if (f.subAdminId.trim()) body.subAdminId = f.subAdminId.trim();
+          return body;
+        };
+
+        const res = await secureApi(
+          'callLogs.getDialerDatas',
+          buildBody(pageToLoad, f.itemsPerPage),
+        );
+        if (!aliveRef.current) return;
+
+        if (!res.ok) {
+          setError(res.message || 'Failed to load dialer push data');
+          setRows([]);
+          setTotal(0);
+          setTotalPages(1);
+          return;
+        }
+
+        let unpacked: { rows: Row[]; total: number; pages: number };
+        try {
+          unpacked = unpackRows(res.data);
+        } catch {
+          setError('Failed to parse dialer push data');
+          setRows([]);
+          setTotal(0);
+          setTotalPages(1);
+          return;
+        }
+
+        // API often returns totalCount > listed leads (and may ignore itemsPerPage).
+        // Retry larger page size, then walk pages using the actual returned page length.
+        if (unpacked.total > unpacked.rows.length) {
+          const bigger = Math.min(Math.max(unpacked.total, f.itemsPerPage, 500), 2000);
+          if (bigger > f.itemsPerPage) {
+            const retry = await secureApi('callLogs.getDialerDatas', buildBody(1, bigger));
+            if (aliveRef.current && retry.ok) {
+              try {
+                const again = unpackRows(retry.data);
+                if (again.rows.length > unpacked.rows.length) unpacked = again;
+              } catch {
+                /* keep first */
+              }
+            }
+          }
+
+          if (unpacked.rows.length < unpacked.total) {
+            const merged = [...unpacked.rows];
+            const seen = new Set(merged.map(rowDedupeKey));
+            const returnedLen = Math.max(1, unpacked.rows.length);
+            const pagesNeeded = Math.max(
+              unpacked.pages > 0 ? unpacked.pages : 1,
+              Math.ceil(unpacked.total / returnedLen),
+            );
+            const maxPages = Math.min(pagesNeeded, 40);
+            // Page 1 already in `merged`; fetch 2..N
+            for (let p = 2; p <= maxPages; p++) {
+              if (merged.length >= unpacked.total) break;
+              const pageRes = await secureApi(
+                'callLogs.getDialerDatas',
+                buildBody(p, f.itemsPerPage),
+              );
+              if (!aliveRef.current || !pageRes.ok) break;
+              try {
+                const pageUnpacked = unpackRows(pageRes.data);
+                if (pageUnpacked.rows.length === 0) break;
+                let added = 0;
+                for (const row of pageUnpacked.rows) {
+                  const id = rowDedupeKey(row);
+                  if (seen.has(id)) continue;
+                  seen.add(id);
+                  merged.push(row);
+                  added += 1;
+                }
+                if (added === 0) break;
+              } catch {
+                break;
+              }
+            }
+            unpacked = { ...unpacked, rows: merged };
+          }
+        }
+
+        setRows(unpacked.rows);
+        setTotal(Math.max(unpacked.total, unpacked.rows.length));
+        const pagesFromCount = Math.max(1, Math.ceil(unpacked.total / Math.max(1, f.itemsPerPage)));
+        setTotalPages(unpacked.pages > 0 ? unpacked.pages : pagesFromCount);
+        setError('');
+      } catch (err) {
+        if (!aliveRef.current) return;
+        setError(err instanceof Error ? err.message : 'Failed to load dialer push data');
+        setRows([]);
+        setTotal(0);
+        setTotalPages(1);
+      } finally {
+        if (aliveRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
-    }
-  }, [canView]);
+    },
+    [canView],
+  );
 
   useEffect(() => {
     if (!isFocused || !canView) return;
@@ -795,10 +764,7 @@ export function DialerPushDataScreen() {
       renderItem={({ item: group }) => {
         const isOpen = Boolean(openCampaigns[group.key]);
         const page = Math.max(1, campaignPage[group.key] || 1);
-        const totalCampPages = Math.max(
-          1,
-          Math.ceil(group.count / CAMPAIGN_PAGE_SIZE),
-        );
+        const totalCampPages = Math.max(1, Math.ceil(group.count / CAMPAIGN_PAGE_SIZE));
         const safePage = Math.min(page, totalCampPages);
         const start = (safePage - 1) * CAMPAIGN_PAGE_SIZE;
         const pageRows = group.rows.slice(start, start + CAMPAIGN_PAGE_SIZE);
@@ -821,10 +787,7 @@ export function DialerPushDataScreen() {
 
             {isOpen
               ? pageRows.map((r, i) => (
-                  <View
-                    key={String(r._id || `${group.key}-${start + i}`)}
-                    style={styles.card}
-                  >
+                  <View key={String(r._id || `${group.key}-${start + i}`)} style={styles.card}>
                     <Text style={styles.cardTitle} numberOfLines={1}>
                       {display(r.first_name)}{' '}
                       {display(r.last_name) !== '—' ? display(r.last_name) : ''}
@@ -862,8 +825,7 @@ export function DialerPushDataScreen() {
                   <Text style={styles.pagerText}>‹</Text>
                 </TouchableOpacity>
                 <Text style={styles.pagerLabel}>
-                  {start + 1}–{Math.min(start + CAMPAIGN_PAGE_SIZE, group.count)} /{' '}
-                  {group.count}
+                  {start + 1}–{Math.min(start + CAMPAIGN_PAGE_SIZE, group.count)} / {group.count}
                 </Text>
                 <TouchableOpacity
                   style={[styles.pagerBtn, safePage >= totalCampPages && styles.disabled]}
@@ -882,9 +844,7 @@ export function DialerPushDataScreen() {
           </View>
         );
       }}
-      ListEmptyComponent={
-        !loading ? <Text style={styles.hint}>No data found</Text> : null
-      }
+      ListEmptyComponent={!loading ? <Text style={styles.hint}>No data found</Text> : null}
       ListFooterComponent={
         <View style={styles.pager}>
           <TouchableOpacity
@@ -910,11 +870,8 @@ export function DialerPushDataScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   headerBlock: { marginBottom: spacing(1) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
   datesRow: {
     flexDirection: 'row',
@@ -972,7 +929,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: '#fff', fontWeight: '700' },
   applyBtn: {

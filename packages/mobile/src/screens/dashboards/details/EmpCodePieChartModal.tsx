@@ -56,7 +56,15 @@ const PIE_COLORS = [
 
 function shadeHex(hex: string, amount: number): string {
   const raw = hex.replace('#', '');
-  const n = parseInt(raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw, 16);
+  const n = parseInt(
+    raw.length === 3
+      ? raw
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : raw,
+    16,
+  );
   if (!Number.isFinite(n)) return hex;
   const r = Math.min(255, Math.max(0, ((n >> 16) & 255) + amount));
   const g = Math.min(255, Math.max(0, ((n >> 8) & 255) + amount));
@@ -233,7 +241,10 @@ export function EmpCodePieChartModal({
 }: Props) {
   const [tab, setTab] = useState<ChartKind>('emp');
   const rows = tab === 'emp' ? empCodeRows : agentRows;
-  const total = Math.max(1, rows.reduce((s, r) => s + r.count, 0));
+  const total = Math.max(
+    1,
+    rows.reduce((s, r) => s + r.count, 0),
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

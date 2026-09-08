@@ -5,14 +5,8 @@
  * showing every column, pull-to-refresh.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import type { SecureAction } from '../../../api/registry.generated';
@@ -136,10 +130,34 @@ export function MasterFlowScreen() {
         align: 'right',
         render: (r) => fmt2(r.initialWalletBalance),
       },
-      { key: 'volume', label: 'Total Volume', width: 100, align: 'right', render: (r) => fmt2(r.pnl?.totalVolume) },
-      { key: 'clientWin', label: 'Total Client Win', width: 110, align: 'right', render: (r) => fmt2(r.pnl?.totalClientWin) },
-      { key: 'client', label: 'Total Client', width: 100, align: 'right', render: (r) => fmt2(r.pnl?.totalClient) },
-      { key: 'commission', label: 'Total Commission', width: 120, align: 'right', render: (r) => fmt2(r.pnl?.totalCommission) },
+      {
+        key: 'volume',
+        label: 'Total Volume',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt2(r.pnl?.totalVolume),
+      },
+      {
+        key: 'clientWin',
+        label: 'Total Client Win',
+        width: 110,
+        align: 'right',
+        render: (r) => fmt2(r.pnl?.totalClientWin),
+      },
+      {
+        key: 'client',
+        label: 'Total Client',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt2(r.pnl?.totalClient),
+      },
+      {
+        key: 'commission',
+        label: 'Total Commission',
+        width: 120,
+        align: 'right',
+        render: (r) => fmt2(r.pnl?.totalCommission),
+      },
       {
         key: 'winLossNoComm',
         label: 'Total WinLoss Without Commission',
@@ -165,7 +183,11 @@ export function MasterFlowScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Master Flow</Text>
@@ -237,10 +259,7 @@ export function MasterFlowScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
   typeRow: { flexDirection: 'row', gap: spacing(2), marginBottom: spacing(3) },
   typeChip: {
@@ -262,5 +281,4 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
 });

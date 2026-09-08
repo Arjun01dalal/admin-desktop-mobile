@@ -4,13 +4,8 @@
  * KPI visibility, and provider card subset.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { makeStyles } from '../../styles/common';
 import { CLIENT_NAMES } from '@astro/shared';
 import { colors, spacing } from '../../theme';
 import { buildKpiItems } from '../../dashboards/buildKpiItems';
@@ -21,10 +16,7 @@ import { useOpsDashboardData } from '../../dashboards/useOpsDashboardData';
 import { ActiveExchangePanel } from '../../dashboards/ui/ActiveExchangePanel';
 import { FilterBar } from '../../dashboards/ui/FilterBar';
 import { KpiGrid } from '../../dashboards/ui/KpiGrid';
-import {
-  LudoDetailsModal,
-  type LudoModalAction,
-} from '../../dashboards/ui/LudoDetailsModal';
+import { LudoDetailsModal, type LudoModalAction } from '../../dashboards/ui/LudoDetailsModal';
 import { ProviderCard } from '../../dashboards/ui/ProviderCard';
 import { todayIST } from '../../utils/dates';
 import { useNavigation } from '@react-navigation/native';
@@ -68,8 +60,10 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
     [startDate, endDate, appClientName, filterBy],
   );
 
-  const { bundle, loading, error, reload, reloadLudo, reloadActiveExchange } =
-    useOpsDashboardData(mode, applied);
+  const { bundle, loading, error, reload, reloadLudo, reloadActiveExchange } = useOpsDashboardData(
+    mode,
+    applied,
+  );
 
   const [selectedLudoGame, setSelectedLudoGame] = useState('All');
   const [selectedIndianDiva, setSelectedIndianDiva] = useState('All');
@@ -82,8 +76,7 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
     [bundle?.ludoGameOptions],
   );
 
-  const appOptions =
-    mode === 'vip' ? VIP_CLIENT_NAMES : (CLIENT_NAMES as readonly string[]);
+  const appOptions = mode === 'vip' ? VIP_CLIENT_NAMES : (CLIENT_NAMES as readonly string[]);
 
   const kpiItems = useMemo(
     () => buildKpiItems(mode, bundle, applied.startDate, applied.endDate, todayIST()),
@@ -113,6 +106,15 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
           onLudoUpdateRtp: () => {
             setLudoModalAction('rtp');
             setLudoModalOpen(true);
+          },
+          onLudoPlayerWiseRtp: () => {
+            openPanelTarget(navigation, {
+              href: '/ludo-player-wise-rtp',
+              state: {
+                gameId: selectedLudoGame,
+                gameOptions: bundle?.ludoGameOptions ?? [],
+              },
+            });
           },
           onLudoGgrDetails: () => {
             const gameOptions = bundle?.ludoGameOptions ?? [];
@@ -230,9 +232,7 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
       <KpiGrid
         items={kpiItems}
         isItemTappable={(item) => canOpenPanelPath(item.href)}
-        onItemPress={(item) =>
-          openPanelTarget(navigation, { href: item.href, state: item.state })
-        }
+        onItemPress={(item) => openPanelTarget(navigation, { href: item.href, state: item.state })}
       />
 
       {visibleCards.map((card) => (
@@ -255,14 +255,10 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
                   openPanelTarget(navigation, {
                     href: '/activeUserData',
                     state: {
-                      startDate:
-                        card.state?.startDate || applied.startDate,
+                      startDate: card.state?.startDate || applied.startDate,
                       endDate: card.state?.endDate || applied.endDate,
                       customerKey: card.activeCustomerKey,
-                      appClientName:
-                        card.state?.appClientName ||
-                        applied.appClientName ||
-                        '',
+                      appClientName: card.state?.appClientName || applied.appClientName || '',
                     },
                   })
               : undefined
@@ -288,11 +284,13 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  description: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
+const styles = makeStyles({
+  description: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: spacing(1),
+    marginBottom: spacing(3),
+  },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -301,6 +299,5 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
 });

@@ -7,24 +7,18 @@
  * Also fetches dashboard.oddsGameList for live odds and merges by match name.
  * Polls every 5s while focused, plus pull-to-refresh.
  */
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useIsFocused, useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import type { SecureAction } from '../../../api/registry.generated';
@@ -92,8 +86,7 @@ function buildRunnerUI(input: unknown): Array<{
     if (runners.length === 0) {
       return { eventName: m.eventName, data: [], code: m.code };
     }
-    const get = (i: number, type: 'back' | 'lay') =>
-      build(runners?.[i]?.[`${type}Prices`]?.[0]);
+    const get = (i: number, type: 'back' | 'lay') => build(runners?.[i]?.[`${type}Prices`]?.[0]);
 
     const data: OddsCell[] =
       runners.length >= 3
@@ -170,14 +163,11 @@ function mergeFinalData(
   return finalRes.map((match) => {
     const found = matches.find(
       (m) =>
-        String(m.eventName || '').toLowerCase() ===
-        String(match.matchName || '').toLowerCase(),
+        String(m.eventName || '').toLowerCase() === String(match.matchName || '').toLowerCase(),
     );
     return {
       ...match,
-      oddsTeams:
-        found?.data ||
-        (Array(6).fill({ price: '-', size: '-' }) as OddsCell[]),
+      oddsTeams: found?.data || (Array(6).fill({ price: '-', size: '-' }) as OddsCell[]),
       code: found?.code,
     };
   });
@@ -192,9 +182,7 @@ function groupBySport(data: MatchRow[]): Record<string, MatchRow[]> {
   }, {});
 }
 
-function sortSports(
-  grouped: Record<string, MatchRow[]>,
-): Array<[string, MatchRow[]]> {
+function sortSports(grouped: Record<string, MatchRow[]>): Array<[string, MatchRow[]]> {
   return Object.entries(grouped).sort(([a], [b]) => {
     const A = a.toLowerCase();
     const B = b.toLowerCase();
@@ -206,10 +194,7 @@ function sortSports(
   });
 }
 
-function getClosestKey(
-  data: Record<string, number>,
-  result: unknown,
-): number | null {
+function getClosestKey(data: Record<string, number>, result: unknown): number | null {
   if (result === '' || result == null) return null;
   const keys = Object.keys(data).map(Number);
   if (Object.prototype.hasOwnProperty.call(data, String(result))) {
@@ -217,9 +202,7 @@ function getClosestKey(
   }
   if (keys.length === 0) return null;
   return keys.reduce((prev, curr) =>
-    Math.abs(curr - Number(result)) < Math.abs(prev - Number(result))
-      ? curr
-      : prev,
+    Math.abs(curr - Number(result)) < Math.abs(prev - Number(result)) ? curr : prev,
   );
 }
 
@@ -243,10 +226,8 @@ function fmt(value: number): string {
 
 export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
-  const initialStartDate =
-    typeof params.startDate === 'string' ? params.startDate : todayIST();
-  const initialEndDate =
-    typeof params.endDate === 'string' ? params.endDate : todayIST();
+  const initialStartDate = typeof params.startDate === 'string' ? params.startDate : todayIST();
+  const initialEndDate = typeof params.endDate === 'string' ? params.endDate : todayIST();
 
   const isFocused = useIsFocused();
   const orderRef = useRef<string[]>([]);
@@ -254,6 +235,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   const mountedRef = useRef(true);
   const pollingActiveRef = useRef(false);
   const fetchInFlightRef = useRef(false);
+  const fetchGenRef = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -261,9 +243,11 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   const [endDate, setEndDate] = useState(initialEndDate);
   const [draftStart, setDraftStart] = useState(initialStartDate);
   const [draftEnd, setDraftEnd] = useState(initialEndDate);
-  const [groupedData, setGroupedData] = useState<Array<[string, MatchRow[]]>>(
-    [],
-  );
+  /** API filter — default `live`; All Data button toggles to `all`. */
+  const [bookType, setBookType] = useState<'all' | 'live'>('live');
+  const bookTypeRef = useRef<'all' | 'live'>(bookType);
+  bookTypeRef.current = bookType;
+  const [groupedData, setGroupedData] = useState<Array<[string, MatchRow[]]>>([]);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [streamId, setStreamId] = useState('');
@@ -302,10 +286,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
     return groupedData
       .map(
         ([sport, matches]) =>
-          [sport, matches.filter((m) => m.matchName === selectedMatch)] as [
-            string,
-            MatchRow[],
-          ],
+          [sport, matches.filter((m) => m.matchName === selectedMatch)] as [string, MatchRow[]],
       )
       .filter(([, matches]) => matches.length > 0);
   }, [groupedData, selectedMatch]);
@@ -318,68 +299,90 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
     }
   }, [matchList, selectedMatch]);
 
-  const fetchAllData = useCallback(async (opts?: { silent?: boolean }) => {
-    const silent = opts?.silent === true;
-    if (fetchInFlightRef.current) return;
-    fetchInFlightRef.current = true;
-    try {
-      if (!silent && firstLoad.current) setLoading(true);
-
-      let matches: Array<{
-        eventName?: string;
-        data: OddsCell[];
-        code?: string;
-      }> = [];
+  const fetchAllData = useCallback(
+    async (opts?: { silent?: boolean; force?: boolean }) => {
+      const silent = opts?.silent === true;
+      const force = opts?.force === true;
+      const effectiveBookType = bookTypeRef.current;
+      if (fetchInFlightRef.current && !force) return;
+      const gen = ++fetchGenRef.current;
+      fetchInFlightRef.current = true;
       try {
-        const oddsRes = await secureApi('dashboard.oddsGameList', {});
-        if (oddsRes.ok) {
-          const oddsRaw = oddsRes.data;
-          const oddsList =
-            oddsRaw && typeof oddsRaw === 'object' && !Array.isArray(oddsRaw)
-              ? ((oddsRaw as { data?: unknown }).data ?? oddsRaw)
-              : oddsRaw;
-          matches = buildRunnerUI(oddsList);
+        if (!silent && firstLoad.current) setLoading(true);
+
+        let matches: Array<{
+          eventName?: string;
+          data: OddsCell[];
+          code?: string;
+        }> = [];
+        try {
+          const oddsRes = await secureApi('dashboard.oddsGameList', {});
+          if (oddsRes.ok) {
+            const oddsRaw = oddsRes.data;
+            const oddsList =
+              oddsRaw && typeof oddsRaw === 'object' && !Array.isArray(oddsRaw)
+                ? ((oddsRaw as { data?: unknown }).data ?? oddsRaw)
+                : oddsRaw;
+            matches = buildRunnerUI(oddsList);
+          }
+        } catch {
+          matches = [];
         }
-      } catch {
-        matches = [];
+
+        if (gen !== fetchGenRef.current) return;
+        // Screen left / blur — stop applying odds + book updates (forced refresh still applies).
+        if (!force && (!mountedRef.current || !pollingActiveRef.current)) return;
+
+        const bookRes = await secureApi(BOOK_ACTION[variant], {
+          startDate,
+          endDate,
+          bookType: effectiveBookType,
+        });
+        if (gen !== fetchGenRef.current) return;
+        if (!force && (!mountedRef.current || !pollingActiveRef.current)) return;
+        if (!bookRes.ok) {
+          setError(bookRes.message || 'Failed to load live match book');
+          setGroupedData([]);
+          return;
+        }
+
+        const finalBook = formatDataForUI(unpackBookList(bookRes.data));
+        const merged = mergeFinalData(finalBook, matches);
+
+        if (firstLoad.current) {
+          orderRef.current = merged.map((m) => m.matchName);
+        }
+
+        const stableSorted = [...merged].sort(
+          (a, b) => orderRef.current.indexOf(a.matchName) - orderRef.current.indexOf(b.matchName),
+        );
+
+        if (gen !== fetchGenRef.current) return;
+        if (!force && (!mountedRef.current || !pollingActiveRef.current)) return;
+        setError('');
+        setGroupedData(sortSports(groupBySport(stableSorted)));
+        firstLoad.current = false;
+      } finally {
+        if (gen === fetchGenRef.current) {
+          fetchInFlightRef.current = false;
+          if (mountedRef.current && !silent) setLoading(false);
+        }
       }
+    },
+    [endDate, startDate, variant],
+  );
 
-      // Screen left / blur — stop applying odds + book updates.
-      if (!mountedRef.current || !pollingActiveRef.current) return;
-
-      const bookRes = await secureApi(BOOK_ACTION[variant], {
-        startDate,
-        endDate,
-      });
-      if (!mountedRef.current || !pollingActiveRef.current) return;
-      if (!bookRes.ok) {
-        setError(bookRes.message || 'Failed to load live match book');
-        setGroupedData([]);
-        return;
-      }
-
-      const finalBook = formatDataForUI(unpackBookList(bookRes.data));
-      const merged = mergeFinalData(finalBook, matches);
-
-      if (firstLoad.current) {
-        orderRef.current = merged.map((m) => m.matchName);
-      }
-
-      const stableSorted = [...merged].sort(
-        (a, b) =>
-          orderRef.current.indexOf(a.matchName) -
-          orderRef.current.indexOf(b.matchName),
-      );
-
-      if (!mountedRef.current || !pollingActiveRef.current) return;
-      setError('');
-      setGroupedData(sortSports(groupBySport(stableSorted)));
-      firstLoad.current = false;
-    } finally {
-      fetchInFlightRef.current = false;
-      if (mountedRef.current && !silent) setLoading(false);
-    }
-  }, [endDate, startDate, variant]);
+  const toggleAllDataBookType = useCallback(() => {
+    const next = bookTypeRef.current === 'all' ? 'live' : 'all';
+    bookTypeRef.current = next;
+    firstLoad.current = true;
+    orderRef.current = [];
+    setBookType(next);
+    setGroupedData([]);
+    setError('');
+    setLoading(true);
+    void fetchAllData({ silent: false, force: true });
+  }, [fetchAllData]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -454,6 +457,26 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         }}
       />
 
+      <View style={styles.bookTypeRow}>
+        <TouchableOpacity
+          style={[styles.bookTypeBtn, bookType === 'all' && styles.bookTypeBtnActive]}
+          activeOpacity={0.8}
+          disabled={loading && groupedData.length === 0}
+          onPress={toggleAllDataBookType}
+        >
+          <Text
+            style={[styles.bookTypeText, bookType === 'all' && styles.bookTypeTextActive]}
+          >
+            All Data
+          </Text>
+        </TouchableOpacity>
+        {bookType === 'all' ? (
+          <Text style={styles.bookTypeHint}>Filter: all</Text>
+        ) : (
+          <Text style={styles.bookTypeHint}>Filter: live</Text>
+        )}
+      </View>
+
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.searchInput}
@@ -510,10 +533,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
                   }}
                 >
                   <Text
-                    style={[
-                      styles.switcherChipText,
-                      active && styles.switcherChipTextActive,
-                    ]}
+                    style={[styles.switcherChipText, active && styles.switcherChipTextActive]}
                     numberOfLines={1}
                   >
                     {match.matchName || 'Unnamed match'}
@@ -531,7 +551,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         </View>
       ) : null}
 
-      {loading && groupedData.length === 0 ? (
+      {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
@@ -539,22 +559,21 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
 
       {!loading && groupedData.length === 0 && !error ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>
-            No live match book data for this date range.
-          </Text>
+          <Text style={styles.emptyText}>No live match book data for this date range.</Text>
         </View>
       ) : null}
 
-      {!selectedMatch && filteredMatchList.length > 0
+      {!loading && !selectedMatch && filteredMatchList.length > 0
         ? (() => {
-            const bySport = filteredMatchList.reduce<
-              Record<string, typeof filteredMatchList>
-            >((acc, item) => {
-              const key = item.sport || 'Other';
-              if (!acc[key]) acc[key] = [];
-              acc[key].push(item);
-              return acc;
-            }, {});
+            const bySport = filteredMatchList.reduce<Record<string, typeof filteredMatchList>>(
+              (acc, item) => {
+                const key = item.sport || 'Other';
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(item);
+                return acc;
+              },
+              {},
+            );
             return Object.entries(bySport).map(([sport, items]) => (
               <View style={styles.sportBlock} key={`list-${sport}`}>
                 <Text style={styles.sportHeader}>{sport}</Text>
@@ -576,9 +595,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
                         {match.marketCount} market · {match.fancyCount} fancy
                       </Text>
                     </View>
-                    {match.live ? (
-                      <Text style={styles.liveDot}>● LIVE</Text>
-                    ) : null}
+                    {match.live ? <Text style={styles.liveDot}>● LIVE</Text> : null}
                     <Text style={styles.listChevron}>›</Text>
                   </TouchableOpacity>
                 ))}
@@ -587,27 +604,20 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
           })()
         : null}
 
-      {!selectedMatch &&
-      !loading &&
-      matchList.length > 0 &&
-      filteredMatchList.length === 0 ? (
+      {!selectedMatch && !loading && matchList.length > 0 && filteredMatchList.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>
-            No matches matching “{searchQuery.trim()}”.
-          </Text>
+          <Text style={styles.emptyText}>No matches matching “{searchQuery.trim()}”.</Text>
         </View>
       ) : null}
 
-      {(selectedMatch ? visibleGroups : []).map(([sport, matches]) => (
+      {(selectedMatch && !loading ? visibleGroups : []).map(([sport, matches]) => (
         <View style={styles.sportBlock} key={sport}>
           <Text style={styles.sportHeader}>{sport || 'Other'}</Text>
           {matches.map((match, mi) => {
             const cardKey = `${match.matchName}-${match.code || mi}`;
             const fancyList = match.fancy || [];
             const expanded = showAll[cardKey] ?? false;
-            const visibleFancy = expanded
-              ? fancyList
-              : fancyList.slice(0, 7);
+            const visibleFancy = expanded ? fancyList : fancyList.slice(0, 7);
             const oddsLabels = ['1', 'X', '2'];
             const oddsGroups = [
               (match.oddsTeams || []).slice(0, 2),
@@ -641,18 +651,11 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
                       <View style={styles.oddsCells}>
                         {group.map((cell, ci) => (
                           <View
-                            style={[
-                              styles.oddsCell,
-                              ci === 0 ? styles.backCell : styles.layCell,
-                            ]}
+                            style={[styles.oddsCell, ci === 0 ? styles.backCell : styles.layCell]}
                             key={`c-${gi}-${ci}`}
                           >
-                            <Text style={styles.oddsPrice}>
-                              {String(cell?.price ?? '-')}
-                            </Text>
-                            <Text style={styles.oddsSize}>
-                              {String(cell?.size ?? '-')}
-                            </Text>
+                            <Text style={styles.oddsPrice}>{String(cell?.price ?? '-')}</Text>
+                            <Text style={styles.oddsSize}>{String(cell?.size ?? '-')}</Text>
                           </View>
                         ))}
                       </View>
@@ -667,9 +670,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
                     {Object.entries(match.teams).map(([team, value]) => (
                       <View style={styles.plRow} key={team}>
                         <Text style={styles.plLabel}>{team}</Text>
-                        <Text
-                          style={[styles.plValue, value < 0 && styles.negative]}
-                        >
+                        <Text style={[styles.plValue, value < 0 && styles.negative]}>
                           {fmt(value)}
                         </Text>
                       </View>
@@ -687,14 +688,10 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
                       <TouchableOpacity
                         style={styles.fancyHeader}
                         activeOpacity={0.7}
-                        onPress={() =>
-                          setOpenKey(isOpen ? null : uniqueKey)
-                        }
+                        onPress={() => setOpenKey(isOpen ? null : uniqueKey)}
                       >
                         <Text style={styles.fancyTitle}>
-                          {`${f?.marketName} (Bet Size:- ${String(
-                            f?.betSize ?? '',
-                          )})`}
+                          {`${f?.marketName} (Bet Size:- ${String(f?.betSize ?? '')})`}
                         </Text>
                         <Text style={styles.chevron}>{isOpen ? '▲' : '▼'}</Text>
                       </TouchableOpacity>
@@ -703,26 +700,13 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
                             const active = Number(key) === selectedKey;
                             return (
                               <View
-                                style={[
-                                  styles.fancyRow,
-                                  active && styles.fancyRowActive,
-                                ]}
+                                style={[styles.fancyRow, active && styles.fancyRowActive]}
                                 key={key}
                               >
-                                <Text
-                                  style={[
-                                    styles.fancyKey,
-                                    active && styles.fancyKeyActive,
-                                  ]}
-                                >
+                                <Text style={[styles.fancyKey, active && styles.fancyKeyActive]}>
                                   {key}
                                 </Text>
-                                <Text
-                                  style={[
-                                    styles.fancyVal,
-                                    val < 0 && styles.negative,
-                                  ]}
-                                >
+                                <Text style={[styles.fancyVal, val < 0 && styles.negative]}>
                                   {fmt(val)}
                                 </Text>
                               </View>
@@ -743,9 +727,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
                       setOpenKey(null);
                     }}
                   >
-                    <Text style={styles.showMore}>
-                      {expanded ? 'Show Less' : 'Show More'}
-                    </Text>
+                    <Text style={styles.showMore}>{expanded ? 'Show Less' : 'Show More'}</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -754,19 +736,43 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         </View>
       ))}
 
-      <LiveStreamModal
-        open={streamOpen}
-        onClose={() => setStreamOpen(false)}
-        streamId={streamId}
-      />
+      <LiveStreamModal open={streamOpen} onClose={() => setStreamOpen(false)} streamId={streamId} />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
+  bookTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginTop: spacing(2),
+    marginBottom: spacing(1),
+  },
+  bookTypeBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+  },
+  bookTypeBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  bookTypeText: {
+    color: colors.foreground,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  bookTypeTextActive: {
+    color: colors.primaryForeground,
+  },
+  bookTypeHint: {
+    color: colors.muted,
+    fontSize: 12,
+  },
   searchWrap: {
     marginTop: spacing(3),
     marginBottom: spacing(3),
@@ -873,7 +879,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   emptyBox: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

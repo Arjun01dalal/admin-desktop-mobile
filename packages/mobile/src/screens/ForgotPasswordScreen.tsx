@@ -6,7 +6,6 @@ import {
   Platform,
   StyleSheet,
   Text,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppBackground } from '../components/AppBackground';
@@ -100,11 +99,7 @@ export function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.center}
       >
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <Image source={require('../../assets/icon.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.overline}>ASTRO ADMIN</Text>
         <Card style={styles.card}>
           <Text style={styles.title}>Forgot Password</Text>

@@ -1,5 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { NavigationContainer, DarkTheme, DefaultTheme, useNavigation } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DarkTheme,
+  DefaultTheme,
+  useNavigation,
+} from '@react-navigation/native';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
@@ -7,7 +12,14 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TextInput, View, TouchableOpacity, useWindowDimensions } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  TouchableOpacity,
+  useWindowDimensions,
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { CreateUserScreen } from '../screens/CreateUserScreen';
@@ -16,7 +28,7 @@ import { WithdrawalScreen } from '../screens/WithdrawalScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAV_ITEMS, type NavItem } from './navItems';
-import { PANEL_DETAIL_ROUTES } from './panelDetail';
+import { canAccessPanelDetail, PANEL_DETAIL_ROUTES } from './panelDetail';
 import { canAccessNavItem } from '../auth/permissions';
 import { SosProvider } from '../auth/useSosGuard';
 import { SosAlertOverlay } from '../components/SosAlertOverlay';
@@ -122,6 +134,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/all-user-login-report': AllUserLoginReportScreen as AnyScreen,
   '/sos-blocked-users': SosBlockedUsersScreen as AnyScreen,
   '/checkers-report': CheckersReportScreen as AnyScreen,
+  '/download-report': SheetDownloadReportScreen as AnyScreen,
   '/downlaodReport': SheetDownloadReportScreen as AnyScreen,
   '/coins-report': PointsReportScreen as AnyScreen,
   '/coins-removal': CoinRemovalListScreen as AnyScreen,
@@ -206,7 +219,7 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {Boolean(menuQuery.trim()) ? (
+          {menuQuery.trim() ? (
             <TouchableOpacity
               style={styles.drawerSearchClear}
               onPress={() => setMenuQuery('')}
@@ -225,9 +238,7 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
         contentContainerStyle={styles.drawerScrollContent}
         // SafeAreaView already handles notch / home-indicator insets.
       >
-        {visibleItems.length === 0 ? (
-          <Text style={styles.drawerNoMatch}>No menu found</Text>
-        ) : null}
+        {visibleItems.length === 0 ? <Text style={styles.drawerNoMatch}>No menu found</Text> : null}
         {visibleItems.map((item) => (
           <DrawerItem
             key={item.id}
@@ -270,6 +281,14 @@ function Screened({ children }: { children: React.ReactNode }) {
   );
 }
 
+function GuardedPanelDetail({ route }: { route: (typeof PANEL_DETAIL_ROUTES)[number] }) {
+  const { user } = useAuth();
+  if (!canAccessPanelDetail(route.path, user)) {
+    return <PlaceholderScreen title="You do not have permission to view this page." />;
+  }
+  return <route.Component />;
+}
+
 /** Header actions — Admin LLM + profile. */
 function PanelHeaderRight() {
   return (
@@ -306,36 +325,32 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
 
   return (
     <Drawer.Navigator
-        initialRouteName="welcome"
-        drawerContent={(props) => <CustomDrawer {...props} items={items} />}
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.foreground,
-          headerTitleStyle: { fontWeight: '600', fontSize: 16 },
-          headerRight: () => <PanelHeaderRight />,
-          drawerType: 'front',
-          overlayColor: 'rgba(0,0,0,0.55)',
-          drawerStyle: {
-            backgroundColor: colors.surface,
-            width: drawerWidth,
-          },
-          sceneStyle: { backgroundColor: colors.background },
-        }}
-      >
-        {items.map((item) => {
-          const Impl = IMPLEMENTED[item.path];
-          const title = toDisplayText(item.label);
-          return (
-            <Drawer.Screen
-              key={item.id}
-              name={screenNameFor(item)}
-              options={{ title }}
-            >
-              {() => <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>}
-            </Drawer.Screen>
-          );
-        })}
-      </Drawer.Navigator>
+      initialRouteName="welcome"
+      drawerContent={(props) => <CustomDrawer {...props} items={items} />}
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.foreground,
+        headerTitleStyle: { fontWeight: '600', fontSize: 16 },
+        headerRight: () => <PanelHeaderRight />,
+        drawerType: 'front',
+        overlayColor: 'rgba(0,0,0,0.55)',
+        drawerStyle: {
+          backgroundColor: colors.surface,
+          width: drawerWidth,
+        },
+        sceneStyle: { backgroundColor: colors.background },
+      }}
+    >
+      {items.map((item) => {
+        const Impl = IMPLEMENTED[item.path];
+        const title = toDisplayText(item.label);
+        return (
+          <Drawer.Screen key={item.id} name={screenNameFor(item)} options={{ title }}>
+            {() => <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>}
+          </Drawer.Screen>
+        );
+      })}
+    </Drawer.Navigator>
   );
 }
 
@@ -343,63 +358,60 @@ export function AppNavigator() {
   const { user } = useAuth();
   useRevealCodes(); // refresh screen titles and navigation chrome
 
-  const items = useMemo(
-    () => NAV_ITEMS.filter((item) => canAccessNavItem(item)),
-    [user],
-  );
+  const items = useMemo(() => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)), [user]);
 
   return (
     <SosProvider enabled={!!user}>
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <NavigationContainer
-      theme={{
-        ...(isDarkTheme() ? DarkTheme : DefaultTheme),
-        colors: {
-          ...(isDarkTheme() ? DarkTheme.colors : DefaultTheme.colors),
-          background: colors.background,
-          card: colors.surface,
-          text: colors.foreground,
-          primary: colors.primary,
-          border: colors.border,
-        },
-      }}
-    >
-      <RootStack.Navigator
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.foreground,
-          headerTitleStyle: { fontWeight: '600' },
-          contentStyle: { backgroundColor: colors.background },
-          animation: 'slide_from_right',
-        }}
-      >
-        <RootStack.Screen name="panel" options={{ headerShown: false }}>
-          {() => <PanelDrawer items={items} />}
-        </RootStack.Screen>
-        <RootStack.Screen name="profile" options={{ title: 'Profile' }}>
-          {() => (
-            <Screened>
-              <ProfileScreen />
-            </Screened>
-          )}
-        </RootStack.Screen>
-        {PANEL_DETAIL_ROUTES.map((route) => (
-          <RootStack.Screen
-            key={route.path}
-            name={route.path}
-            options={{ title: toDisplayText(route.title) }}
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <NavigationContainer
+          theme={{
+            ...(isDarkTheme() ? DarkTheme : DefaultTheme),
+            colors: {
+              ...(isDarkTheme() ? DarkTheme.colors : DefaultTheme.colors),
+              background: colors.background,
+              card: colors.surface,
+              text: colors.foreground,
+              primary: colors.primary,
+              border: colors.border,
+            },
+          }}
+        >
+          <RootStack.Navigator
+            screenOptions={{
+              headerStyle: { backgroundColor: colors.surface },
+              headerTintColor: colors.foreground,
+              headerTitleStyle: { fontWeight: '600' },
+              contentStyle: { backgroundColor: colors.background },
+              animation: 'slide_from_right',
+            }}
           >
-            {() => (
-              <Screened>
-                <route.Component />
-              </Screened>
-            )}
-          </RootStack.Screen>
-        ))}
-      </RootStack.Navigator>
-      </NavigationContainer>
-      {user ? <SosAlertOverlay /> : null}
-    </View>
+            <RootStack.Screen name="panel" options={{ headerShown: false }}>
+              {() => <PanelDrawer items={items} />}
+            </RootStack.Screen>
+            <RootStack.Screen name="profile" options={{ title: 'Profile' }}>
+              {() => (
+                <Screened>
+                  <ProfileScreen />
+                </Screened>
+              )}
+            </RootStack.Screen>
+            {PANEL_DETAIL_ROUTES.map((route) => (
+              <RootStack.Screen
+                key={route.path}
+                name={route.path}
+                options={{ title: toDisplayText(route.title) }}
+              >
+                {() => (
+                  <Screened>
+                    <GuardedPanelDetail route={route} />
+                  </Screened>
+                )}
+              </RootStack.Screen>
+            ))}
+          </RootStack.Navigator>
+        </NavigationContainer>
+        {user ? <SosAlertOverlay /> : null}
+      </View>
     </SosProvider>
   );
 }

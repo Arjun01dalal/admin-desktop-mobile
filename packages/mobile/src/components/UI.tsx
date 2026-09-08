@@ -62,11 +62,7 @@ export function Button({
 
 export function Input(props: TextInputProps) {
   return (
-    <TextInput
-      placeholderTextColor={colors.muted}
-      {...props}
-      style={[styles.input, props.style]}
-    />
+    <TextInput placeholderTextColor={colors.muted} {...props} style={[styles.input, props.style]} />
   );
 }
 

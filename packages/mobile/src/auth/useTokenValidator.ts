@@ -6,10 +6,7 @@ import { TOKEN_CHECK_INTERVAL, runTokenValidation } from './sessionCheck';
  * Polls check-token-blacklisted so a newer login on another panel/device
  * invalidates this session and returns the user to Login.
  */
-export function useTokenValidator(
-  enabled: boolean,
-  onInvalid: (reason: string) => void,
-): void {
+export function useTokenValidator(enabled: boolean, onInvalid: (reason: string) => void): void {
   const logoutTriggered = useRef(false);
   const onInvalidRef = useRef(onInvalid);
   onInvalidRef.current = onInvalid;
@@ -17,9 +14,7 @@ export function useTokenValidator(
   const handleLogout = useCallback((reason?: string) => {
     if (logoutTriggered.current) return;
     logoutTriggered.current = true;
-    onInvalidRef.current(
-      reason || 'Your session is no longer valid. Please login again.',
-    );
+    onInvalidRef.current(reason || 'Your session is no longer valid. Please login again.');
   }, []);
 
   const validateToken = useCallback(

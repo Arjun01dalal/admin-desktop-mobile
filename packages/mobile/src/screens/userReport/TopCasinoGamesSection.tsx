@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { secureApi } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
 
@@ -32,16 +26,9 @@ function normalize(data: unknown): Row[] {
     .map((item) => {
       const row = item as Record<string, unknown>;
       return {
-        providerName: String(
-          row.providerName ?? row.provider ?? row.provider_name ?? '',
-        ).trim(),
+        providerName: String(row.providerName ?? row.provider ?? row.provider_name ?? '').trim(),
         marketName: String(
-          row.marketName ??
-            row.market ??
-            row.market_name ??
-            row.gameName ??
-            row.name ??
-            '',
+          row.marketName ?? row.market ?? row.market_name ?? row.gameName ?? row.name ?? '',
         ).trim(),
         playCount: Number(row.playCount ?? row.count ?? row.play_count ?? 0) || 0,
       };
@@ -80,11 +67,7 @@ export function TopCasinoGamesSection({ userId }: { userId: string }) {
     if (open) void load();
   }, [userId, open, load]);
 
-  const summaryText = !open
-    ? 'Tap to expand'
-    : loading
-      ? 'Loading…'
-      : `${rows.length} games`;
+  const summaryText = !open ? 'Tap to expand' : loading ? 'Loading…' : `${rows.length} games`;
 
   return (
     <View style={styles.wrap}>
@@ -135,7 +118,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
     overflow: 'hidden',
   },
   header: {

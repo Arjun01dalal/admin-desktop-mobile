@@ -14,14 +14,14 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
-import { pickPageSizes, appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
+import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -97,8 +97,6 @@ type ScannerRow = {
 };
 
 type GatewayOption = { _id: string; name?: string; mid?: string | number };
-
-const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 
 const TYPE_OPTIONS: { key: RequestType; label: string }[] = [
   { key: 'automaticDeposit', label: 'Automatic' },
@@ -184,9 +182,7 @@ export function DepositApprovedReportScreen() {
         ? (body.items as GatewayOption[])
         : asList<GatewayOption>(res.data);
     setGateways(
-      list
-        .filter((g) => g && g._id)
-        .map((g) => ({ _id: String(g._id), name: g.name, mid: g.mid })),
+      list.filter((g) => g && g._id).map((g) => ({ _id: String(g._id), name: g.name, mid: g.mid })),
     );
   }, []);
 
@@ -369,7 +365,12 @@ export function DepositApprovedReportScreen() {
 
   const depositColumns = useMemo<DataTableColumn<DepositRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: IDX_W, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: IDX_W,
+        render: (_r, i) => String((page - 1) * pageSize + i + 1),
+      },
       {
         key: 'userName',
         label: 'User Name',
@@ -378,19 +379,50 @@ export function DepositApprovedReportScreen() {
         onCellPress: (r) => openUserReport(r.userId, r.userName),
       },
       { key: 'userId', label: 'DP Id', width: 180, render: (r) => display(r.userId) },
-      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
-      { key: 'amount', label: 'Amount', width: dw.amount, align: 'right', render: (r) => formatIN(r.amount) },
+      {
+        key: 'clientName',
+        label: 'App Code',
+        width: 90,
+        render: (r) => appCodeForName(r.clientName),
+      },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: dw.amount,
+        align: 'right',
+        render: (r) => formatIN(r.amount),
+      },
       { key: 'userState', label: 'State', width: 130, render: (r) => display(r.userState) },
       { key: 'userCity', label: 'City', width: 120, render: (r) => display(r.userCity) },
       { key: 'bank', label: 'Bank', width: 130, render: (r) => display(r.userBankName) },
       { key: 'account', label: 'Account #', width: 150, render: (r) => display(r.accountNumber) },
       { key: 'aadhaar', label: 'Aadhaar', width: 140, render: (r) => display(r.aadhaarNumber) },
       { key: 'orderId', label: 'Transaction Id', width: 200, render: (r) => display(r.orderId) },
-      { key: 'paymentMethod', label: 'Payment Method', width: 180, render: (r) => paymentMethod(r.paymentGatewayName, r.mid) },
-      { key: 'date', label: 'Date', width: 110, render: (r) => formatDisplayDate(r.createdOn) || '—' },
-      { key: 'time', label: 'Time', width: 100, render: (r) => formatDisplayTime(r.createdOn) || '—' },
+      {
+        key: 'paymentMethod',
+        label: 'Payment Method',
+        width: 180,
+        render: (r) => paymentMethod(r.paymentGatewayName, r.mid),
+      },
+      {
+        key: 'date',
+        label: 'Date',
+        width: 110,
+        render: (r) => formatDisplayDate(r.createdOn) || '—',
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        width: 100,
+        render: (r) => formatDisplayTime(r.createdOn) || '—',
+      },
       { key: 'status', label: 'Status', width: dw.status, render: (r) => display(r.status) },
-      { key: 'kyc', label: 'Kyc', width: 110, render: (r) => (r.kyc === false ? 'Kyc not done' : '—') },
+      {
+        key: 'kyc',
+        label: 'Kyc',
+        width: 110,
+        render: (r) => (r.kyc === false ? 'Kyc not done' : '—'),
+      },
       { key: 'reason', label: 'Rejected Reason', width: 150, render: (r) => display(r.reason) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -407,8 +439,19 @@ export function DepositApprovedReportScreen() {
         render: (r) => display(r.userName),
         onCellPress: (r) => openUserReport(r.userId, r.userName),
       },
-      { key: 'clientName', label: 'App Code', width: 90, render: (r) => appCodeForName(r.clientName) },
-      { key: 'balance', label: 'Balance', width: sw.balance, align: 'right', render: (r) => formatIN(r.balance) },
+      {
+        key: 'clientName',
+        label: 'App Code',
+        width: 90,
+        render: (r) => appCodeForName(r.clientName),
+      },
+      {
+        key: 'balance',
+        label: 'Balance',
+        width: sw.balance,
+        align: 'right',
+        render: (r) => formatIN(r.balance),
+      },
       { key: 'state', label: 'State', width: 130, render: (r) => display(r.state) },
       { key: 'city', label: 'City', width: 120, render: (r) => display(r.city) },
       {
@@ -422,8 +465,18 @@ export function DepositApprovedReportScreen() {
       { key: 'remark', label: 'Remark', width: 200, render: (r) => display(r.remark ?? r.remakr) },
       { key: 'userId', label: 'User Id', width: 180, render: (r) => display(r.userId) },
       { key: 'utr', label: 'UTR', width: 160, render: (r) => display(r.utr) },
-      { key: 'date', label: 'Date', width: 110, render: (r) => formatDisplayDate(r.createdOn) || '—' },
-      { key: 'time', label: 'Time', width: 100, render: (r) => formatDisplayTime(r.createdOn) || '—' },
+      {
+        key: 'date',
+        label: 'Date',
+        width: 110,
+        render: (r) => formatDisplayDate(r.createdOn) || '—',
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        width: 100,
+        render: (r) => formatDisplayTime(r.createdOn) || '—',
+      },
       {
         key: 'lastActivity',
         label: 'Last Activity',
@@ -510,7 +563,11 @@ export function DepositApprovedReportScreen() {
         onSearchSubmit={search}
       />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipsRow}
+      >
         <Text style={styles.chipsLabel}>Type</Text>
         {TYPE_OPTIONS.map((t) => (
           <TouchableOpacity
@@ -528,7 +585,11 @@ export function DepositApprovedReportScreen() {
         ))}
       </ScrollView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipsRow}
+      >
         <Text style={styles.chipsLabel}>Gateway</Text>
         <TouchableOpacity
           style={[styles.chip, !gatewayId && styles.chipActive]}
@@ -580,7 +641,9 @@ export function DepositApprovedReportScreen() {
 
       {isScanner ? (
         <>
-          {loading && visibleScannerRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
+          {loading && visibleScannerRows.length === 0 ? (
+            <Text style={styles.hint}>Loading…</Text>
+          ) : null}
           {!loading && visibleScannerRows.length === 0 ? (
             <Text style={styles.hint}>No scanner data found</Text>
           ) : null}
@@ -616,11 +679,15 @@ export function DepositApprovedReportScreen() {
                 </View>
                 <View style={styles.cardRow}>
                   <Text style={styles.cardLabel}>Reason</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>{display(row.reason)}</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {display(row.reason)}
+                  </Text>
                 </View>
                 <View style={styles.cardRow}>
                   <Text style={styles.cardLabel}>DP ID</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>{display(row.userId)}</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {display(row.userId)}
+                  </Text>
                 </View>
                 <View style={styles.cardRow}>
                   <Text style={styles.cardLabel}>Date</Text>
@@ -677,7 +744,9 @@ export function DepositApprovedReportScreen() {
                 </View>
                 <View style={styles.cardRow}>
                   <Text style={styles.cardLabel}>DP ID</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>{display(row.userId)}</Text>
+                  <Text style={styles.cardValue} numberOfLines={1}>
+                    {display(row.userId)}
+                  </Text>
                 </View>
                 <View style={styles.cardRow}>
                   <Text style={styles.cardLabel}>Date</Text>
@@ -769,10 +838,7 @@ export function DepositApprovedReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   downloadBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
@@ -781,7 +847,6 @@ const styles = StyleSheet.create({
   },
   downloadBtnDisabled: { opacity: 0.5 },
   downloadBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
   chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   chip: {
@@ -792,9 +857,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(3) },
   summaryChip: {
     backgroundColor: 'rgba(255,159,10,0.15)',
@@ -803,49 +866,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
   },
   summaryText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   reportBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
@@ -853,26 +873,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1),
   },
   reportBtnText: { color: colors.primaryForeground, fontSize: 10, fontWeight: '700' },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -881,28 +881,4 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   approvedText: { color: '#16a34a' },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
 });

@@ -13,11 +13,7 @@ import {
   View,
 } from 'react-native';
 import { formatLudoRtp, parseLudoRtpList, type LudoRtpRow } from '@astro/shared/ludoRtp';
-import {
-  apiOtpFailed,
-  maskOtpMobile,
-  resolveLudoRtpOtpMobile,
-} from '@astro/shared/walletOtp';
+import { apiOtpFailed, maskOtpMobile, resolveLudoRtpOtpMobile } from '@astro/shared/walletOtp';
 import { secureApi } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
 import { Button, Input } from '../../components/UI';
@@ -71,14 +67,13 @@ export function LudoDetailsModal({
 
   const otpMobile = resolveLudoRtpOtpMobile();
 
-  const gameIdsKey = existingGameIds.join(',');
   const updateOpen = open && action === 'update';
   const rtpOpen = open && action === 'rtp';
 
   useEffect(() => {
     const gameIds = existingGameIds.filter((id) => id && id !== 'All');
     setCurrentGameIds(gameIds);
-  }, [gameIdsKey]);
+  }, [existingGameIds]);
 
   useEffect(() => {
     if (!open) return;
@@ -212,9 +207,7 @@ export function LudoDetailsModal({
       }
       setMessage({ text: res.message || 'RTP updated successfully', error: false });
       setRtpRows((prev) =>
-        prev.map((row) =>
-          row.gameId === selectedRtpGameId ? { ...row, rtp } : row,
-        ),
+        prev.map((row) => (row.gameId === selectedRtpGameId ? { ...row, rtp } : row)),
       );
       setOtpPending(false);
       setOtp('');
@@ -484,8 +477,8 @@ export function LudoDetailsModal({
                   ) : otpPending ? (
                     <View style={styles.confirmRow}>
                       <Text style={styles.confirmText}>
-                        OTP sent to SuperAdmin ({maskOtpMobile(otpMobile)}). Enter OTP to
-                        update RTP for {selectedRtpGameId} → {rtpValue}.
+                        OTP sent to SuperAdmin ({maskOtpMobile(otpMobile)}). Enter OTP to update RTP
+                        for {selectedRtpGameId} → {rtpValue}.
                       </Text>
                       <Input
                         placeholder="4-digit OTP"

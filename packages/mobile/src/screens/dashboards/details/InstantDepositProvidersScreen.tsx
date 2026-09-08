@@ -18,6 +18,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -52,7 +53,11 @@ function asPagedItems<T>(data: unknown): T[] {
     const obj = data as Record<string, unknown>;
     if (Array.isArray(obj.items)) return obj.items as T[];
     const payload = obj.payload;
-    if (payload && typeof payload === 'object' && Array.isArray((payload as Record<string, unknown>).items)) {
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      Array.isArray((payload as Record<string, unknown>).items)
+    ) {
       return (payload as Record<string, unknown>).items as T[];
     }
     if (Array.isArray(obj.payload)) return obj.payload as T[];
@@ -185,7 +190,11 @@ export function InstantDepositProvidersScreen() {
     setEditRow(row);
     setEditKind(kind);
     setEditText(
-      kind === 'name' ? String(row.name ?? '') : kind === 'mid' ? String(row.mid ?? '') : String(row.link ?? ''),
+      kind === 'name'
+        ? String(row.name ?? '')
+        : kind === 'mid'
+          ? String(row.mid ?? '')
+          : String(row.link ?? ''),
     );
     setEditMsg('');
     setSheetRow(null);
@@ -269,7 +278,12 @@ export function InstantDepositProvidersScreen() {
       { key: 'name', label: 'Gateway Name', width: 150, render: (r) => display(r.name) },
       { key: 'mid', label: 'Mid', width: 120, render: (r) => display(r.mid) },
       { key: 'link', label: 'Link', width: 220, render: (r) => display(r.link) },
-      { key: 'status', label: 'Status', width: 90, render: (r) => (r.status ? 'Enabled' : 'Disabled') },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 90,
+        render: (r) => (r.status ? 'Enabled' : 'Disabled'),
+      },
       {
         key: 'updatedBy.userName',
         label: 'Enable / Disable By',
@@ -295,7 +309,11 @@ export function InstantDepositProvidersScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <View style={styles.headerRow}>
@@ -474,7 +492,12 @@ export function InstantDepositProvidersScreen() {
       </Modal>
 
       {/* Add provider modal */}
-      <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
+      <Modal
+        visible={addOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddOpen(false)}
+      >
         <KeyboardAvoidingView
           style={[styles.backdrop, styles.backdropCentered]}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -541,7 +564,10 @@ export function InstantDepositProvidersScreen() {
                     onPress={() => setForm((p) => ({ ...p, openInBrowser: o.value }))}
                   >
                     <Text
-                      style={[styles.chipText, form.openInBrowser === o.value && styles.chipTextActive]}
+                      style={[
+                        styles.chipText,
+                        form.openInBrowser === o.value && styles.chipTextActive,
+                      ]}
                     >
                       {o.label}
                     </Text>
@@ -564,15 +590,7 @@ export function InstantDepositProvidersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-  },
+const styles = makeStyles({
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700', flex: 1 },
   addBtn: {
     backgroundColor: colors.primary,
@@ -598,50 +616,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2.5),
     paddingHorizontal: spacing(3),
   },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -652,20 +626,6 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -673,24 +633,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
   cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '28%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   backdropCentered: { justifyContent: 'center', padding: spacing(4) },
-  backdropTouch: { flex: 1 },
   backdropTouchFill: { ...StyleSheet.absoluteFillObject },
   modalSheet: {
     backgroundColor: colors.background,
@@ -705,9 +649,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md * 2,
     maxHeight: '80%',
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1, marginRight: spacing(2) },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   modalScrollContent: { gap: spacing(2), paddingBottom: spacing(1) },
   modalInput: {
     borderWidth: 1,
@@ -729,9 +670,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   saveBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
@@ -739,6 +678,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing(2),
   },
-  btnDisabled: { opacity: 0.5 },
   saveBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
 });

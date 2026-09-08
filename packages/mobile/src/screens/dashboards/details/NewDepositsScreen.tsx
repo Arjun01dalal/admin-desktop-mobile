@@ -12,13 +12,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -28,7 +28,6 @@ import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { pickPageSizes } from '@astro/shared';
 
 type Row = {
   _id?: string;
@@ -63,8 +62,6 @@ type Row = {
 type Filters = { name: string; mobile: string };
 
 const EMPTY_FILTERS: Filters = { name: '', mobile: '' };
-const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
-
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
@@ -211,7 +208,12 @@ export function NewDepositsScreen() {
         width: 130,
         render: (r) => maskMobile(r.mobile, canShowMobile),
       },
-      { key: 'userBankName', label: 'User Bank Name', width: 150, render: (r) => display(r.userBankName) },
+      {
+        key: 'userBankName',
+        label: 'User Bank Name',
+        width: 150,
+        render: (r) => display(r.userBankName),
+      },
       {
         key: 'encryptedDpId',
         label: 'User Encrypted Dp ID',
@@ -239,9 +241,7 @@ export function NewDepositsScreen() {
         label: 'Previous Caller DP ID',
         width: 160,
         render: (r) =>
-          display(
-            r.previousCaller?.Dp_ID ?? r.previousCaller?.DP_ID ?? r.previousCallerDpId,
-          ),
+          display(r.previousCaller?.Dp_ID ?? r.previousCaller?.DP_ID ?? r.previousCallerDpId),
       },
       {
         key: 'currentCaller',
@@ -318,7 +318,11 @@ export function NewDepositsScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <View style={styles.headerRow}>
@@ -537,19 +541,14 @@ export function NewDepositsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   searchBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
     paddingVertical: spacing(2),
     paddingHorizontal: spacing(4),
   },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   chipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -571,49 +570,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   clearChip: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   reportBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
@@ -626,20 +582,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -647,39 +589,12 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  backdropTouch: { flex: 1 },
   modalSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.md * 2,
     borderTopRightRadius: radius.md * 2,
     padding: spacing(4),
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
-  },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
-  fieldLabel: { color: colors.muted, fontSize: 12, marginTop: spacing(3), marginBottom: spacing(1) },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -689,27 +604,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     fontSize: 14,
   },
-  submitBtn: {
-    marginTop: spacing(4),
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-  },
-  submitBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
 });

@@ -6,15 +6,8 @@
  * Automatic / Scanner Add / Scanner Remove selector.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -242,17 +235,12 @@ export function FundsScreen() {
           });
         let res = await requestOnce();
         // Desktop retries once on timeouts (the report is slow server-side).
-        if (
-          !res.ok &&
-          /timeout|etimedout|econnaborted|abort/i.test(String(res.message || ''))
-        ) {
+        if (!res.ok && /timeout|etimedout|econnaborted|abort/i.test(String(res.message || ''))) {
           res = await requestOnce();
         }
         if (gen !== payinGenRef.current) return;
         if (!res.ok) {
-          setPayinError(
-            res.message || 'Failed to load transactions. Try a shorter date range.',
-          );
+          setPayinError(res.message || 'Failed to load transactions. Try a shorter date range.');
           setSummary(null);
           setTransactions([]);
           setCoins([]);
@@ -372,19 +360,29 @@ export function FundsScreen() {
   const autoColumns = useMemo<DataTableColumn<TxnRow>[]>(
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
-      { key: 'amount', label: 'Amount', width: 90, align: 'right', render: (r) => display(r.amount) },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: 90,
+        align: 'right',
+        render: (r) => display(r.amount),
+      },
       { key: 'orderId', label: 'OrderID', width: 180, render: (r) => display(r.orderId) },
       { key: 'userName', label: 'UserName', width: 130, render: (r) => display(r.userName) },
       {
         key: 'userMobile',
         label: 'Mobile',
         width: 110,
-        render: (r) =>
-          canShowMobile ? display(r.userMobile) : r.userMobile ? '**********' : '—',
+        render: (r) => (canShowMobile ? display(r.userMobile) : r.userMobile ? '**********' : '—'),
       },
       { key: 'userCity', label: 'City', width: 110, render: (r) => display(r.userCity) },
       { key: 'userState', label: 'State', width: 110, render: (r) => display(r.userState) },
-      { key: 'userBankName', label: 'User Bank', width: 130, render: (r) => display(r.userBankName) },
+      {
+        key: 'userBankName',
+        label: 'User Bank',
+        width: 130,
+        render: (r) => display(r.userBankName),
+      },
       {
         key: 'accountNumber',
         label: 'User Account',
@@ -411,7 +409,13 @@ export function FundsScreen() {
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
       { key: 'userId', label: 'UserId', width: 200, render: (r) => display(r.userId) },
-      { key: 'balance', label: 'Balance', width: 90, align: 'right', render: (r) => display(r.balance) },
+      {
+        key: 'balance',
+        label: 'Balance',
+        width: 90,
+        align: 'right',
+        render: (r) => display(r.balance),
+      },
       { key: 'reason', label: 'Reason', width: 150, render: (r) => display(r.reason) },
       { key: 'remark', label: 'Remark', width: 200, render: (r) => display(r.remark) },
       // UTR is present on Scanner Add rows only (desktop parity).
@@ -477,8 +481,7 @@ export function FundsScreen() {
     return {
       todayTotal: sumAmount(txn.today) + sumBalance(cr.today) - sumBalance(db.today),
       todayCount: txn.today.length + cr.today.length + db.today.length,
-      previousTotal:
-        sumAmount(txn.previous) + sumBalance(cr.previous) - sumBalance(db.previous),
+      previousTotal: sumAmount(txn.previous) + sumBalance(cr.previous) - sumBalance(db.previous),
       previousCount: txn.previous.length + cr.previous.length + db.previous.length,
     };
   }, [transactions, coins, debitCoins, startDate, endDate]);
@@ -533,14 +536,15 @@ export function FundsScreen() {
       Alert.alert('No data to export');
       return false;
     }
-    return shareCsvFile(
-      `${sheetName.toLowerCase()}_${Date.now()}.csv`,
-      rowsToCsv(rows),
-    );
+    return shareCsvFile(`${sheetName.toLowerCase()}_${Date.now()}.csv`, rowsToCsv(rows));
   }, [requestType, transactions, coins, debitCoins, canShowMobile]);
 
   const payinRows =
-    requestType === 'scanner add' ? coins : requestType === 'scanner remove' ? debitCoins : transactions;
+    requestType === 'scanner add'
+      ? coins
+      : requestType === 'scanner remove'
+        ? debitCoins
+        : transactions;
   const payinColumns = requestType === 'automaticDeposit' ? autoColumns : scannerColumns;
 
   // ---------- MID list view ----------
@@ -600,20 +604,12 @@ export function FundsScreen() {
                 </Text>
               </View>
               <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>
-                  Final: {formatAmt(row.finalAmount)}
-                </Text>
-                <Text style={styles.cardSplitRight}>
-                  Txn: {formatAmt(row.transactionAmount)}
-                </Text>
+                <Text style={styles.cardSplitLeft}>Final: {formatAmt(row.finalAmount)}</Text>
+                <Text style={styles.cardSplitRight}>Txn: {formatAmt(row.transactionAmount)}</Text>
               </View>
               <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>
-                  Scan+: {formatAmt(row.coinAdd)}
-                </Text>
-                <Text style={styles.cardSplitRight}>
-                  Scan−: {formatAmt(row.coinRemove)}
-                </Text>
+                <Text style={styles.cardSplitLeft}>Scan+: {formatAmt(row.coinAdd)}</Text>
+                <Text style={styles.cardSplitRight}>Scan−: {formatAmt(row.coinRemove)}</Text>
               </View>
               <Text style={styles.cardHint}>
                 {gatewayOnly ? 'MID details locked' : 'Tap card for transactions'}
@@ -709,9 +705,7 @@ export function FundsScreen() {
           </View>
         ) : null}
 
-        {payinLoading && payinRows.length === 0 ? (
-          <Text style={styles.hint}>Loading…</Text>
-        ) : null}
+        {payinLoading && payinRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
         {!payinLoading && payinRows.length === 0 ? (
           <Text style={styles.hint}>No transactions</Text>
         ) : null}
@@ -736,9 +730,7 @@ export function FundsScreen() {
                 {isAuto ? (
                   <>
                     <View style={styles.cardSplitRow}>
-                      <Text style={styles.cardSplitLeft}>
-                        Amount: {display(row.amount)}
-                      </Text>
+                      <Text style={styles.cardSplitLeft}>Amount: {display(row.amount)}</Text>
                       <Text style={styles.cardSplitRight} numberOfLines={1}>
                         {canShowMobile
                           ? display(row.userMobile)
@@ -757,9 +749,7 @@ export function FundsScreen() {
                 ) : (
                   <>
                     <View style={styles.cardSplitRow}>
-                      <Text style={styles.cardSplitLeft}>
-                        Balance: {display(row.balance)}
-                      </Text>
+                      <Text style={styles.cardSplitLeft}>Balance: {display(row.balance)}</Text>
                       <Text style={styles.cardSplitRight} numberOfLines={1}>
                         {display(row.reason)}
                       </Text>
@@ -904,9 +894,7 @@ export function FundsScreen() {
                 </Text>
               </View>
               <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>
-                  Total: {formatAmt(row.totalFinalAmount)}
-                </Text>
+                <Text style={styles.cardSplitLeft}>Total: {formatAmt(row.totalFinalAmount)}</Text>
                 <Text style={styles.cardSplitRight}>
                   Auto: {formatAmt(row.totalTransactionAmount)}
                 </Text>
@@ -938,11 +926,7 @@ export function FundsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   backLink: {
     color: colors.primary,
     fontWeight: '700',
@@ -1001,60 +985,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   downloadChip: { borderColor: colors.primary },
   downloadChipText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
   cardDisabled: { opacity: 0.55 },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -1063,28 +997,5 @@ const styles = StyleSheet.create({
     maxWidth: '50%',
     textAlign: 'right',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
   cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '40%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
 });

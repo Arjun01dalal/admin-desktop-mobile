@@ -19,23 +19,24 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
-import { pickPageSizes, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
+import { appCodeForName, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-import { canShowUniqueDepositEmpCode, getSessionUser, hasPermission } from '../../../auth/permissions';
-import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import {
-  getCachedEmpCodeNameMap,
-  getEmpCodeNameMap,
-} from '../../../utils/empCodeNameCache';
+  canShowUniqueDepositEmpCode,
+  getSessionUser,
+  hasPermission,
+} from '../../../auth/permissions';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '../../../utils/empCodeNameCache';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
@@ -62,8 +63,6 @@ type UniquePendingRow = {
   transactionId?: string;
   uniquePendingReason?: { reason?: string; name?: string; _id?: string };
 };
-
-const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -140,8 +139,8 @@ export function UniqueDepositPendingScreen() {
   const canWhatsApp = hasPermission('whatsapp_icon');
   const canShowMobile = hasPermission('show_mobile');
   const canShowEmpCode = canShowUniqueDepositEmpCode(admin);
-  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
-    () => getCachedEmpCodeNameMap(),
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
+    getCachedEmpCodeNameMap(),
   );
 
   const [draftStart, setDraftStart] = useState(todayIST);
@@ -307,7 +306,8 @@ export function UniqueDepositPendingScreen() {
     }
     setBusy(true);
     try {
-      const action = inputMode === 'comment' ? 'uniquePending.message' : 'uniquePending.statusChange';
+      const action =
+        inputMode === 'comment' ? 'uniquePending.message' : 'uniquePending.statusChange';
       const res = await secureApi<unknown>(action, {
         orderId: row.orderId,
         uniquePendingReason: {
@@ -388,9 +388,7 @@ export function UniqueDepositPendingScreen() {
       { label: 'Mobile No', value: maskMobile(rowMobile(sheetRow), canShowMobile) },
       { label: 'App Code', value: appCodeForName(sheetRow.clientName) },
       { label: 'DP ID', value: display(sheetRow.userId) },
-      ...(canShowEmpCode
-        ? [{ label: 'Emp Code', value: formatEmpCode(sheetRow) }]
-        : []),
+      ...(canShowEmpCode ? [{ label: 'Emp Code', value: formatEmpCode(sheetRow) }] : []),
       { label: 'Amount', value: formatIN(sheetRow.amount) },
       { label: 'State', value: display(sheetRow.userState || sheetRow.state) },
       { label: 'City', value: display(sheetRow.userCity || sheetRow.city) },
@@ -430,7 +428,11 @@ export function UniqueDepositPendingScreen() {
     }
     const isPending = String(sheetRow.status || '').toLowerCase() === 'pending';
     if (!sheetRow.uniquePendingReason?.reason) {
-      acts.push({ label: 'Add Comment', tone: 'default', onPress: () => openInput('comment', sheetRow) });
+      acts.push({
+        label: 'Add Comment',
+        tone: 'default',
+        onPress: () => openInput('comment', sheetRow),
+      });
     }
     if (canWhatsApp && isPending) {
       acts.push({ label: 'WhatsApp', tone: 'primary', onPress: () => openWhatsApp(sheetRow) });
@@ -443,7 +445,11 @@ export function UniqueDepositPendingScreen() {
       onPress: () => openDialer(sheetRow),
     });
     if (canChangeStatus) {
-      acts.push({ label: 'Change Status', tone: 'warning', onPress: () => openInput('status', sheetRow) });
+      acts.push({
+        label: 'Change Status',
+        tone: 'warning',
+        onPress: () => openInput('status', sheetRow),
+      });
     }
     return acts;
   }, [
@@ -510,10 +516,7 @@ export function UniqueDepositPendingScreen() {
           </Text>
         </View>
         {canDownload ? (
-          <TouchableOpacity
-            style={styles.downloadChip}
-            onPress={() => setDownloadOpen(true)}
-          >
+          <TouchableOpacity style={styles.downloadChip} onPress={() => setDownloadOpen(true)}>
             <Text style={styles.downloadChipText}>⬇ Download Data</Text>
           </TouchableOpacity>
         ) : null}
@@ -687,12 +690,14 @@ export function UniqueDepositPendingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing(2), marginTop: spacing(3) },
+const styles = makeStyles({
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
   summaryChip: {
     backgroundColor: 'rgba(255,159,10,0.15)',
     borderRadius: 999,
@@ -707,49 +712,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
   },
   downloadChipText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
   reportBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
@@ -762,26 +724,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
   cardSplitRight: {
     color: colors.foreground,
     fontSize: 11,
@@ -789,26 +731,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     textAlign: 'right',
   },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: { color: colors.foreground, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'right' },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  backdropTouch: { flex: 1 },
   modalSheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
@@ -849,6 +772,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing(3),
   },
-  btnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
 });

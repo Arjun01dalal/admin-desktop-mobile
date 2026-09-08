@@ -1,6 +1,6 @@
 /**
  * Non-dismissible overlay when the device has no network (Wi‑Fi / cellular off).
- * Closes automatically once NetInfo reports a connection again.
+ * Closes automatically once the device reports a connection again.
  */
 import React from 'react';
 import {
@@ -22,12 +22,7 @@ type Props = {
 
 export function OfflineGate({ open, checking, onRetry }: Props) {
   return (
-    <Modal
-      visible={open}
-      transparent
-      animationType="fade"
-      onRequestClose={() => undefined}
-    >
+    <Modal visible={open} transparent animationType="fade" onRequestClose={() => undefined}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.iconWrap}>
@@ -35,8 +30,8 @@ export function OfflineGate({ open, checking, onRetry }: Props) {
           </View>
           <Text style={styles.title}>No internet</Text>
           <Text style={styles.body}>
-            Your network is off. Turn on Wi‑Fi or mobile data to continue. This
-            alert will close automatically once you are back online.
+            Your network is off. Turn on Wi‑Fi or mobile data to continue. This alert will close
+            automatically once you are back online.
           </Text>
 
           <View style={styles.actions}>

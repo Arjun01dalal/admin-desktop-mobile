@@ -3,13 +3,8 @@
  * This is distinct from the BetConstruct games CRUD screen.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
@@ -41,6 +36,11 @@ type Summary = {
   ggr?: number;
 };
 
+type BetConstructResponse = {
+  byGame?: GameRow[];
+  summary?: Summary;
+};
+
 const MAIN_KEYS = new Set(['gameId', 'bet', 'ggr', 'rtp']);
 
 function fmt(value: unknown): string {
@@ -65,7 +65,7 @@ export function BetConstructGamesListScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await secureApi('dashboard.betConstructGameWiseGgr', {
+      const res = await secureApi<BetConstructResponse>('dashboard.betConstructGameWiseGgr', {
         startDate,
         endDate,
       });
@@ -75,16 +75,8 @@ export function BetConstructGamesListScreen() {
         setSummary({});
         return;
       }
-      const payload =
-        res.data && typeof res.data === 'object'
-          ? (res.data as Record<string, unknown>)
-          : {};
-      setRows(Array.isArray(payload.byGame) ? (payload.byGame as GameRow[]) : []);
-      setSummary(
-        payload.summary && typeof payload.summary === 'object'
-          ? (payload.summary as Summary)
-          : {},
-      );
+      setRows(res.data?.byGame ?? []);
+      setSummary(res.data?.summary ?? {});
     } finally {
       setLoading(false);
     }
@@ -97,12 +89,48 @@ export function BetConstructGamesListScreen() {
   const columns = useMemo<DataTableColumn<GameRow>[]>(
     () => [
       { key: 'gameId', label: 'Game Id', width: 130, render: (r) => String(r.gameId || '—') },
-      { key: 'bet', label: 'Bet Amount', width: 105, align: 'right', render: (r) => fmt(r.totalBetAmount) },
-      { key: 'bets', label: 'No. of Bets', width: 90, align: 'right', render: (r) => fmt(r.totalBets) },
-      { key: 'win', label: 'Win Amount', width: 105, align: 'right', render: (r) => fmt(r.totalWinningAmount) },
-      { key: 'wins', label: 'No. of Wins', width: 90, align: 'right', render: (r) => fmt(r.totalWinningBets) },
-      { key: 'commission', label: 'Commission', width: 100, align: 'right', render: (r) => fmt(r.totalCommission) },
-      { key: 'users', label: 'Total Users', width: 90, align: 'right', render: (r) => fmt(r.totalUsers) },
+      {
+        key: 'bet',
+        label: 'Bet Amount',
+        width: 105,
+        align: 'right',
+        render: (r) => fmt(r.totalBetAmount),
+      },
+      {
+        key: 'bets',
+        label: 'No. of Bets',
+        width: 90,
+        align: 'right',
+        render: (r) => fmt(r.totalBets),
+      },
+      {
+        key: 'win',
+        label: 'Win Amount',
+        width: 105,
+        align: 'right',
+        render: (r) => fmt(r.totalWinningAmount),
+      },
+      {
+        key: 'wins',
+        label: 'No. of Wins',
+        width: 90,
+        align: 'right',
+        render: (r) => fmt(r.totalWinningBets),
+      },
+      {
+        key: 'commission',
+        label: 'Commission',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(r.totalCommission),
+      },
+      {
+        key: 'users',
+        label: 'Total Users',
+        width: 90,
+        align: 'right',
+        render: (r) => fmt(r.totalUsers),
+      },
       {
         key: 'ggr',
         label: 'GGR',
@@ -139,11 +167,17 @@ export function BetConstructGamesListScreen() {
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>{toDisplayText('BetConstruct Details')}</Text>
-      <Text style={styles.sub}>{startDate} → {endDate}</Text>
+      <Text style={styles.sub}>
+        {startDate} → {endDate}
+      </Text>
 
       <DetailFilterBar
         startDate={draftStart}
@@ -189,10 +223,7 @@ export function BetConstructGamesListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
   summaryGrid: {
     flexDirection: 'row',
@@ -209,6 +240,11 @@ const styles = StyleSheet.create({
     padding: spacing(3),
   },
   summaryLabel: { color: colors.muted, fontSize: 11 },
-  summaryValue: { color: colors.foreground, fontSize: 15, fontWeight: '700', marginTop: spacing(1) },
+  summaryValue: {
+    color: colors.foreground,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: spacing(1),
+  },
   error: { color: colors.destructive, fontSize: 13, marginBottom: spacing(3) },
 });

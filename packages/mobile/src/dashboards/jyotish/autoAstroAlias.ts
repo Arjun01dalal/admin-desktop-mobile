@@ -1,4 +1,5 @@
 import { CLIENT_NAMES } from '@astro/shared/clientNames';
+import { appStorage } from '../../lib/webShim';
 
 /**
  * Deterministic astro aliases for unknown providers / games.
@@ -133,7 +134,7 @@ let cache: AliasMap | null = null;
 function readStore(): AliasMap {
   if (cache) return cache;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = appStorage.getItem(STORAGE_KEY);
     cache = raw ? (JSON.parse(raw) as AliasMap) : {};
   } catch {
     cache = {};
@@ -144,7 +145,7 @@ function readStore(): AliasMap {
 function writeStore(map: AliasMap): void {
   cache = map;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    appStorage.setItem(STORAGE_KEY, JSON.stringify(map));
   } catch {
     // ignore quota
   }
@@ -272,10 +273,7 @@ export function isAutoMapCandidate(value: string): boolean {
  * Pass `force` for known domains (e.g. House Krida gameId) where plain
  * lowercase ids like "aviator" must still get an alias when unmapped.
  */
-export function ensureAutoAstroAlias(
-  original: string,
-  opts?: { force?: boolean },
-): string {
+export function ensureAutoAstroAlias(original: string, opts?: { force?: boolean }): string {
   const trimmed = original.trim();
   if (!trimmed) return trimmed;
   if (!opts?.force && !isAutoMapCandidate(trimmed)) return trimmed;
@@ -304,10 +302,7 @@ export function reverseAutoAstroAlias(text: string): string {
   let out = text;
   for (const [originalLower, jyotish] of entries) {
     if (!jyotish) continue;
-    const re = new RegExp(
-      jyotish.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-      'gi',
-    );
+    const re = new RegExp(jyotish.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     // Restore original casing from first-seen key is lost — use stored key's
     // best-effort: prefer title-ish from lowercase key.
     const restored = originalLower.replace(/\b([a-z])/g, (c) => c.toUpperCase());

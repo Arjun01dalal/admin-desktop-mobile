@@ -55,10 +55,7 @@ function pickMessage(body: unknown, fallback: string): string {
 }
 
 /** Match electron/secure/index.cjs execute() payload unwrapping. */
-function resolvePayloadOut(
-  data: Record<string, unknown>,
-  keepDataEnvelope?: boolean,
-): unknown {
+function resolvePayloadOut(data: Record<string, unknown>, keepDataEnvelope?: boolean): unknown {
   if (Array.isArray(data)) return data;
   if (keepDataEnvelope) return data?.data ?? data;
   if (Array.isArray(data?.data)) return data.data;
@@ -169,9 +166,7 @@ async function uploadBannerVideo(
       ok: true,
       success: data.success !== false,
       message:
-        typeof data.message === 'string'
-          ? data.message
-          : 'Tutorial video uploaded successfully',
+        typeof data.message === 'string' ? data.message : 'Tutorial video uploaded successfully',
       data: data.data ?? data,
       status: res.status,
     };
@@ -194,8 +189,7 @@ async function uploadLlmVoice(
   tokenOverride?: string | null,
 ): Promise<ApiResult> {
   const audioUri = typeof payload.audioUri === 'string' ? payload.audioUri.trim() : '';
-  const audioBase64 =
-    typeof payload.audioBase64 === 'string' ? payload.audioBase64.trim() : '';
+  const audioBase64 = typeof payload.audioBase64 === 'string' ? payload.audioBase64.trim() : '';
   const mimeType = String(payload.mimeType || 'audio/m4a').slice(0, 80);
   const history = Array.isArray(payload.history) ? payload.history : [];
 
@@ -347,9 +341,7 @@ export async function secureApi<T = unknown>(
 
     const isGet = entry.method === 'GET';
     // Registry paths may be absolute (other backends, e.g. Live Match book/odds).
-    let url = /^https?:\/\//i.test(entry.path)
-      ? entry.path
-      : `${getApiBaseUrl()}${entry.path}`;
+    let url = /^https?:\/\//i.test(entry.path) ? entry.path : `${getApiBaseUrl()}${entry.path}`;
     // Match desktop: GET payload goes in the query string (e.g. startDate/endDate).
     if (isGet) {
       const entries = Object.entries(rest || {}).filter(
@@ -365,7 +357,7 @@ export async function secureApi<T = unknown>(
     // Honor per-action registry timeouts (e.g. Funds reports use 180s); default 60s.
     const timeoutMs =
       typeof (entry as { timeout?: unknown }).timeout === 'number'
-        ? ((entry as { timeout: number }).timeout)
+        ? (entry as { timeout: number }).timeout
         : 60_000;
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res: Response;
@@ -444,9 +436,7 @@ export async function secureApi<T = unknown>(
           if (wasCheckedRecently(10_000)) return;
           const status = await runTokenValidation({ force: true });
           if (status === 'invalid') {
-            authFailureHandler?.(
-              'You were logged in elsewhere. Please login again.',
-            );
+            authFailureHandler?.('You were logged in elsewhere. Please login again.');
           }
         })
         .catch(() => {
@@ -472,4 +462,3 @@ export async function secureApi<T = unknown>(
     return { ok: false, message };
   }
 }
-

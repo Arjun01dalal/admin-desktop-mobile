@@ -9,14 +9,8 @@
  * other taps copy a decoy) is preserved with the native clipboard.
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import * as Clipboard from 'expo-clipboard';
 import { CLIENT_APP_CODES, CLIENT_NAMES } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
@@ -57,7 +51,10 @@ type AppLink = {
 };
 
 function buildMobileAppLinks(empCode = '001'): AppLink[] {
-  const code = String(empCode || '001').replace(/\D/g, '').slice(0, 12) || '001';
+  const code =
+    String(empCode || '001')
+      .replace(/\D/g, '')
+      .slice(0, 12) || '001';
   return MOBILE_APP_DETAILS.map((item) => {
     const appCode = CLIENT_APP_CODES[item.clientName] || item.clientName;
     const asPath = `AS${appCode}`;
@@ -165,10 +162,7 @@ export function MobileAppScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1), marginBottom: spacing(2) },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(2) },
   appCard: {

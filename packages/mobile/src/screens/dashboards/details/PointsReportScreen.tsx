@@ -4,15 +4,8 @@
  * (desktop's /coin-reports/report drill-down) and update the coin limit (reports.addCoin).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
@@ -53,7 +46,6 @@ type Row = {
   documents?: Doc[];
   [key: string]: unknown;
 };
-
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -145,7 +137,12 @@ export function PointsReportScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'subadminName', label: 'Pseudo Name', width: 140, render: (r) => display(r.subadminName) },
+      {
+        key: 'subadminName',
+        label: 'Pseudo Name',
+        width: 140,
+        render: (r) => display(r.subadminName),
+      },
       { key: 'realName', label: 'Real-Name', width: 130, render: (r) => display(r.realName) },
       {
         key: 'mobile',
@@ -154,7 +151,13 @@ export function PointsReportScreen() {
         render: (r) =>
           canShowMobile ? display(r.subadminMobile) : r.subadminMobile ? '**********' : '—',
       },
-      { key: 'creditCount', label: 'Credit Count', width: 100, align: 'center', render: (r) => String(r.creditCount ?? 0) },
+      {
+        key: 'creditCount',
+        label: 'Credit Count',
+        width: 100,
+        align: 'center',
+        render: (r) => String(r.creditCount ?? 0),
+      },
       {
         key: 'totalGiven',
         label: 'Total Balance Give',
@@ -162,7 +165,13 @@ export function PointsReportScreen() {
         align: 'center',
         render: (r) => floorNum(r.totalBalanceGiven ?? 0).toLocaleString('en-IN'),
       },
-      { key: 'debitCount', label: 'Debit Count', width: 100, align: 'center', render: (r) => String(r.debitCount ?? 0) },
+      {
+        key: 'debitCount',
+        label: 'Debit Count',
+        width: 100,
+        align: 'center',
+        render: (r) => String(r.debitCount ?? 0),
+      },
       {
         key: 'totalRemove',
         label: 'Total Balance Remove',
@@ -178,9 +187,19 @@ export function PointsReportScreen() {
     () => [
       { key: 'idx', label: '#', width: 40, render: (_d, i) => String(i + 1) },
       { key: 'userName', label: 'User Name', width: 120, render: (d) => display(d.userName) },
-      { key: 'userBankName', label: 'User Bank Name', width: 130, render: (d) => display(d.userBankName) },
+      {
+        key: 'userBankName',
+        label: 'User Bank Name',
+        width: 130,
+        render: (d) => display(d.userBankName),
+      },
       { key: 'userId', label: 'User Id', width: 150, render: (d) => display(d.userId) },
-      { key: 'appCode', label: 'App Code', width: 80, render: (d) => appCodeForName(String(d.clientName || '')) },
+      {
+        key: 'appCode',
+        label: 'App Code',
+        width: 80,
+        render: (d) => appCodeForName(String(d.clientName || '')),
+      },
       {
         key: 'mobile',
         label: 'Mobile',
@@ -258,16 +277,31 @@ export function PointsReportScreen() {
         {docs.length === 0 ? <Text style={styles.hint}>No documents found</Text> : null}
         <View style={styles.list}>
           {docs.map((doc, index) => (
-            <TouchableOpacity key={`row-${index}-${String(doc._id ?? '')}`} style={styles.card} activeOpacity={0.75} onPress={() => setSelectedDoc(doc)}>
+            <TouchableOpacity
+              key={`row-${index}-${String(doc._id ?? '')}`}
+              style={styles.card}
+              activeOpacity={0.75}
+              onPress={() => setSelectedDoc(doc)}
+            >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>{display(doc.userName)}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {display(doc.userName)}
+                </Text>
               </View>
               <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>Balance: {floorNum(doc.balance ?? 0).toLocaleString('en-IN')}</Text>
-                <Text style={styles.cardSplitRight}>App: {appCodeForName(String(doc.clientName || ''))}</Text>
+                <Text style={styles.cardSplitLeft}>
+                  Balance: {floorNum(doc.balance ?? 0).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.cardSplitRight}>
+                  App: {appCodeForName(String(doc.clientName || ''))}
+                </Text>
               </View>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>{doc.createdOn ? `${formatDisplayDate(doc.createdOn)} ${formatDisplayTime(doc.createdOn)}` : '—'}</Text>
+              <Text style={styles.cardSplitLeft} numberOfLines={1}>
+                {doc.createdOn
+                  ? `${formatDisplayDate(doc.createdOn)} ${formatDisplayTime(doc.createdOn)}`
+                  : '—'}
+              </Text>
               <Text style={styles.cardHint}>Tap card for details</Text>
             </TouchableOpacity>
           ))}
@@ -296,7 +330,11 @@ export function PointsReportScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Points Report</Text>
@@ -325,18 +363,29 @@ export function PointsReportScreen() {
       {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
       <View style={styles.list}>
         {rows.map((row, index) => (
-          <TouchableOpacity key={`row-${index}-${String(row._id ?? '')}`} style={styles.card} activeOpacity={0.75} onPress={() => setSheetRow(row)}>
+          <TouchableOpacity
+            key={`row-${index}-${String(row._id ?? '')}`}
+            style={styles.card}
+            activeOpacity={0.75}
+            onPress={() => setSheetRow(row)}
+          >
             <View style={styles.cardHeader}>
               <Text style={styles.cardIndex}>#{index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>{display(row.subadminName)}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {display(row.subadminName)}
+              </Text>
             </View>
             <View style={styles.cardSplitRow}>
               <Text style={styles.cardSplitLeft}>Credit: {String(row.creditCount ?? 0)}</Text>
-              <Text style={styles.cardSplitRight}>Given: {floorNum(row.totalBalanceGiven ?? 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.cardSplitRight}>
+                Given: {floorNum(row.totalBalanceGiven ?? 0).toLocaleString('en-IN')}
+              </Text>
             </View>
             <View style={styles.cardSplitRow}>
               <Text style={styles.cardSplitLeft}>Debit: {String(row.debitCount ?? 0)}</Text>
-              <Text style={styles.cardSplitRight}>Removed: {floorNum(row.totalBalanceRemove ?? 0).toLocaleString('en-IN')}</Text>
+              <Text style={styles.cardSplitRight}>
+                Removed: {floorNum(row.totalBalanceRemove ?? 0).toLocaleString('en-IN')}
+              </Text>
             </View>
             <Text style={styles.cardHint}>Tap card for details & documents</Text>
           </TouchableOpacity>
@@ -366,11 +415,7 @@ export function PointsReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
   coinCard: {
     backgroundColor: colors.surface,
@@ -380,7 +425,12 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginTop: spacing(3),
   },
-  coinTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', marginBottom: spacing(2) },
+  coinTitle: {
+    color: colors.foreground,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: spacing(2),
+  },
   coinRow: { flexDirection: 'row', alignItems: 'center' },
   coinInput: {
     flex: 1,
@@ -402,38 +452,6 @@ const styles = StyleSheet.create({
   coinBtnDisabled: { opacity: 0.5 },
   coinBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   coinMsg: { color: colors.muted, fontSize: 12, marginTop: spacing(2) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), marginBottom: spacing(1) },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', flex: 1, minWidth: 0 },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -444,8 +462,4 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing(2), paddingVertical: 1 },
-  cardSplitLeft: { color: colors.foreground, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'left' },
-  cardSplitRight: { color: colors.foreground, fontSize: 11, fontWeight: '700', flexShrink: 0, maxWidth: '48%', textAlign: 'right' },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
 });

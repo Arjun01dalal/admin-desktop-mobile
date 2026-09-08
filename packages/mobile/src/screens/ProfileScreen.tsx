@@ -136,10 +136,7 @@ function ChangeRoleRow() {
       setOpen(false);
       Alert.alert('Role updated', 'Your menu and permissions have been refreshed.');
     } catch (error) {
-      Alert.alert(
-        'Change role',
-        error instanceof Error ? error.message : 'Failed to update role',
-      );
+      Alert.alert('Change role', error instanceof Error ? error.message : 'Failed to update role');
     } finally {
       setBusy(false);
     }
@@ -179,7 +176,9 @@ function ChangeRoleRow() {
                   <Text style={[styles.roleOptionText, active && styles.roleOptionTextActive]}>
                     {role.name}
                   </Text>
-                  {active ? <MaterialIcons name="check" size={20} color={colors.primaryForeground} /> : null}
+                  {active ? (
+                    <MaterialIcons name="check" size={20} color={colors.primaryForeground} />
+                  ) : null}
                 </TouchableOpacity>
               );
             })}
@@ -307,7 +306,9 @@ export function ProfileScreen() {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      style={styles.root} contentContainerStyle={styles.content}>
+      style={styles.root}
+      contentContainerStyle={styles.content}
+    >
       <View style={styles.avatarWrap}>
         <View style={styles.avatar}>
           <MaterialIcons name="person" size={40} color={colors.primaryForeground} />
@@ -467,7 +468,12 @@ const styles = StyleSheet.create({
   roleOptionActive: { borderColor: colors.primary, backgroundColor: colors.primary },
   roleOptionText: { color: colors.foreground, fontSize: 14, fontWeight: '600' },
   roleOptionTextActive: { color: colors.primaryForeground },
-  roleActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(2) },
+  roleActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing(2),
+    marginTop: spacing(2),
+  },
   roleCancel: { paddingHorizontal: spacing(4), paddingVertical: spacing(2.5) },
   roleCancelText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
   roleSubmit: {

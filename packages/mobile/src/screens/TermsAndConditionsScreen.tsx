@@ -24,11 +24,7 @@ export function TermsAndConditionsScreen({ onBack }: { onBack: () => void }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator
       >
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <Image source={require('../../assets/icon.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.overline}>ASTRO ADMIN</Text>
         {paragraphs.map((block, index) => (
           <Text key={index} style={styles.paragraph}>

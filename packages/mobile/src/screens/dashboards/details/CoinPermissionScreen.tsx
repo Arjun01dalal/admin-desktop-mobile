@@ -18,13 +18,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { pickPageSizes, asPaged, CLIENT_NAMES } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -51,10 +51,7 @@ type Row = {
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([20, 25, 50, 75, 100]);
 // Same Role_ID allowlist the web panel uses for the Edit Apps "Add" button.
-const EDIT_APPS_ADD_ROLE_IDS = new Set([
-  '6a33c137a6558491e0d20464',
-  '64f710d9a2ab78980020c5fb',
-]);
+const EDIT_APPS_ADD_ROLE_IDS = new Set(['6a33c137a6558491e0d20464', '64f710d9a2ab78980020c5fb']);
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -71,7 +68,10 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   const [pageSize, setPageSize] = useState(20);
   const [searchName, setSearchName] = useState('');
   const [searchMob, setSearchMob] = useState('');
-  const [applied, setApplied] = useState<{ name: string; mobile: string }>({ name: '', mobile: '' });
+  const [applied, setApplied] = useState<{ name: string; mobile: string }>({
+    name: '',
+    mobile: '',
+  });
   const [rows, setRows] = useState<Row[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -283,22 +283,53 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: 44,
+        render: (_r, i) => String((page - 1) * pageSize + i + 1),
+      },
       { key: 'name', label: 'Name', width: 140, render: (r) => display(r.name) },
       { key: 'mobile', label: 'Mobile No', width: 120, render: (r) => display(r.mobile) },
-      { key: 'coinLimit', label: 'Coins Limit', width: 90, align: 'right', render: (r) => display(r.coinLimit) },
+      {
+        key: 'coinLimit',
+        label: 'Coins Limit',
+        width: 90,
+        align: 'right',
+        render: (r) => display(r.coinLimit),
+      },
       { key: 'email', label: 'Email', width: 190, render: (r) => display(r.email) },
       { key: 'roleId', label: 'Role Id', width: 190, render: (r) => display(r.Role_ID) },
-      { key: 'status', label: 'Status', width: 90, render: (r) => (r.block ? 'Blocked' : 'Active') },
-      { key: 'coinRole', label: 'Coin Role', width: 90, render: (r) => (r.showCoins === true ? 'Added' : '—') },
+      {
+        key: 'status',
+        label: 'Status',
+        width: 90,
+        render: (r) => (r.block ? 'Blocked' : 'Active'),
+      },
+      {
+        key: 'coinRole',
+        label: 'Coin Role',
+        width: 90,
+        render: (r) => (r.showCoins === true ? 'Added' : '—'),
+      },
       {
         key: 'removePerm',
         label: 'Remove Coin Permission',
         width: 160,
         render: (r) => (r.showRemoveCoin === true ? 'Yes' : 'No'),
       },
-      { key: 'createdOn', label: 'Created On', width: 150, render: (r) => (r.createdOn ? formatDisplayDate(r.createdOn) : '—') },
-      { key: 'updatedOn', label: 'Last Activity', width: 150, render: (r) => (r.updatedOn ? formatDisplayDate(r.updatedOn) : '—') },
+      {
+        key: 'createdOn',
+        label: 'Created On',
+        width: 150,
+        render: (r) => (r.createdOn ? formatDisplayDate(r.createdOn) : '—'),
+      },
+      {
+        key: 'updatedOn',
+        label: 'Last Activity',
+        width: 150,
+        render: (r) => (r.updatedOn ? formatDisplayDate(r.updatedOn) : '—'),
+      },
       {
         key: 'apps',
         label: 'Current Apps',
@@ -326,8 +357,18 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
     const actions: SheetAction[] = [];
     actions.push(
       row.showCoins === true
-        ? { label: 'Remove Coin Role', tone: 'warning', disabled: busy, onPress: () => handleCoinRole(row, 'remove') }
-        : { label: 'Add Coin Role', tone: 'primary', disabled: busy, onPress: () => handleCoinRole(row, 'add') },
+        ? {
+            label: 'Remove Coin Role',
+            tone: 'warning',
+            disabled: busy,
+            onPress: () => handleCoinRole(row, 'remove'),
+          }
+        : {
+            label: 'Add Coin Role',
+            tone: 'primary',
+            disabled: busy,
+            onPress: () => handleCoinRole(row, 'add'),
+          },
     );
     actions.push({
       label: row.showRemoveCoin === true ? 'Remove Permission' : 'Add Permission',
@@ -380,14 +421,7 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       },
     });
     return actions;
-  }, [
-    sheetRow,
-    busy,
-    canAddApps,
-    handleCoinRole,
-    handleRemovePermission,
-    openAfterSheetClose,
-  ]);
+  }, [sheetRow, busy, canAddApps, handleCoinRole, handleRemovePermission, openAfterSheetClose]);
 
   const appOptions: readonly string[] =
     appMode === 'add' ? (CLIENT_NAMES as readonly string[]) : appTarget?.allotedApps || [];
@@ -409,7 +443,11 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <TouchableOpacity onPress={onBack}>
@@ -554,7 +592,10 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
 
       {/* Edit Coin Limit */}
       <Modal visible={coinOpen} transparent animationType="slide" onRequestClose={closeCoinModal}>
-        <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <TouchableWithoutFeedback onPress={closeCoinModal}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
@@ -590,7 +631,10 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
 
       {/* Block / Un Block remark */}
       <Modal visible={blockOpen} transparent animationType="slide" onRequestClose={closeBlockModal}>
-        <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <TouchableWithoutFeedback onPress={closeBlockModal}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
@@ -632,7 +676,9 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
           <View style={styles.formSheet}>
-            <Text style={styles.formTitle}>{appMode === 'add' ? 'Select an App' : 'Remove an App'}</Text>
+            <Text style={styles.formTitle}>
+              {appMode === 'add' ? 'Select an App' : 'Remove an App'}
+            </Text>
             {appOptions.length === 0 ? (
               <Text style={styles.mutedText}>No apps assigned to this user.</Text>
             ) : (
@@ -644,11 +690,17 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
                   return (
                     <TouchableOpacity
                       key={appName}
-                      style={[styles.chip, selected && styles.chipActive, disabled && styles.chipDisabled]}
+                      style={[
+                        styles.chip,
+                        selected && styles.chipActive,
+                        disabled && styles.chipDisabled,
+                      ]}
                       disabled={disabled}
                       onPress={() => setAppSelected(appName)}
                     >
-                      <Text style={[styles.chipText, selected && styles.chipTextActive]}>{appName}</Text>
+                      <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                        {appName}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -683,12 +735,15 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   backLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginBottom: spacing(2) },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '700', marginBottom: spacing(3) },
-  searchRow: { flexDirection: 'row', gap: spacing(2), marginBottom: spacing(2), alignItems: 'center' },
+  searchRow: {
+    flexDirection: 'row',
+    gap: spacing(2),
+    marginBottom: spacing(2),
+    alignItems: 'center',
+  },
   searchInput: { flex: 1, marginTop: 0 },
   searchBtn: {
     backgroundColor: colors.primary,
@@ -696,7 +751,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(2.5),
   },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   chipsRowWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -713,10 +767,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipDisabled: { opacity: 0.35 },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -725,7 +777,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   hint: { color: colors.muted, fontSize: 13, marginBottom: spacing(2) },
   list: { gap: spacing(2), marginBottom: spacing(2) },
   card: {
@@ -734,12 +785,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing(3),
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
   },
   cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
   cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, minWidth: 0 },
@@ -760,38 +805,7 @@ const styles = StyleSheet.create({
     gap: spacing(2),
     paddingVertical: 1,
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
   cardApps: { color: colors.muted, fontSize: 11, marginTop: spacing(1) },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   pager: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -800,11 +814,7 @@ const styles = StyleSheet.create({
     marginTop: spacing(3),
   },
   pagerBtn: { color: colors.primary, fontSize: 14, fontWeight: '700', padding: spacing(2) },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
   mutedText: { color: colors.muted, fontSize: 13, marginTop: spacing(2) },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  backdropTouch: { flex: 1 },
   formSheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
@@ -814,7 +824,12 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     gap: spacing(1),
   },
-  formTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700', marginBottom: spacing(2) },
+  formTitle: {
+    color: colors.foreground,
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: spacing(2),
+  },
   input: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -840,5 +855,4 @@ const styles = StyleSheet.create({
   formBtnPrimary: { backgroundColor: colors.primary },
   formBtnDanger: { backgroundColor: colors.destructive },
   formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  btnDisabled: { opacity: 0.5 },
 });

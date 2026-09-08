@@ -2,6 +2,7 @@
  * Temporary reveal of original (non-Jyotish) UI labels after OTP verify.
  * Valid for 1 hour, then auto-resets.
  */
+import { appStorage } from '../lib/webShim';
 
 const STORAGE_KEY = 'astroRevealCodesUntil';
 export const REVEAL_CODES_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -14,7 +15,7 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 
 function readUntil(): number {
   try {
-    const n = Number(localStorage.getItem(STORAGE_KEY) || 0);
+    const n = Number(appStorage.getItem(STORAGE_KEY) || 0);
     return Number.isFinite(n) ? n : 0;
   } catch {
     return 0;
@@ -51,7 +52,7 @@ export function isRevealCodesActive(): boolean {
 export function activateRevealCodes(ttlMs = REVEAL_CODES_TTL_MS): void {
   until = Date.now() + ttlMs;
   try {
-    localStorage.setItem(STORAGE_KEY, String(until));
+    appStorage.setItem(STORAGE_KEY, String(until));
   } catch {
     // ignore quota / private mode
   }
@@ -62,7 +63,7 @@ export function activateRevealCodes(ttlMs = REVEAL_CODES_TTL_MS): void {
 export function clearRevealCodes(): void {
   until = 0;
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    appStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -85,7 +86,7 @@ if (until > 0) {
   if (Date.now() >= until) {
     until = 0;
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      appStorage.removeItem(STORAGE_KEY);
     } catch {
       // ignore
     }

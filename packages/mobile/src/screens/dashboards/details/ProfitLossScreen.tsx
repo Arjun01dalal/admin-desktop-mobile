@@ -5,24 +5,17 @@
  * main columns and a bottom sheet showing every column, pagination.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { pickPageSizes } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
-import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { type SearchFieldOption } from './DetailFilterBar';
-import { TextInput } from 'react-native';
-import { pickPageSizes } from '@astro/shared';
+import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type PLRow = {
   _id?: string;
@@ -58,7 +51,7 @@ function maskMobile(value: unknown, canShow: boolean): string {
 function unwrap(raw: unknown): { rows: PLRow[]; count: number } {
   const body =
     raw && typeof raw === 'object' && 'payload' in (raw as object)
-      ? (raw as { payload?: unknown }).payload ?? raw
+      ? ((raw as { payload?: unknown }).payload ?? raw)
       : raw;
   if (body && typeof body === 'object') {
     const obj = body as { data?: unknown; count?: unknown };
@@ -74,7 +67,9 @@ function unwrap(raw: unknown): { rows: PLRow[]; count: number } {
 
 export function ProfitLossScreen() {
   const isFocused = useIsFocused();
+  const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
+  const canOpenReport = hasPermission('wallet_history');
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -87,6 +82,17 @@ export function ProfitLossScreen() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: PLRow; index: number } | null>(null);
   const genRef = React.useRef(0);
+
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId || !canOpenReport) return;
+      navigation.navigate('/user-report', {
+        userId: String(userId),
+        userName: String(userName || ''),
+      });
+    },
+    [canOpenReport, navigation],
+  );
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -131,17 +137,74 @@ export function ProfitLossScreen() {
       { key: 'sr', label: '#', width: 50, render: (_r, i) => String(i + 1 + rowOffset) },
       { key: 'userId', label: 'User ID', width: 160, render: (r) => String(r._id || '—') },
       { key: 'name', label: 'User Name', width: 140, render: (r) => String(r.name || '—') },
-      { key: 'mobile', label: 'Mobile No', width: 110, render: (r) => maskMobile(r.mobile, canShowMobile) },
-      { key: 'startBalance', label: 'Start Balance', width: 110, align: 'right', render: (r) => fmt(r.balance) },
-      { key: 'deposite', label: 'Deposit', width: 100, align: 'right', render: (r) => fmt(r.deposite) },
-      { key: 'betAmount', label: 'Bet Amount', width: 100, align: 'right', render: (r) => fmt(r.betAmount) },
-      { key: 'winAmount', label: 'Win Amount', width: 100, align: 'right', render: (r) => fmt(r.totalProfit) },
-      { key: 'withdraw', label: 'Refund', width: 100, align: 'right', render: (r) => fmt(r.withdrawl) },
+      {
+        key: 'mobile',
+        label: 'Mobile No',
+        width: 110,
+        render: (r) => maskMobile(r.mobile, canShowMobile),
+      },
+      {
+        key: 'startBalance',
+        label: 'Start Balance',
+        width: 110,
+        align: 'right',
+        render: (r) => fmt(r.balance),
+      },
+      {
+        key: 'deposite',
+        label: 'Deposit',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(r.deposite),
+      },
+      {
+        key: 'betAmount',
+        label: 'Bet Amount',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(r.betAmount),
+      },
+      {
+        key: 'winAmount',
+        label: 'Win Amount',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(r.totalProfit),
+      },
+      {
+        key: 'withdraw',
+        label: 'Refund',
+        width: 100,
+        align: 'right',
+        render: (r) => fmt(r.withdrawl),
+      },
       { key: 'bonus', label: 'Bonus', width: 90, align: 'right', render: (r) => fmt(r.bonus ?? 0) },
-      { key: 'endBalance', label: 'End Balance', width: 110, align: 'right', render: (r) => fmt(r.balance) },
+      {
+        key: 'endBalance',
+        label: 'End Balance',
+        width: 110,
+        align: 'right',
+        render: (r) => fmt(r.balance),
+      },
     ],
     [rowOffset, canShowMobile],
   );
+
+  const sheetActions = useMemo<SheetAction[] | undefined>(() => {
+    if (!selected?.row._id || !canOpenReport) return undefined;
+    return [
+      {
+        label: 'View Details',
+        tone: 'primary',
+        onPress: () => {
+          const id = selected.row._id;
+          const name = selected.row.name;
+          setSelected(null);
+          openUserReport(id, name);
+        },
+      },
+    ];
+  }, [selected, canOpenReport, openUserReport]);
 
   return (
     <ScrollView
@@ -149,7 +212,11 @@ export function ProfitLossScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Profit &amp; Loss</Text>
@@ -281,15 +348,13 @@ export function ProfitLossScreen() {
             : []
         }
         onClose={() => setSelected(null)}
+        actions={sheetActions}
       />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
   searchCard: {
     backgroundColor: colors.surface,
@@ -317,28 +382,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
-  searchRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
-  searchInput: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    fontSize: 14,
-  },
   searchBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
     paddingHorizontal: spacing(4),
     paddingVertical: spacing(2.5),
   },
-  searchBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -347,75 +397,8 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    maxWidth: '40%',
-  },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   editCityBtn: {
     borderWidth: 1,
     borderColor: colors.border,

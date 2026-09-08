@@ -4,16 +4,10 @@
  * mount (params can drop large `games[]`). Qtech: long-press / sheet → User Stats.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
+import { makeStyles } from '../../../styles/common';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import {
   normalizeActivityList,
@@ -188,8 +182,7 @@ export function GameActivityDetailsScreen() {
     [provider],
   );
 
-  const title =
-    (provider ? providerLabel(provider) : providerName) || 'Provider';
+  const title = (provider ? providerLabel(provider) : providerName) || 'Provider';
 
   if (!provider && !loading) {
     return (
@@ -228,7 +221,9 @@ export function GameActivityDetailsScreen() {
       ) : null}
 
       {loading && games.length === 0 ? <Text style={styles.hint}>Loading games…</Text> : null}
-      {!loading && games.length === 0 ? <Text style={styles.hint}>No games for this provider</Text> : null}
+      {!loading && games.length === 0 ? (
+        <Text style={styles.hint}>No games for this provider</Text>
+      ) : null}
 
       <View style={styles.list}>
         {games.map((game, index) => {
@@ -243,10 +238,7 @@ export function GameActivityDetailsScreen() {
             >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardIndex}>#{index}</Text>
-                <Text
-                  style={[styles.cardTitle, isQtech && styles.cardTitleLink]}
-                  numberOfLines={1}
-                >
+                <Text style={[styles.cardTitle, isQtech && styles.cardTitleLink]} numberOfLines={1}>
                   {gameName(game)}
                 </Text>
               </View>
@@ -270,9 +262,7 @@ export function GameActivityDetailsScreen() {
                 <Text style={styles.cardSplitRight}>RTP: {String(game.rtp ?? '—')}</Text>
               </View>
               <Text style={styles.cardHint}>
-                {isQtech
-                  ? 'Tap for details · Long-press for user stats'
-                  : 'Tap for details'}
+                {isQtech ? 'Tap for details · Long-press for user stats' : 'Tap for details'}
               </Text>
             </TouchableOpacity>
           );
@@ -303,82 +293,9 @@ export function GameActivityDetailsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   centerBox: { justifyContent: 'center', alignItems: 'center', padding: spacing(6) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  cardTitleLink: {
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
+  // Boxed empty state rather than the shared bare-text one.
   empty: {
     color: colors.muted,
     textAlign: 'center',

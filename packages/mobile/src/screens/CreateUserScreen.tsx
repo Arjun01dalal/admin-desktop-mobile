@@ -12,12 +12,12 @@ import {
   Modal,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../styles/common';
 import { CLIENT_NAMES, INDIA_STATES, appCodeForName } from '@astro/shared';
 import { secureApi } from '../api/client';
 import { colors, radius, spacing } from '../theme';
@@ -178,7 +178,9 @@ export function CreateUserScreen() {
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.modeRow}>
           {(['user', 'admin'] as const).map((m) => (
             <TouchableOpacity
@@ -209,9 +211,7 @@ export function CreateUserScreen() {
 
           <View style={styles.field}>
             <Text style={styles.label}>Password</Text>
-            <View
-              style={[styles.input, styles.passwordRow, errors.password && styles.inputError]}
-            >
+            <View style={[styles.input, styles.passwordRow, errors.password && styles.inputError]}>
               <TextInput
                 style={styles.passwordInput}
                 value={form.password}
@@ -301,7 +301,7 @@ export function CreateUserScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   root: { flex: 1, backgroundColor: 'transparent' },
   scroll: { padding: spacing(4), paddingBottom: spacing(10) },
   modeRow: { flexDirection: 'row', gap: spacing(2), marginBottom: spacing(3) },
@@ -337,7 +337,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2.5),
     fontSize: 14,
   },
-  inputError: { borderColor: colors.destructive },
   errorText: { color: colors.destructive, fontSize: 11, marginTop: spacing(1) },
   passwordRow: {
     flexDirection: 'row',
@@ -357,7 +356,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing(2),
   },
-  submitText: { color: colors.primaryForeground, fontWeight: '800', fontSize: 14, letterSpacing: 1 },
+  submitText: {
+    color: colors.primaryForeground,
+    fontWeight: '800',
+    fontSize: 14,
+    letterSpacing: 1,
+  },
   btnDisabled: { opacity: 0.6 },
   pickerBackdrop: {
     flex: 1,

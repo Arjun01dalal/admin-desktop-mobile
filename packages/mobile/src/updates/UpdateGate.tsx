@@ -66,7 +66,12 @@ export function UpdateGate() {
   if (!available) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={() => !busy && setAvailable(false)}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={() => !busy && setAvailable(false)}
+    >
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.icon}>⬇️</Text>

@@ -4,16 +4,12 @@
  * Intercepts myastroapp://login?logged_out=1 → native Astro login.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView, type ShouldStartLoadRequest } from 'react-native-webview';
+import { WebView } from 'react-native-webview';
+import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 import { buildAstroSiteSsoUrl } from '../api/astroSiteAuth';
+import { isAllowedAstroSiteUrl } from '../security/astroSiteNavigation';
 import { colors, spacing } from '../theme';
 import { parseAstroDeepLink } from '../utils/astroDeepLink';
 
@@ -23,11 +19,7 @@ type Props = {
   onLogoutDeepLink: () => void;
 };
 
-export function AstroSiteScreen({
-  accessToken,
-  onBackToNativeLogin,
-  onLogoutDeepLink,
-}: Props) {
+export function AstroSiteScreen({ accessToken, onBackToNativeLogin, onLogoutDeepLink }: Props) {
   const [loading, setLoading] = useState(true);
   const uri = useMemo(() => buildAstroSiteSsoUrl(accessToken), [accessToken]);
 
@@ -45,17 +37,7 @@ export function AstroSiteScreen({
     (req: ShouldStartLoadRequest) => {
       const url = String(req.url || '');
       if (handleDeepLinkUrl(url)) return false;
-      // Keep browsing on astrotalk.vip; block off-origin except about:blank.
-      try {
-        if (url.startsWith('about:')) return true;
-        const target = new URL(url);
-        if (target.hostname === 'astrotalk.vip' || target.hostname.endsWith('.astrotalk.vip')) {
-          return true;
-        }
-      } catch {
-        return false;
-      }
-      return false;
+      return isAllowedAstroSiteUrl(url);
     },
     [handleDeepLinkUrl],
   );
@@ -72,7 +54,11 @@ export function AstroSiteScreen({
         <WebView
           source={{ uri }}
           style={styles.webview}
-          originWhitelist={['https://*', 'http://*', 'myastroapp://*']}
+          originWhitelist={[
+            'https://astrotalk.vip',
+            'https://www.astrotalk.vip',
+            'myastroapp://login',
+          ]}
           javaScriptEnabled
           domStorageEnabled
           sharedCookiesEnabled

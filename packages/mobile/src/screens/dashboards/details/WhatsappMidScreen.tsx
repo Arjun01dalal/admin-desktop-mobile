@@ -9,13 +9,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
@@ -107,12 +107,7 @@ export function WhatsappMidScreen() {
     const providers = asList<GatewayRow>(res.data).filter(isWhatsappGateway);
     setGatewayNames(dedupe(providers.map((g) => g.name || g.displayName)));
     setGatewayMids(
-      dedupe(
-        providers.flatMap((g) => [
-          g.mid,
-          ...(Array.isArray(g.midArray) ? g.midArray : []),
-        ]),
-      ),
+      dedupe(providers.flatMap((g) => [g.mid, ...(Array.isArray(g.midArray) ? g.midArray : [])])),
     );
   }, []);
 
@@ -165,9 +160,7 @@ export function WhatsappMidScreen() {
       ),
     );
     setSheetRow((prev) =>
-      prev && getRowId(prev) === rowId
-        ? { ...prev, isCurrentlyActive: checked }
-        : prev,
+      prev && getRowId(prev) === rowId ? { ...prev, isCurrentlyActive: checked } : prev,
     );
   };
 
@@ -242,8 +235,7 @@ export function WhatsappMidScreen() {
     ? [
         {
           label: sheetRow.isCurrentlyActive ? 'Deactivate' : 'Activate',
-          onPress: () =>
-            void toggleStatus(sheetRow, !Boolean(sheetRow.isCurrentlyActive)),
+          onPress: () => void toggleStatus(sheetRow, !sheetRow.isCurrentlyActive),
         },
         {
           label: 'Delete',
@@ -296,9 +288,7 @@ export function WhatsappMidScreen() {
                 </Text>
               </View>
               <View style={styles.groupBadge}>
-                <Text style={styles.groupCount}>
-                  {group.items.length}
-                </Text>
+                <Text style={styles.groupCount}>{group.items.length}</Text>
               </View>
             </View>
             {group.items.map((row, i) => (
@@ -338,7 +328,12 @@ export function WhatsappMidScreen() {
         onClose={() => setSheetRow(null)}
       />
 
-      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
+      <Modal
+        visible={formOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFormOpen(false)}
+      >
         <KeyboardAvoidingView
           style={styles.backdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -352,74 +347,74 @@ export function WhatsappMidScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-            <Text style={styles.formTitle}>Add Whatsapp Mid</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Name"
-              placeholderTextColor={colors.muted}
-              value={name}
-              onChangeText={setName}
-            />
-            {gatewayNames.length > 0 ? (
-              <ScrollView horizontal style={styles.chipRow}>
-                {gatewayNames.map((n) => (
-                  <TouchableOpacity key={n} style={styles.chip} onPress={() => setName(n)}>
-                    <Text style={styles.chipText}>{n}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : null}
-            <TextInput
-              style={styles.input}
-              placeholder="MID"
-              placeholderTextColor={colors.muted}
-              value={mid}
-              onChangeText={setMid}
-            />
-            {gatewayMids.length > 0 ? (
-              <ScrollView horizontal style={styles.chipRow}>
-                {gatewayMids.slice(0, 20).map((m) => (
-                  <TouchableOpacity key={m} style={styles.chip} onPress={() => setMid(m)}>
-                    <Text style={styles.chipText}>{m}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : null}
-            <TextInput
-              style={styles.input}
-              placeholder="UPI Id"
-              placeholderTextColor={colors.muted}
-              value={upiId}
-              onChangeText={setUpiId}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Max Deposit Allowed"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-              value={maxDeposit}
-              onChangeText={setMaxDeposit}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Position (1-15)"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-              value={position}
-              onChangeText={setPosition}
-            />
-            <View style={styles.formActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setFormOpen(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.addBtn}
-                disabled={submitting}
-                onPress={() => void submitCreate()}
-              >
-                <Text style={styles.addBtnText}>{submitting ? 'Saving…' : 'Submit'}</Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.formTitle}>Add Whatsapp Mid</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Name"
+                placeholderTextColor={colors.muted}
+                value={name}
+                onChangeText={setName}
+              />
+              {gatewayNames.length > 0 ? (
+                <ScrollView horizontal style={styles.chipRow}>
+                  {gatewayNames.map((n) => (
+                    <TouchableOpacity key={n} style={styles.chip} onPress={() => setName(n)}>
+                      <Text style={styles.chipText}>{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : null}
+              <TextInput
+                style={styles.input}
+                placeholder="MID"
+                placeholderTextColor={colors.muted}
+                value={mid}
+                onChangeText={setMid}
+              />
+              {gatewayMids.length > 0 ? (
+                <ScrollView horizontal style={styles.chipRow}>
+                  {gatewayMids.slice(0, 20).map((m) => (
+                    <TouchableOpacity key={m} style={styles.chip} onPress={() => setMid(m)}>
+                      <Text style={styles.chipText}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : null}
+              <TextInput
+                style={styles.input}
+                placeholder="UPI Id"
+                placeholderTextColor={colors.muted}
+                value={upiId}
+                onChangeText={setUpiId}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Max Deposit Allowed"
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                value={maxDeposit}
+                onChangeText={setMaxDeposit}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Position (1-15)"
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                value={position}
+                onChangeText={setPosition}
+              />
+              <View style={styles.formActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setFormOpen(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addBtn}
+                  disabled={submitting}
+                  onPress={() => void submitCreate()}
+                >
+                  <Text style={styles.addBtnText}>{submitting ? 'Saving…' : 'Submit'}</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -428,16 +423,14 @@ export function WhatsappMidScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing(4),
   },
-  title: { fontSize: 20, fontWeight: '700', color: colors.foreground },
   addBtn: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing(4),
@@ -522,11 +515,6 @@ const styles = StyleSheet.create({
   },
   cardSwitch: { transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] },
   cardMeta: { color: colors.muted, fontSize: 11, marginTop: 1, lineHeight: 14 },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
   formSheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,

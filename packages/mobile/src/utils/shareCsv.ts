@@ -36,7 +36,7 @@ export function rowsToCsv(rows: Record<string, unknown>[]): string {
 }
 
 function safeFileName(fileName: string): string {
-  const raw = fileName.replace(/[^\w.\-]+/g, '_') || 'sheet.csv';
+  const raw = fileName.replace(/[^\w.-]+/g, '_') || 'sheet.csv';
   return raw.toLowerCase().endsWith('.csv') ? raw : `${raw}.csv`;
 }
 
@@ -97,10 +97,7 @@ async function saveOnIos(fileName: string, csv: string): Promise<boolean> {
 }
 
 /** Save a CSV onto the device. Does not open WhatsApp. */
-export async function shareCsvFile(
-  fileName: string,
-  csv: string,
-): Promise<boolean> {
+export async function shareCsvFile(fileName: string, csv: string): Promise<boolean> {
   const safe = safeFileName(fileName);
   try {
     if (Platform.OS === 'android') return saveOnAndroid(safe, csv);

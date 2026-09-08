@@ -8,11 +8,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
@@ -91,9 +91,8 @@ export function ActiveUserDataScreen() {
       const keyLower = customerKey.toLowerCase();
       const entry =
         (providerWise[customerKey] as Record<string, unknown> | undefined) ||
-        (Object.entries(providerWise).find(
-          ([k]) => k.toLowerCase() === keyLower,
-        )?.[1] as Record<string, unknown> | undefined) ||
+        (Object.entries(providerWise).find(([k]) => k.toLowerCase() === keyLower)?.[1] as
+          Record<string, unknown> | undefined) ||
         {};
 
       setRows(Array.isArray(entry.list) ? (entry.list as UserRow[]) : []);
@@ -143,9 +142,7 @@ export function ActiveUserDataScreen() {
 
       {!customerKey ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>
-            Open this screen from a provider card player count.
-          </Text>
+          <Text style={styles.emptyText}>Open this screen from a provider card player count.</Text>
         </View>
       ) : null}
 
@@ -258,10 +255,7 @@ export function ActiveUserDataScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   description: {
     color: colors.muted,
     fontSize: 13,
@@ -276,7 +270,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   loadingBox: { paddingVertical: spacing(8), alignItems: 'center' },
   emptyBox: {
     backgroundColor: colors.surface,

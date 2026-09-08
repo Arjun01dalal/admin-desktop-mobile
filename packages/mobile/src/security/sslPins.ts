@@ -11,15 +11,8 @@
  * Requires a custom native build — skipped gracefully in Expo Go.
  */
 import { Platform } from 'react-native';
-import {
-  initializeSslPinning,
-  isSslPinningAvailable,
-} from 'react-native-ssl-public-key-pinning';
-import {
-  getApiBaseUrl,
-  getSslPinGenerateUrl,
-  getSslStressKey,
-} from '../config';
+import { initializeSslPinning, isSslPinningAvailable } from 'react-native-ssl-public-key-pinning';
+import { getApiBaseUrl, getSslPinGenerateUrl, getSslStressKey } from '../config';
 
 /** Host whose traffic must be pinned (matches desktop `PINNED_HOST`). */
 export const PINNED_HOST = 'laxminarayan.live';
@@ -42,7 +35,7 @@ function b64Decode(input: string): string {
     return globalThis.atob(padded);
   }
   // Node / test fallback
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   return require('buffer').Buffer.from(padded, 'base64').toString('binary');
 }
 
@@ -116,8 +109,7 @@ async function applyPins(publicKeyHashes: string[]): Promise<void> {
     console.warn('[sslPin] no valid pins to apply');
     return;
   }
-  const options: Record<string, { includeSubdomains: boolean; publicKeyHashes: string[] }> =
-    {};
+  const options: Record<string, { includeSubdomains: boolean; publicKeyHashes: string[] }> = {};
   for (const host of pinHosts()) {
     options[host] = {
       includeSubdomains: true,
@@ -125,9 +117,7 @@ async function applyPins(publicKeyHashes: string[]): Promise<void> {
     };
   }
   await initializeSslPinning(options);
-  console.log(
-    `[sslPin] active for ${Object.keys(options).join(', ')} (${pins.length} pin(s))`,
-  );
+  console.log(`[sslPin] active for ${Object.keys(options).join(', ')} (${pins.length} pin(s))`);
 }
 
 /**
@@ -137,6 +127,7 @@ async function applyPins(publicKeyHashes: string[]): Promise<void> {
 export async function fetchRemoteSslPins(): Promise<string[]> {
   const url = getSslPinGenerateUrl();
   const stressKey = getSslStressKey();
+  if (!stressKey) return [];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20_000);
   try {
@@ -189,10 +180,7 @@ export async function setupSslPinning(): Promise<void> {
       );
     }
   } catch (err) {
-    console.warn(
-      '[sslPin] setup failed:',
-      err instanceof Error ? err.message : err,
-    );
+    console.warn('[sslPin] setup failed:', err instanceof Error ? err.message : err);
   }
 }
 

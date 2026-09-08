@@ -11,12 +11,12 @@ import {
   Modal,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
@@ -53,8 +53,7 @@ function asBotMap(raw: unknown): Record<string, BotUser[]> {
     (obj.users_by_bots as Record<string, BotUser[]> | undefined) ||
     (obj.payload && typeof obj.payload === 'object'
       ? ((obj.payload as Record<string, unknown>).users_by_bots as
-          | Record<string, BotUser[]>
-          | undefined)
+          Record<string, BotUser[]> | undefined)
       : undefined) ||
     obj;
   if (!nested || typeof nested !== 'object' || Array.isArray(nested)) return {};
@@ -97,10 +96,7 @@ export function BotDataScreen() {
     [botMap],
   );
 
-  const totalUsers = useMemo(
-    () => cards.reduce((sum, c) => sum + c.count, 0),
-    [cards],
-  );
+  const totalUsers = useMemo(() => cards.reduce((sum, c) => sum + c.count, 0), [cards]);
 
   const load = useCallback(async () => {
     if (!userType || !bots.length || !states.length) {
@@ -144,39 +140,35 @@ export function BotDataScreen() {
       setError('No data to push. Apply filters first.');
       return;
     }
-    Alert.alert(
-      'Add Data To Bot',
-      `Push ${totalUsers} leads to the dialer?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Push',
-          onPress: () => {
-            void (async () => {
-              setPushing(true);
-              setError(null);
-              try {
-                const dialout_settings = entries.flatMap(([botId, users]) =>
-                  mapUsersToBotSettings(users, botId, userType),
-                );
-                const res = await secureApi<unknown>('callLogs.addToBotDialer', {
-                  userId: user?._id,
-                  created_by: user?.name,
-                  dialout_settings,
-                });
-                if (!res.ok) {
-                  setError(res.message || 'Failed to add to dialer');
-                  return;
-                }
-                setBotMap({});
-              } finally {
-                setPushing(false);
+    Alert.alert('Add Data To Bot', `Push ${totalUsers} leads to the dialer?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Push',
+        onPress: () => {
+          void (async () => {
+            setPushing(true);
+            setError(null);
+            try {
+              const dialout_settings = entries.flatMap(([botId, users]) =>
+                mapUsersToBotSettings(users, botId, userType),
+              );
+              const res = await secureApi<unknown>('callLogs.addToBotDialer', {
+                userId: user?._id,
+                created_by: user?.name,
+                dialout_settings,
+              });
+              if (!res.ok) {
+                setError(res.message || 'Failed to add to dialer');
+                return;
               }
-            })();
-          },
+              setBotMap({});
+            } finally {
+              setPushing(false);
+            }
+          })();
         },
-      ],
-    );
+      },
+    ]);
   }, [botMap, totalUsers, userType, user]);
 
   const pickerOptions = picker === 'states' ? INDIA_STATES : BOT_ID_OPTIONS;
@@ -373,7 +365,8 @@ export function BotDataScreen() {
             </View>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.pickerChips}>
+              contentContainerStyle={styles.pickerChips}
+            >
               {pickerOptions.map((opt) => {
                 const active = pickerSelected.includes(opt);
                 return (
@@ -397,10 +390,7 @@ export function BotDataScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   panel: {
     marginTop: spacing(3),
     backgroundColor: colors.surface,
@@ -441,9 +431,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   actionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -456,20 +444,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3.5),
     paddingVertical: spacing(2.5),
   },
-  btnDisabled: { opacity: 0.5 },
   actionBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   totalUsers: { color: colors.foreground, fontSize: 13, marginTop: spacing(1) },
   bold: { fontWeight: '700' },
   muted: { color: colors.muted, fontSize: 13, marginTop: spacing(3) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
   cardsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -488,7 +466,6 @@ const styles = StyleSheet.create({
   botCardLabel: { color: colors.muted, fontSize: 11 },
   botCardId: { color: '#ffd28a', fontSize: 18, fontWeight: '700' },
   botCardCount: { color: colors.foreground, fontSize: 13, marginTop: spacing(1) },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   pickerSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.md * 2,
@@ -496,9 +473,7 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     maxHeight: '75%',
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   pickerChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',

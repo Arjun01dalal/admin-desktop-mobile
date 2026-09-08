@@ -5,8 +5,7 @@
 const SITE_API_BASE = 'https://api.astrothirdeye.com';
 
 export type SiteLoginResult =
-  | { ok: true; message: string; accessToken: string }
-  | { ok: false; message: string };
+  { ok: true; message: string; accessToken: string } | { ok: false; message: string };
 
 function apiMessage(data: unknown, fallback: string): string {
   if (!data || typeof data !== 'object') return fallback;
@@ -55,7 +54,11 @@ function pickAccessToken(data: unknown): string {
 
 async function assertAstrologerProfileToken(accessToken: string): Promise<SiteLoginResult> {
   const token = String(accessToken || '').trim();
-  if (!token || token.length > 8192 || /[\s\u0000-\u001F\u007F]/.test(token)) {
+  const hasControlCharacter = [...token].some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 0x20 || code === 0x7f;
+  });
+  if (!token || token.length > 8192 || /\s/.test(token) || hasControlCharacter) {
     return {
       ok: false,
       message: 'External login token missing or malformed. Please sign in again.',

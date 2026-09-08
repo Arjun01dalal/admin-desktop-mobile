@@ -23,13 +23,7 @@ type Props = {
   onSubmit: (imagePath: string) => void;
 };
 
-export function UpdateGameImageModal({
-  visible,
-  loading,
-  target,
-  onClose,
-  onSubmit,
-}: Props) {
+export function UpdateGameImageModal({ visible, loading, target, onClose, onSubmit }: Props) {
   const [imagePath, setImagePath] = useState('');
   const trimmed = imagePath.trim();
 
@@ -38,7 +32,12 @@ export function UpdateGameImageModal({
   }, [visible, target?.currentImageUrl]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => !loading && onClose()}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => !loading && onClose()}
+    >
       <KeyboardAvoidingView
         style={styles.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

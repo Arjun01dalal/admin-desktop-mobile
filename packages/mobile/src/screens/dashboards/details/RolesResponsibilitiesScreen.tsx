@@ -18,13 +18,13 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { asList } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
@@ -44,8 +44,7 @@ export function RolesResponsibilitiesScreen() {
   const canView = hasPermission(Permissions.View_Roles_and_Responsibilities, user);
   const canEdit = hasPermission(Permissions.Edit_Role, user);
   const canDelete = hasPermission(Permissions.Delete_Role, user);
-  const canAdd =
-    hasPermission(Permissions.add_new_role_responsibility, user) || canEdit;
+  const canAdd = hasPermission(Permissions.add_new_role_responsibility, user) || canEdit;
   // Web panel gates the Coin Permission button on this dedicated responsibility.
   const canCoinPerm = hasPermission('Add_Coin_Permission', user);
 
@@ -380,7 +379,11 @@ export function RolesResponsibilitiesScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <View style={styles.headerRow}>
@@ -428,7 +431,9 @@ export function RolesResponsibilitiesScreen() {
       ) : null}
 
       {loading && roles.length === 0 ? <Text style={styles.noPermText}>Loading…</Text> : null}
-      {!loading && roles.length === 0 ? <Text style={styles.noPermText}>No roles found</Text> : null}
+      {!loading && roles.length === 0 ? (
+        <Text style={styles.noPermText}>No roles found</Text>
+      ) : null}
       {roles.map((role, i) => {
         const count = role.Responsibilities?.length || 0;
         return (
@@ -458,7 +463,12 @@ export function RolesResponsibilitiesScreen() {
       })}
 
       {/* Add Role (clone) */}
-      <Modal visible={cloneOpen} transparent animationType="slide" onRequestClose={() => setCloneOpen(false)}>
+      <Modal
+        visible={cloneOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCloneOpen(false)}
+      >
         <KeyboardAvoidingView
           style={styles.backdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -477,12 +487,18 @@ export function RolesResponsibilitiesScreen() {
               placeholderTextColor={colors.muted}
             />
             <Text style={styles.fieldLabel}>Reference Role (optional)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+            >
               <TouchableOpacity
                 style={[styles.chip, cloneRefId === '' && styles.chipActive]}
                 onPress={() => setCloneRefId('')}
               >
-                <Text style={[styles.chipText, cloneRefId === '' && styles.chipTextActive]}>Empty Role</Text>
+                <Text style={[styles.chipText, cloneRefId === '' && styles.chipTextActive]}>
+                  Empty Role
+                </Text>
               </TouchableOpacity>
               {roles.map((role) => (
                 <TouchableOpacity
@@ -509,7 +525,9 @@ export function RolesResponsibilitiesScreen() {
                 onPress={() => void handleClone()}
                 disabled={submitting}
               >
-                <Text style={styles.formBtnPrimaryText}>{submitting ? 'Creating…' : 'Create Role'}</Text>
+                <Text style={styles.formBtnPrimaryText}>
+                  {submitting ? 'Creating…' : 'Create Role'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -517,7 +535,12 @@ export function RolesResponsibilitiesScreen() {
       </Modal>
 
       {/* Add Responsibility */}
-      <Modal visible={respOpen} transparent animationType="slide" onRequestClose={() => setRespOpen(false)}>
+      <Modal
+        visible={respOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRespOpen(false)}
+      >
         <KeyboardAvoidingView
           style={styles.backdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -579,18 +602,14 @@ export function RolesResponsibilitiesScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   noPerm: { flex: 1, backgroundColor: 'transparent', padding: spacing(4) },
   noPermText: { color: colors.muted, fontSize: 14 },
   headerRow: { marginBottom: spacing(3) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
   backLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginBottom: spacing(2) },
   subCount: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
   respItem: { paddingVertical: spacing(1.5) },
@@ -612,7 +631,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   roleCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -622,7 +640,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   roleCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  roleCardName: { color: colors.foreground, fontSize: 15, fontWeight: '700', flex: 1, marginRight: spacing(2) },
+  roleCardName: {
+    color: colors.foreground,
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: spacing(2),
+  },
   roleCountPill: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -634,8 +658,6 @@ const styles = StyleSheet.create({
   roleCountText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   roleCardSub: { color: colors.muted, fontSize: 12, marginTop: spacing(1.5) },
   roleCardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1.5), fontStyle: 'italic' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  backdropTouch: { flex: 1 },
   formSheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
@@ -646,7 +668,12 @@ const styles = StyleSheet.create({
     gap: spacing(1),
   },
   editSheet: { maxHeight: '85%' },
-  formTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700', marginBottom: spacing(2) },
+  formTitle: {
+    color: colors.foreground,
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: spacing(2),
+  },
   fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: spacing(2) },
   sectionLabel: {
     color: colors.foreground,
@@ -675,13 +702,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   respScroll: { maxHeight: 320, marginTop: spacing(1) },
   groupBlock: { marginBottom: spacing(2) },
   groupLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginBottom: spacing(1) },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(2), paddingVertical: spacing(1.5) },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    paddingVertical: spacing(1.5),
+  },
   checkbox: {
     width: 20,
     height: 20,
@@ -707,5 +737,4 @@ const styles = StyleSheet.create({
   formBtnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
   formBtnPrimary: { backgroundColor: colors.primary },
   formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  btnDisabled: { opacity: 0.5 },
 });

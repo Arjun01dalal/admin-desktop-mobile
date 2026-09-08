@@ -10,15 +10,8 @@
  * name/mobile search; card tap opens the full detail sheet.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { pickPageSizes, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
@@ -134,10 +127,7 @@ function unpackDocuments(data: unknown): { rows: FundRow[]; total: number; total
 export function BonusWalletFundRequestScreen() {
   const canShowMobile = hasPermission('show_mobile');
   // Read once — getSessionUser returns a fresh object each call.
-  const admin = useMemo(
-    () => getSessionUser() as { _id?: string; name?: string } | null,
-    [],
-  );
+  const admin = useMemo(() => getSessionUser() as { _id?: string; name?: string } | null, []);
 
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
@@ -349,16 +339,64 @@ export function BonusWalletFundRequestScreen() {
   // Column defs kept for RowDetailSheet field rendering (full desktop set).
   const columns = useMemo<DataTableColumn<FundRow>[]>(
     () => [
-      { key: 'idx', label: '#', width: 34, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: 34,
+        render: (_r, i) => String((page - 1) * pageSize + i + 1),
+      },
       { key: 'name', label: 'Name', width: 140, render: (r) => display(r.name) },
-      { key: 'mobile', label: 'Mobile', width: 120, render: (r) => maskMobile(r.mobile, canShowMobile) },
-      { key: 'openBal', label: 'Opening Balance', width: 130, align: 'right', render: (r) => display(r.bonusWalletOpenBalance) },
-      { key: 'amount', label: 'Amount', width: 100, align: 'right', render: (r) => display(r.amount) },
-      { key: 'closeBal', label: 'Closing Balance', width: 130, align: 'right', render: (r) => display(r.bonusWalletClosingBalance) },
-      { key: 'refByName', label: 'Referred By Name', width: 150, render: (r) => display(r.referredByName) },
-      { key: 'refByMobile', label: 'Referred By Mobile', width: 150, render: (r) => maskMobile(r.referredByMobile, canShowMobile) },
-      { key: 'refToName', label: 'Referred To Name', width: 150, render: (r) => display(r.referredToName) },
-      { key: 'refToMobile', label: 'Referred To Mobile', width: 150, render: (r) => maskMobile(r.referredToMobile, canShowMobile) },
+      {
+        key: 'mobile',
+        label: 'Mobile',
+        width: 120,
+        render: (r) => maskMobile(r.mobile, canShowMobile),
+      },
+      {
+        key: 'openBal',
+        label: 'Opening Balance',
+        width: 130,
+        align: 'right',
+        render: (r) => display(r.bonusWalletOpenBalance),
+      },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: 100,
+        align: 'right',
+        render: (r) => display(r.amount),
+      },
+      {
+        key: 'closeBal',
+        label: 'Closing Balance',
+        width: 130,
+        align: 'right',
+        render: (r) => display(r.bonusWalletClosingBalance),
+      },
+      {
+        key: 'refByName',
+        label: 'Referred By Name',
+        width: 150,
+        render: (r) => display(r.referredByName),
+      },
+      {
+        key: 'refByMobile',
+        label: 'Referred By Mobile',
+        width: 150,
+        render: (r) => maskMobile(r.referredByMobile, canShowMobile),
+      },
+      {
+        key: 'refToName',
+        label: 'Referred To Name',
+        width: 150,
+        render: (r) => display(r.referredToName),
+      },
+      {
+        key: 'refToMobile',
+        label: 'Referred To Mobile',
+        width: 150,
+        render: (r) => maskMobile(r.referredToMobile, canShowMobile),
+      },
       {
         key: 'firstDeposit',
         label: 'First Deposit %',
@@ -380,8 +418,18 @@ export function BonusWalletFundRequestScreen() {
             : '—',
       },
       { key: 'status', label: 'Status', width: 100, render: (r) => display(r.status) },
-      { key: 'created', label: 'Created', width: 110, render: (r) => formatDateTime(r.createdOn ?? r.createdAt) },
-      { key: 'updated', label: 'Updated', width: 110, render: (r) => formatDateTime(r.updatedOn ?? r.updatedAt) },
+      {
+        key: 'created',
+        label: 'Created',
+        width: 110,
+        render: (r) => formatDateTime(r.createdOn ?? r.createdAt),
+      },
+      {
+        key: 'updated',
+        label: 'Updated',
+        width: 110,
+        render: (r) => formatDateTime(r.updatedOn ?? r.updatedAt),
+      },
     ],
     [page, pageSize, canShowMobile],
   );
@@ -395,7 +443,10 @@ export function BonusWalletFundRequestScreen() {
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow || !sheetRow.userId) return [];
-    const pending = String(sheetRow.status || '').trim().toLowerCase() === 'pending';
+    const pending =
+      String(sheetRow.status || '')
+        .trim()
+        .toLowerCase() === 'pending';
     if (!pending) return [];
     const busy = Boolean(actingId);
     return (['approve', 'reject', 'remove'] as ActionStatus[]).map((a) => ({
@@ -414,7 +465,11 @@ export function BonusWalletFundRequestScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={tableLoading} onRefresh={() => void loadTable()} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={tableLoading}
+            onRefresh={() => void loadTable()}
+            tintColor={colors.primary}
+          />
         }
       >
         <TouchableOpacity onPress={() => setView('main')}>
@@ -620,11 +675,7 @@ export function BonusWalletFundRequestScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
   toggleRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
   chip: {
@@ -644,9 +695,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing(2),
   },
   pageSizeLabel: { color: colors.muted, fontSize: 12 },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   cardsWrap: { gap: spacing(3), marginTop: spacing(4) },
   kpiCard: {
     backgroundColor: colors.surface,
@@ -664,15 +713,6 @@ const styles = StyleSheet.create({
   },
   kpiValue: { color: colors.primary, fontSize: 18, fontWeight: '800', marginTop: spacing(2) },
   kpiHint: { color: colors.muted, fontSize: 11, marginTop: spacing(2) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
   hint: { color: colors.muted, fontSize: 13, marginTop: spacing(2), marginBottom: spacing(2) },
   list: { gap: spacing(2), marginTop: spacing(2) },
   card: {
@@ -681,12 +721,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing(3),
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
   },
   cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
   cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, minWidth: 0 },
@@ -707,50 +741,4 @@ const styles = StyleSheet.create({
     gap: spacing(2),
     paddingVertical: 1,
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
-  cardValue: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
 });

@@ -8,12 +8,12 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { secureApi } from '../../../api/client';
@@ -57,7 +57,7 @@ type TabKey = 'Today' | 'Active' | 'Warning' | 'Inactive';
 const PLAY_LABELS: Record<string, string> = {
   E: 'Exchange',
   C: 'Casino',
-  S: 'Sports',
+  S: 'Satta Matka',
 };
 
 function playParts(row: DetailRow): string[] {
@@ -334,11 +334,7 @@ export function CallerDetailsScreen() {
       });
       setSelectedIds(new Set());
 
-      if (
-        !aiRes.ok &&
-        todayBundle.users.length === 0 &&
-        warning.items.length === 0
-      ) {
+      if (!aiRes.ok && todayBundle.users.length === 0 && warning.items.length === 0) {
         setError('Failed to load caller details');
       }
     } finally {
@@ -382,8 +378,7 @@ export function CallerDetailsScreen() {
         key: 'lastActivity',
         label: 'Last Activity',
         width: 130,
-        render: (r) =>
-          formatDisplayDate(r.activeUser || r.lastActivity || r.lastActive) || '—',
+        render: (r) => formatDisplayDate(r.activeUser || r.lastActivity || r.lastActive) || '—',
       },
       { key: 'city', label: 'City', width: 110, render: (r) => display(r.city) },
       { key: 'state', label: 'State', width: 110, render: (r) => display(r.state) },
@@ -491,15 +486,12 @@ export function CallerDetailsScreen() {
     });
   }, []);
 
-  const warningRows = useMemo(
-    () => (tab === 'Warning' ? filtered : []),
-    [tab, filtered],
-  );
+  const warningRows = useMemo(() => (tab === 'Warning' ? filtered : []), [tab, filtered]);
   const allWarningSelected =
     warningRows.length > 0 && warningRows.every((row) => selectedIds.has(rowId(row)));
 
   const toggleSelectAllWarning = useCallback(() => {
-    setSelectedIds((prev) => {
+    setSelectedIds(() => {
       if (allWarningSelected) return new Set();
       return new Set(warningRows.map((row) => rowId(row)).filter(Boolean));
     });
@@ -591,7 +583,8 @@ export function CallerDetailsScreen() {
           <TouchableOpacity
             style={[
               styles.addDialerBtn,
-              (addDialerBusy || selectedIds.size === 0 || dialerBusyId != null) && styles.addDialerBtnDisabled,
+              (addDialerBusy || selectedIds.size === 0 || dialerBusyId != null) &&
+                styles.addDialerBtnDisabled,
             ]}
             disabled={addDialerBusy || selectedIds.size === 0 || dialerBusyId != null}
             onPress={() => void addSelectedToDialer()}
@@ -662,11 +655,7 @@ export function CallerDetailsScreen() {
                         canOpenReport && rowId(row) ? styles.userCardNameLink : null,
                       ]}
                       numberOfLines={1}
-                      onPress={
-                        canOpenReport && rowId(row)
-                          ? () => openUserReport(row)
-                          : undefined
-                      }
+                      onPress={canOpenReport && rowId(row) ? () => openUserReport(row) : undefined}
                     >
                       {name}
                     </Text>
@@ -807,10 +796,7 @@ export function CallerDetailsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: {
     color: colors.muted,
     fontSize: 13,

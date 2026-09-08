@@ -1,36 +1,22 @@
 /**
- * Live online/offline status from NetInfo.
+ * Live online/offline status via expo-network (Expo module — reliable with New Arch).
  * Treats airplane mode / Wi‑Fi+cellular off as offline.
  * Does not use `isInternetReachable` — that can be false even when
  * the device has a working network connection.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState } from 'react-native';
+import * as Network from 'expo-network';
 
-type NetInfoState = {
+type NetworkSnapshot = {
   type?: string | null;
   isConnected?: boolean | null;
 };
 
-type NetInfoLike = {
-  fetch: () => Promise<NetInfoState>;
-  refresh: () => Promise<NetInfoState>;
-  addEventListener: (listener: (state: NetInfoState) => void) => () => void;
-};
-
-function loadNetInfo(): NetInfoLike | null {
-  if (Platform.OS === 'web') return null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('@react-native-community/netinfo').default as NetInfoLike;
-  } catch {
-    return null;
-  }
-}
-
-export function isOfflineState(state: NetInfoState | null | undefined): boolean {
+export function isOfflineState(state: NetworkSnapshot | null | undefined): boolean {
   if (!state) return false;
-  if (state.type === 'none') return true;
+  if (state.type === Network.NetworkStateType.NONE) return true;
+  if (String(state.type || '').toUpperCase() === 'NONE') return true;
   return state.isConnected === false;
 }
 
@@ -42,43 +28,44 @@ export function useNetworkStatus(): {
   const [offline, setOffline] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  const apply = useCallback((state: NetInfoState) => {
+  const apply = useCallback((state: NetworkSnapshot) => {
     setOffline(isOfflineState(state));
   }, []);
 
   const refresh = useCallback(async () => {
-    const NetInfo = loadNetInfo();
-    if (!NetInfo) return;
     setChecking(true);
     try {
-      const state = await NetInfo.refresh();
+      const state = await Network.getNetworkStateAsync();
       apply(state);
     } catch {
-      /* keep last known */
+      /* keep last known — native module missing / transient error */
     } finally {
       setChecking(false);
     }
   }, [apply]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    const NetInfo = loadNetInfo();
-    if (!NetInfo) return;
-
     let cancelled = false;
-    void NetInfo.fetch().then((state) => {
+
+    void Network.getNetworkStateAsync()
+      .then((state) => {
+        if (!cancelled) apply(state);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+
+    const sub = Network.addNetworkStateListener((state) => {
       if (!cancelled) apply(state);
     });
-    const unsub = NetInfo.addEventListener((state) => {
-      if (!cancelled) apply(state);
-    });
+
     const appSub = AppState.addEventListener('change', (s) => {
       if (s === 'active') void refresh();
     });
 
     return () => {
       cancelled = true;
-      unsub();
+      sub.remove();
       appSub.remove();
     };
   }, [apply, refresh]);

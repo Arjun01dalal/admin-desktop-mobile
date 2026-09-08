@@ -17,6 +17,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asPaged } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
@@ -25,11 +26,7 @@ import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
-import {
-  DetailFilterBar,
-  type SearchFieldKey,
-  type SearchFieldOption,
-} from './DetailFilterBar';
+import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 type Row = {
@@ -277,7 +274,11 @@ export function NonPerformingUserScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Non Performing User</Text>
@@ -332,9 +333,7 @@ export function NonPerformingUserScreen() {
               onPress={() => setSheetRow(row)}
             >
               <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>
-                  #{(page - 1) * PAGE_SIZE + index + 1}
-                </Text>
+                <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
                 <Text style={styles.cardTitle} numberOfLines={1}>
                   {display(row.name)}
                 </Text>
@@ -363,9 +362,7 @@ export function NonPerformingUserScreen() {
               </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardLabel}>App</Text>
-                <Text style={styles.cardValue}>
-                  {appCodeForName(String(row.clientName || ''))}
-                </Text>
+                <Text style={styles.cardValue}>{appCodeForName(String(row.clientName || ''))}</Text>
               </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardLabel}>Mobile</Text>
@@ -463,7 +460,9 @@ export function NonPerformingUserScreen() {
                           <Text style={styles.commentMetaText}>
                             By: {display(item.who?.userName || item.userName || item.commented_by)}
                           </Text>
-                          {ts ? <Text style={styles.commentMetaText}>{formatTs(String(ts))}</Text> : null}
+                          {ts ? (
+                            <Text style={styles.commentMetaText}>{formatTs(String(ts))}</Text>
+                          ) : null}
                         </View>
                       </View>
                     );
@@ -495,21 +494,7 @@ export function NonPerformingUserScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
+const styles = makeStyles({
   list: { gap: spacing(3), marginTop: spacing(3) },
   card: {
     backgroundColor: colors.surface,
@@ -563,21 +548,6 @@ const styles = StyleSheet.create({
   cardLabel: { color: colors.muted, fontSize: 12, fontWeight: '600', width: '40%' },
   cardValue: { color: colors.foreground, fontSize: 12, flex: 1, textAlign: 'right' },
   cardHint: { color: colors.muted, fontSize: 11, marginTop: spacing(1.5) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
   backdrop: {
     flex: 1,
     justifyContent: 'center',

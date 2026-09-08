@@ -10,12 +10,12 @@ import {
   Modal,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { colors, radius, spacing } from '../../../theme';
@@ -102,7 +102,9 @@ export function LeaderboardScreen() {
   const cityTotals = useMemo(() => {
     const totals = new Map<string, number>(CITY_TOTALS.map((c) => [c, 0]));
     for (const row of rows) {
-      const city = String(row.city || '').trim().toLowerCase();
+      const city = String(row.city || '')
+        .trim()
+        .toLowerCase();
       if (totals.has(city)) {
         totals.set(city, (totals.get(city) || 0) + Number(row.customerDepositAmt || 0));
       }
@@ -154,7 +156,12 @@ export function LeaderboardScreen() {
         onCellPress: (r) => openCityEdit(r),
       },
       { key: 'email', label: 'Email', width: 180, render: (r) => String(r.email || '—') },
-      { key: 'password', label: 'Password', width: 120, render: (r) => String(r.plainPassword || '—') },
+      {
+        key: 'password',
+        label: 'Password',
+        width: 120,
+        render: (r) => String(r.plainPassword || '—'),
+      },
       {
         key: 'customerCount',
         label: 'Customer Count',
@@ -184,7 +191,7 @@ export function LeaderboardScreen() {
         color: (r) => (r.block ? colors.destructive : colors.success),
       },
     ],
-    [],
+    [openCityEdit],
   );
 
   return (
@@ -193,7 +200,11 @@ export function LeaderboardScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Leaderboard</Text>
@@ -255,10 +266,14 @@ export function LeaderboardScreen() {
                   <Text style={styles.cardSplitLeft} numberOfLines={1}>
                     City: {String(row.city || '—')}
                   </Text>
-                  <Text style={styles.cardSplitRight}>Deposit: {fmtINR(row.customerDepositAmt)}</Text>
+                  <Text style={styles.cardSplitRight}>
+                    Deposit: {fmtINR(row.customerDepositAmt)}
+                  </Text>
                 </View>
                 <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft}>Customers: {String(row.customerCount ?? 0)}</Text>
+                  <Text style={styles.cardSplitLeft}>
+                    Customers: {String(row.customerCount ?? 0)}
+                  </Text>
                   <Text style={styles.cardSplitRight}>
                     Active today: {String(row.activeUserCount ?? 0)}
                   </Text>
@@ -356,10 +371,7 @@ export function LeaderboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
   cityScroll: { marginTop: spacing(3), marginBottom: spacing(3) },
   cityRow: { flexDirection: 'row', gap: spacing(2) },
@@ -381,75 +393,8 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    maxWidth: '40%',
-  },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   editCityBtn: {
     alignSelf: 'flex-start',
     marginTop: spacing(1),

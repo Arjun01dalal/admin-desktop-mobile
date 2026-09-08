@@ -22,11 +22,7 @@ export function SplashScreen({ onDone, durationMs = 1200 }: Props) {
     <SafeAreaView style={styles.root}>
       <AppBackground />
       <View style={styles.center}>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <Image source={require('../../assets/icon.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.overline}>ASTRO ADMIN</Text>
         <Text style={styles.welcome}>WELCOME to</Text>
         <Text style={styles.brand}>ASTRO ADMIN</Text>

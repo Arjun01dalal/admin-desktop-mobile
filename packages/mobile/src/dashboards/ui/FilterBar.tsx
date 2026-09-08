@@ -6,12 +6,11 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
-  StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../styles/common';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../theme';
 import { PROVIDER_FILTERS } from '../constants';
@@ -89,15 +88,17 @@ export function FilterBar(props: Props) {
   } = props;
   const [showCustom, setShowCustom] = useState(false);
 
-  const activePreset = PRESETS.find(
-    (p) => p.start() === startDate && p.end() === endDate,
-  )?.label;
+  const activePreset = PRESETS.find((p) => p.start() === startDate && p.end() === endDate)?.label;
 
   const datesValid = DATE_RE.test(startDate) && DATE_RE.test(endDate);
 
   return (
     <View style={styles.wrap}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+      >
         {PRESETS.map((p) => (
           <Chip
             key={p.label}
@@ -130,7 +131,11 @@ export function FilterBar(props: Props) {
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+      >
         <Chip label="All Apps" active={!appClientName} onPress={() => onAppChange('')} />
         {appOptions.map((name, i) => (
           <Chip
@@ -143,7 +148,11 @@ export function FilterBar(props: Props) {
       </ScrollView>
 
       {showProviderFilter && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.row}
+        >
           {PROVIDER_FILTERS.map((name) => (
             <Chip
               key={name}
@@ -179,7 +188,7 @@ export function FilterBar(props: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = makeStyles({
   wrap: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -198,9 +207,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   datesRow: { flexDirection: 'row', gap: spacing(2) },
   dateField: { flex: 1 },
   dateLabel: { color: colors.muted, fontSize: 11, marginBottom: spacing(1) },
@@ -221,7 +228,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(5),
     paddingVertical: spacing(2.5),
   },
-  btnDisabled: { opacity: 0.5 },
   applyText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   outlineBtn: {
     borderWidth: 1,

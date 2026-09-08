@@ -8,8 +8,7 @@ import { useState } from 'react';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { raspConfig, type ThreatKind } from './rasp';
 
-const IS_EXPO_GO =
-  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 const RASP_DISABLED =
   IS_EXPO_GO ||
@@ -21,7 +20,6 @@ type FreeRaspHook = typeof import('freerasp-react-native').useFreeRasp;
 let useFreeRaspHook: FreeRaspHook | null = null;
 if (!RASP_DISABLED) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     useFreeRaspHook = (require('freerasp-react-native') as typeof import('freerasp-react-native'))
       .useFreeRasp;
   } catch {
@@ -39,7 +37,7 @@ function useActiveRaspThreats(): { threats: ThreatKind[] } {
     setThreats((prev) => (prev.includes(kind) ? prev : [...prev, kind]));
 
   // Hook is always present when this function is selected.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+
   useFreeRaspHook!(raspConfig, {
     privilegedAccess: () => raise('privilegedAccess'),
     hooks: () => raise('hooks'),

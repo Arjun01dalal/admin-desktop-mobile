@@ -100,9 +100,7 @@ function ResultTable({
       Alert.alert('Validation', 'Please select a Campaign ID');
       return;
     }
-    const userIds = Array.from(
-      new Set([...collectUserIds(rows), ...(extraIds || [])]),
-    );
+    const userIds = Array.from(new Set([...collectUserIds(rows), ...(extraIds || [])]));
     if (userIds.length === 0) {
       Alert.alert('Error', 'No user IDs found in this result');
       return;
@@ -129,8 +127,7 @@ function ResultTable({
         serverId: campaignMeta?.serverId ?? String(admin?.serverId || ''),
         listId: getListIdForCampaign(selectedCampaignId),
         listName:
-          campaignMeta?.name ||
-          `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
+          campaignMeta?.name || `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
       });
       if (!dialerRes.ok) {
         Alert.alert('Error', dialerRes.message || 'Failed to push to dialer');
@@ -159,7 +156,10 @@ function ResultTable({
                   onPress={() => setSelectedCampaignId(active ? '' : id)}
                   disabled={dialerLoading}
                 >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                    numberOfLines={1}
+                  >
                     {id}
                   </Text>
                 </TouchableOpacity>
@@ -174,9 +174,7 @@ function ResultTable({
             disabled={dialerLoading || !selectedCampaignId}
             onPress={() => void addToDialer()}
           >
-            <Text style={styles.dialerBtnText}>
-              {dialerLoading ? 'Pushing…' : 'Add to dialer'}
-            </Text>
+            <Text style={styles.dialerBtnText}>{dialerLoading ? 'Pushing…' : 'Add to dialer'}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -192,11 +190,7 @@ function ResultTable({
           {rows.map((row, idx) => (
             <View key={idx} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
               {columns.map((col) => (
-                <Text
-                  key={col}
-                  style={[styles.tableCell, { minWidth: 120 }]}
-                  numberOfLines={1}
-                >
+                <Text key={col} style={[styles.tableCell, { minWidth: 120 }]} numberOfLines={1}>
                   {formatLlmCell(row[col])}
                 </Text>
               ))}
@@ -226,9 +220,7 @@ function MessageBody({
       const contentIsJson = trimmed.startsWith('{') || trimmed.startsWith('[');
       return (
         <View style={styles.resultStack}>
-          {!contentIsJson && trimmed ? (
-            <Text style={styles.bubbleText}>{content}</Text>
-          ) : null}
+          {!contentIsJson && trimmed ? <Text style={styles.bubbleText}>{content}</Text> : null}
           <ResultTable
             rows={rows}
             collection={collection}
@@ -241,18 +233,14 @@ function MessageBody({
     }
   }
   return (
-    <Text style={[styles.bubbleText, role === 'user' && styles.bubbleTextUser]}>
-      {content}
-    </Text>
+    <Text style={[styles.bubbleText, role === 'user' && styles.bubbleTextUser]}>{content}</Text>
   );
 }
 
 export function AdminLlmChatHeaderButton() {
   const hasAccess = canUseAdminLlmChat();
   const insets = useSafeAreaInsets();
-  const [open, setOpen] = useState(
-    () => appStorage.getItem(LLM_CHAT_OPEN_KEY) === '1',
-  );
+  const [open, setOpen] = useState(() => appStorage.getItem(LLM_CHAT_OPEN_KEY) === '1');
   const [messages, setMessages] = useState<LlmChatMessage[]>(loadStoredMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -363,10 +351,7 @@ export function AdminLlmChatHeaderButton() {
         ];
       });
     } catch (err) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to send voice message',
-      );
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to send voice message');
       setMessages((prev) => [
         ...prev.filter((m) => m._pendingVoiceId !== pendingId),
         {
@@ -546,17 +531,14 @@ export function AdminLlmChatHeaderButton() {
               ref={listRef}
               style={styles.messagesFlex}
               data={messages}
-              keyExtractor={(item, idx) =>
-                `${item.role}-${idx}-${item._pendingVoiceId || ''}`
-              }
+              keyExtractor={(item, idx) => `${item.role}-${idx}-${item._pendingVoiceId || ''}`}
               contentContainerStyle={styles.messagesList}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
               ListEmptyComponent={
                 <Text style={styles.emptyText}>
-                  Ask in English or Hindi about deposits, withdrawals, users, offices,
-                  callers, roles, or wallet metrics — type or use the mic. Sensitive
-                  customer data is masked.
+                  Ask in English or Hindi about deposits, withdrawals, users, offices, callers,
+                  roles, or wallet metrics — type or use the mic. Sensitive customer data is masked.
                 </Text>
               }
               renderItem={({ item: m }) => {
@@ -606,9 +588,7 @@ export function AdminLlmChatHeaderButton() {
                 value={input}
                 onChangeText={setInput}
                 placeholder={
-                  recording
-                    ? 'Listening… tap stop when done'
-                    : 'Ask a question (English or Hindi)…'
+                  recording ? 'Listening… tap stop when done' : 'Ask a question (English or Hindi)…'
                 }
                 placeholderTextColor={LLM.muted}
                 editable={!loading && !recording}
@@ -617,10 +597,7 @@ export function AdminLlmChatHeaderButton() {
                 underlineColorAndroid="transparent"
               />
               <TouchableOpacity
-                style={[
-                  styles.micBtn,
-                  recording ? styles.micBtnRecording : null,
-                ]}
+                style={[styles.micBtn, recording ? styles.micBtnRecording : null]}
                 onPress={() => void toggleRecording()}
                 disabled={loading}
                 accessibilityLabel={recording ? 'Stop recording' : 'Ask by voice'}

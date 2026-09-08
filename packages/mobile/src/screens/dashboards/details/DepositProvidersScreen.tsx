@@ -19,6 +19,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { CLIENT_NAMES } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -104,10 +105,7 @@ export function DepositProvidersScreen() {
   const canEdit = !hasPermission('Disable_Deposit_Provider_Edit');
   const canUpdateAmount = hasPermission('Update_Deposit_Amount_Edit');
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
-  const updatedBy = useMemo(
-    () => ({ userId: admin?._id, userName: admin?.name }),
-    [admin],
-  );
+  const updatedBy = useMemo(() => ({ userId: admin?._id, userName: admin?.name }), [admin]);
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -222,7 +220,12 @@ export function DepositProvidersScreen() {
     () => [
       { key: 'idx', label: '#', width: 44, render: (_r, i) => String(i + 1) },
       { key: 'name', label: 'Gateway', width: 130, render: (r) => display(r.name) },
-      { key: 'displayName', label: 'Display Name', width: 130, render: (r) => display(r.displayName) },
+      {
+        key: 'displayName',
+        label: 'Display Name',
+        width: 130,
+        render: (r) => display(r.displayName),
+      },
       {
         key: 'status',
         label: 'Status',
@@ -246,8 +249,18 @@ export function DepositProvidersScreen() {
         width: 180,
         render: (r) => display(r.redirectionLink),
       },
-      { key: 'states', label: 'Blocked States', width: 180, render: (r) => display(r.stateNotAllowed) },
-      { key: 'cities', label: 'Blocked Cities', width: 180, render: (r) => display(r.cityNotAllowed) },
+      {
+        key: 'states',
+        label: 'Blocked States',
+        width: 180,
+        render: (r) => display(r.stateNotAllowed),
+      },
+      {
+        key: 'cities',
+        label: 'Blocked Cities',
+        width: 180,
+        render: (r) => display(r.cityNotAllowed),
+      },
       {
         key: 'stateUpdatedBy',
         label: 'State Updated By',
@@ -266,7 +279,9 @@ export function DepositProvidersScreen() {
         width: 160,
         render: (r) =>
           `${display(r.updatedBy?.userName)}${
-            r.updatedOn ? ` · ${formatDisplayDate(r.updatedOn)} ${formatDisplayTime(r.updatedOn)}` : ''
+            r.updatedOn
+              ? ` · ${formatDisplayDate(r.updatedOn)} ${formatDisplayTime(r.updatedOn)}`
+              : ''
           }`,
       },
       { key: 'order', label: 'Order', width: 70, align: 'center', render: (r) => display(r.order) },
@@ -377,7 +392,7 @@ export function DepositProvidersScreen() {
         },
       });
       sheetActions.push({
-        label: 'Add to list',
+        label: 'Manage list',
         onPress: () => {
           setListRow(sheetRow);
           setListKey('mid');
@@ -507,7 +522,10 @@ export function DepositProvidersScreen() {
         err = await run('depositProviders.updateBonusAndClients', {
           _id: listRow._id,
           cityNotAllowed: {
-            cities: value.split(',').map((s) => s.trim()).filter(Boolean),
+            cities: value
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean),
             action: 'add',
           },
           updatedBy,
@@ -516,7 +534,10 @@ export function DepositProvidersScreen() {
         err = await run('depositProviders.updateBonusAndClients', {
           _id: listRow._id,
           stateNotAllowed: {
-            states: value.split(',').map((s) => s.trim()).filter(Boolean),
+            states: value
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean),
             action: 'add',
           },
           updatedBy,
@@ -532,6 +553,35 @@ export function DepositProvidersScreen() {
       setBusy(false);
     }
   }, [listRow, listKey, inputValue, run, updatedBy]);
+
+  const submitListRemoveMid = useCallback(
+    async (mid: string) => {
+      if (!listRow?._id || !mid.trim()) return;
+      setBusy(true);
+      setModalMsg('');
+      try {
+        const err = await run('depositProviders.removeMidArray', {
+          _id: listRow._id,
+          midArray: [mid.trim()],
+          updatedBy,
+        });
+        if (err) {
+          setModalMsg(err);
+          return;
+        }
+        // Keep modal open but refresh the visible row from latest list after reload.
+        setListRow((prev) => {
+          if (!prev) return prev;
+          const next = (prev.midArray || []).filter((m) => String(m) !== mid.trim());
+          return { ...prev, midArray: next };
+        });
+        void load();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [listRow, run, updatedBy, load],
+  );
 
   const submitAmount = useCallback(async () => {
     if (!amountRow) return;
@@ -650,7 +700,10 @@ export function DepositProvidersScreen() {
             <Text style={styles.modalTitle} numberOfLines={1}>
               {title}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.modalClose}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -673,7 +726,11 @@ export function DepositProvidersScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Deposit Providers</Text>
@@ -828,7 +885,10 @@ export function DepositProvidersScreen() {
       />
 
       {/* Generic input modal (order / instant payout) */}
-      {renderModalShell(inputModal !== null, inputModal?.title || '', () => setInputModal(null), (
+      {renderModalShell(
+        inputModal !== null,
+        inputModal?.title || '',
+        () => setInputModal(null),
         <View>
           <TextInput
             style={styles.modalInput}
@@ -859,11 +919,14 @@ export function DepositProvidersScreen() {
             <Text style={styles.submitText}>{inputSaving ? 'Saving…' : 'Save'}</Text>
           </TouchableOpacity>
           {inputMsg ? <Text style={styles.modalMsg}>{inputMsg}</Text> : null}
-        </View>
-      ))}
+        </View>,
+      )}
 
       {/* Edit field modal */}
-      {renderModalShell(editRow !== null, `Edit field — ${editRow?.name || ''}`, () => setEditRow(null), (
+      {renderModalShell(
+        editRow !== null,
+        `Edit field — ${editRow?.name || ''}`,
+        () => setEditRow(null),
         <View>
           <View style={styles.chipsWrap}>
             {EDIT_FIELDS.map((f) => (
@@ -897,11 +960,14 @@ export function DepositProvidersScreen() {
           >
             <Text style={styles.submitText}>{busy ? 'Saving…' : 'Save'}</Text>
           </TouchableOpacity>
-        </View>
-      ))}
+        </View>,
+      )}
 
-      {/* Add-to-list modal */}
-      {renderModalShell(listRow !== null, `Add to list — ${listRow?.name || ''}`, () => setListRow(null), (
+      {/* Manage-list modal (add + remove MID) */}
+      {renderModalShell(
+        listRow !== null,
+        `Manage list — ${listRow?.name || ''}`,
+        () => setListRow(null),
         <View>
           <View style={styles.chipsWrap}>
             {LIST_FIELDS.map((f) => (
@@ -916,6 +982,58 @@ export function DepositProvidersScreen() {
               </TouchableOpacity>
             ))}
           </View>
+          {listKey === 'mid' && Array.isArray(listRow?.midArray) && listRow!.midArray!.length > 0 ? (
+            <View style={{ gap: spacing(1.5), marginTop: spacing(2) }}>
+              {listRow!.midArray!.map((mid) => {
+                const midStr = String(mid);
+                const isActive = String(listRow?.mid || '') === midStr;
+                return (
+                  <View key={midStr} style={styles.midRow}>
+                    <TouchableOpacity
+                      style={[styles.midEnableBtn, isActive && styles.midEnableBtnActive]}
+                      disabled={busy || isActive}
+                      onPress={() => {
+                        void (async () => {
+                          setBusy(true);
+                          setModalMsg('');
+                          try {
+                            const err = await run('depositProviders.updateMidNameLink', {
+                              _id: listRow!._id,
+                              mid: midStr,
+                            });
+                            if (err) {
+                              setModalMsg(err);
+                              return;
+                            }
+                            setListRow((prev) => (prev ? { ...prev, mid: midStr } : prev));
+                            void load();
+                          } finally {
+                            setBusy(false);
+                          }
+                        })();
+                      }}
+                    >
+                      <Text
+                        style={[styles.midEnableText, isActive && styles.midEnableTextActive]}
+                      >
+                        {isActive ? 'Active' : 'Enable'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.midDeleteBtn}
+                      disabled={busy}
+                      onPress={() => void submitListRemoveMid(midStr)}
+                    >
+                      <Text style={styles.midDeleteText}>Delete</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.midName} numberOfLines={2}>
+                      {midStr}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
           <TextInput
             style={styles.modalInput}
             value={inputValue}
@@ -923,7 +1041,9 @@ export function DepositProvidersScreen() {
             placeholder={
               listKey === 'city' || listKey === 'state'
                 ? 'Comma-separated values…'
-                : 'Value to add…'
+                : listKey === 'mid'
+                  ? 'MID to add…'
+                  : 'Value to add…'
             }
             placeholderTextColor={colors.muted}
             autoCapitalize="none"
@@ -936,54 +1056,53 @@ export function DepositProvidersScreen() {
           >
             <Text style={styles.submitText}>{busy ? 'Adding…' : 'Add'}</Text>
           </TouchableOpacity>
-        </View>
-      ))}
+          {modalMsg ? <Text style={styles.modalMsg}>{modalMsg}</Text> : null}
+        </View>,
+      )}
 
       {/* Amount modal */}
       {renderModalShell(
         amountRow !== null,
         `Update amount — ${amountRow?.name || ''}`,
         () => setAmountRow(null),
-        (
-          <View>
-            <View style={styles.chipsWrap}>
-              {['All', ...CLIENT_NAMES].map((name) => (
-                <TouchableOpacity
-                  key={name}
-                  style={[styles.chip, amountApp === name && styles.chipActive]}
-                  onPress={() => setAmountApp(name)}
-                >
-                  <Text style={[styles.chipText, amountApp === name && styles.chipTextActive]}>
-                    {name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              style={styles.modalInput}
-              value={minAmt}
-              onChangeText={setMinAmt}
-              placeholder="Min deposit…"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={maxAmt}
-              onChangeText={setMaxAmt}
-              placeholder="Max deposit…"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-            />
-            <TouchableOpacity
-              style={[styles.submitBtn, busy && styles.btnDisabled]}
-              disabled={busy}
-              onPress={() => void submitAmount()}
-            >
-              <Text style={styles.submitText}>{busy ? 'Updating…' : 'Update amount'}</Text>
-            </TouchableOpacity>
+        <View>
+          <View style={styles.chipsWrap}>
+            {['All', ...CLIENT_NAMES].map((name) => (
+              <TouchableOpacity
+                key={name}
+                style={[styles.chip, amountApp === name && styles.chipActive]}
+                onPress={() => setAmountApp(name)}
+              >
+                <Text style={[styles.chipText, amountApp === name && styles.chipTextActive]}>
+                  {name}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ),
+          <TextInput
+            style={styles.modalInput}
+            value={minAmt}
+            onChangeText={setMinAmt}
+            placeholder="Min deposit…"
+            placeholderTextColor={colors.muted}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={styles.modalInput}
+            value={maxAmt}
+            onChangeText={setMaxAmt}
+            placeholder="Max deposit…"
+            placeholderTextColor={colors.muted}
+            keyboardType="numeric"
+          />
+          <TouchableOpacity
+            style={[styles.submitBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => void submitAmount()}
+          >
+            <Text style={styles.submitText}>{busy ? 'Updating…' : 'Update amount'}</Text>
+          </TouchableOpacity>
+        </View>,
         { raise: true },
       )}
 
@@ -992,48 +1111,46 @@ export function DepositProvidersScreen() {
         bonusRow !== null,
         `Update bonus — ${bonusRow?.name || ''}`,
         () => setBonusRow(null),
-        (
-          <View>
-            <TextInput
-              style={styles.modalInput}
-              value={bonusPercent}
-              onChangeText={setBonusPercent}
-              placeholder="Bonus percentage…"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={bonusText}
-              onChangeText={setBonusText}
-              placeholder="Bonus text…"
-              placeholderTextColor={colors.muted}
-            />
-            <View style={styles.chipsWrap}>
-              {[
-                { label: 'Bonus On', value: true },
-                { label: 'Bonus Off', value: false },
-              ].map((o) => (
-                <TouchableOpacity
-                  key={o.label}
-                  style={[styles.chip, bonusStatus === o.value && styles.chipActive]}
-                  onPress={() => setBonusStatus(o.value)}
-                >
-                  <Text style={[styles.chipText, bonusStatus === o.value && styles.chipTextActive]}>
-                    {o.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity
-              style={[styles.submitBtn, busy && styles.btnDisabled]}
-              disabled={busy}
-              onPress={() => void submitBonus()}
-            >
-              <Text style={styles.submitText}>{busy ? 'Updating…' : 'Update bonus'}</Text>
-            </TouchableOpacity>
+        <View>
+          <TextInput
+            style={styles.modalInput}
+            value={bonusPercent}
+            onChangeText={setBonusPercent}
+            placeholder="Bonus percentage…"
+            placeholderTextColor={colors.muted}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={styles.modalInput}
+            value={bonusText}
+            onChangeText={setBonusText}
+            placeholder="Bonus text…"
+            placeholderTextColor={colors.muted}
+          />
+          <View style={styles.chipsWrap}>
+            {[
+              { label: 'Bonus On', value: true },
+              { label: 'Bonus Off', value: false },
+            ].map((o) => (
+              <TouchableOpacity
+                key={o.label}
+                style={[styles.chip, bonusStatus === o.value && styles.chipActive]}
+                onPress={() => setBonusStatus(o.value)}
+              >
+                <Text style={[styles.chipText, bonusStatus === o.value && styles.chipTextActive]}>
+                  {o.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ),
+          <TouchableOpacity
+            style={[styles.submitBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => void submitBonus()}
+          >
+            <Text style={styles.submitText}>{busy ? 'Updating…' : 'Update bonus'}</Text>
+          </TouchableOpacity>
+        </View>,
       )}
 
       {/* Add provider modal */}
@@ -1041,7 +1158,6 @@ export function DepositProvidersScreen() {
         addOpen,
         'Add deposit provider',
         () => setAddOpen(false),
-        (
         <View>
           {(
             [
@@ -1073,19 +1189,14 @@ export function DepositProvidersScreen() {
           >
             <Text style={styles.submitText}>{busy ? 'Adding…' : 'Add provider'}</Text>
           </TouchableOpacity>
-        </View>
-        ),
+        </View>,
         { raise: true },
       )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(3) },
   searchInput: {
     flex: 1,
@@ -1127,52 +1238,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
-  errorBox: {
+  removeChip: {
+    borderColor: 'rgba(239,68,68,0.45)',
     backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
+  removeChipText: { color: '#ef5350', fontSize: 12, fontWeight: '700' },
+  midRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
+    gap: spacing(2),
   },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
+  midEnableBtn: {
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.55)',
+    borderRadius: radius.md,
+    paddingVertical: spacing(1),
+    paddingHorizontal: spacing(2.5),
   },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
+  midEnableBtnActive: {
+    backgroundColor: 'rgba(34,197,94,0.2)',
+    borderColor: '#22c55e',
   },
+  midEnableText: { color: '#4ade80', fontSize: 11, fontWeight: '700' },
+  midEnableTextActive: { color: '#166534' },
+  midDeleteBtn: {
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.55)',
+    borderRadius: radius.md,
+    paddingVertical: spacing(1),
+    paddingHorizontal: spacing(2.5),
+  },
+  midDeleteText: { color: '#ef5350', fontSize: 11, fontWeight: '700' },
+  midName: { flex: 1, color: colors.foreground, fontSize: 12, fontWeight: '600' },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',
@@ -1183,32 +1281,7 @@ const styles = StyleSheet.create({
   },
   statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
   statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   backdropCentered: { justifyContent: 'center', padding: spacing(4) },
-  backdropTouch: { flex: 1 },
   backdropTouchFill: { ...StyleSheet.absoluteFillObject },
   modalSheet: {
     backgroundColor: colors.background,
@@ -1222,15 +1295,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md * 2,
     maxHeight: '82%',
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
-  },
-  modalClose: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -1241,14 +1305,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: spacing(2.5),
   },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  btnDisabled: { opacity: 0.5 },
   submitText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
-  modalMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
 });

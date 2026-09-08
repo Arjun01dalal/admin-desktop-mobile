@@ -38,7 +38,14 @@ type Props<Row> = {
   /** Extra controls under each phone card (e.g. Check / Cross Check). */
   renderCardFooter?: (row: Row, index: number) => React.ReactNode;
   /** Sheet actions when a compact card is tapped (e.g. Edit). */
-  getSheetActions?: (row: Row, index: number) => { label: string; onPress: () => void; tone?: 'primary' | 'warning' | 'danger' | 'default' }[];
+  getSheetActions?: (
+    row: Row,
+    index: number,
+  ) => {
+    label: string;
+    onPress: () => void;
+    tone?: 'primary' | 'warning' | 'danger' | 'default';
+  }[];
   /** Always use cards, even on tablet. */
   forceCards?: boolean;
   /**
@@ -221,10 +228,7 @@ function CardList<Row>({
               </View>
               {badge ? (
                 <View
-                  style={[
-                    styles.statusPill,
-                    badge.color ? { backgroundColor: badge.color } : null,
-                  ]}
+                  style={[styles.statusPill, badge.color ? { backgroundColor: badge.color } : null]}
                 >
                   <Text style={styles.statusPillText} numberOfLines={1}>
                     {toDisplayText(badge.text)}

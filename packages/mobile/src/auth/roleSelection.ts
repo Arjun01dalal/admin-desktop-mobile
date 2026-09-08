@@ -31,11 +31,7 @@ function extractResponsibilities(data: unknown): string[] {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const object = value as Record<string, unknown>;
     value =
-      object.payload ??
-      object.Responsibilities ??
-      object.responsibilities ??
-      object.data ??
-      value;
+      object.payload ?? object.Responsibilities ?? object.responsibilities ?? object.data ?? value;
   }
   return Array.isArray(value) ? value.map(responsibilityName).filter(Boolean) : [];
 }
@@ -50,7 +46,7 @@ async function resolveResponsibilityEnums(keys: string[]): Promise<string[]> {
     const list = Array.isArray(res.data)
       ? res.data
       : Array.isArray((res.data as { payload?: unknown } | null)?.payload)
-        ? ((res.data as { payload: unknown[] }).payload)
+        ? (res.data as { payload: unknown[] }).payload
         : [];
     const idToEnum: Record<string, string> = {};
     for (const item of list) {
@@ -65,9 +61,7 @@ async function resolveResponsibilityEnums(keys: string[]): Promise<string[]> {
         (typeof row.name === 'string' && row.name);
       if (enumKey) idToEnum[id] = enumKey;
     }
-    return keys
-      .map((key) => (isMongoObjectId(key) ? idToEnum[key] || key : key))
-      .filter(Boolean);
+    return keys.map((key) => (isMongoObjectId(key) ? idToEnum[key] || key : key)).filter(Boolean);
   } catch {
     return keys;
   }

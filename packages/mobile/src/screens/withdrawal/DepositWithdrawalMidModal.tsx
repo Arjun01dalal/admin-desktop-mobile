@@ -2,14 +2,7 @@
  * Choose MID for Withdrawal — mobile port of desktop DepositWithdrawalMidModal.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   buildDepositWithdrawalReportRequest,
   filterWithdrawalRoutingMidRows,
@@ -146,7 +139,10 @@ export function DepositWithdrawalMidModal({ open, row, catalogMids, onClose }: P
                 </View>
                 {routingRows.map((item) => (
                   <View key={item.mid} style={styles.tableRow}>
-                    <Text style={[styles.bodyCell, styles.midCol, styles.midText]} numberOfLines={2}>
+                    <Text
+                      style={[styles.bodyCell, styles.midCol, styles.midText]}
+                      numberOfLines={2}
+                    >
                       {display(item.mid)}
                     </Text>
                     <Text style={[styles.bodyCell, styles.amountCol]}>—</Text>

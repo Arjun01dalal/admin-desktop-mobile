@@ -4,34 +4,33 @@
  * Lists deposit transactions (deposits.transactions, type 'deposit') as cards
  * instead of a table. Each card shows user name, amount, payment method,
  * mobile, app name and status, plus an Approve button for pending rows
- * (deposits.updateStatus → status 'Approved'). Tapping a card opens the full
- * detail sheet with every field.
+ * (deposits.updateStatus → status 'Approved'). Pending rows with
+ * whatsapp_icon show WhatsApp / Telegram buttons inside the detail sheet
+ * (Laxmi parity). Tapping a card opens the full detail sheet with every field.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { makeStyles } from '../../../styles/common';
+import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import {
-  getCachedEmpCodeNameMap,
-  getEmpCodeNameMap,
-} from '../../../utils/empCodeNameCache';
+import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '../../../utils/empCodeNameCache';
 import * as ImagePicker from 'expo-image-picker';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -177,15 +176,75 @@ function formatDateTime(value?: string | number): string {
   return [d, t].filter(Boolean).join(' ') || '—';
 }
 
+function formatPhone(raw?: string): string {
+  let n = String(raw || '').replace(/\D/g, '');
+  if (n.length === 10) n = `91${n}`;
+  return n;
+}
+
+/** State-aware WhatsApp greeting (Laxmi / desktop DepositCells parity). */
+function whatsAppMessage(row: DepositRow): string {
+  const state = row.userState || row.state || '';
+  const client = row.clientName || '';
+  const template =
+    state === 'Karnataka'
+      ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nನೀವು ಠೇವಣಿ ಮಾಡಲು ಪ್ರಯತ್ನಿಸುತ್ತಿರುವಿರಿ ಎಂದು ಕಾಣುತ್ತದೆ. ನಾನು ಇಂದು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?`
+      : ['Telangana', 'Andhra Pradesh'].includes(state)
+        ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nమీరు డిపాజిట్ చేయడానికి ప్రయత్నిస్తున్నారని నేను చూస్తున్నాను. నేను ఈ రోజు మీకు ఎలా సహాయం చేయగలను?`
+        : ['Tamil Nadu', 'Tiruchirappalli'].includes(state)
+          ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nநீங்கள் டெப்பாசிட் செய்ய முயற்சிக்கிறீர்கள் என்று பார்க்கிறேன். இன்று நான் உங்களுக்கு எப்படி உதவலாம்?`
+          : `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nI see you're trying to make a deposit. How can I assist you today?`;
+  return template.replace('{USER_NAME}', (row.userName || '').split(' ')[0] || '');
+}
+
+async function openWhatsApp(row: DepositRow): Promise<void> {
+  const raw = row.userMobile || row.mobile;
+  if (!raw) {
+    Alert.alert('No mobile number for this user');
+    return;
+  }
+  const formatted = formatPhone(raw);
+  const encoded = encodeURIComponent(whatsAppMessage(row));
+  const appUrl = `whatsapp://send?phone=${formatted}&text=${encoded}`;
+  const webUrl = `https://wa.me/${formatted}?text=${encoded}`;
+  try {
+    await Linking.openURL(appUrl);
+  } catch {
+    try {
+      await Linking.openURL(webUrl);
+    } catch {
+      Alert.alert('Unable to open WhatsApp');
+    }
+  }
+}
+
+async function openTelegram(row: DepositRow): Promise<void> {
+  const raw = row.userMobile || row.mobile;
+  if (!raw) {
+    Alert.alert('No mobile number for this user');
+    return;
+  }
+  const formatted = formatPhone(raw);
+  const appUrl = `tg://resolve?phone=${formatted}`;
+  const webUrl = `https://t.me/+${formatted}`;
+  try {
+    await Linking.openURL(appUrl);
+  } catch {
+    try {
+      await Linking.openURL(webUrl);
+    } catch {
+      Alert.alert('Unable to open Telegram');
+    }
+  }
+}
+
 export function DepositScreen() {
   const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   const canShowMobile = hasPermission('show_mobile');
+  const canWhatsApp = hasPermission('whatsapp_icon');
   const canPencil = hasPermission('Deposit_Pensil');
   // Read once — getSessionUser returns a fresh object each call.
-  const admin = useMemo(
-    () => getSessionUser() as { _id?: string; name?: string } | null,
-    [],
-  );
+  const admin = useMemo(() => getSessionUser() as { _id?: string; name?: string } | null, []);
 
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
@@ -237,8 +296,8 @@ export function DepositScreen() {
   const [secRow, setSecRow] = useState<DepositRow | null>(null);
   const [secName, setSecName] = useState('');
   const [secSaving, setSecSaving] = useState(false);
-  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(
-    () => getCachedEmpCodeNameMap(),
+  const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
+    getCachedEmpCodeNameMap(),
   );
 
   useEffect(() => {
@@ -261,11 +320,7 @@ export function DepositScreen() {
         : Array.isArray(body.items)
           ? (body.items as { mid?: string | number }[])
           : asList<{ mid?: string | number }>(res.data);
-      setMids(
-        list
-          .filter((m) => m && m.mid != null && m.mid !== '')
-          .map((m) => String(m.mid)),
-      );
+      setMids(list.filter((m) => m && m.mid != null && m.mid !== '').map((m) => String(m.mid)));
     })();
   }, []);
 
@@ -373,69 +428,72 @@ export function DepositScreen() {
     [admin, load],
   );
 
-  const submitSettle = useCallback((utrOverride?: string) => {
-    const row = settleRow;
-    if (!row?.orderId || !row.userId) {
-      Alert.alert('Missing order / user');
-      return;
-    }
-    const utrValue = (utrOverride ?? sUtr).trim();
-    if (!utrValue) {
-      Alert.alert('Please enter UTR No');
-      return;
-    }
-    if (utrValue.length <= 10) {
-      Alert.alert('UTR No length should be more than 10 characters');
-      return;
-    }
-    if (!sReason.trim()) {
-      Alert.alert('Select reason');
-      return;
-    }
-    void (async () => {
-      setSaving(true);
-      try {
-        if (sGateway && sGateway !== row.paymentGatewayName) {
-          const gwRes = await secureApi<unknown>('deposits.updateGatewayName', {
-            _id: row._id,
-            paymentGatewayName: sGateway,
-          });
-          if (!gwRes.ok || gwRes.success === false) {
-            Alert.alert(gwRes.message || 'Failed to update payment gateway name');
+  const submitSettle = useCallback(
+    (utrOverride?: string) => {
+      const row = settleRow;
+      if (!row?.orderId || !row.userId) {
+        Alert.alert('Missing order / user');
+        return;
+      }
+      const utrValue = (utrOverride ?? sUtr).trim();
+      if (!utrValue) {
+        Alert.alert('Please enter UTR No');
+        return;
+      }
+      if (utrValue.length <= 10) {
+        Alert.alert('UTR No length should be more than 10 characters');
+        return;
+      }
+      if (!sReason.trim()) {
+        Alert.alert('Select reason');
+        return;
+      }
+      void (async () => {
+        setSaving(true);
+        try {
+          if (sGateway && sGateway !== row.paymentGatewayName) {
+            const gwRes = await secureApi<unknown>('deposits.updateGatewayName', {
+              _id: row._id,
+              paymentGatewayName: sGateway,
+            });
+            if (!gwRes.ok || gwRes.success === false) {
+              Alert.alert(gwRes.message || 'Failed to update payment gateway name');
+              return;
+            }
+          }
+          const payload: Record<string, unknown> = {
+            userId: row.userId,
+            balance: Number(sAmount) || row.amount,
+            updatedBy: { name: admin?.name || '', _id: admin?._id || '' },
+            reason: sReason.trim(),
+            remark: `Deposit failure of ${row.userName || ''} through ${sGateway || row.paymentGatewayName || ''} pay with order id ${row.orderId} and mobile no ${row.userMobile || row.mobile || ''}`,
+            tag: 'credit',
+            orderId: row.orderId,
+            mid: sMid || row.mid,
+            paymentDate: sDate,
+            utr: utrValue,
+          };
+          if (sReason.startsWith('manual-deposit-')) {
+            payload.type = 'paymentGatewayManualDeposit';
+          }
+          const action = isUpiGateway(row.paymentGatewayName)
+            ? 'upiPayments.addCoin'
+            : 'deposits.addCoin';
+          const res = await secureApi<unknown>(action, payload);
+          if (!res.ok || res.success === false) {
+            Alert.alert(res.message || 'Settle failed');
             return;
           }
+          Alert.alert(res.message || 'Settled successfully');
+          setSettleRow(null);
+          void load();
+        } finally {
+          setSaving(false);
         }
-        const payload: Record<string, unknown> = {
-          userId: row.userId,
-          balance: Number(sAmount) || row.amount,
-          updatedBy: { name: admin?.name || '', _id: admin?._id || '' },
-          reason: sReason.trim(),
-          remark: `Deposit failure of ${row.userName || ''} through ${sGateway || row.paymentGatewayName || ''} pay with order id ${row.orderId} and mobile no ${row.userMobile || row.mobile || ''}`,
-          tag: 'credit',
-          orderId: row.orderId,
-          mid: sMid || row.mid,
-          paymentDate: sDate,
-          utr: utrValue,
-        };
-        if (sReason.startsWith('manual-deposit-')) {
-          payload.type = 'paymentGatewayManualDeposit';
-        }
-        const action = isUpiGateway(row.paymentGatewayName)
-          ? 'upiPayments.addCoin'
-          : 'deposits.addCoin';
-        const res = await secureApi<unknown>(action, payload);
-        if (!res.ok || res.success === false) {
-          Alert.alert(res.message || 'Settle failed');
-          return;
-        }
-        Alert.alert(res.message || 'Settled successfully');
-        setSettleRow(null);
-        void load();
-      } finally {
-        setSaving(false);
-      }
-    })();
-  }, [settleRow, sUtr, sReason, sGateway, sAmount, sMid, sDate, admin, load]);
+      })();
+    },
+    [settleRow, sUtr, sReason, sGateway, sAmount, sMid, sDate, admin, load],
+  );
 
   // Upload slip photo → OCR (WebView tesseract) → extract UTR → auto submit.
   const pickSlip = useCallback(async () => {
@@ -548,9 +606,10 @@ export function DepositScreen() {
       { label: 'Reason', value: display(r.reason), multiline: true },
       {
         label: 'Secondary Names',
-        value: Array.isArray(r.oldMultipleNames) && r.oldMultipleNames.length
-          ? r.oldMultipleNames.join(', ')
-          : '—',
+        value:
+          Array.isArray(r.oldMultipleNames) && r.oldMultipleNames.length
+            ? r.oldMultipleNames.join(', ')
+            : '—',
         multiline: true,
       },
       { label: 'Created', value: formatDateTime(r.createdOn) },
@@ -592,6 +651,7 @@ export function DepositScreen() {
         onPress: () => openUserDetails(sheetRow),
       },
     ];
+    const pending = String(sheetRow.status || '').toLowerCase() === 'pending';
     if (canShowCheckAction(sheetRow, canPencil)) {
       if (!sheetRow.checkBy) {
         acts.push({
@@ -627,7 +687,7 @@ export function DepositScreen() {
           },
         },
       );
-    } else if (String(sheetRow.status || '').toLowerCase() === 'pending') {
+    } else if (pending) {
       acts.push({
         label: 'Add Secondary Name',
         tone: 'default',
@@ -639,7 +699,43 @@ export function DepositScreen() {
       });
     }
     return acts;
-  }, [sheetRow, openSettle, openUserDetails, canPencil, checkingId, markChecked]);
+  }, [
+    sheetRow,
+    openSettle,
+    openUserDetails,
+    canPencil,
+    checkingId,
+    markChecked,
+  ]);
+
+  const sheetChatFooter = useMemo(() => {
+    if (!sheetRow) return null;
+    const pending = String(sheetRow.status || '').toLowerCase() === 'pending';
+    if (!canWhatsApp || !canShowMobile || !pending) return null;
+    if (!(sheetRow.userMobile || sheetRow.mobile)) return null;
+    return (
+      <View style={styles.sheetChatRow}>
+        <TouchableOpacity
+          style={[styles.sheetChatIconBtn, styles.sheetChatWa]}
+          onPress={() => void openWhatsApp(sheetRow)}
+          activeOpacity={0.8}
+          accessibilityLabel="Open WhatsApp"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <FontAwesome5 name="whatsapp" size={22} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sheetChatIconBtn, styles.sheetChatTg]}
+          onPress={() => void openTelegram(sheetRow)}
+          activeOpacity={0.8}
+          accessibilityLabel="Open Telegram"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <FontAwesome5 name="telegram-plane" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    );
+  }, [sheetRow, canWhatsApp, canShowMobile]);
 
   return (
     <ScrollView
@@ -647,7 +743,11 @@ export function DepositScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>Deposit</Text>
@@ -681,7 +781,11 @@ export function DepositScreen() {
         onSearchSubmit={search}
       />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipsRow}
+      >
         <Text style={styles.chipsLabel}>Status</Text>
         {STATUS_OPTIONS.map((s) => (
           <TouchableOpacity
@@ -705,9 +809,7 @@ export function DepositScreen() {
         </View>
       ) : null}
 
-      {!loading && !rows.length ? (
-        <Text style={styles.empty}>No deposits found</Text>
-      ) : null}
+      {!loading && !rows.length ? <Text style={styles.empty}>No deposits found</Text> : null}
 
       {rows.map((r, i) => {
         const pending = String(r.status || '').toLowerCase() === 'pending';
@@ -798,7 +900,10 @@ export function DepositScreen() {
                   </Text>
                 ) : (
                   <TouchableOpacity
-                    style={[styles.checkBtn, checkingId === `${r.orderId}-first` && styles.btnDisabled]}
+                    style={[
+                      styles.checkBtn,
+                      checkingId === `${r.orderId}-first` && styles.btnDisabled,
+                    ]}
                     disabled={!!checkingId}
                     onPress={() => void markChecked(r, 'first')}
                   >
@@ -813,7 +918,10 @@ export function DepositScreen() {
                   </Text>
                 ) : (
                   <TouchableOpacity
-                    style={[styles.checkBtn, checkingId === `${r.orderId}-second` && styles.btnDisabled]}
+                    style={[
+                      styles.checkBtn,
+                      checkingId === `${r.orderId}-second` && styles.btnDisabled,
+                    ]}
                     disabled={!!checkingId}
                     onPress={() => void markChecked(r, 'second')}
                   >
@@ -855,6 +963,7 @@ export function DepositScreen() {
         title={sheetRow ? display(sheetRow.userName) : ''}
         fields={sheetFields}
         actions={sheetActions}
+        footer={sheetChatFooter}
         onClose={() => setSheetRow(null)}
       />
 
@@ -870,10 +979,7 @@ export function DepositScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.modalCard}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>Manual Settle Transaction</Text>
               <Text style={styles.modalSub}>
                 {display(settleRow?.userName)} · {display(settleRow?.orderId)}
@@ -969,11 +1075,7 @@ export function DepositScreen() {
               ) : null}
 
               <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  disabled={saving}
-                  onPress={closeSettle}
-                >
+                <TouchableOpacity style={styles.cancelBtn} disabled={saving} onPress={closeSettle}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1003,9 +1105,7 @@ export function DepositScreen() {
               {display(secRow?.userName)} · {display(secRow?.orderId)}
             </Text>
             {Array.isArray(secRow?.oldMultipleNames) && secRow.oldMultipleNames.length ? (
-              <Text style={styles.modalNote}>
-                Existing: {secRow.oldMultipleNames.join(', ')}
-              </Text>
+              <Text style={styles.modalNote}>Existing: {secRow.oldMultipleNames.join(', ')}</Text>
             ) : null}
             <Text style={styles.fieldLabel}>Secondary user name</Text>
             <TextInput
@@ -1042,11 +1142,7 @@ export function DepositScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
+const styles = makeStyles({
   chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
   chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   chip: {
@@ -1057,9 +1153,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   errorBox: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -1079,7 +1173,13 @@ const styles = StyleSheet.create({
     marginTop: spacing(2),
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardName: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, marginRight: spacing(2) },
+  cardName: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: spacing(2),
+  },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), flexShrink: 0 },
   statusPill: {
     backgroundColor: colors.surfaceAlt,
@@ -1102,6 +1202,21 @@ const styles = StyleSheet.create({
   cardLabel: { color: colors.muted, fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
   cardValue: { color: colors.foreground, fontSize: 12, marginTop: 1 },
   cardEmpName: { color: colors.muted, fontSize: 10, fontWeight: '500', marginTop: 1 },
+  sheetChatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginBottom: spacing(3),
+  },
+  sheetChatIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetChatWa: { backgroundColor: '#25D366' },
+  sheetChatTg: { backgroundColor: '#2AABEE' },
   appRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1149,7 +1264,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: spacing(1.25),
   },
-  btnDisabled: { opacity: 0.5 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1232,6 +1346,5 @@ const styles = StyleSheet.create({
     marginTop: spacing(4),
   },
   pagerBtn: { color: colors.primary, fontSize: 13, fontWeight: '700', padding: spacing(2) },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
   pagerLabel: { color: colors.foreground, fontSize: 12 },
 });

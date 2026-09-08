@@ -3,14 +3,7 @@
  * Renders the live-score and live-stream pages in WebViews (iframes on web).
  */
 import React from 'react';
-import {
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { colors, radius, spacing } from '../../theme';
 
@@ -53,20 +46,12 @@ export function LiveStreamModal({ open, onClose, streamId }: Props) {
   const scoreUrl = `https://aaa.aaryapaar.exchange/sports/exchange/live-score/${id}`;
 
   return (
-    <Modal
-      visible={open}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>Live Match</Text>
-            <TouchableOpacity
-              onPress={onClose}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={styles.close}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -78,9 +63,7 @@ export function LiveStreamModal({ open, onClose, streamId }: Props) {
               <StreamFrame uri={streamUrl} title="Live Stream" />
             ) : (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>
-                  No stream available for this match.
-                </Text>
+                <Text style={styles.emptyText}>No stream available for this match.</Text>
               </View>
             )}
           </View>

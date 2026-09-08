@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { DateField } from '../../../components/DateField';
@@ -415,10 +416,7 @@ export function AAAFraudBetReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
+const styles = makeStyles({
   sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1), marginBottom: spacing(3) },
   filterCard: {
     backgroundColor: colors.surface,
@@ -456,9 +454,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
     backgroundColor: colors.surfaceAlt,
   },
-  chipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
   chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   actionRow: { flexDirection: 'row', marginTop: spacing(1) },
   btn: {
     backgroundColor: colors.primary,

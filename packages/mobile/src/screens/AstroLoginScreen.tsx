@@ -17,10 +17,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  SITE_ACCESS_TOKEN_KEY,
-  siteLoginViaPassword,
-} from '../api/astroSiteAuth';
+import { siteLoginViaPassword } from '../api/astroSiteAuth';
 import { AppBackground } from '../components/AppBackground';
 import { Button, Card, ErrorBanner, Input } from '../components/UI';
 import { colors, spacing, radius } from '../theme';
@@ -135,11 +132,8 @@ export function AstroLoginScreen({
         return;
       }
 
-      try {
-        await AsyncStorage.setItem(SITE_ACCESS_TOKEN_KEY, res.accessToken);
-      } catch {
-        /* ignore */
-      }
+      // Keep the customer SSO token only in the in-memory AppRoot state.
+      // It must not be persisted in ordinary app storage.
       onOpenAstroSite(res.accessToken);
     } finally {
       setBusy(false);

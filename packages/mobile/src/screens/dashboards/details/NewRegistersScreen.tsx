@@ -11,12 +11,12 @@ import {
   Modal,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
@@ -43,11 +43,7 @@ import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDia
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
-import {
-  DetailFilterBar,
-  type SearchFieldKey,
-  type SearchFieldOption,
-} from './DetailFilterBar';
+import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 
 /** Search fields mirroring desktop NewRegistersPage per-column filters (filter keys match).
@@ -120,11 +116,7 @@ type RegistrationCallLog = {
 };
 
 function registrationComments(row: Row): RegistrationComment[] {
-  const raw =
-    row.newRegistrationComments ||
-    row.registrationComments ||
-    row.comments ||
-    [];
+  const raw = row.newRegistrationComments || row.registrationComments || row.comments || [];
   return Array.isArray(raw) ? (raw as RegistrationComment[]) : [];
 }
 
@@ -282,7 +274,11 @@ export function NewRegistersScreen() {
       // Only send `app` when it actually restricts something — an empty
       // array/string makes the server match no apps and return 0 records.
       const adminApp = admin?.clientName || admin?.allotedApps;
-      if (Array.isArray(adminApp) ? adminApp.length > 0 : typeof adminApp === 'string' && adminApp.trim()) {
+      if (
+        Array.isArray(adminApp)
+          ? adminApp.length > 0
+          : typeof adminApp === 'string' && adminApp.trim()
+      ) {
         payload.app = adminApp;
       }
 
@@ -401,8 +397,9 @@ export function NewRegistersScreen() {
       setDialerMsg('No users to send');
       return;
     }
-    const campaign = campaignOptions.find((c) => c.id.trim() === campaignId.trim())
-      ?? CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
+    const campaign =
+      campaignOptions.find((c) => c.id.trim() === campaignId.trim()) ??
+      CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
     setPushing(true);
     try {
       const res = await addToDialerBatch({
@@ -496,7 +493,12 @@ export function NewRegistersScreen() {
 
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const cols: DataTableColumn<Row>[] = [
-      { key: 'idx', label: '#', width: 44, render: (_r, i) => String((page - 1) * pageSize + i + 1) },
+      {
+        key: 'idx',
+        label: '#',
+        width: 44,
+        render: (_r, i) => String((page - 1) * pageSize + i + 1),
+      },
       { key: 'name', label: 'Name', width: 120, render: (r) => display(r.name) },
       { key: 'dpId', label: 'DP ID', width: 150, render: (r) => display(r._id) },
       {
@@ -516,13 +518,28 @@ export function NewRegistersScreen() {
         },
       },
       { key: 'spacer', label: '', width: 20, render: () => '' },
-      { key: 'lastActivity', label: 'Last Activity', width: 150, render: (r) => pickLastActivity(r) },
+      {
+        key: 'lastActivity',
+        label: 'Last Activity',
+        width: 150,
+        render: (r) => pickLastActivity(r),
+      },
     ];
     if (!hideContact) {
-      cols.push({ key: 'userBankName', label: 'User Bank Name', width: 130, render: (r) => pickUserBankName(r) });
+      cols.push({
+        key: 'userBankName',
+        label: 'User Bank Name',
+        width: 130,
+        render: (r) => pickUserBankName(r),
+      });
     }
     cols.push(
-      { key: 'appName', label: 'App Code', width: 70, render: (r) => appCodeForName(pickAppName(r)) },
+      {
+        key: 'appName',
+        label: 'App Code',
+        width: 70,
+        render: (r) => appCodeForName(pickAppName(r)),
+      },
       { key: 'playIn', label: 'In', width: 90, render: (r) => pickPlayIn(r) },
       {
         key: 'encryptedDpId',
@@ -533,11 +550,36 @@ export function NewRegistersScreen() {
     );
     if (!hideContact) {
       cols.push(
-        { key: 'mobile', label: 'Mobile Phone', width: 100, render: (r) => maskMobile(r.mobile, canShowMobile) },
-        { key: 'kyc', label: 'Kyc', width: 70, render: (r) => (r.kyc === true ? 'Done' : 'Not Done') },
-        { key: 'accountNumber', label: 'Account Number', width: 130, render: (r) => pickAccountNumber(r) },
-        { key: 'aadharNumber', label: 'Aadhar Number', width: 120, render: (r) => pickAadharNumber(r) },
-        { key: 'email', label: 'Email', width: 160, render: (r) => (canShowMobile ? display(r.email) : '**********') },
+        {
+          key: 'mobile',
+          label: 'Mobile Phone',
+          width: 100,
+          render: (r) => maskMobile(r.mobile, canShowMobile),
+        },
+        {
+          key: 'kyc',
+          label: 'Kyc',
+          width: 70,
+          render: (r) => (r.kyc === true ? 'Done' : 'Not Done'),
+        },
+        {
+          key: 'accountNumber',
+          label: 'Account Number',
+          width: 130,
+          render: (r) => pickAccountNumber(r),
+        },
+        {
+          key: 'aadharNumber',
+          label: 'Aadhar Number',
+          width: 120,
+          render: (r) => pickAadharNumber(r),
+        },
+        {
+          key: 'email',
+          label: 'Email',
+          width: 160,
+          render: (r) => (canShowMobile ? display(r.email) : '**********'),
+        },
       );
     }
     cols.push(
@@ -546,21 +588,61 @@ export function NewRegistersScreen() {
     );
     if (!hideContact) {
       cols.push(
-        { key: 'previousCallerName', label: 'Previous Caller Name', width: 130, render: (r) => nestedName(r.previousCaller) },
-        { key: 'previousCallerDpId', label: 'Previous Caller Dp_ID', width: 150, render: (r) => nestedDpId(r.previousCaller) },
+        {
+          key: 'previousCallerName',
+          label: 'Previous Caller Name',
+          width: 130,
+          render: (r) => nestedName(r.previousCaller),
+        },
+        {
+          key: 'previousCallerDpId',
+          label: 'Previous Caller Dp_ID',
+          width: 150,
+          render: (r) => nestedDpId(r.previousCaller),
+        },
       );
     }
-    cols.push({ key: 'empCode', label: 'Employee Code', width: 100, render: (r) => String(r.empCode || '-') });
+    cols.push({
+      key: 'empCode',
+      label: 'Employee Code',
+      width: 100,
+      render: (r) => String(r.empCode || '-'),
+    });
     if (!hideContact) {
       cols.push(
-        { key: 'currentCaller', label: 'Current Caller', width: 120, render: (r) => nestedName(r.currentCaller) },
-        { key: 'referredCode', label: 'Referred Referral Code', width: 140, render: (r) => String(r.referredCode || '-') },
-        { key: 'referralCode', label: 'Referral Code', width: 110, render: (r) => String(r.referralCodeUser || '-') },
+        {
+          key: 'currentCaller',
+          label: 'Current Caller',
+          width: 120,
+          render: (r) => nestedName(r.currentCaller),
+        },
+        {
+          key: 'referredCode',
+          label: 'Referred Referral Code',
+          width: 140,
+          render: (r) => String(r.referredCode || '-'),
+        },
+        {
+          key: 'referralCode',
+          label: 'Referral Code',
+          width: 110,
+          render: (r) => String(r.referralCodeUser || '-'),
+        },
       );
     }
     cols.push(
-      { key: 'deviceType', label: 'Device Type', width: 90, render: (r) => String(r.deviceType || '-') },
-      { key: 'playerAppVersion', label: 'User App Version', width: 110, render: (r) => String(r.currentAppVersion || '-') },
+      {
+        key: 'deviceType',
+        label: 'Device Type',
+        width: 90,
+        render: (r) => String(r.deviceType || '-'),
+      },
+      {
+        key: 'playerAppVersion',
+        label: 'User App Version',
+        width: 110,
+        render: (r) => String(r.currentAppVersion || '-'),
+      },
       {
         key: 'appVersion',
         label: 'App Version',
@@ -589,8 +671,18 @@ export function NewRegistersScreen() {
     );
     if (!hideContact) {
       cols.push(
-        { key: 'blockReason', label: 'Block User Reason', width: 140, render: (r) => String(r.blockUserReason || '-') },
-        { key: 'aadharAddress', label: 'Aadhar Address', width: 220, render: (r) => formatAadharAddress(r) },
+        {
+          key: 'blockReason',
+          label: 'Block User Reason',
+          width: 140,
+          render: (r) => String(r.blockUserReason || '-'),
+        },
+        {
+          key: 'aadharAddress',
+          label: 'Aadhar Address',
+          width: 220,
+          render: (r) => formatAadharAddress(r),
+        },
       );
     }
     return cols;
@@ -602,7 +694,11 @@ export function NewRegistersScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={colors.primary}
+        />
       }
     >
       <Text style={styles.title}>New Registration</Text>
@@ -665,7 +761,9 @@ export function NewRegistersScreen() {
               setPage(1);
             }}
           >
-            <Text style={[styles.chipText, activeFilter === opt && styles.chipTextActive]}>{opt}</Text>
+            <Text style={[styles.chipText, activeFilter === opt && styles.chipTextActive]}>
+              {opt}
+            </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity
@@ -675,7 +773,9 @@ export function NewRegistersScreen() {
             setPage(1);
           }}
         >
-          <Text style={[styles.chipText, nonPerforming && styles.chipTextActive]}>Non-Performing</Text>
+          <Text style={[styles.chipText, nonPerforming && styles.chipTextActive]}>
+            Non-Performing
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.chip, otherState && styles.chipActive]}
@@ -690,7 +790,9 @@ export function NewRegistersScreen() {
           style={[styles.chip, showEmpty && styles.chipActive]}
           onPress={() => setShowEmpty((v) => !v)}
         >
-          <Text style={[styles.chipText, showEmpty && styles.chipTextActive]}>Show Empty Record</Text>
+          <Text style={[styles.chipText, showEmpty && styles.chipTextActive]}>
+            Show Empty Record
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -720,7 +822,8 @@ export function NewRegistersScreen() {
                     onPress={() => setCampaignId(campaignId === id ? '' : id)}
                   >
                     <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
-                      {id}{c.name && c.name !== id ? ` · ${c.name}` : ''}
+                      {id}
+                      {c.name && c.name !== id ? ` · ${c.name}` : ''}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -731,7 +834,10 @@ export function NewRegistersScreen() {
             Sends all {rows.length} users shown below to the selected campaign.
           </Text>
           <TouchableOpacity
-            style={[styles.dialerBtn, (pushing || !rows.length || !campaignId) && styles.dialerBtnDisabled]}
+            style={[
+              styles.dialerBtn,
+              (pushing || !rows.length || !campaignId) && styles.dialerBtnDisabled,
+            ]}
             onPress={() => void addToDialer()}
             disabled={pushing || !rows.length || !campaignId}
           >
@@ -859,9 +965,7 @@ export function NewRegistersScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Add Comment</Text>
-            {commentUserName ? (
-              <Text style={styles.modalSub}>{commentUserName}</Text>
-            ) : null}
+            {commentUserName ? <Text style={styles.modalSub}>{commentUserName}</Text> : null}
             <TextInput
               style={styles.commentInput}
               value={commentInput}
@@ -957,10 +1061,7 @@ export function NewRegistersScreen() {
                 ))
               )}
             </ScrollView>
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setViewLogsOpen(false)}
-            >
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setViewLogsOpen(false)}>
               <Text style={styles.modalCloseBtnText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -988,83 +1089,13 @@ export function NewRegistersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700' },
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 13 },
-  hint: { color: colors.muted, marginTop: spacing(3), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(3) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginBottom: spacing(1),
-  },
-  cardIndex: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '800',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
+const styles = makeStyles({
   cardApp: {
     color: colors.primary,
     fontSize: 11,
     fontWeight: '700',
     flexShrink: 0,
   },
-  cardSplitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-  cardSplitLeft: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'left',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '48%',
-    textAlign: 'right',
-  },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1) },
   quickRow: { marginTop: spacing(3), flexGrow: 0 },
   chip: {
     backgroundColor: colors.surface,
@@ -1075,9 +1106,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     marginRight: spacing(2),
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primaryForeground },
   dialerHeader: { marginTop: spacing(3) },
   dialerHeaderText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   dialerCard: {
@@ -1100,21 +1129,6 @@ const styles = StyleSheet.create({
   dialerBtnDisabled: { opacity: 0.5 },
   dialerBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
   dialerMsg: { color: colors.foreground, fontSize: 12, marginTop: spacing(2), textAlign: 'center' },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(4),
-  },
-  pagerBtn: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-  },
-  pagerDisabled: { color: colors.muted, opacity: 0.5 },
-  pagerLabel: { color: colors.muted, fontSize: 13 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

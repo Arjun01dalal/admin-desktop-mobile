@@ -73,7 +73,10 @@ export function pickPlayIn(row: UserRow): string {
   if (raw === true) return 'Yes';
   if (raw === false) return 'No';
   if (Array.isArray(raw)) {
-    const joined = raw.map((v) => String(v).trim()).filter(Boolean).join(', ');
+    const joined = raw
+      .map((v) => String(v).trim())
+      .filter(Boolean)
+      .join(', ');
     return joined || '-';
   }
   const text = raw == null ? '' : String(raw).trim();
@@ -164,12 +167,7 @@ export function pickBalance(row: UserRow): number | null {
     rec.availableBalance,
     rec.userBalance,
     rec.Balance,
-    findByNormKeys(rec, [
-      'balance',
-      'walletBalance',
-      'availableBalance',
-      'userBalance',
-    ]),
+    findByNormKeys(rec, ['balance', 'walletBalance', 'availableBalance', 'userBalance']),
   );
   if (raw == null) return null;
   if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;

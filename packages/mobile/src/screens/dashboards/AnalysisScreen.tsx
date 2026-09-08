@@ -9,11 +9,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { makeStyles } from '../../styles/common';
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../api/client';
 import { colors, radius, spacing } from '../../theme';
@@ -99,8 +99,18 @@ function StatGrid({ stats }: { stats: Array<[string, unknown]> }) {
 }
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 function currentMonthIST(): { year: number; month: number } {
@@ -116,10 +126,7 @@ export function AnalysisScreen() {
   const [ym, setYm] = useState(currentMonthIST);
 
   /** Year & Month value sent to the API, e.g. "2026-08" (matches the web UI's month input). */
-  const dateParam = useMemo(
-    () => `${ym.year}-${String(ym.month).padStart(2, '0')}`,
-    [ym],
-  );
+  const dateParam = useMemo(() => `${ym.year}-${String(ym.month).padStart(2, '0')}`, [ym]);
 
   const shiftMonth = useCallback((delta: number) => {
     setYm((prev) => {
@@ -206,7 +213,9 @@ export function AnalysisScreen() {
         </View>
       ) : null}
 
-      {!loading && !error && (!data || (stats.length === 0 && tables.length === 0 && nested.length === 0)) ? (
+      {!loading &&
+      !error &&
+      (!data || (stats.length === 0 && tables.length === 0 && nested.length === 0)) ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyText}>No analytics data available.</Text>
         </View>
@@ -259,9 +268,7 @@ export function AnalysisScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
+const styles = makeStyles({
   title: {
     color: colors.foreground,
     fontSize: 20,
@@ -295,7 +302,6 @@ const styles = StyleSheet.create({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
   emptyBox: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
