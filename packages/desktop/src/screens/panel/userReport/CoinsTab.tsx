@@ -15,24 +15,81 @@ import { hasPermission } from '@/auth/permissions';
 import { useLocationController } from '@/controllers/LocationProvider';
 import { getStoredUser, todayIST } from '@/utils/dates';
 import { requireWithdrawalGeo } from '@/screens/panel/withdrawal/geo';
-import { laxmiActionBtnSx } from './laxmiButtonSx';
 import { canAddCoinsAction, canRemoveCoinsAction } from './coinAccess';
 
 type Props = { userId: string };
 
-/** White Laxmi-style card on dark panel — force readable input text. */
+/** White card on dark panel — borders must be explicit (theme outline is light/invisible). */
 const lightFormFieldSx = {
-  '& .MuiInputBase-root': {
+  '& .MuiOutlinedInput-root': {
     bgcolor: '#fff',
     color: '#111',
+    fontSize: 13,
+    borderRadius: '8px',
+    '& fieldset': { borderColor: '#c4cad3', borderWidth: '1px' },
+    '&:hover fieldset': { borderColor: '#98a2b3' },
+    '&.Mui-focused fieldset': { borderColor: '#1976d2', borderWidth: '1.5px' },
   },
   '& .MuiInputBase-input': {
     color: '#111 !important',
     WebkitTextFillColor: '#111 !important',
+    py: '10px',
   },
-  '& .MuiInputLabel-root': { color: '#5c5c62' },
-  '& .MuiSelect-icon': { color: '#5c5c62' },
+  '& .MuiInputLabel-root': {
+    color: '#667085',
+    '&.Mui-focused': { color: '#1976d2' },
+  },
+  '& .MuiFormLabel-asterisk': { color: '#d32f2f' },
+  '& .MuiSelect-icon': { color: '#5c6470' },
 } as const;
+
+const NO_GLOW = {
+  boxShadow: 'none !important',
+  backgroundImage: 'none !important',
+  filter: 'none',
+} as const;
+
+const addBtnSx = {
+  ...NO_GLOW,
+  textTransform: 'none' as const,
+  bgcolor: '#1976d2',
+  color: '#fff',
+  fontWeight: 700,
+  fontSize: 13,
+  px: 2.5,
+  py: 0.9,
+  borderRadius: '8px',
+  minHeight: 40,
+  minWidth: 128,
+  border: '1px solid #1565c0',
+  '&:hover': { ...NO_GLOW, bgcolor: '#1565c0' },
+  '&.Mui-disabled': {
+    bgcolor: '#90caf9',
+    color: '#fff',
+    borderColor: '#90caf9',
+  },
+};
+
+const removeBtnSx = {
+  ...NO_GLOW,
+  textTransform: 'none' as const,
+  bgcolor: '#fff',
+  color: '#c62828',
+  fontWeight: 700,
+  fontSize: 13,
+  px: 2.5,
+  py: 0.9,
+  borderRadius: '8px',
+  minHeight: 40,
+  minWidth: 128,
+  border: '1px solid #e57373',
+  '&:hover': { ...NO_GLOW, bgcolor: '#fff5f5', borderColor: '#c62828' },
+  '&.Mui-disabled': {
+    bgcolor: '#f5f5f5',
+    color: '#bdbdbd',
+    borderColor: '#e0e0e0',
+  },
+};
 
 type MidOption = { mid?: string; _id?: string; name?: string };
 
@@ -168,35 +225,55 @@ export function CoinsTab({ userId }: Props) {
   }
 
   return (
-    <Box sx={{ textAlign: 'center', py: 3 }}>
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 3, px: 1 }}>
       <Box
         sx={{
-          display: 'inline-block',
-          textAlign: 'left',
           width: '100%',
-          maxWidth: 420,
-          p: 3,
+          maxWidth: 440,
+          p: { xs: 2.5, sm: 3 },
           bgcolor: '#fff',
-          borderRadius: 2,
-          boxShadow: '0 8px 28px rgba(0,0,0,0.12)',
+          borderRadius: '12px',
+          border: '1px solid #e4e7ec',
+          boxShadow: '0 10px 32px rgba(15,23,42,0.10)',
         }}
       >
-        <Typography fontWeight={700} mb={2} color="#111" textAlign="center">
+        <Typography
+          fontWeight={800}
+          mb={0.5}
+          color="#101828"
+          textAlign="center"
+          fontSize={18}
+          letterSpacing={0.2}
+        >
           Coins
         </Typography>
+        <Typography
+          mb={2.5}
+          color="#667085"
+          textAlign="center"
+          fontSize={12}
+          lineHeight={1.4}
+        >
+          Credit or debit coins for this user
+        </Typography>
+
         <Stack spacing={2}>
           <TextField
-            label="Amount *"
+            label="Amount"
+            required
             type="number"
             size="small"
             fullWidth
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            placeholder="Enter amount"
+            inputProps={{ min: 0, step: 'any' }}
             sx={lightFormFieldSx}
           />
           <TextField
             select
             label="Reason"
+            required
             size="small"
             fullWidth
             value={reason}
@@ -229,11 +306,12 @@ export function CoinsTab({ userId }: Props) {
 
           {TXN_ID_REASONS.has(reason) ? (
             <TextField
-              label="TransactionId"
+              label="Transaction ID"
               size="small"
               fullWidth
               value={transactionId}
               onChange={(e) => setTransactionId(e.target.value)}
+              placeholder="Optional"
               sx={lightFormFieldSx}
             />
           ) : null}
@@ -246,14 +324,16 @@ export function CoinsTab({ userId }: Props) {
                 fullWidth
                 value={utr}
                 onChange={(e) => setUtr(e.target.value)}
+                placeholder="Optional"
                 sx={lightFormFieldSx}
               />
               <TextField
-                label="TransactionId"
+                label="Transaction ID"
                 size="small"
                 fullWidth
                 value={transactionId}
                 onChange={(e) => setTransactionId(e.target.value)}
+                placeholder="Optional"
                 sx={lightFormFieldSx}
               />
               <Autocomplete
@@ -264,32 +344,47 @@ export function CoinsTab({ userId }: Props) {
                 onChange={(_e, next) => setSelectedMid(next)}
                 isOptionEqualToValue={(a, b) => a.mid === b.mid}
                 renderInput={(params) => (
-                  <TextField {...params} label="Search & Select MID" sx={lightFormFieldSx} />
+                  <TextField
+                    {...params}
+                    label="Search & Select MID"
+                    required
+                    placeholder="Type to search"
+                    sx={lightFormFieldSx}
+                  />
                 )}
               />
             </>
           ) : null}
 
           <TextField
-            label="Remark *"
+            label="Remark"
+            required
             size="small"
             fullWidth
             value={remark}
             onChange={(e) => setRemark(e.target.value)}
+            placeholder="Enter remark"
             multiline
             minRows={2}
             sx={lightFormFieldSx}
           />
 
-          <Stack direction="row" spacing={1.5} justifyContent="center" pt={1}>
-            {busy ? <CircularProgress size={22} /> : null}
+          <Stack
+            direction="row"
+            spacing={1.5}
+            justifyContent="center"
+            alignItems="center"
+            pt={1.5}
+            flexWrap="wrap"
+            useFlexGap
+          >
+            {busy ? <CircularProgress size={22} sx={{ color: '#1976d2' }} /> : null}
             {canAdd ? (
               <Button
                 variant="contained"
-                color="inherit"
                 disableElevation
                 disabled={busy}
-                sx={laxmiActionBtnSx('white')}
+                sx={addBtnSx}
                 onClick={() => void submit('add')}
               >
                 Add Coins
@@ -297,11 +392,10 @@ export function CoinsTab({ userId }: Props) {
             ) : null}
             {canRemove ? (
               <Button
-                variant="contained"
-                color="inherit"
+                variant="outlined"
                 disableElevation
                 disabled={busy}
-                sx={laxmiActionBtnSx('white')}
+                sx={removeBtnSx}
                 onClick={() => void submit('remove')}
               >
                 Remove Coins

@@ -15,18 +15,26 @@ import { laxmiActionBtnSx } from './laxmiButtonSx';
 
 type Props = { userId: string };
 
-/** White Laxmi-style card on dark panel — force readable input text. */
+/** White card — explicit borders (theme outline is invisible on white). */
 const lightFormFieldSx = {
-  '& .MuiInputBase-root': {
+  '& .MuiOutlinedInput-root': {
     bgcolor: '#fff',
     color: '#111',
+    fontSize: 13,
+    borderRadius: '8px',
+    '& fieldset': { borderColor: '#c4cad3' },
+    '&:hover fieldset': { borderColor: '#98a2b3' },
+    '&.Mui-focused fieldset': { borderColor: '#1976d2', borderWidth: '1.5px' },
   },
   '& .MuiInputBase-input': {
     color: '#111 !important',
     WebkitTextFillColor: '#111 !important',
   },
-  '& .MuiInputLabel-root': { color: '#5c5c62' },
-  '& .MuiSelect-icon': { color: '#5c5c62' },
+  '& .MuiInputLabel-root': {
+    color: '#667085',
+    '&.Mui-focused': { color: '#1976d2' },
+  },
+  '& .MuiSelect-icon': { color: '#5c6470' },
 } as const;
 
 const REASON_OPTIONS = [

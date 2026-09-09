@@ -18,15 +18,23 @@ import { laxmiActionBtnSx } from './laxmiButtonSx';
 type Props = { userId: string };
 
 const lightFormFieldSx = {
-  '& .MuiInputBase-root': {
+  '& .MuiOutlinedInput-root': {
     bgcolor: '#fff',
     color: '#111',
+    fontSize: 13,
+    borderRadius: '8px',
+    '& fieldset': { borderColor: '#c4cad3' },
+    '&:hover fieldset': { borderColor: '#98a2b3' },
+    '&.Mui-focused fieldset': { borderColor: '#1976d2', borderWidth: '1.5px' },
   },
   '& .MuiInputBase-input': {
     color: '#111 !important',
     WebkitTextFillColor: '#111 !important',
   },
-  '& .MuiInputLabel-root': { color: '#5c5c62' },
+  '& .MuiInputLabel-root': {
+    color: '#667085',
+    '&.Mui-focused': { color: '#1976d2' },
+  },
 } as const;
 
 /** Remove Bonus Coins — centered popup form + confirm dialog. */

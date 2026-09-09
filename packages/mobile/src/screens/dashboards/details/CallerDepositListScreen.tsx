@@ -2,7 +2,7 @@
  * Caller deposit / refund / unique-pending list — port of desktop
  * CallerDepositListPage. Opened from Caller Responsibility row actions.
  *
- * - Deposit: uses `list.deposits` from the parent caller row (no extra API).
+ * - Deposit: `caller.approvedDepositsByEmpcode` (Laxmi type === "deposit")
  * - Refund: `caller.withdrawalByEmpcode`
  * - Unique Pending: `caller.uniquePendingDeposits`
  */
@@ -34,7 +34,7 @@ import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSh
 
 type ListParams = {
   list?: CallerRow;
-  type?: 'withdrawal' | 'uniquePending' | string;
+  type?: 'deposit' | 'withdrawal' | 'uniquePending' | string;
   empCode?: string;
   startDate?: string;
   endDate?: string;
@@ -84,11 +84,27 @@ function pickItems(data: unknown): CallerRow[] {
   return [];
 }
 
-function pickTotalPages(data: unknown): number {
-  if (!data || typeof data !== 'object') return 1;
-  const obj = data as CallerRow;
-  const nested = obj.payload && typeof obj.payload === 'object' ? (obj.payload as CallerRow) : null;
-  return Number(obj.totalPages ?? nested?.totalPages ?? 1) || 1;
+function pickTotalPages(data: unknown, pageSize = 50): number {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return 1;
+  const obj = data as Record<string, unknown>;
+  const nested =
+    obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+      ? (obj.payload as Record<string, unknown>)
+      : null;
+  const src = nested || obj;
+  const explicit = Number(src.totalPages ?? src.totalPage ?? src.pages ?? obj.totalPages);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.floor(explicit);
+
+  const totals =
+    src.totals && typeof src.totals === 'object'
+      ? (src.totals as { all?: { count?: number } })
+      : null;
+  const total = Number(src.total ?? src.totalCount ?? totals?.all?.count);
+  const size = Number(pageSize) > 0 ? Number(pageSize) : 50;
+  if (Number.isFinite(total) && total > 0) {
+    return Math.max(1, Math.ceil(total / size));
+  }
+  return 1;
 }
 
 function pickWithdrawalTotals(data: unknown): {
@@ -147,6 +163,7 @@ export function CallerDepositListScreen() {
   const type = params.type;
   const isWithdrawal = type === 'withdrawal';
   const isUniquePending = type === 'uniquePending';
+  const isDeposit = type === 'deposit' || (!isWithdrawal && !isUniquePending);
   const empCode = String(params.empCode || list?.empCode || '');
   const parentStart = params.startDate;
   const parentEnd = params.endDate;
@@ -188,6 +205,7 @@ export function CallerDepositListScreen() {
   const [maxAmount, setMaxAmount] = useState('');
   const [selected, setSelected] = useState<{ row: CallerRow; index: number } | null>(null);
   const [calling, setCalling] = useState(false);
+  const [searchNonce, setSearchNonce] = useState(0);
   const textFiltersRef = React.useRef({ name: '', minAmount: '', maxAmount: '' });
   textFiltersRef.current = { name, minAmount, maxAmount };
 
@@ -239,12 +257,7 @@ export function CallerDepositListScreen() {
   );
 
   const rows = useMemo(() => {
-    let next: CallerRow[];
-    if (isWithdrawal || isUniquePending) next = pickItems(payload);
-    else {
-      const deposits = list?.deposits;
-      next = Array.isArray(deposits) ? (deposits as CallerRow[]) : [];
-    }
+    let next: CallerRow[] = pickItems(payload);
     if (!isWithdrawal) return next;
     const min = Number(minAmount);
     const max = Number(maxAmount);
@@ -261,13 +274,31 @@ export function CallerDepositListScreen() {
       }
       return true;
     });
-  }, [isWithdrawal, isUniquePending, payload, list, minAmount, maxAmount, checkedFilter]);
+  }, [isWithdrawal, payload, minAmount, maxAmount, checkedFilter]);
 
-  const totalPages = pickTotalPages(payload);
+  const totalPages = useMemo(
+    () => pickTotalPages(payload, itemsPerPage),
+    [payload, itemsPerPage],
+  );
   const withdrawalTotals = useMemo(() => pickWithdrawalTotals(payload), [payload]);
+  const depositTotalCount = useMemo(() => {
+    if (!payload || typeof payload !== 'object') return rows.length;
+    const obj = payload as Record<string, unknown>;
+    const nested =
+      obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+        ? (obj.payload as Record<string, unknown>)
+        : null;
+    const src = nested || obj;
+    const totals =
+      src.totals && typeof src.totals === 'object'
+        ? (src.totals as { all?: { count?: number } })
+        : null;
+    const n = Number(src.total ?? src.totalCount ?? totals?.all?.count ?? rows.length);
+    return Number.isFinite(n) ? n : rows.length;
+  }, [payload, rows.length]);
 
   const loadRemote = useCallback(async () => {
-    if (!isWithdrawal && !isUniquePending) return;
+    if (!isWithdrawal && !isUniquePending && !isDeposit) return;
     if (!empCode) {
       setError('Employee code missing for this caller');
       return;
@@ -298,7 +329,7 @@ export function CallerDepositListScreen() {
           return;
         }
         setPayload(res.data ?? {});
-      } else {
+      } else if (isUniquePending) {
         const filter: Record<string, unknown> = {};
         if (mobile.trim()) filter.mobile = mobile.trim();
         if (clientName.trim()) filter.clientName = clientName.trim();
@@ -316,6 +347,21 @@ export function CallerDepositListScreen() {
           return;
         }
         setPayload(res.data ?? {});
+      } else {
+        // Laxmi getApprovedDepositsByEmpCode
+        const res = await secureApi('caller.approvedDepositsByEmpcode', {
+          empCode,
+          startDate,
+          endDate,
+          pageNo: page,
+          itemsPerPage,
+        });
+        if (!res.ok) {
+          setError(res.message || 'Failed to load deposits');
+          setPayload({});
+          return;
+        }
+        setPayload(res.data ?? {});
       }
     } finally {
       setLoading(false);
@@ -324,6 +370,7 @@ export function CallerDepositListScreen() {
     empCode,
     isWithdrawal,
     isUniquePending,
+    isDeposit,
     status,
     page,
     itemsPerPage,
@@ -334,11 +381,19 @@ export function CallerDepositListScreen() {
     parentStart,
     parentEnd,
     checkedFilter,
+    searchNonce,
   ]);
 
   useEffect(() => {
     void loadRemote();
   }, [loadRemote]);
+
+  const applyDepositSearch = useCallback(() => {
+    setStartDate(draftStart);
+    setEndDate(draftEnd);
+    setPage(1);
+    setSearchNonce((n) => n + 1);
+  }, [draftStart, draftEnd]);
 
   /** Full column set for the detail sheet (card list shows a compact summary). */
   const columns = useMemo<DataTableColumn<CallerRow>[]>(() => {
@@ -568,6 +623,25 @@ export function CallerDepositListScreen() {
         {callerLabel ? ` — ${callerLabel}` : ''}
       </Text>
 
+      {isDeposit ? (
+        <>
+          <DetailFilterBar
+            startDate={draftStart}
+            endDate={draftEnd}
+            loading={loading}
+            onStartDateChange={setDraftStart}
+            onEndDateChange={setDraftEnd}
+            pageSize={itemsPerPage}
+            onPageSizeChange={(n) => {
+              setItemsPerPage(n);
+              setPage(1);
+            }}
+            onApply={applyDepositSearch}
+          />
+          <Text style={styles.totalLine}>Total Count: {depositTotalCount}</Text>
+        </>
+      ) : null}
+
       {isWithdrawal ? (
         <>
           <DetailFilterBar
@@ -585,7 +659,7 @@ export function CallerDepositListScreen() {
               setStartDate(draftStart);
               setEndDate(draftEnd);
               setPage(1);
-              void loadRemote();
+              setSearchNonce((n) => n + 1);
             }}
           />
           <ScrollView
@@ -824,7 +898,7 @@ export function CallerDepositListScreen() {
         </View>
       )}
 
-      {(isWithdrawal || isUniquePending) && totalPages > 1 ? (
+      {(isWithdrawal || isUniquePending || isDeposit) && rows.length > 0 && totalPages > 1 ? (
         <View style={styles.pager}>
           <TouchableOpacity
             style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
@@ -834,7 +908,7 @@ export function CallerDepositListScreen() {
             <Text style={styles.pageBtnText}>Prev</Text>
           </TouchableOpacity>
           <Text style={styles.pageLabel}>
-            {page} / {totalPages}
+            {Math.min(page, totalPages)} / {totalPages}
           </Text>
           <TouchableOpacity
             style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}

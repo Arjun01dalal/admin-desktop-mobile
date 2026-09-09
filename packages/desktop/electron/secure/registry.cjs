@@ -131,6 +131,13 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  // Laxmi CallerDepositList — View Deposit (`type: deposit`)
+  'caller.approvedDepositsByEmpcode': {
+    method: 'POST',
+    path: '/transaction/approved-deposits-by-empcode',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   'caller.callerActiveToday': {
     method: 'POST',
     path: '/SubAdmin/caller-active-today',
@@ -1892,6 +1899,24 @@ module.exports = {
   'subadmin.removeCoinPermission': {
     method: 'POST',
     path: '/SubAdmin/removeCoin',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'subadmin.getSubadmin': {
+    method: 'POST',
+    path: '/SubAdmin/get-subadmin',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'coin.getSubadminCoinHistory': {
+    method: 'POST',
+    path: '/coin/getSubadminCoinHistory',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'coin.getSubadminCoinHistoryCumulative': {
+    method: 'POST',
+    path: '/coin/getSubadminCoinHistoryCumulative',
     encryptRequest: true,
     decryptResponse: true,
   },

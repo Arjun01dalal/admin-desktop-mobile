@@ -67,6 +67,10 @@ const CoinRemovalDetailsPage = lazyNamed(
   () => import('@/screens/panel/coinRemoval/CoinRemovalDetailsPage'),
   'CoinRemovalDetailsPage',
 );
+const ShowMyCoinHistoryPage = lazyNamed(
+  () => import('@/screens/panel/ShowMyCoinHistoryPage'),
+  'ShowMyCoinHistoryPage',
+);
 const CustomerAllotmentPage = lazyNamed(
   () => import('@/screens/panel/CustomerAllotmentPage'),
   'CustomerAllotmentPage',
@@ -368,6 +372,7 @@ export {
   StateWiseRegistrationPage,
   CoinRemovalPage,
   CoinRemovalDetailsPage,
+  ShowMyCoinHistoryPage,
   CustomerAllotmentPage,
   PointsReportPage,
   PointsReportDetailsPage,

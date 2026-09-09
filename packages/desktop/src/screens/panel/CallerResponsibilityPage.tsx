@@ -392,7 +392,13 @@ export function CallerResponsibilityPage() {
                     e.preventDefault();
                     e.stopPropagation();
                     navigate('/caller-responsibility/deposit-list', {
-                      state: { list: r },
+                      state: {
+                        list: r,
+                        type: 'deposit',
+                        empCode: r.empCode,
+                        startDate,
+                        endDate,
+                      },
                     });
                   }}
                 >

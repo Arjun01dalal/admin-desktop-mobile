@@ -94,7 +94,7 @@ function renderCheckBy(value: unknown) {
 
 type ListState = {
   list?: CallerRow;
-  type?: 'withdrawal' | 'uniquePending' | string;
+  type?: 'deposit' | 'withdrawal' | 'uniquePending' | string;
   empCode?: string;
   startDate?: string;
   endDate?: string;
@@ -114,11 +114,31 @@ function pickItems(data: unknown): CallerRow[] {
   return [];
 }
 
-function pickTotalPages(data: unknown): number {
-  if (!data || typeof data !== 'object') return 1;
-  const obj = data as CallerRow;
-  const nested = obj.payload && typeof obj.payload === 'object' ? (obj.payload as CallerRow) : null;
-  return Number(obj.totalPages ?? nested?.totalPages ?? 1) || 1;
+function pickTotalPages(data: unknown, pageSize = 50): number {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return 1;
+  }
+  const obj = data as Record<string, unknown>;
+  const nested =
+    obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+      ? (obj.payload as Record<string, unknown>)
+      : null;
+  const src = nested || obj;
+  const explicit = Number(src.totalPages ?? src.totalPage ?? src.pages ?? obj.totalPages);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.floor(explicit);
+
+  const totals =
+    src.totals && typeof src.totals === 'object'
+      ? (src.totals as { all?: { count?: number } })
+      : null;
+  const total = Number(src.total ?? src.totalCount ?? totals?.all?.count);
+  const size = Number(pageSize) > 0 ? Number(pageSize) : 50;
+  if (Number.isFinite(total) && total > 0) {
+    return Math.max(1, Math.ceil(total / size));
+  }
+  const items = pickItems(data);
+  // Single page of results with no meta — treat as 1 page (don't invent extras).
+  return items.length > 0 ? 1 : 1;
 }
 
 type StatusTotal = { count?: number; amount?: number };
@@ -158,6 +178,22 @@ function pickWithdrawalTotals(data: unknown): {
   };
 }
 
+function pickTotalCount(data: unknown, itemCount: number): number {
+  if (!data || typeof data !== 'object') return itemCount;
+  const obj = data as Record<string, unknown>;
+  const nested =
+    obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+      ? (obj.payload as Record<string, unknown>)
+      : null;
+  const src = nested || obj;
+  const totals =
+    src.totals && typeof src.totals === 'object'
+      ? (src.totals as { all?: { count?: number } })
+      : null;
+  const n = Number(src.total ?? src.totalCount ?? totals?.all?.count ?? itemCount);
+  return Number.isFinite(n) ? n : itemCount;
+}
+
 export function CallerDepositListPage() {
   const location = useLocation();
   const state = (location.state || {}) as ListState;
@@ -165,6 +201,8 @@ export function CallerDepositListPage() {
   const type = state.type;
   const isWithdrawal = type === 'withdrawal';
   const isUniquePending = type === 'uniquePending';
+  // Laxmi: type === "deposit" || default when not withdrawal/uniquePending
+  const isDeposit = type === 'deposit' || (!isWithdrawal && !isUniquePending);
   const empCode = String(state.empCode || list?.empCode || '');
   const parentStart = state.startDate;
   const parentEnd = state.endDate;
@@ -183,6 +221,9 @@ export function CallerDepositListPage() {
 
   const [startDate, setStartDate] = useState(() => parentStart || todayIST());
   const [endDate, setEndDate] = useState(() => parentEnd || todayIST());
+  // Laxmi: deposit dates only apply on Search (not on every date input change).
+  const [queryStart, setQueryStart] = useState(() => parentStart || todayIST());
+  const [queryEnd, setQueryEnd] = useState(() => parentEnd || todayIST());
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -195,20 +236,24 @@ export function CallerDepositListPage() {
   const [amountGte, setAmountGte] = useState('');
   const [amountLte, setAmountLte] = useState('');
   const [checked, setChecked] = useState(true);
+  /** Bumps on Search so page-1 + same dates still reloads (Laxmi parity). */
+  const [searchNonce, setSearchNonce] = useState(0);
 
-  const depositRows = useMemo(() => {
-    if (isWithdrawal || isUniquePending) {
-      return pickItems(payload);
-    }
-    const deposits = list?.deposits;
-    return Array.isArray(deposits) ? (deposits as CallerRow[]) : [];
-  }, [isWithdrawal, isUniquePending, payload, list]);
+  const depositRows = useMemo(() => pickItems(payload), [payload]);
 
-  const totalPages = pickTotalPages(payload);
+  const totalPages = useMemo(
+    () => pickTotalPages(payload, itemsPerPage),
+    [payload, itemsPerPage],
+  );
+  const depositTotalCount = useMemo(
+    () => pickTotalCount(payload, depositRows.length),
+    [payload, depositRows.length],
+  );
   const withdrawalTotals = useMemo(() => pickWithdrawalTotals(payload), [payload]);
+  const showPagination = depositRows.length > 0 && totalPages > 1;
 
   const loadRemote = useCallback(async () => {
-    if (!isWithdrawal && !isUniquePending) return;
+    if (!isWithdrawal && !isUniquePending && !isDeposit) return;
     if (!empCode) {
       toast.error('Employee code missing for this caller');
       return;
@@ -221,8 +266,8 @@ export function CallerDepositListPage() {
           empCode,
           pageNo: page,
           itemPerPage: itemsPerPage,
-          startDate,
-          endDate,
+          startDate: queryStart,
+          endDate: queryEnd,
           checked,
         };
         if (status) body.status = status;
@@ -237,15 +282,15 @@ export function CallerDepositListPage() {
           return;
         }
         setPayload(res.data ?? {});
-      } else {
+      } else if (isUniquePending) {
         const filter: Record<string, unknown> = {};
         if (mobile.trim()) filter.mobile = mobile.trim();
         if (clientName.trim()) filter.clientName = clientName.trim();
 
         const res = await secureApi('caller.uniquePendingDeposits', {
           empCode,
-          startDate: parentStart || startDate,
-          endDate: parentEnd || endDate,
+          startDate: parentStart || queryStart,
+          endDate: parentEnd || queryEnd,
           pageNo: page,
           itemsPerPage,
           filter,
@@ -256,14 +301,31 @@ export function CallerDepositListPage() {
           return;
         }
         setPayload(res.data ?? {});
+      } else {
+        // Laxmi getApprovedDepositsByEmpCode — /transaction/approved-deposits-by-empcode
+        const res = await secureApi('caller.approvedDepositsByEmpcode', {
+          empCode,
+          startDate: queryStart,
+          endDate: queryEnd,
+          pageNo: page,
+          itemsPerPage,
+        });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to load deposits');
+          setPayload({});
+          return;
+        }
+        setPayload(res.data ?? {});
       }
     } finally {
       setLoading(false);
     }
+    // searchNonce forces Search reload even when already on page 1.
   }, [
     empCode,
     isWithdrawal,
     isUniquePending,
+    isDeposit,
     status,
     name,
     amountGte,
@@ -271,19 +333,35 @@ export function CallerDepositListPage() {
     checked,
     page,
     itemsPerPage,
-    startDate,
-    endDate,
+    queryStart,
+    queryEnd,
     mobile,
     clientName,
     parentStart,
     parentEnd,
+    searchNonce,
   ]);
 
   useEffect(() => {
     void loadRemote();
   }, [loadRemote]);
 
+  // If a new search returns fewer pages, snap back so we don't request an empty page.
+  useEffect(() => {
+    if (totalPages >= 1 && page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [totalPages, page]);
+
+  const runSearch = useCallback(() => {
+    setQueryStart(startDate);
+    setQueryEnd(endDate);
+    setPage(1);
+    setSearchNonce((n) => n + 1);
+  }, [startDate, endDate]);
+
   const title = isWithdrawal ? 'Refund List' : isUniquePending ? 'Unique Pending' : 'Deposit List';
+  const showRemoteFilters = isWithdrawal || isUniquePending || isDeposit;
 
   const columns = useMemo<CommonTableColumn<CallerRow>[]>(() => {
     const col = (
@@ -293,7 +371,12 @@ export function CallerDepositListPage() {
       extra?: Partial<CommonTableColumn<CallerRow>>,
     ): CommonTableColumn<CallerRow> => ({ id, label, render, ...extra });
 
-    const sr = col('#', 'SR.No', (_r, i) => i + 1, { width: 56 });
+    const sr = col(
+      '#',
+      'SR.No',
+      (_r, i) => (page - 1) * itemsPerPage + i + 1,
+      { width: 56 },
+    );
     const name = col('name', 'Name', (r) => String(r.userName || r.name || '-'));
     const dp = col('dp', 'DP ID', (r) => (
       <CopyText
@@ -407,7 +490,7 @@ export function CallerDepositListPage() {
 
     cols.push(status);
     return cols;
-  }, [isWithdrawal, isUniquePending, isCaller, canShowMobile]);
+  }, [isWithdrawal, isUniquePending, isCaller, canShowMobile, page, itemsPerPage]);
 
   if (!list && !empCode) {
     return (
@@ -424,19 +507,37 @@ export function CallerDepositListPage() {
 
   return (
     <Box>
-      {!isWithdrawal && !isUniquePending && (
-        <Typography variant="h5" fontWeight={700} mb={2}>
-          {title} — {String(list?.subAdminName || empCode || '')}
-        </Typography>
-      )}
-
-      {(isWithdrawal || isUniquePending) && (
+      {showRemoteFilters && (
         <CollapsibleFilterPanel
           title={`${title} — ${String(list?.subAdminName || empCode || '')}`}
           summary={`${startDate} → ${endDate}`}
           contentSx={{ overflow: 'auto' }}
         >
           <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="nowrap">
+            {isDeposit && (
+              <>
+                <TextField
+                  type="date"
+                  label="From Date"
+                  size="small"
+                  fullWidth={false}
+                  InputLabelProps={{ shrink: true }}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  sx={{ width: 170, flexShrink: 0 }}
+                />
+                <TextField
+                  type="date"
+                  label="To Date"
+                  size="small"
+                  fullWidth={false}
+                  InputLabelProps={{ shrink: true }}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  sx={{ width: 170, flexShrink: 0 }}
+                />
+              </>
+            )}
             {isWithdrawal && (
               <>
                 <TextField
@@ -466,10 +567,7 @@ export function CallerDepositListPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      setPage(1);
-                      void loadRemote();
-                    }
+                    if (e.key === 'Enter') runSearch();
                   }}
                   sx={{ width: 160, flexShrink: 0 }}
                 />
@@ -574,16 +672,18 @@ export function CallerDepositListPage() {
             <Button
               variant="contained"
               color="secondary"
-              onClick={() => {
-                setPage(1);
-                void loadRemote();
-              }}
+              onClick={() => runSearch()}
               disabled={loading}
               sx={{ flexShrink: 0, fontWeight: 700 }}
             >
               Search
             </Button>
             {loading && <CircularProgress size={22} />}
+            {isDeposit && (
+              <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'nowrap', ml: 1 }}>
+                {`Total Count: ${depositTotalCount}`}
+              </Typography>
+            )}
           </Stack>
           {isWithdrawal && (
             <Stack
@@ -620,13 +720,14 @@ export function CallerDepositListPage() {
 
       <TablePanel
         footer={
-          (isWithdrawal || isUniquePending) && totalPages > 1 ? (
+          showRemoteFilters && showPagination ? (
             <>
               <Pagination
                 count={totalPages}
-                page={page}
+                page={Math.min(page, totalPages)}
                 onChange={(_e, p) => setPage(p)}
                 color="primary"
+                disabled={loading}
               />
             </>
           ) : undefined

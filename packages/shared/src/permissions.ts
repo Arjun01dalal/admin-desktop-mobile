@@ -420,7 +420,7 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     // Same audience as Deposit — unlock when View_Deposits is granted.
     'View_Deposits',
   ],
-  casino_switch: ['casino_switch', 'Casino_Switch', 'Casino Switch', 'View_Games'],
+  casino_switch: ['casino_switch', 'Casino_Switch', 'Casino Switch'],
   show_whatsapp_messages: [
     'show_whatsapp_messages',
     'Show_Whatsapp_Messages',
@@ -622,6 +622,16 @@ export function isCallerRole(
   return roleNameVariants(name).some((v) => v === 'caller' || v === 'caller_new');
 }
 
+/**
+ * Laxmi admin-panel-domains: "Show My Coin History" nav uses `User.data.showCoins`
+ * (coin-role flag from /SubAdmin/update-coin-roles) — not a Responsibility string.
+ */
+export function canShowMyCoinHistory(user: PermissionUser | null = null): boolean {
+  if (!user) return false;
+  const v = user.showCoins;
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
 /** Final nav visibility: Role_ID allowlist + Responsibilities + dashboard Role_ID gate. */
 export function canAccessNavItem(
   item: { id: string; permission?: string },
@@ -634,6 +644,11 @@ export function canAccessNavItem(
     (item.id === 'botPerformance' || item.id === 'stateWiseRegistration')
   ) {
     return false;
+  }
+
+  // Coin-role flag only (Laxmi SideNavItems show: User.data.showCoins).
+  if (item.id === 'showMyCoinHistory') {
+    return canShowMyCoinHistory(user);
   }
 
   // Ungated items (Welcome) — always in the drawer for every role except caller-hidden ids above.

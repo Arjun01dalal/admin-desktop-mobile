@@ -54,6 +54,7 @@ const LOADERS: Record<string, Loader> = {
   '/coin-reports/report': () => import('@/screens/panel/pointsReport/PointsReportDetailsPage'),
   '/coins-removal': () => import('@/screens/panel/CoinRemovalPage'),
   '/coins-removal/details': () => import('@/screens/panel/coinRemoval/CoinRemovalDetailsPage'),
+  '/show_my_coin_history': () => import('@/screens/panel/ShowMyCoinHistoryPage'),
   '/customer-allotment': () => import('@/screens/panel/CustomerAllotmentPage'),
   '/customer-allotted': () => import('@/screens/panel/customerAllotment/AllottedCustomersPage'),
   '/non_performing_user': () => import('@/screens/panel/NonPerformingUserPage'),

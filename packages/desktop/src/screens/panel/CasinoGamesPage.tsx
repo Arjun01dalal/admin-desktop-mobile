@@ -74,6 +74,49 @@ const GAME_CATEGORIES = [
   'BlackJack',
 ] as const;
 
+/** Laxmi Status filter: All / Enabled / Disabled — shown as Total / Active / Inactive. */
+type StatusFilter = 'all' | 'active' | 'inactive';
+
+type GameCounts = {
+  total: number;
+  active: number;
+  inactive: number;
+};
+
+const EMPTY_COUNTS: GameCounts = { total: 0, active: 0, inactive: 0 };
+
+const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'Total' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
+function parseGameCounts(raw: unknown): GameCounts {
+  if (!raw || typeof raw !== 'object') return EMPTY_COUNTS;
+  const c = raw as Record<string, unknown>;
+  // API payload.counts: { total, enabled, disabled }
+  return {
+    total: Math.max(0, Number(c.total) || 0),
+    active: Math.max(0, Number(c.enabled ?? c.active) || 0),
+    inactive: Math.max(0, Number(c.disabled ?? c.inactive) || 0),
+  };
+}
+
+function applyStatusCountDelta(prev: GameCounts, nextActive: boolean): GameCounts {
+  if (nextActive) {
+    return {
+      total: prev.total,
+      active: prev.active + 1,
+      inactive: Math.max(0, prev.inactive - 1),
+    };
+  }
+  return {
+    total: prev.total,
+    active: Math.max(0, prev.active - 1),
+    inactive: prev.inactive + 1,
+  };
+}
+
 const filterFieldSx = {
   minWidth: 120,
   '& .MuiInputBase-root': { bgcolor: 'background.paper', fontSize: 12 },
@@ -83,6 +126,40 @@ const headerFieldSx = {
   minWidth: 180,
   '& .MuiInputBase-root': { bgcolor: '#121218' },
   '& .MuiInputLabel-root': { color: '#9aa3b5' },
+};
+
+const countPillBaseSx = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 0.5,
+  px: 1.5,
+  py: 0.65,
+  borderRadius: '14px',
+  fontSize: 11,
+  fontWeight: 500,
+  letterSpacing: 0.15,
+  cursor: 'pointer',
+  border: '1px solid transparent',
+  userSelect: 'none' as const,
+  lineHeight: 1.35,
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+};
+
+const countPillSx = (kind: StatusFilter, selected: boolean) => {
+  const palette =
+    kind === 'active'
+      ? { bg: '#e8f7ee', color: '#166534', border: '#86efac' }
+      : kind === 'inactive'
+        ? { bg: '#fdecec', color: '#991b1b', border: '#fca5a5' }
+        : { bg: '#eef2f7', color: '#334155', border: '#cbd5e1' };
+  return {
+    ...countPillBaseSx,
+    bgcolor: palette.bg,
+    color: palette.color,
+    borderColor: selected ? palette.border : 'transparent',
+    boxShadow: selected ? `0 0 0 1px ${palette.border}` : 'none',
+    '&:hover': { borderColor: palette.border },
+  };
 };
 
 const orangeBtnSx = {
@@ -189,6 +266,8 @@ export function CasinoGamesPage() {
   const [gameCategory, setGameCategory] = useState('');
   const [providerNameSearch, setProviderNameSearch] = useState('');
   const [providerOptions, setProviderOptions] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [gameCounts, setGameCounts] = useState<GameCounts>(EMPTY_COUNTS);
 
   const [activeProvider, setActiveProvider] = useState<CasinoProvider>('QTECH');
   const pendingProvider = useRef<CasinoProvider>('QTECH');
@@ -262,13 +341,14 @@ export function CasinoGamesPage() {
       categoryOverride = gameCategory,
       providerOverride = activeProvider,
       providerNameOverride = providerNameSearch,
+      statusOverride = statusFilter,
     ) => {
       const gen = next();
       begin();
       setLoading(true);
       setError(null);
       try {
-        const filters: Record<string, string> = {};
+        const filters: Record<string, string | boolean> = {};
         const nameFilter = categoryOverride.trim() || nameOverride.trim();
         if (nameFilter) filters.Name = nameFilter;
         if (idOverride.trim()) {
@@ -278,6 +358,9 @@ export function CasinoGamesPage() {
         if (providerOverride === 'QTECH' && providerNameOverride.trim()) {
           filters['provider.name'] = providerNameOverride.trim();
         }
+        // Laxmi: statusFilter Enabled → true, Disabled → false
+        if (statusOverride === 'active') filters.status = true;
+        else if (statusOverride === 'inactive') filters.status = false;
 
         const res = await secureApi('ops.casinoGetData', {
           pageNo,
@@ -293,6 +376,7 @@ export function CasinoGamesPage() {
           startTransition(() => {
             setRows([]);
             setTotalPages(1);
+            setGameCounts(EMPTY_COUNTS);
           });
           return;
         }
@@ -302,6 +386,7 @@ export function CasinoGamesPage() {
         startTransition(() => {
           setRows(items);
           setTotalPages(Math.max(1, Number(data.totalPages) || 1));
+          if (data.counts) setGameCounts(parseGameCounts(data.counts));
         });
       } finally {
         end();
@@ -316,6 +401,7 @@ export function CasinoGamesPage() {
       gameCategory,
       activeProvider,
       providerNameSearch,
+      statusFilter,
       next,
       begin,
       end,
@@ -332,7 +418,7 @@ export function CasinoGamesPage() {
   useEffect(() => {
     void load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, activeProvider, gameCategory, providerNameSearch]);
+  }, [page, pageSize, activeProvider, gameCategory, providerNameSearch, statusFilter]);
 
   const deferredRows = useDeferredValue(rows);
 
@@ -340,8 +426,29 @@ export function CasinoGamesPage() {
     setAppliedName(nameSearch);
     setAppliedId(idSearch);
     setPage(1);
-    void load(1, nameSearch, idSearch, gameCategory, activeProvider, providerNameSearch);
-  }, [nameSearch, idSearch, gameCategory, activeProvider, providerNameSearch, load]);
+    void load(
+      1,
+      nameSearch,
+      idSearch,
+      gameCategory,
+      activeProvider,
+      providerNameSearch,
+      statusFilter,
+    );
+  }, [
+    nameSearch,
+    idSearch,
+    gameCategory,
+    activeProvider,
+    providerNameSearch,
+    statusFilter,
+    load,
+  ]);
+
+  const selectStatusFilter = useCallback((next: StatusFilter) => {
+    setStatusFilter(next);
+    setPage(1);
+  }, []);
 
   const confirmProviderChange = useCallback(async () => {
     setProviderSaving(true);
@@ -438,6 +545,7 @@ export function CasinoGamesPage() {
       setRows((prev) =>
         prev.map((item) => (item._id === row._id ? { ...item, status: nextStatus } : item)),
       );
+      setGameCounts((prev) => applyStatusCountDelta(prev, nextStatus));
       toast.success(nextStatus ? 'Game enabled' : 'Game disabled');
     } finally {
       setTogglingId(null);
@@ -648,7 +756,9 @@ export function CasinoGamesPage() {
     <Box>
       <CollapsibleFilterPanel
         title={toDisplayText('Casino Games')}
-        summary={`${toDisplayText(activeProvider)} · ${gameCategory || 'All categories'} · ${pageSize} per page`}
+        summary={`${toDisplayText(activeProvider)} · ${
+          STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label || 'Total'
+        } · ${gameCategory || 'All categories'} · ${pageSize} per page`}
         headerActions={
           <Button
             variant="outlined"
@@ -665,83 +775,61 @@ export function CasinoGamesPage() {
           </Button>
         }
       >
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
-          <TextField
-            select
-            label={toDisplayText('Active Casino Provider')}
-            size="small"
-            value={activeProvider}
-            onChange={(e) => {
-              const nextProvider = asProvider(e.target.value);
-              if (nextProvider === activeProvider) return;
-              pendingProvider.current = nextProvider;
-              setProviderConfirmOpen(true);
-            }}
-            sx={headerFieldSx}
-          >
-            {PROVIDER_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {toDisplayText(opt)}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button
-            variant="contained"
-            onClick={() => {
-              void loadMiraiStatus();
-              setMiraiOpen(true);
-            }}
-            sx={{ ...orangeBtnSx, height: 40, px: 2.5, flexShrink: 0 }}
-          >
-            Mirai Games
-          </Button>
-          <TextField
-            select
-            label="Items Per Page"
-            size="small"
-            value={String(pageSize)}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setPage(1);
-            }}
-            sx={{ ...headerFieldSx, minWidth: 140 }}
-          >
-            {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label="Game Category"
-            size="small"
-            value={gameCategory}
-            onChange={(e) => {
-              setGameCategory(e.target.value);
-              setPage(1);
-            }}
-            sx={{ ...headerFieldSx, minWidth: 200 }}
-            SelectProps={{ displayEmpty: true }}
-            InputLabelProps={{ shrink: true }}
-          >
-            <MenuItem value="">
-              <em>All</em>
-            </MenuItem>
-            {GAME_CATEGORIES.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-          {activeProvider === 'QTECH' ? (
+        <Stack spacing={1.5}>
+          <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap" useFlexGap>
             <TextField
               select
-              label="Provider Name"
+              label={toDisplayText('Active Casino Provider')}
               size="small"
-              value={providerNameSearch}
+              value={activeProvider}
               onChange={(e) => {
-                setProviderNameSearch(e.target.value);
+                const nextProvider = asProvider(e.target.value);
+                if (nextProvider === activeProvider) return;
+                pendingProvider.current = nextProvider;
+                setProviderConfirmOpen(true);
+              }}
+              sx={headerFieldSx}
+            >
+              {PROVIDER_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {toDisplayText(opt)}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button
+              variant="contained"
+              onClick={() => {
+                void loadMiraiStatus();
+                setMiraiOpen(true);
+              }}
+              sx={{ ...orangeBtnSx, height: 40, px: 2.5, flexShrink: 0 }}
+            >
+              Mirai Games
+            </Button>
+            <TextField
+              select
+              label="Items Per Page"
+              size="small"
+              value={String(pageSize)}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              sx={{ ...headerFieldSx, minWidth: 140 }}
+            >
+              {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Game Category"
+              size="small"
+              value={gameCategory}
+              onChange={(e) => {
+                setGameCategory(e.target.value);
                 setPage(1);
               }}
               sx={{ ...headerFieldSx, minWidth: 200 }}
@@ -751,13 +839,88 @@ export function CasinoGamesPage() {
               <MenuItem value="">
                 <em>All</em>
               </MenuItem>
-              {providerOptions.map((opt) => (
+              {GAME_CATEGORIES.map((opt) => (
                 <MenuItem key={opt} value={opt}>
                   {opt}
                 </MenuItem>
               ))}
             </TextField>
-          ) : null}
+            {activeProvider === 'QTECH' ? (
+              <TextField
+                select
+                label="Provider Name"
+                size="small"
+                value={providerNameSearch}
+                onChange={(e) => {
+                  setProviderNameSearch(e.target.value);
+                  setPage(1);
+                }}
+                sx={{ ...headerFieldSx, minWidth: 200 }}
+                SelectProps={{ displayEmpty: true }}
+                InputLabelProps={{ shrink: true }}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {providerOptions.map((opt) => (
+                  <MenuItem key={opt} value={opt}>
+                    {opt}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null}
+            <TextField
+              select
+              label="Status"
+              size="small"
+              value={statusFilter}
+              onChange={(e) => selectStatusFilter(e.target.value as StatusFilter)}
+              sx={{ ...headerFieldSx, minWidth: 150 }}
+            >
+              {STATUS_FILTER_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent="flex-end"
+            flexWrap="wrap"
+            useFlexGap
+          >
+            {(
+              [
+                { key: 'all' as const, label: 'Total', value: gameCounts.total },
+                { key: 'active' as const, label: 'Active', value: gameCounts.active },
+                { key: 'inactive' as const, label: 'Inactive', value: gameCounts.inactive },
+              ] as const
+            ).map((pill) => (
+              <Box
+                key={pill.key}
+                component="button"
+                type="button"
+                onClick={() => selectStatusFilter(pill.key)}
+                sx={{
+                  ...countPillSx(pill.key, statusFilter === pill.key),
+                  appearance: 'none',
+                  m: 0,
+                  fontFamily: 'inherit',
+                }}
+              >
+                <Box component="span" sx={{ fontWeight: 500, opacity: 0.9 }}>
+                  {pill.label}
+                </Box>
+                <Box component="strong" sx={{ fontWeight: 700, fontSize: 11, ml: 0.5 }}>
+                  {pill.value}
+                </Box>
+              </Box>
+            ))}
+          </Stack>
         </Stack>
       </CollapsibleFilterPanel>
 

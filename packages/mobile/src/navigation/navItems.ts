@@ -161,6 +161,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.Coin_Removal,
   },
   {
+    id: 'showMyCoinHistory',
+    label: 'Show My Coin History',
+    path: '/show_my_coin_history',
+    // Visibility: User.data.showCoins (see canAccessNavItem) — not a Responsibility.
+  },
+  {
     id: 'customerAllotment',
     label: 'Customer Allotment',
     path: '/customer-allotment',

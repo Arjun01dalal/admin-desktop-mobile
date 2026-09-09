@@ -59,6 +59,7 @@ import { CheckersReportScreen } from '../screens/dashboards/details/CheckersRepo
 import { SheetDownloadReportScreen } from '../screens/dashboards/details/SheetDownloadReportScreen';
 import { PointsReportScreen } from '../screens/dashboards/details/PointsReportScreen';
 import { CoinRemovalListScreen } from '../screens/dashboards/details/CoinRemovalListScreen';
+import { ShowMyCoinHistoryScreen } from '../screens/dashboards/details/ShowMyCoinHistoryScreen';
 import { CustomerAllotmentScreen } from '../screens/dashboards/details/CustomerAllotmentScreen';
 import { CallerAllotmentScreen } from '../screens/dashboards/details/CallerAllotmentScreen';
 import { NonPerformingUserScreen } from '../screens/dashboards/details/NonPerformingUserScreen';
@@ -138,6 +139,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/downlaodReport': SheetDownloadReportScreen as AnyScreen,
   '/coins-report': PointsReportScreen as AnyScreen,
   '/coins-removal': CoinRemovalListScreen as AnyScreen,
+  '/show_my_coin_history': ShowMyCoinHistoryScreen as AnyScreen,
   '/customer-allotment': CustomerAllotmentScreen as AnyScreen,
   '/callerAllotment': CallerAllotmentScreen as AnyScreen,
   '/non_performing_user': NonPerformingUserScreen as AnyScreen,

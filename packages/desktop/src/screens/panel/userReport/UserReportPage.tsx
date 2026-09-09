@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { hasPermission } from '@/auth/permissions';
+import { getSessionUser, hasPermission } from '@/auth/permissions';
 import { BackRowActions } from '@/layout/BackRowActions';
 import { WalletHistoryView } from './WalletHistoryView';
 import { GameHistoryTab } from './GameHistoryTab';
@@ -31,10 +31,16 @@ import { ProviderHistoryTab } from './ProviderHistoryTab';
 import { QtechBetDetailsTab } from './QtechBetDetailsTab';
 import { SettleJetfairModal } from './SettleJetfairModal';
 import { TopCasinoGamesSection } from './TopCasinoGamesSection';
-import { canShowAddBonusCoinsTab, canShowCoinsTab } from './coinAccess';
+import {
+  canShowAddBonusCoinsTab,
+  canShowCoinsTab,
+  mergeCoinFlagsIntoSession,
+  readCoinUserFlags,
+} from './coinAccess';
 import { USER_REPORT_TABS, type EncryptedUser, type UserReportTab } from './types';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
+import { unpackPayload } from '@astro/shared/api';
 
 type EncryptedUserResponse = EncryptedUser & { payload?: EncryptedUser };
 
@@ -48,6 +54,7 @@ const SHORT_LABEL: Partial<Record<UserReportTab, string>> = {
   qtech_history: 'Qtech',
   jetfair_history: 'JetFair',
   falcon_history: 'Falcon',
+  coins: 'Coins',
   remove_bonus_coins: 'Remove Bonus',
   add_bonus_coins: 'Add Bonus',
   fund_request: 'Fund Request',
@@ -155,8 +162,8 @@ export function UserReportPage() {
   }>();
   const navigate = useNavigate();
   const canOpen = hasPermission('wallet_history');
-  const showCoinsTab = canShowCoinsTab();
-  const showAddBonusTab = canShowAddBonusCoinsTab();
+  const [showCoinsTab, setShowCoinsTab] = useState(() => canShowCoinsTab());
+  const [showAddBonusTab, setShowAddBonusTab] = useState(() => canShowAddBonusCoinsTab());
   const visibleTabs = useMemo(
     () =>
       USER_REPORT_TABS.filter((item) => {
@@ -237,6 +244,44 @@ export function UserReportPage() {
     }
     void loadEncrypted();
   }, [canOpen, loadEncrypted, navigate]);
+
+  // Laxmi: Coins / Add Bonus visibility from User.data.showCoinButton | showRemoveCoin.
+  // Refresh flags from get-subadmin so OTP/login payload gaps don't hide the tabs.
+  useEffect(() => {
+    let cancelled = false;
+    const refreshVisibility = () => {
+      if (cancelled) return;
+      setShowCoinsTab(canShowCoinsTab());
+      setShowAddBonusTab(canShowAddBonusCoinsTab());
+    };
+    refreshVisibility();
+    window.addEventListener('gcalc:user-updated', refreshVisibility);
+
+    void (async () => {
+      const session = getSessionUser() as Record<string, unknown> | null;
+      const id = session?._id != null ? String(session._id) : '';
+      if (!id) return;
+      try {
+        const res = await secureApi('subadmin.getSubadmin', { _id: id });
+        if (!res.ok || cancelled) return;
+        const payload = unpackPayload(res.data) as Record<string, unknown>;
+        const flags = readCoinUserFlags({ ...session, ...payload });
+        mergeCoinFlagsIntoSession({
+          showCoinButton: flags.showCoinButton,
+          showRemoveCoin: flags.showRemoveCoin,
+          showCoins: flags.showCoins,
+        });
+        refreshVisibility();
+      } catch {
+        // Keep session flags if refresh fails.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('gcalc:user-updated', refreshVisibility);
+    };
+  }, []);
 
   const onTabClick = useCallback(
     (id: UserReportTab) => {

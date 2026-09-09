@@ -143,17 +143,16 @@ export function CallerResponsibilityScreen() {
   const genRef = React.useRef(0);
 
   const openDepositList = useCallback(
-    (row: CallerRow, type?: 'withdrawal' | 'uniquePending') => {
-      const state: Record<string, unknown> = {
-        list: row,
-        empCode: row.empCode,
-        startDate,
-        endDate,
-      };
-      if (type) state.type = type;
+    (row: CallerRow, type: 'deposit' | 'withdrawal' | 'uniquePending' = 'deposit') => {
       openPanelTarget(navigation, {
         href: '/caller-responsibility/deposit-list',
-        state,
+        state: {
+          list: row,
+          type,
+          empCode: row.empCode,
+          startDate,
+          endDate,
+        },
       });
       setSelected(null);
     },
@@ -746,7 +745,7 @@ export function CallerResponsibilityScreen() {
                 },
                 {
                   label: 'View Deposit',
-                  onPress: () => openDepositList(selected.row),
+                  onPress: () => openDepositList(selected.row, 'deposit'),
                 },
                 {
                   label: 'View Refund List',

@@ -26,6 +26,7 @@ import {
   StateWiseRegistrationPage,
   CoinRemovalPage,
   CoinRemovalDetailsPage,
+  ShowMyCoinHistoryPage,
   CustomerAllotmentPage,
   PointsReportPage,
   PointsReportDetailsPage,
@@ -186,6 +187,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/coin-reports/report" element={<PointsReportDetailsPage />} />
             <Route path="/coins-removal" element={<CoinRemovalPage />} />
             <Route path="/coins-removal/details" element={<CoinRemovalDetailsPage />} />
+            <Route path="/show_my_coin_history" element={<ShowMyCoinHistoryPage />} />
             <Route path="/customer-allotment" element={<CustomerAllotmentPage />} />
             <Route path="/customer-allotted" element={<AllottedCustomersPage />} />
             <Route path="/non_performing_user" element={<NonPerformingUserPage />} />

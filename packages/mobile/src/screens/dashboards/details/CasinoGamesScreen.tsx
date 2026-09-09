@@ -60,6 +60,26 @@ const GAME_CATEGORIES = [
   'BlackJack',
 ];
 
+type StatusFilter = 'all' | 'active' | 'inactive';
+type GameCounts = { total: number; active: number; inactive: number };
+
+const EMPTY_COUNTS: GameCounts = { total: 0, active: 0, inactive: 0 };
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'Total' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
+function parseGameCounts(raw: unknown): GameCounts {
+  if (!raw || typeof raw !== 'object') return EMPTY_COUNTS;
+  const c = raw as Record<string, unknown>;
+  return {
+    total: Math.max(0, Number(c.total) || 0),
+    active: Math.max(0, Number(c.enabled ?? c.active) || 0),
+    inactive: Math.max(0, Number(c.disabled ?? c.inactive) || 0),
+  };
+}
+
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
@@ -118,6 +138,8 @@ export function CasinoGamesScreen() {
   const [gameCategory, setGameCategory] = useState('');
   const [providerName, setProviderName] = useState('');
   const [providerOptions, setProviderOptions] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [gameCounts, setGameCounts] = useState<GameCounts>(EMPTY_COUNTS);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +184,9 @@ export function CasinoGamesScreen() {
       if (provider === 'QTECH' && providerName.trim()) {
         filters['provider.name'] = providerName.trim();
       }
+      if (statusFilter === 'active') filters.status = true;
+      else if (statusFilter === 'inactive') filters.status = false;
+
       const res = await secureApi<unknown>('ops.casinoGetData', {
         pageNo: page,
         itemsPerPage: pageSize,
@@ -172,16 +197,22 @@ export function CasinoGamesScreen() {
         setError(res.message || 'Failed to load casino games');
         setRows([]);
         setTotalPages(1);
+        setGameCounts(EMPTY_COUNTS);
         return;
       }
-      const data = (res.data || {}) as { items?: Row[]; totalPages?: number };
+      const data = (res.data || {}) as {
+        items?: Row[];
+        totalPages?: number;
+        counts?: unknown;
+      };
       setSheetRow(null);
       setRows(Array.isArray(data.items) ? data.items : []);
       setTotalPages(Math.max(1, Number(data.totalPages) || 1));
+      if (data.counts) setGameCounts(parseGameCounts(data.counts));
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [page, pageSize, gameCategory, applied, provider, providerName]);
+  }, [page, pageSize, gameCategory, applied, provider, providerName, statusFilter]);
 
   useEffect(() => {
     void load();
@@ -209,6 +240,20 @@ export function CasinoGamesScreen() {
                   });
                   if (res.ok) {
                     setSheetRow(null);
+                    setGameCounts((prev) => {
+                      if (next) {
+                        return {
+                          ...prev,
+                          active: prev.active + 1,
+                          inactive: Math.max(0, prev.inactive - 1),
+                        };
+                      }
+                      return {
+                        ...prev,
+                        active: Math.max(0, prev.active - 1),
+                        inactive: prev.inactive + 1,
+                      };
+                    });
                     void load();
                   } else {
                     setError(res.message || 'Failed to update game status');
@@ -430,6 +475,73 @@ export function CasinoGamesScreen() {
         </View>
       ) : null}
 
+      <View style={styles.filterBlock}>
+        <Text style={styles.filterLabel}>Status</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipScroll}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.chip, statusFilter === opt.value && styles.chipActive]}
+              onPress={() => {
+                if (statusFilter !== opt.value) {
+                  setStatusFilter(opt.value);
+                  setPage(1);
+                }
+              }}
+            >
+              <Text
+                style={[styles.chipText, statusFilter === opt.value && styles.chipTextActive]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      <View style={styles.countsRow}>
+        {(
+          [
+            { key: 'all' as const, label: 'Total', value: gameCounts.total, style: styles.countAll },
+            {
+              key: 'active' as const,
+              label: 'Active',
+              value: gameCounts.active,
+              style: styles.countActive,
+            },
+            {
+              key: 'inactive' as const,
+              label: 'Inactive',
+              value: gameCounts.inactive,
+              style: styles.countInactive,
+            },
+          ] as const
+        ).map((pill) => (
+          <TouchableOpacity
+            key={pill.key}
+            style={[
+              styles.countPill,
+              pill.style,
+              statusFilter === pill.key && styles.countPillSelected,
+            ]}
+            onPress={() => {
+              if (statusFilter !== pill.key) {
+                setStatusFilter(pill.key);
+                setPage(1);
+              }
+            }}
+          >
+            <Text style={styles.countPillText}>
+              {pill.label} <Text style={styles.countPillValue}>{pill.value}</Text>
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <View style={styles.chipsRow}>
         <Text style={styles.chipsLabel}>Per page:</Text>
         {PAGE_SIZE_OPTIONS.map((n) => (
@@ -590,6 +702,26 @@ const styles = makeStyles({
     marginTop: spacing(3),
   },
   chipsLabel: { color: colors.muted, fontSize: 12 },
+  countsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(3),
+    justifyContent: 'flex-end',
+  },
+  countPill: {
+    borderRadius: 16,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  countPillSelected: { borderColor: colors.border },
+  countAll: { backgroundColor: '#eef2f7' },
+  countActive: { backgroundColor: '#e8f7ee' },
+  countInactive: { backgroundColor: '#fdecec' },
+  countPillText: { fontSize: 11, fontWeight: '500', color: '#334155' },
+  countPillValue: { fontWeight: '700', fontSize: 11 },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,

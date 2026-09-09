@@ -15,6 +15,7 @@ import {
   canAccessDashboard as sharedCanAccessDashboard,
   canAccessNavItem as sharedCanAccessNavItem,
   canEditMidLimits as sharedCanEditMidLimits,
+  canShowMyCoinHistory as sharedCanShowMyCoinHistory,
   canShowSos as sharedCanShowSos,
   canViewMidLimits as sharedCanViewMidLimits,
   deriveRoleNameFromLogin,
@@ -111,6 +112,11 @@ export function canAccessNavItem(
   user: StoredUser | null = getSessionUser(),
 ): boolean {
   return sharedCanAccessNavItem(item, user, storage);
+}
+
+/** Laxmi: Show My Coin History — `User.data.showCoins` only. */
+export function canShowMyCoinHistory(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanShowMyCoinHistory(user);
 }
 
 export function canViewMidLimits(user: StoredUser | null = getSessionUser()): boolean {
