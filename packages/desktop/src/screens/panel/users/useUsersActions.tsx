@@ -4,8 +4,16 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getRoleName, hasPermission, Permissions } from '@/auth/permissions';
+import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import { SHOW_EDIT_EMP_CODE, resolveBlockOtpMobile } from './constants';
-import { MAX_REMARK, type RoleOption, type SubAdminEditType } from './usersHelpers';
+import {
+  MAX_REMARK,
+  extractRoleId,
+  extractRoleName,
+  normalizeRoleOptions,
+  type RoleOption,
+  type SubAdminEditType,
+} from './usersHelpers';
 import type { UsersAdmin } from './useUsersQuery';
 import type { UserRow } from './utils';
 
@@ -323,26 +331,31 @@ export function useUsersActions({
   );
 
   const openRoleEdit = useCallback(async (row: UserRow) => {
+    const currentRoleId = extractRoleId(row.Role_ID);
     setRoleEditId(row._id);
-    setRoleEditValue(String(row.Role_ID || ''));
+    setRoleEditValue(currentRoleId);
+    setRoleOptions([]);
     try {
       const res = await secureApi('roles.list', {});
       if (!res.ok) {
         toast.error(res.message || 'Failed to load roles');
+        setRoleEditId(null);
         return;
       }
-      const data = res.data as
-        RoleOption[] | { items?: RoleOption[]; payload?: RoleOption[] } | undefined;
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data?.payload)
-            ? data.payload
-            : [];
+      const list = normalizeRoleOptions(res.data);
+      if (list.length === 0) {
+        toast.error('No roles available');
+        setRoleEditId(null);
+        return;
+      }
       setRoleOptions(list);
+      // Keep selection only if it still exists in the loaded list.
+      if (currentRoleId && !list.some((r) => r._id === currentRoleId)) {
+        setRoleEditValue(list[0]?._id || '');
+      }
     } catch {
       toast.error('Failed to load roles');
+      setRoleEditId(null);
     }
   }, []);
 
@@ -362,13 +375,55 @@ export function useUsersActions({
         toast.error(res.message || 'Failed to update role');
         return;
       }
+
+      const selected = roleOptions.find((r) => r._id === roleEditValue);
+      const nextName = selected?.Name || selected?.name || '';
+
+      // Update the row immediately so the table doesn't flash/break while reload runs.
+      setRows((prev) =>
+        prev.map((row) =>
+          row._id === roleEditId
+            ? {
+                ...row,
+                Role_ID: roleEditValue,
+                Role_Name: nextName || row.Role_Name,
+              }
+            : row,
+        ),
+      );
+
+      // Editing the logged-in account's own role — refresh session nav permissions.
+      if (admin?._id && String(admin._id) === String(roleEditId)) {
+        try {
+          const raw = localStorage.getItem('user');
+          const session = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+          const nextUser = {
+            ...session,
+            Role_ID: roleEditValue,
+            ...(nextName ? { Role_Name: nextName } : {}),
+          };
+          localStorage.setItem('user', JSON.stringify(nextUser));
+          localStorage.setItem('role_id', roleEditValue);
+          if (nextName) localStorage.setItem('role', nextName);
+          await syncResponsibilitiesForRole(roleEditValue);
+          window.dispatchEvent(new Event('gcalc:user-updated'));
+        } catch {
+          // Session sync failure shouldn't block the role update success path.
+        }
+      }
+
       toast.success('Role updated');
       setRoleEditId(null);
-      void load(page);
+      setRoleOptions([]);
+      try {
+        await load(page);
+      } catch {
+        // Local row already updated; reload failure is non-fatal.
+      }
     } finally {
       setRoleEditBusy(false);
     }
-  }, [admin?._id, load, page, roleEditId, roleEditValue]);
+  }, [admin?._id, load, page, roleEditId, roleEditValue, roleOptions, setRows]);
 
   const updateSubAdminLocation = useCallback(
     async (row: UserRow) => {

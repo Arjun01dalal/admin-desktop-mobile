@@ -257,21 +257,29 @@ export function UsersDialogs({ block, dump, subEdit, role, realName, blockCaller
       >
         <DialogTitle>Edit Role</DialogTitle>
         <DialogContent>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Role"
-            value={role.value}
-            onChange={(e) => role.setValue(e.target.value)}
-            sx={{ mt: 1 }}
-          >
-            {role.options.map((r) => (
-              <MenuItem key={r._id} value={r._id}>
-                {r.Name || r.name || r._id}
-              </MenuItem>
-            ))}
-          </TextField>
+          {role.options.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Loading roles…
+            </Typography>
+          ) : (
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Role"
+              value={
+                role.options.some((r) => r._id === role.value) ? role.value : role.options[0]?._id || ''
+              }
+              onChange={(e) => role.setValue(e.target.value)}
+              sx={{ mt: 1 }}
+            >
+              {role.options.map((r) => (
+                <MenuItem key={r._id} value={r._id}>
+                  {r.Name || r.name || r._id}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={role.close} disabled={role.busy}>
@@ -279,7 +287,7 @@ export function UsersDialogs({ block, dump, subEdit, role, realName, blockCaller
           </Button>
           <Button
             variant="contained"
-            disabled={role.busy}
+            disabled={role.busy || role.options.length === 0 || !role.value}
             onClick={() => void role.submit()}
             sx={{ bgcolor: '#ff9f0a', color: '#1a1200', fontWeight: 700 }}
           >

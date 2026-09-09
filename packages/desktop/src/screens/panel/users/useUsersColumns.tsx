@@ -51,7 +51,7 @@ import {
   DATETIME_COL_WIDTH,
   DATETIME_COL_SX,
 } from './columnLayout';
-import { SUBADMIN_LOCATIONS } from './usersHelpers';
+import { SUBADMIN_LOCATIONS, extractRoleName } from './usersHelpers';
 import { reasonForUserType } from './toolbarHelpers';
 import {
   nestedCallerName,
@@ -299,7 +299,11 @@ export function useUsersColumns(p: UseUsersColumnsParams) {
           render: (r) => (
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <Typography variant="body2" noWrap>
-                {String(r.Role_Name || '-')}
+                {String(
+                  r.Role_Name ||
+                    extractRoleName(r.Role_ID) ||
+                    '-',
+                )}
               </Typography>
               {canEditSubAdminRole ? (
                 <IconButton
