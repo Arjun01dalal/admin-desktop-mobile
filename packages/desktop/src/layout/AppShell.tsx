@@ -153,6 +153,7 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
         '/exchangeRateManagement',
         '/activeUserData',
         '/betConstructGamesList',
+        '/nandi-platform',
         '/ludo-player-wise-rtp',
         '/falcon-rate-management',
         '/exchange-rate-management',

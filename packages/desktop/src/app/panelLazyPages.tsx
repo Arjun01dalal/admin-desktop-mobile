@@ -226,6 +226,15 @@ const FundRequestCoinTablePage = lazyNamed(
 const PercentagePage = lazyNamed(() => import('@/screens/panel/PercentagePage'), 'PercentagePage');
 const FeedbackPage = lazyNamed(() => import('@/screens/panel/FeedbackPage'), 'FeedbackPage');
 const BannersPage = lazyNamed(() => import('@/screens/panel/BannersPage'), 'BannersPage');
+const PushNotificationsPage = lazyNamed(
+  () => import('@/screens/panel/PushNotificationsPage'),
+  'PushNotificationsPage',
+);
+const BlockWithdrawalPage = lazyNamed(
+  () => import('@/screens/panel/BlockWithdrawalPage'),
+  'BlockWithdrawalPage',
+);
+const GgrAlertPage = lazyNamed(() => import('@/screens/panel/GgrAlertPage'), 'GgrAlertPage');
 const DumpUsersPage = lazyNamed(() => import('@/screens/panel/DumpUsersPage'), 'DumpUsersPage');
 const UsersPage = lazyNamed(() => import('@/screens/panel/UsersPage'), 'UsersPage');
 const UserReportPage = lazyNamed(
@@ -314,6 +323,10 @@ const ActiveUserDataPage = lazyNamed(
 const BetConstructGamesListPage = lazyNamed(
   () => import('@/screens/panel/dashboards/BetConstructGamesListPage'),
   'BetConstructGamesListPage',
+);
+const NandiPlatformPage = lazyNamed(
+  () => import('@/screens/panel/dashboards/NandiPlatformPage'),
+  'NandiPlatformPage',
 );
 const LudoPlayerWiseRtpPage = lazyNamed(
   () => import('@/screens/panel/dashboards/LudoPlayerWiseRtpPage'),
@@ -423,6 +436,9 @@ export {
   PercentagePage,
   FeedbackPage,
   BannersPage,
+  PushNotificationsPage,
+  BlockWithdrawalPage,
+  GgrAlertPage,
   DumpUsersPage,
   UsersPage,
   UserReportPage,
@@ -451,6 +467,7 @@ export {
   ExchangeRateManagementPage,
   ActiveUserDataPage,
   BetConstructGamesListPage,
+  NandiPlatformPage,
   LudoPlayerWiseRtpPage,
   LiveMatchTotalLaxmiPage,
   LiveMatchTotalMasterPage,

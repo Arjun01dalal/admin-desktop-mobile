@@ -71,6 +71,9 @@ import { CasinoSwitchScreen } from '../screens/dashboards/details/CasinoSwitchSc
 import { TopGamesScreen } from '../screens/dashboards/details/TopGamesScreen';
 import { CasinoTopupBalanceScreen } from '../screens/dashboards/details/CasinoTopupBalanceScreen';
 import { BannersScreen } from '../screens/dashboards/details/BannersScreen';
+import { PushNotificationsScreen } from '../screens/dashboards/details/PushNotificationsScreen';
+import { BlockWithdrawalScreen } from '../screens/dashboards/details/BlockWithdrawalScreen';
+import { GgrAlertScreen } from '../screens/dashboards/details/GgrAlertScreen';
 import { UpiPaymentsScreen } from '../screens/dashboards/details/UpiPaymentsScreen';
 import { UpiListsScreen } from '../screens/dashboards/details/UpiListsScreen';
 import { UtrProviderScreen } from '../screens/dashboards/details/UtrProviderScreen';
@@ -151,6 +154,9 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/top-games': TopGamesScreen as AnyScreen,
   '/casino-topup-balance': CasinoTopupBalanceScreen as AnyScreen,
   '/banners': BannersScreen as AnyScreen,
+  '/push-notifications': PushNotificationsScreen as AnyScreen,
+  '/block-withdrawal': BlockWithdrawalScreen as AnyScreen,
+  '/ggr-alert': GgrAlertScreen as AnyScreen,
   '/all-upi-payments': UpiPaymentsScreen as AnyScreen,
   '/upi-lists': UpiListsScreen as AnyScreen,
   '/utr-provider': UtrProviderScreen as AnyScreen,

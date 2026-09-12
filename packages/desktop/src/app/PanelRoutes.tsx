@@ -77,6 +77,9 @@ import {
   PercentagePage,
   FeedbackPage,
   BannersPage,
+  PushNotificationsPage,
+  BlockWithdrawalPage,
+  GgrAlertPage,
   DumpUsersPage,
   UsersPage,
   UserReportPage,
@@ -105,6 +108,7 @@ import {
   ExchangeRateManagementPage,
   ActiveUserDataPage,
   BetConstructGamesListPage,
+  NandiPlatformPage,
   LudoPlayerWiseRtpPage,
   LiveMatchTotalLaxmiPage,
   LiveMatchTotalMasterPage,
@@ -143,6 +147,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/exchangeRateManagement" element={<ExchangeRateManagementPage />} />
             <Route path="/activeUserData" element={<ActiveUserDataPage />} />
             <Route path="/betConstructGamesList" element={<BetConstructGamesListPage />} />
+            <Route path="/nandi-platform" element={<NandiPlatformPage />} />
             <Route path="/ludo-player-wise-rtp" element={<LudoPlayerWiseRtpPage />} />
             <Route path="/liveMatchTotal" element={<LiveMatchTotalLaxmiPage />} />
             <Route path="/masterLiveMatchTotal" element={<LiveMatchTotalMasterPage />} />
@@ -198,6 +203,9 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/users-kyc" element={<UsersKycPage />} />
             <Route path="/kycList" element={<KycListPage />} />
             <Route path="/banners" element={<BannersPage />} />
+            <Route path="/push-notifications" element={<PushNotificationsPage />} />
+            <Route path="/block-withdrawal" element={<BlockWithdrawalPage />} />
+            <Route path="/ggr-alert" element={<GgrAlertPage />} />
             <Route path="/upi-lists" element={<UpiListsPage />} />
             <Route path="/all-upi-payments" element={<UpiPaymentsPage />} />
             <Route path="/utr-provider" element={<UtrProviderPage />} />

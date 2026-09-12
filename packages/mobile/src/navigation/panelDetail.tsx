@@ -19,6 +19,7 @@ import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/Playe
 import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameActivityDetailsScreen';
 import { GameUserStatsScreen } from '../screens/dashboards/details/GameUserStatsScreen';
 import { BetConstructGamesListScreen } from '../screens/dashboards/details/BetConstructGamesListScreen';
+import { NandiPlatformScreen } from '../screens/dashboards/details/NandiPlatformScreen';
 import { LudoUserGgrScreen } from '../screens/dashboards/details/LudoUserGgrScreen';
 import { LudoPlayerWiseRtpScreen } from '../screens/dashboards/details/LudoPlayerWiseRtpScreen';
 import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
@@ -67,6 +68,7 @@ const DETAIL_PERMISSION_BY_PATH: Readonly<Record<string, Permission>> = {
   '/game-activity/details': Permissions.game_activity,
   '/game-activity/user-stats': Permissions.game_activity,
   '/betConstructGamesList': Permissions.View_Games,
+  '/nandi-platform': Permissions.View_Dashboard,
   '/ludo-user-ggr-by-round': Permissions.house_game,
   '/ludo-player-wise-rtp': Permissions.house_game,
   '/leaderboardCustomerCount': Permissions.caller_leaderboard_tab,
@@ -174,6 +176,11 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     path: '/betConstructGamesList',
     title: 'BetConstruct Details',
     Component: BetConstructGamesListScreen as PanelDetailRoute['Component'],
+  },
+  {
+    path: '/nandi-platform',
+    title: 'Shatabhisha Platform',
+    Component: NandiPlatformScreen as PanelDetailRoute['Component'],
   },
   {
     path: '/ludo-user-ggr-by-round',

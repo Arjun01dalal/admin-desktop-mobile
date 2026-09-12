@@ -151,6 +151,12 @@ export const Permissions = {
   Percentage: 'Percentage',
   New_Deposits: 'New_Deposits',
   Social_Media: 'Social_Media',
+  /** Push Notifications / scheduled topic campaigns (admin-panel PushNotifications). */
+  Scheduled_Topic_Notifications: 'Scheduled_Topic_Notifications',
+  /** Block Withdrawal page (admin-panel BlockWithdrawal). */
+  show_withdrawal_block: 'show_withdrawal_block',
+  /** GGR Alert page (admin-panel GgrAlert). */
+  show_ggr_alert: 'show_ggr_alert',
   /** Set Whatsapp Mid page (admin-panel WhatsappMid). */
   set_whatsapp_limit: 'set_whatsapp_limit',
   /** AAA Fraud Bet Report (external nodeadmin). */

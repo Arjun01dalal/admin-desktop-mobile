@@ -317,6 +317,7 @@ export function buildProviderCards(
       filters: ['Ashwini', 'Shatabhisha'],
       showOnVip: true,
       loading,
+      href: '/nandi-platform',
       activeCustomerCount: activeCount(active, 'sattaMatka', 'sattamatka', 'satta'),
       activeCustomerKey: 'sattamatka',
       state: dateState,

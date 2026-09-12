@@ -346,6 +346,18 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_Withdrawals,
   },
   {
+    id: 'blockWithdrawal',
+    label: 'Block Withdrawal',
+    path: '/block-withdrawal',
+    permission: Permissions.show_withdrawal_block,
+  },
+  {
+    id: 'ggrAlert',
+    label: 'GGR Alert',
+    path: '/ggr-alert',
+    permission: Permissions.show_ggr_alert,
+  },
+  {
     id: 'withdrawalFund',
     label: 'Withdrawal Fund',
     path: '/withdrawal-fund',
@@ -362,6 +374,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Social Media',
     path: '/social-media',
     permission: Permissions.Social_Media,
+  },
+  {
+    id: 'pushNotifications',
+    label: 'Push Notifications',
+    path: '/push-notifications',
+    permission: Permissions.Scheduled_Topic_Notifications,
   },
   {
     id: 'whatsappMid',
@@ -465,6 +483,7 @@ export const PANEL_PATHS = new Set<string>([
   '/exchangeRateManagement',
   '/activeUserData',
   '/betConstructGamesList',
+  '/nandi-platform',
   '/falcon-rate-management',
   '/exchange-rate-management',
   '/balance-f',
