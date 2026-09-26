@@ -169,8 +169,10 @@ export function searchFieldsFor(
   }
   const fields: SearchFieldOption[] = [
     { key: 'name', label: 'Name' },
-    { key: '_id', label: 'Dp Id' },
   ];
+  if (type !== 'In_Active_Deposit') {
+    fields.push({ key: '_id', label: 'Dp Id' });
+  }
   if (!hideContact) {
     fields.push(
       { key: 'mobile', label: 'Mobile' },

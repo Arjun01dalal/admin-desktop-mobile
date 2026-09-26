@@ -23,27 +23,34 @@ export type ValidationItem = {
 };
 
 export type WithdrawalRow = {
-  _id: string;
+  _id?: string;
   userId?: string;
   userName?: string;
+  name?: string;
   empCode?: string;
   accountHolderName?: string;
   mobile?: string;
   userMobile?: string;
   clientName?: string;
+  appName?: string;
   amount?: number | string;
+  Amount?: number | string;
   status?: string;
   state?: string;
   city?: string;
   userBankName?: string;
   bankName?: string;
   orderId?: string;
+  order_id?: string;
   transactionId?: string;
   dp_id?: string;
+  Dp_ID?: string;
   accountNo?: string;
+  accountNumber?: string;
   ifscCode?: string;
   commissionAmount?: number | string;
   createdOn?: string;
+  createdAt?: string;
   updatedOn?: string;
   mid?: string | number;
   paymentGatewayName?: string;
@@ -62,6 +69,8 @@ export type WithdrawalRow = {
   totalPoints?: number;
   validationResults?: ValidationItem[];
   upiId?: string;
+  /** Allow Active User Withdrawal / API extras without losing typed fields. */
+  [key: string]: unknown;
 };
 
 export type ColumnFilters = {

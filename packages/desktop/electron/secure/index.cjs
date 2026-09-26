@@ -372,21 +372,31 @@ async function externalDialerBatch(payload = {}, token = null) {
 
 async function externalDialerSingle(payload = {}, token = null) {
   const { details = {}, extensionId = [], adminName = 'ADMIN', serverId } = payload;
-  const ids = Array.isArray(extensionId) ? extensionId.map(String) : [];
-  const numericId = ids.find((val) => /^\d+$/.test(val));
-  if (!numericId) {
+  const ids = Array.isArray(extensionId)
+    ? extensionId.map((v) => String(v ?? '').trim()).filter(Boolean)
+    : typeof extensionId === 'string' && String(extensionId).trim()
+      ? [String(extensionId).trim()]
+      : [];
+
+  // Prefer alphanumeric login campaign (K_1009); else pure numeric.
+  // list_id = 90 + digits (e.g. K_1009 → 901009).
+  const HAS_LETTER_AND_DIGIT = /^(?=.*[A-Za-z])(?=.*\d).+$/;
+  const alpha = ids.find((val) => HAS_LETTER_AND_DIGIT.test(val));
+  const numericOnly = ids.find((val) => /^\d+$/.test(val));
+  const campaignId = alpha || numericOnly || '';
+  const numericPart = (alpha || '').replace(/\D/g, '') || numericOnly || '';
+  if (!campaignId || !numericPart) {
     return { ok: false, message: 'Dialer extension ID not found for this admin' };
   }
 
-  // Call button uses extension as campaign_id (laxmi CallingBtn).
   // 3xxx → api.ganesha999.com; 1xxx → api2.ganesha999.com
-  const url = dialerBaseUrl(serverId, numericId);
+  const url = dialerBaseUrl(serverId, campaignId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   const dialerBody = {
-    list_id: `9${numericId}`,
+    list_id: `90${numericPart}`,
     list_name: `${String(adminName).toUpperCase()} BOT CALLING LIST`,
-    campaign_id: numericId,
+    campaign_id: campaignId,
     leads: [
       sanitizeDialerLead({
         first_name: details?.client_name,

@@ -124,23 +124,32 @@ export async function singleCallToDialer(args: {
   serverId?: unknown;
 }): Promise<{ ok: boolean; message: string }> {
   const ids = Array.isArray(args.extensionId)
-    ? args.extensionId.map(String)
+    ? args.extensionId.map((v) => String(v ?? '').trim()).filter(Boolean)
     : typeof args.extensionId === 'string' && args.extensionId.trim()
       ? [args.extensionId.trim()]
       : [];
-  const numericId = ids.find((val) => /^\d+$/.test(val));
-  if (!numericId) return { ok: false, message: 'Dialer extension ID not found for this admin' };
 
-  const url = dialerBaseUrl(args.serverId, numericId);
+  // Prefer alphanumeric login campaign (K_1009); else pure numeric.
+  // list_id = 90 + digits (e.g. K_1009 → 901009).
+  const HAS_LETTER_AND_DIGIT = /^(?=.*[A-Za-z])(?=.*\d).+$/;
+  const alpha = ids.find((val) => HAS_LETTER_AND_DIGIT.test(val));
+  const numericOnly = ids.find((val) => /^\d+$/.test(val));
+  const campaignId = alpha || numericOnly || '';
+  const numericPart = (alpha || '').replace(/\D/g, '') || numericOnly || '';
+  if (!campaignId || !numericPart) {
+    return { ok: false, message: 'Dialer extension ID not found for this admin' };
+  }
+
+  const url = dialerBaseUrl(args.serverId, campaignId);
   if (!url) return { ok: false, message: 'Invalid dialer server' };
 
   const lead = toLead(args.lead);
   if (!lead.phone_number) return { ok: false, message: 'No valid phone number' };
 
   const body = {
-    list_id: `9${numericId}`,
+    list_id: `90${numericPart}`,
     list_name: `${String(args.adminName || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
-    campaign_id: numericId,
+    campaign_id: campaignId,
     leads: [lead],
   };
 

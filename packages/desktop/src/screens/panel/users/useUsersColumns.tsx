@@ -791,15 +791,7 @@ export function useUsersColumns(p: UseUsersColumnsParams) {
           width: DP_ID_COL_WIDTH,
           headSx: DP_ID_COL_SX,
           cellSx: DP_ID_COL_SX,
-          filter: (
-            <FilterInput
-              value={draft.dpId}
-              onChange={setDraftField('dpId')}
-              onSearch={search}
-              placeholder="DP ID"
-              compact
-            />
-          ),
+          filter: null,
           render: (r) => <CompactDpId value={String(r._id || '')} />,
         },
         {

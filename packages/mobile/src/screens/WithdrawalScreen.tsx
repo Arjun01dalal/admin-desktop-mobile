@@ -19,6 +19,7 @@ import { DepositWithdrawalMidModal } from './withdrawal/DepositWithdrawalMidModa
 import { WithdrawalModals } from './withdrawal/WithdrawalModals';
 import { WithdrawalCardFooter } from './withdrawal/WithdrawalCardFooter';
 import { WithdrawalToolbar } from './withdrawal/WithdrawalToolbar';
+import { TotalBeneListModal } from './withdrawal/TotalBeneListModal';
 import { display, fmtAmount, statusBadgeBg, type Rec } from './withdrawal/helpers';
 import { styles } from './WithdrawalScreen.styles';
 import { useWithdrawalScreen } from './withdrawal/useWithdrawalScreen';
@@ -106,6 +107,15 @@ export function WithdrawalScreen() {
     addBeneSearch,
     setAddBeneSearch,
     availableBanks,
+    beneAccOptions,
+    selectedBeneficiaryAccounts,
+    draftBeneficiaryAccounts,
+    setDraftBeneficiaryAccounts,
+    benePendingOpen,
+    toggleBenePendingPanel,
+    applyBenePendingPanel,
+    totalBeneListOpen,
+    setTotalBeneListOpen,
     addBeneExisting,
     submitAddBene,
     beneOpen,
@@ -243,6 +253,14 @@ export function WithdrawalScreen() {
         mids={mids}
         canManageBeneficiaries={perms.actions}
         onOpenBeneList={() => void openBeneModal()}
+        onOpenTotalBeneList={() => setTotalBeneListOpen(true)}
+        beneAccOptions={beneAccOptions}
+        selectedBeneficiaryAccounts={selectedBeneficiaryAccounts}
+        draftBeneficiaryAccounts={draftBeneficiaryAccounts}
+        setDraftBeneficiaryAccounts={setDraftBeneficiaryAccounts}
+        benePendingOpen={benePendingOpen}
+        toggleBenePendingPanel={toggleBenePendingPanel}
+        applyBenePendingPanel={applyBenePendingPanel}
         canDownload={perms.download}
         requestSheetDownload={requestSheetDownload}
         downloadData={downloadData}
@@ -394,6 +412,11 @@ export function WithdrawalScreen() {
         setStatusModal={setStatusModal}
         remark={remark}
         setRemark={setRemark}
+      />
+
+      <TotalBeneListModal
+        open={totalBeneListOpen}
+        onClose={() => setTotalBeneListOpen(false)}
       />
 
       <View style={styles.pagerRow}>

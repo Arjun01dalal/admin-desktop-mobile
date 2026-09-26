@@ -148,6 +148,8 @@ export type UseNewRegistersColumnsParams = {
   onViewComments: (row: UserRow) => void;
   onViewCallLogs: (row: UserRow) => void;
   onCallSuccess?: () => void;
+  /** Selected toolbar campaign id (e.g. K_1009) — Call dialer fallback. */
+  campaignId?: string;
 };
 
 export function useNewRegistersColumns({
@@ -160,6 +162,7 @@ export function useNewRegistersColumns({
   onViewComments,
   onViewCallLogs,
   onCallSuccess,
+  campaignId = '',
 }: UseNewRegistersColumnsParams): CommonTableColumn<UserRow>[] {
   const rowOffset = (page - 1) * itemsPerPage;
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
@@ -324,7 +327,7 @@ export function useNewRegistersColumns({
         render: (row) => (
           <CallingBtn
             item={row as never}
-            campaignName="OM south"
+            campaignName={campaignId}
             hideBotCall
             isNewRegistration
             onSuccess={onCallSuccess}
@@ -700,5 +703,6 @@ export function useNewRegistersColumns({
     onViewComments,
     onViewCallLogs,
     onCallSuccess,
+    campaignId,
   ]);
 }

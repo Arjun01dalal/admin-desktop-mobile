@@ -9,3 +9,4 @@ export {
   SettleTab,
   PlayerRtpLink,
 } from './actionTabs';
+export { IndianDivasSettleTab } from './IndianDivasSettleTab';

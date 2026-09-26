@@ -1,15 +1,10 @@
 import { useMemo, useState } from 'react';
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Button, Stack, Typography } from '@mui/material';
 import { toast } from 'react-toastify';
+import {
+  collectCallerExtensionIds,
+  resolveCallerDialerIdsFromUser,
+} from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { getStoredUser } from '@/utils/dates';
@@ -22,12 +17,14 @@ type CallingAdmin = {
   name?: string;
   extensionId?: string[] | string;
   serverId?: string | number;
+  [key: string]: unknown;
 };
 
 type CallingBtnProps = {
   item: UserRow;
   reasonList?: string;
   botId?: string;
+  /** Login / toolbar campaign id fallback (e.g. K_1009). */
   campaignName?: string;
   /** Hide Bot Call button (New Registers parity). */
   hideBotCall?: boolean;
@@ -36,16 +33,11 @@ type CallingBtnProps = {
   onSuccess?: () => void;
 };
 
-function extensionIds(admin: CallingAdmin | null): string[] {
-  const raw = admin?.extensionId;
-  if (Array.isArray(raw)) return raw.map(String);
-  if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
-  return [];
-}
-
 /**
  * Mobile + Call / Bot Call — ported from laxminarayan CallingBtn.
  * Number visible only when `show_mobile` responsibility is present.
+ * Call dials immediately (no confirm modal) using login campaign id (e.g. K_1009)
+ * and list_id `90` + digits (e.g. 901009).
  */
 export function CallingBtn({
   item,
@@ -58,25 +50,37 @@ export function CallingBtn({
 }: CallingBtnProps) {
   const admin = getStoredUser<CallingAdmin>();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const ids = useMemo(() => extensionIds(admin), [admin]);
-  const numericCampaignId = useMemo(() => ids.find((val) => /^\d+$/.test(val)) || '', [ids]);
-  // Same values posted by externalDialerSingle / laxmi sendData
-  const dialerListId = numericCampaignId ? `9${numericCampaignId}` : '—';
-  const dialerListName = `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`;
-  const dialerCampaignId = numericCampaignId || '—';
-  const dialerCampaignLabel = campaignName?.trim() || dialerCampaignId;
+  const dialerIds = useMemo(
+    () =>
+      resolveCallerDialerIdsFromUser(
+        admin as Record<string, unknown> | null,
+        campaignName,
+      ),
+    [admin, campaignName],
+  );
+
+  const extensionIdPayload = useMemo(() => {
+    const fromLogin = collectCallerExtensionIds(admin as Record<string, unknown> | null);
+    if (dialerIds?.campaignId && !fromLogin.includes(dialerIds.campaignId)) {
+      fromLogin.push(dialerIds.campaignId);
+    }
+    if (dialerIds?.numericPart && !fromLogin.includes(dialerIds.numericPart)) {
+      fromLogin.push(dialerIds.numericPart);
+    }
+    return fromLogin;
+  }, [admin, dialerIds]);
 
   const mobile = String(item.mobile || item.userMobile || '');
 
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
-
-  /** Manual Call — external dialer single lead (laxminarayan sendData). */
+  /** Manual Call — external dialer single lead (login campaign + 90<id> list). */
   const sendData = async () => {
-    if (!numericCampaignId) {
+    if (!mobile) {
+      toast.error('Mobile number not found');
+      return;
+    }
+    if (!dialerIds) {
       toast.error('Dialer extension / campaign ID not found for this admin');
       return;
     }
@@ -106,7 +110,7 @@ export function CallingBtn({
           app_name: item.clientName,
           caller_user_id: item._id,
         },
-        extensionId: ids,
+        extensionId: extensionIdPayload.length ? extensionIdPayload : [dialerIds.campaignId],
         adminName: admin?.name || 'ADMIN',
         serverId: admin?.serverId,
       });
@@ -115,7 +119,6 @@ export function CallingBtn({
         return;
       }
       toast.success(res.message || 'Data sent successfully');
-      setOpen(false);
       onSuccess?.();
     } finally {
       setBusy(false);
@@ -154,8 +157,8 @@ export function CallingBtn({
           size="small"
           variant="contained"
           color="warning"
-          disabled={busy || !mobile}
-          onClick={handleOpen}
+          disabled={busy || !mobile || !dialerIds}
+          onClick={() => void sendData()}
           sx={{
             minWidth: 48,
             px: 1,
@@ -191,62 +194,6 @@ export function CallingBtn({
           </Button>
         )}
       </Stack>
-
-      <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ textAlign: 'center', fontWeight: 600, fontSize: 18 }}>
-          Confirm Details
-        </DialogTitle>
-        <DialogContent>
-          <Box
-            sx={{
-              bgcolor: 'action.hover',
-              borderRadius: 2,
-              p: 2,
-              mt: 1,
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-              CAMPAIGN ID
-            </Typography>
-            <Typography sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}>
-              {dialerCampaignLabel}
-            </Typography>
-
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-              LIST ID
-            </Typography>
-            <Typography sx={{ fontWeight: 700, fontSize: 18, color: 'primary.main', mb: 1.5 }}>
-              {dialerListId}
-            </Typography>
-
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-              LIST NAME
-            </Typography>
-            <Typography sx={{ fontWeight: 600, fontSize: 15, color: 'text.primary' }}>
-              {dialerListName}
-            </Typography>
-          </Box>
-          <Typography sx={{ textAlign: 'center', mt: 2, fontSize: 13, color: 'text.secondary' }}>
-            Do you want to proceed with this details?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 2, pb: 2, gap: 1 }}>
-          <Button fullWidth variant="outlined" color="error" onClick={handleClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={() => void sendData()}
-            disabled={busy || !numericCampaignId}
-            sx={{ fontWeight: 600 }}
-          >
-            Submit
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Stack>
   );
 }

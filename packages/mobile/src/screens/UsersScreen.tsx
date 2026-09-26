@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { appCodeForName } from '@astro/shared';
+import { appCodeForName, resolveCallerDialerIds } from '@astro/shared';
 import { USER_TYPES, type UserType } from '@astro/shared/userTypes';
 import { colors } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
@@ -149,7 +149,6 @@ export function UsersScreen() {
   const [campaignId, setCampaignId] = useState('');
   const [dialerBusy, setDialerBusy] = useState(false);
   const [dialerMsg, setDialerMsg] = useState('');
-  const [callConfirmRow, setCallConfirmRow] = useState<Row | null>(null);
   const [callBusy, setCallBusy] = useState(false);
 
   const adminRec = useMemo(() => (admin ?? {}) as Record<string, unknown>, [admin]);
@@ -159,46 +158,44 @@ export function UsersScreen() {
     if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
     return [] as string[];
   }, [adminRec.extensionId]);
-  const numericCampaignId = useMemo(
-    () => extensionIds.find((val) => /^\d+$/.test(val)) || '',
-    [extensionIds],
+  const callerDialerIds = useMemo(
+    () => resolveCallerDialerIds(adminRec.extensionId),
+    [adminRec.extensionId],
   );
-  const dialerListId = numericCampaignId ? `9${numericCampaignId}` : '—';
-  const dialerListName = `${String(adminRec.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`;
 
-  const confirmManualCall = useCallback(async () => {
-    const row = callConfirmRow;
-    if (!row) return;
-    const mobile = String(row.mobile || '').trim();
-    if (!mobile) {
-      Alert.alert('No mobile number for this user');
-      return;
-    }
-    if (!numericCampaignId) {
-      Alert.alert('Dialer extension / campaign ID not found for this admin');
-      return;
-    }
-    setCallBusy(true);
-    try {
-      const res = await singleCallToDialer({
-        lead: {
-          _id: String(row._id || ''),
-          name: row.name,
-          mobile,
-          city: row.city,
-          state: row.state,
-          clientName: row.clientName,
-        },
-        extensionId: extensionIds,
-        adminName: typeof adminRec.name === 'string' ? adminRec.name : 'ADMIN',
-        serverId: adminRec.serverId,
-      });
-      Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
-      if (res.ok) setCallConfirmRow(null);
-    } finally {
-      setCallBusy(false);
-    }
-  }, [adminRec, callConfirmRow, extensionIds, numericCampaignId]);
+  const placeManualCall = useCallback(
+    async (row: Row) => {
+      const mobile = String(row.mobile || '').trim();
+      if (!mobile) {
+        Alert.alert('No mobile number for this user');
+        return;
+      }
+      if (!callerDialerIds) {
+        Alert.alert('Dialer extension / campaign ID not found for this admin');
+        return;
+      }
+      setCallBusy(true);
+      try {
+        const res = await singleCallToDialer({
+          lead: {
+            _id: String(row._id || ''),
+            name: row.name,
+            mobile,
+            city: row.city,
+            state: row.state,
+            clientName: row.clientName,
+          },
+          extensionId: extensionIds,
+          adminName: typeof adminRec.name === 'string' ? adminRec.name : 'ADMIN',
+          serverId: adminRec.serverId,
+        });
+        Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
+      } finally {
+        setCallBusy(false);
+      }
+    },
+    [adminRec, callerDialerIds, extensionIds],
+  );
 
   const handleAddToBot = useCallback(async () => {
     setDialerMsg('');
@@ -290,24 +287,43 @@ export function UsersScreen() {
       ) {
         filter.uniqueUser = false;
       }
-      if (appliedSearch.text.trim() && !(callerEmpScoped && appliedSearch.field === 'empCode')) {
-        filter[appliedSearch.field] = appliedSearch.text.trim();
+      const searchText = appliedSearch.text.trim();
+      const searchingDpId =
+        Boolean(searchText) &&
+        (appliedSearch.field === '_id' ||
+          appliedSearch.field === 'dpId' ||
+          appliedSearch.field === 'dp_id');
+      if (searchText && !(callerEmpScoped && appliedSearch.field === 'empCode')) {
+        // Exact DP ID lookup uses API `_id` (Laxmi inactive-deposit / users parity).
+        const field =
+          appliedSearch.field === 'dpId' || appliedSearch.field === 'dp_id'
+            ? '_id'
+            : appliedSearch.field;
+        if (searchingDpId) {
+          // Drop other filters — state/clientName hide exact matches.
+          for (const key of Object.keys(filter)) {
+            if (key !== 'uniqueUser') delete filter[key];
+          }
+          filter._id = searchText;
+        } else {
+          filter[field] = searchText;
+        }
       }
-      if (blockFilter && userType === 'User') filter.blockUser = blockFilter === 'block';
+      if (blockFilter && userType === 'User' && !searchingDpId) {
+        filter.blockUser = blockFilter === 'block';
+      }
       // Caller default list = own emp; when searching DP ID / name / etc. omit empCode
       // so 001 (unassigned) users can be returned, then scoped client-side.
       const callerSearchingOther =
         callerEmpScoped &&
-        Boolean(appliedSearch.text.trim()) &&
+        Boolean(searchText) &&
         appliedSearch.field !== 'empCode';
-      const searchingDpId =
-        Boolean(appliedSearch.text.trim()) &&
-        (appliedSearch.field === '_id' || appliedSearch.field === 'dpId');
       if (
         callerEmpScoped &&
         loginEmpCode &&
         userType !== 'In_Active_Deposit' &&
-        !callerSearchingOther
+        !callerSearchingOther &&
+        !searchingDpId
       ) {
         filter.empCode = loginEmpCode;
       }
@@ -340,9 +356,17 @@ export function UsersScreen() {
         if (Object.keys(scoped).length > 0) withAppState = { appWithState: scoped };
       }
 
-      if (appClientName && userType !== 'Sub_Admin' && userType !== 'LAXMI_999_Users' && !searchingDpId) {
+      if (
+        appClientName &&
+        userType !== 'Sub_Admin' &&
+        userType !== 'LAXMI_999_Users' &&
+        !searchingDpId
+      ) {
         filter.clientName = appClientName;
       }
+
+      const datePayload =
+        !searchingDpId && dates ? { startDate: dates.start, endDate: dates.end } : {};
 
       let payload: Record<string, unknown>;
       switch (userType) {
@@ -358,7 +382,7 @@ export function UsersScreen() {
             pageNo: page,
             itemPerPage: pageSize,
             filter,
-            ...(dates ? { startDate: dates.start, endDate: dates.end } : {}),
+            ...datePayload,
             ...app,
             ...withAppState,
           };
@@ -374,7 +398,9 @@ export function UsersScreen() {
             pageNo: page,
             itemsPerPage: pageSize,
             filter,
-            ...(dates ? { activeUserStartDate: dates.start, activeUserEndDate: dates.end } : {}),
+            ...(!searchingDpId && dates
+              ? { activeUserStartDate: dates.start, activeUserEndDate: dates.end }
+              : {}),
             ...app,
             ...withAppState,
           };
@@ -385,7 +411,7 @@ export function UsersScreen() {
             pageNo: page,
             itemsPerPage: pageSize,
             filter,
-            ...(dates ? { startDate: dates.start, endDate: dates.end } : {}),
+            ...datePayload,
             ...(userType === 'User'
               ? { activeUserStart: '', activeUserEnd: '' }
               : { ...app, ...withAppState }),
@@ -398,16 +424,28 @@ export function UsersScreen() {
         return;
       }
       const raw = Array.isArray(res.data) ? {} : (res.data ?? {});
+      const nested =
+        raw.payload && typeof raw.payload === 'object' && !Array.isArray(raw.payload)
+          ? (raw.payload as Record<string, unknown>)
+          : raw;
       let list = Array.isArray(res.data)
         ? res.data
-        : (raw.items ?? raw.users ?? raw.user ?? raw.data ?? []);
-      if (callerEmpScoped && loginEmpCode) {
+        : ((nested.items ??
+            nested.users ??
+            nested.user ??
+            nested.data ??
+            raw.items ??
+            raw.users ??
+            raw.user ??
+            raw.data ??
+            []) as Row[]);
+      if (callerEmpScoped && loginEmpCode && !searchingDpId) {
         list = filterCallerEmpScope(list, loginEmpCode, Boolean(callerSearchingOther));
       }
       setSelected(null);
       setRows(list);
-      setTotalPages(Math.max(1, Number(raw.totalPages ?? 1) || 1));
-      setTotal(Number(raw.total ?? raw.count ?? list.length) || 0);
+      setTotalPages(Math.max(1, Number(nested.totalPages ?? raw.totalPages ?? 1) || 1));
+      setTotal(Number(nested.total ?? nested.count ?? raw.total ?? raw.count ?? list.length) || 0);
     } finally {
       setLoading(false);
     }
@@ -810,7 +848,7 @@ export function UsersScreen() {
                         disabled={callBusy}
                         onPress={() => {
                           setSelected(null);
-                          setCallConfirmRow(r);
+                          void placeManualCall(r);
                         }}
                       >
                         <Text style={styles.callBtnText}>Call</Text>
@@ -886,7 +924,7 @@ export function UsersScreen() {
                         onPress: () => {
                           const row = selected;
                           setSelected(null);
-                          setCallConfirmRow(row);
+                          if (row) void placeManualCall(row);
                         },
                       },
                     ]
@@ -921,51 +959,6 @@ export function UsersScreen() {
             : undefined
         }
       />
-
-      <Modal
-        visible={callConfirmRow !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => !callBusy && setCallConfirmRow(null)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Confirm Details</Text>
-            <Text style={styles.modalSub}>
-              {display(callConfirmRow?.name)} · {display(callConfirmRow?.mobile)}
-            </Text>
-            <View style={styles.callConfirmBox}>
-              <Text style={styles.callConfirmLabel}>CAMPAIGN ID</Text>
-              <Text style={styles.callConfirmValue}>{numericCampaignId || '—'}</Text>
-              <Text style={styles.callConfirmLabel}>LIST ID</Text>
-              <Text style={styles.callConfirmValue}>{dialerListId}</Text>
-              <Text style={styles.callConfirmLabel}>LIST NAME</Text>
-              <Text style={styles.callConfirmValue}>{dialerListName}</Text>
-            </View>
-            <Text style={styles.modalSub}>Do you want to proceed with this details?</Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.mBtn, styles.mBtnGhost]}
-                onPress={() => setCallConfirmRow(null)}
-                disabled={callBusy}
-              >
-                <Text style={styles.mBtnGhostText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.mBtn,
-                  styles.mBtnPrimary,
-                  (callBusy || !numericCampaignId) && styles.disabled,
-                ]}
-                onPress={() => void confirmManualCall()}
-                disabled={callBusy || !numericCampaignId}
-              >
-                <Text style={styles.mBtnPrimaryText}>{callBusy ? 'Sending…' : 'Submit'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <BlockUserModal row={blockRow} onClose={() => setBlockRow(null)} onDone={() => void load()} />
       <DumpUserModal

@@ -155,32 +155,47 @@ export function FilterInput({
   compact?: boolean;
 }) {
   return (
-    <TextField
-      size="small"
-      fullWidth={!compact}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onSearch();
-      }}
-      sx={{
-        width: compact ? '100%' : undefined,
-        maxWidth: compact ? '100%' : undefined,
-        '& .MuiInputBase-root': {
-          bgcolor: '#fff',
-          color: '#111',
-          fontSize: compact ? 10.5 : 11,
-          minHeight: 26,
-          height: 26,
-          borderRadius: '999px',
-        },
-        '& .MuiInputBase-input': {
-          py: 0.25,
-          px: 1,
-        },
-      }}
-    />
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={0.25}
+      sx={{ width: compact ? '100%' : undefined, maxWidth: '100%', minWidth: 0 }}
+    >
+      <TextField
+        size="small"
+        fullWidth
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onSearch();
+        }}
+        sx={{
+          minWidth: 0,
+          flex: 1,
+          '& .MuiInputBase-root': {
+            bgcolor: '#fff',
+            color: '#111',
+            fontSize: compact ? 10.5 : 11,
+            minHeight: 26,
+            height: 26,
+            borderRadius: '999px',
+          },
+          '& .MuiInputBase-input': {
+            py: 0.25,
+            px: 1,
+          },
+        }}
+      />
+      <IconButton
+        size="small"
+        onClick={onSearch}
+        aria-label="search"
+        sx={{ color: '#666', p: 0.35, flexShrink: 0 }}
+      >
+        <SearchIcon sx={{ fontSize: compact ? 14 : 16 }} />
+      </IconButton>
+    </Stack>
   );
 }
 

@@ -375,6 +375,7 @@ export const COMMON_UI_MAP = [
   { original: 'Jetfair Provider History', jyotish: 'Jyeshtha Provider History' },
   { original: 'Settle Jetfair Bets', jyotish: 'Settle Jyeshtha Panja' },
   { original: 'Settle SM Bets', jyotish: 'Settle SM Panja' },
+  { original: 'Indian Divas Settle', jyotish: 'Indu Settle' },
   { original: 'Total Payout', jyotish: 'Vyaya' },
   { original: 'Missing Bets', jyotish: 'Missing Panja' },
 

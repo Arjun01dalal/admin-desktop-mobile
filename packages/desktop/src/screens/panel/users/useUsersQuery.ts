@@ -194,9 +194,15 @@ export function useUsersQuery({
 
         const searchingDpId = Boolean(applied.dpId.trim());
 
+        // Exact DP ID lookup: only send `_id` (+ uniqueUser where required). Extra
+        // filters (state/city/clientName/dates/appWithState) hide the match.
+        const filterSource = searchingDpId
+          ? { ...EMPTY_USER_FILTERS, dpId: applied.dpId.trim() }
+          : applied;
+
         const filter = buildUserFilter(
           userType,
-          applied,
+          filterSource,
           searchingDpId ? '' : clientName,
           searchingDpId ? '' : playedIn,
           uniqueUser,
@@ -209,8 +215,8 @@ export function useUsersQuery({
           pageNo,
           itemsPerPage,
           filter,
-          startDate,
-          endDate,
+          startDate: searchingDpId ? '' : startDate,
+          endDate: searchingDpId ? '' : endDate,
           allottedApps:
             userType === 'User' || searchingDpId ? undefined : allottedApps,
           appWithState:
@@ -218,8 +224,8 @@ export function useUsersQuery({
               ? undefined
               : adminAppWithState,
           selectedClientName: searchingDpId ? undefined : clientName || undefined,
-          activeUserStart: applied.activeUserStart || undefined,
-          activeUserEnd: applied.activeUserEnd || undefined,
+          activeUserStart: searchingDpId ? undefined : applied.activeUserStart || undefined,
+          activeUserEnd: searchingDpId ? undefined : applied.activeUserEnd || undefined,
         });
 
         const res = await secureApi(actionForType(userType), payload);
@@ -296,12 +302,12 @@ export function useUsersQuery({
 
   useEffect(() => {
     // Non_Performing_Active_User has no server pagination — fetch once per filter set.
+    // Do not depend on raw `page` for client-paged types (avoids refetching full list on page change).
     void load(isClientPagedType ? 1 : page);
   }, [
     queryPage,
     queryItemsPerPage,
     isClientPagedType,
-    page,
     userType,
     applied,
     clientName,
@@ -319,7 +325,7 @@ export function useUsersQuery({
   );
 
   const search = useCallback(() => {
-    setApplied(draft);
+    setApplied({ ...draft });
     setPage(1);
   }, [draft]);
 
@@ -342,7 +348,7 @@ export function useUsersQuery({
   }, [accessibleStates, endDate, startDate]);
 
   const handleApply = useCallback(() => {
-    setApplied(draft);
+    setApplied({ ...draft });
     setPage(1);
   }, [draft]);
 

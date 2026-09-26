@@ -26,28 +26,42 @@ type Props = {
   onChange: (v: string) => void;
   placeholder?: string;
   style?: object;
+  disabled?: boolean;
 };
 
-export function DateField({ value, onChange, placeholder = 'YYYY-MM-DD', style }: Props) {
+export function DateField({
+  value,
+  onChange,
+  placeholder = 'YYYY-MM-DD',
+  style,
+  disabled = false,
+}: Props) {
   const [open, setOpen] = useState(false);
 
   if (Platform.OS === 'web') {
     return (
       <TextInput
-        style={[styles.input, style]}
+        style={[styles.input, style, disabled && styles.inputDisabled]}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         autoCapitalize="none"
         autoCorrect={false}
+        editable={!disabled}
       />
     );
   }
 
   return (
     <>
-      <TouchableOpacity style={[styles.input, style]} onPress={() => setOpen(true)}>
+      <TouchableOpacity
+        style={[styles.input, style, disabled && styles.inputDisabled]}
+        onPress={() => {
+          if (!disabled) setOpen(true);
+        }}
+        disabled={disabled}
+      >
         <Text style={value ? styles.valueText : styles.placeholderText}>
           {value || placeholder}
         </Text>
@@ -109,6 +123,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(2),
     justifyContent: 'center',
   },
+  inputDisabled: { opacity: 0.5 },
   valueText: { color: colors.foreground, fontSize: 13 },
   placeholderText: { color: colors.muted, fontSize: 13 },
   backdrop: {

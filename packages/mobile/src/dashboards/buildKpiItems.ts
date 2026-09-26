@@ -71,6 +71,7 @@ export function buildKpiItems(
       label: KPI_MAP.totalWithdrawal.jyotish,
       value: floorNum(dw.totalRefund ?? s.totalRefund ?? dw.totalWithdrawal ?? s.totalWithdrawal),
       prefix: '₹',
+      href: '/withdrawal',
     },
     {
       id: 'totalPendingWithdrawal',

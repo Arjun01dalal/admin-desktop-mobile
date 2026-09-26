@@ -84,6 +84,21 @@ export function pushCampaignIntervalLabel(item: Pick<PushCampaign, 'sendOnce' | 
   return `Every ${item.intervalValue} ${item.intervalUnit}`;
 }
 
+/** Laxmi: strip unsafe chars from upload file names before S3/CDN path. */
+export function sanitizePushImageFileName(name: string): string {
+  const base = String(name || 'image.png').split(/[/\\]/).pop() || 'image.png';
+  const cleaned = base
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '');
+  return cleaned || 'image.png';
+}
+
+export function buildPushImageUploadFileName(originalName: string): string {
+  return `push-notifications/${Date.now()}-${sanitizePushImageFileName(originalName)}`;
+}
+
+/** Read imagePath from upload response; encodeURI for safe notification image URLs. */
 export function unpackUploadImagePath(data: unknown): string {
   if (!data || typeof data !== 'object') return '';
   const obj = data as Record<string, unknown>;
@@ -91,5 +106,11 @@ export function unpackUploadImagePath(data: unknown): string {
     obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
       ? (obj.payload as Record<string, unknown>)
       : obj;
-  return String(payload.imagePath || obj.imagePath || '').trim();
+  const imagePath = String(payload.imagePath || obj.imagePath || '').trim();
+  if (!imagePath) return '';
+  try {
+    return encodeURI(imagePath);
+  } catch {
+    return imagePath;
+  }
 }

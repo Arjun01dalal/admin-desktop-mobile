@@ -19,6 +19,7 @@ export type UserReportTab =
   | 'crazzy_wheel'
   | 'settle_sm'
   | 'settle_jetfair'
+  | 'indian_divas_settle'
   | 'player_rtp';
 
 export const USER_REPORT_TABS: { id: UserReportTab; label: string }[] = [
@@ -42,6 +43,7 @@ export const USER_REPORT_TABS: { id: UserReportTab; label: string }[] = [
   { id: 'crazzy_wheel', label: 'Crazzy wheel' },
   { id: 'settle_sm', label: 'Settle SM Bets' },
   { id: 'settle_jetfair', label: 'Settle Jetfair Bets' },
+  { id: 'indian_divas_settle', label: 'Indian Divas Settle' },
   { id: 'player_rtp', label: 'Player RTP' },
 ];
 

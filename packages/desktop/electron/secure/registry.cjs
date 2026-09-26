@@ -162,6 +162,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'withdrawals.byActiveUser': {
+    method: 'POST',
+    path: '/SubAdmin/withdrawals-by-active-user',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'caller.uploadDiallerData': {
     type: 'local',
   },
@@ -1934,6 +1940,25 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  // Indian Divas Settle (Laxmi User Report → revealer)
+  'userReport.indianDivasPendingBets': {
+    method: 'POST',
+    path: '/revealer/pending-bets',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'userReport.indianDivasUpdateBetStatus': {
+    method: 'POST',
+    path: '/revealer/update-bet-status',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'userReport.indianDivasRollbackAll': {
+    method: 'POST',
+    path: '/revealer/rollback-all-pending',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   'userReport.settleGameBet': {
     method: 'POST',
     path: '/User/update-status-l-to-w',
@@ -2400,6 +2425,12 @@ module.exports = {
   'withdrawals.availableBanks': {
     method: 'POST',
     path: '/change-percentage/available-banks/get',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'withdrawals.beneficiaryAccountsUserCount': {
+    method: 'POST',
+    path: '/User/beneficiary-accounts-user-count',
     encryptRequest: true,
     decryptResponse: true,
   },

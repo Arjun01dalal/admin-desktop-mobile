@@ -102,6 +102,7 @@ const LOADERS: Record<string, Loader> = {
   '/deposit': () => import('@/screens/panel/DepositPage'),
   '/state-wise-deposit': () => import('@/screens/panel/StateWiseDepositPage'),
   '/withdrawal': () => import('@/screens/panel/WithdrawalPage'),
+  '/active-user-withdrawal': () => import('@/screens/panel/ActiveUserWithdrawalPage'),
   '/withdrawal-fund': () => import('@/screens/panel/withdrawalFund'),
   '/withdraw-user-data': () => import('@/screens/panel/withdrawalFund'),
   '/fund-request': () => import('@/screens/panel/FundRequestPage'),

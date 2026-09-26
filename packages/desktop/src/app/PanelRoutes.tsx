@@ -70,6 +70,7 @@ import {
   DepositPage,
   StateWiseDepositPage,
   WithdrawalPage,
+  ActiveUserWithdrawalPage,
   WithdrawalFundPage,
   WithdrawUserDataPage,
   FundRequestPage,
@@ -241,6 +242,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/deposit" element={<DepositPage />} />
             <Route path="/state-wise-deposit" element={<StateWiseDepositPage />} />
             <Route path="/withdrawal" element={<WithdrawalPage />} />
+            <Route path="/active-user-withdrawal" element={<ActiveUserWithdrawalPage />} />
             <Route path="/withdrawal-fund" element={<WithdrawalFundPage />} />
             <Route path="/withdraw-user-data" element={<WithdrawUserDataPage />} />
             <Route path="/fund-request" element={<FundRequestPage />} />

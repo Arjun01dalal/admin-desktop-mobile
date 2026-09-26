@@ -13,6 +13,7 @@
     "./permissions": "./src/permissions.ts",
     "./callerRoles": "./src/callerRoles.ts",
     "./campaignList": "./src/campaignList.ts",
+    "./callerDialerIds": "./src/callerDialerIds.ts",
     "./botIds": "./src/botIds.ts",
     "./pagination": "./src/pagination.ts",
     "./vipClients": "./src/vipClients.ts",
@@ -25,6 +26,9 @@
     "./walletOtp": "./src/walletOtp.ts",
     "./subAdminFcm": "./src/subAdminFcm.ts",
     "./depositWithdrawalReport": "./src/depositWithdrawalReport.ts",
+    "./activeUserWithdrawal": "./src/activeUserWithdrawal.ts",
+    "./indianDivasSettle": "./src/indianDivasSettle.ts",
+    "./beneficiaryAccountCounts": "./src/beneficiaryAccountCounts.ts",
     "./llmChat": "./src/llmChat.ts",
     "./casinoTopup": "./src/casinoTopup.ts",
     "./gameUserStats": "./src/gameUserStats.ts"

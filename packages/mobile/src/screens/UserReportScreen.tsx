@@ -30,6 +30,7 @@ import {
   RemoveBonusTab,
   SettleTab,
   WalletTab,
+  IndianDivasSettleTab,
 } from './userReport/tabs';
 import {
   TABS,
@@ -246,6 +247,8 @@ function TabBody({ tab, userId }: { tab: Tab; userId: string }) {
       return <SettleTab userId={userId} kind="sm" />;
     case 'Settle Jetfair Bets':
       return <SettleTab userId={userId} kind="jetfair" />;
+    case 'Indian Divas Settle':
+      return <IndianDivasSettleTab userId={userId} />;
     case 'Player RTP':
       return <PlayerRtpLink userId={userId} />;
     default:

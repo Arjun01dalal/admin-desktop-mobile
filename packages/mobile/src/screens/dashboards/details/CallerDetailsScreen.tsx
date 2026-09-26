@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { makeStyles } from '../../../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { appCodeForName } from '@astro/shared';
+import { appCodeForName, resolveCallerDialerIds } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
@@ -274,9 +274,9 @@ export function CallerDetailsScreen() {
   const hideContact = hasPermission('contact_visibility_none', user);
   const showCalling = !hideContact;
   const extensionIds = useMemo(() => extensionIdsOf(user), [user]);
-  const numericCampaignId = useMemo(
-    () => extensionIds.find((val) => /^\d+$/.test(val)) || '',
-    [extensionIds],
+  const callerDialerIds = useMemo(
+    () => resolveCallerDialerIds(user?.extensionId),
+    [user?.extensionId],
   );
 
   const [draftStart, setDraftStart] = useState(todayIST());
@@ -411,7 +411,7 @@ export function CallerDetailsScreen() {
         Alert.alert('Dialer', 'Mobile number not found');
         return;
       }
-      if (!numericCampaignId) {
+      if (!callerDialerIds) {
         Alert.alert('Dialer', 'Dialer extension / campaign ID not found for this admin');
         return;
       }
@@ -435,11 +435,11 @@ export function CallerDetailsScreen() {
         setDialerBusyId(null);
       }
     },
-    [extensionIds, numericCampaignId, user?.name, user?.serverId],
+    [callerDialerIds, extensionIds, user?.name, user?.serverId],
   );
 
   const addSelectedToDialer = useCallback(async () => {
-    if (!numericCampaignId) {
+    if (!callerDialerIds) {
       Alert.alert('Dialer', 'Dialer extension / campaign ID not found for this admin');
       return;
     }
@@ -463,10 +463,10 @@ export function CallerDetailsScreen() {
     setAddDialerBusy(true);
     try {
       const res = await addToDialerBatch({
-        campaignId: numericCampaignId,
+        campaignId: callerDialerIds.campaignId,
         serverId: user?.serverId != null ? String(user.serverId) : undefined,
         leads,
-        listId: `9${numericCampaignId}`,
+        listId: callerDialerIds.listId,
         listName: `${String(user?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
       });
       Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
@@ -474,7 +474,7 @@ export function CallerDetailsScreen() {
     } finally {
       setAddDialerBusy(false);
     }
-  }, [numericCampaignId, rows, selectedIds, user?.name, user?.serverId]);
+  }, [callerDialerIds, rows, selectedIds, user?.name, user?.serverId]);
 
   const toggleSelect = useCallback((id: string) => {
     if (!id) return;

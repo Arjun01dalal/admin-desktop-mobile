@@ -2,7 +2,7 @@ import type { WithdrawalRow } from './types';
 import { TERMINAL_STATUSES } from './types';
 
 export function orderIdOf(row: WithdrawalRow): string {
-  return row.orderId || row.transactionId || '';
+  return String(row.orderId || row.order_id || row.transactionId || row._id || '');
 }
 
 export function midLabel(m: {

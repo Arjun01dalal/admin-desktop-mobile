@@ -22,6 +22,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import {
   asPaged,
+  buildPushImageUploadFileName,
   emptyPushCampaignForm,
   formatPushCampaignIst,
   fromIstInputValue,
@@ -282,7 +283,7 @@ export function PushNotificationsScreen() {
     try {
       if (imageBase64 && imageFileName) {
         const upload = await secureApi<unknown>('ops.bannersUploadImageEncrypted', {
-          File_Name: `push-notifications/${Date.now()}-${imageFileName}`,
+          File_Name: buildPushImageUploadFileName(imageFileName),
           Image: imageBase64,
         });
         if (!upload.ok) {

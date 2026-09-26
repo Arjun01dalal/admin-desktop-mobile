@@ -30,6 +30,7 @@ import { FundRequestTab } from './FundRequestTab';
 import { ProviderHistoryTab } from './ProviderHistoryTab';
 import { QtechBetDetailsTab } from './QtechBetDetailsTab';
 import { SettleJetfairModal } from './SettleJetfairModal';
+import { IndianDivasSettleModal } from './IndianDivasSettleModal';
 import { TopCasinoGamesSection } from './TopCasinoGamesSection';
 import {
   canShowAddBonusCoinsTab,
@@ -66,6 +67,7 @@ const SHORT_LABEL: Partial<Record<UserReportTab, string>> = {
   crazzy_wheel: 'Crazy Wheel',
   settle_sm: 'Settle SM',
   settle_jetfair: 'Settle Jetfair',
+  indian_divas_settle: 'Indian Divas Settle',
   player_rtp: 'Player RTP',
 };
 
@@ -96,7 +98,12 @@ const PROVIDER_IDS: UserReportTab[] = [
   'qtech_bet_details',
 ];
 
-const ACTION_IDS: UserReportTab[] = ['settle_sm', 'settle_jetfair', 'player_rtp'];
+const ACTION_IDS: UserReportTab[] = [
+  'settle_sm',
+  'settle_jetfair',
+  'indian_divas_settle',
+  'player_rtp',
+];
 
 function tabLabel(id: UserReportTab, fullLabel: string): string {
   return toDisplayText(SHORT_LABEL[id] || fullLabel);
@@ -194,6 +201,7 @@ export function UserReportPage() {
   const [smSettleOpen, setSmSettleOpen] = useState(false);
   const [smBusy, setSmBusy] = useState(false);
   const [jetfairSettleOpen, setJetfairSettleOpen] = useState(false);
+  const [indianDivasSettleOpen, setIndianDivasSettleOpen] = useState(false);
 
   const currentLabel = useMemo(() => {
     const hit = byId.get(tab);
@@ -295,6 +303,10 @@ export function UserReportPage() {
       }
       if (id === 'settle_jetfair') {
         setJetfairSettleOpen(true);
+        return;
+      }
+      if (id === 'indian_divas_settle') {
+        setIndianDivasSettleOpen(true);
         return;
       }
       setTab(id);
@@ -487,6 +499,11 @@ export function UserReportPage() {
       </Dialog>
 
       <SettleJetfairModal open={jetfairSettleOpen} onClose={() => setJetfairSettleOpen(false)} />
+      <IndianDivasSettleModal
+        open={indianDivasSettleOpen}
+        onClose={() => setIndianDivasSettleOpen(false)}
+        userId={userId}
+      />
     </Box>
   );
 }

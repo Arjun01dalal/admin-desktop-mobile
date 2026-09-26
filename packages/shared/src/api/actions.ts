@@ -20,6 +20,9 @@ export const ApiActions = {
   callLogs: {
     externalDialerBatch: 'callLogs.externalDialerBatch',
   },
+  withdrawals: {
+    byActiveUser: 'withdrawals.byActiveUser',
+  },
   llmChat: {
     send: 'llmChat.send',
     sendVoice: 'llmChat.sendVoice',

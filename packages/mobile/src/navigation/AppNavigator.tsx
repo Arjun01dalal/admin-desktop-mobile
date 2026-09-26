@@ -25,6 +25,7 @@ import { AppBackground } from '../components/AppBackground';
 import { CreateUserScreen } from '../screens/CreateUserScreen';
 import { UsersScreen } from '../screens/UsersScreen';
 import { WithdrawalScreen } from '../screens/WithdrawalScreen';
+import { ActiveUserWithdrawalScreen } from '../screens/dashboards/details/ActiveUserWithdrawalScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAV_ITEMS, type NavItem } from './navItems';
@@ -193,6 +194,7 @@ const IMPLEMENTED: Record<string, AnyScreen> = {
   '/create-user': CreateUserScreen as AnyScreen,
   '/users': UsersScreen as AnyScreen,
   '/withdrawal': WithdrawalScreen as AnyScreen,
+  '/active-user-withdrawal': ActiveUserWithdrawalScreen as AnyScreen,
 };
 
 function screenNameFor(item: NavItem): string {

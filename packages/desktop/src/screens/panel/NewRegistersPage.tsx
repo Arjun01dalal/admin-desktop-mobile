@@ -226,6 +226,7 @@ export function NewRegistersPage() {
     onViewComments: openViewComments,
     onViewCallLogs: openViewCallLogs,
     onCallSuccess: () => void load(page),
+    campaignId: campaignName,
   });
 
   const filtersValue = useMemo(

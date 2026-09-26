@@ -360,12 +360,25 @@ export function NewRegistersScreen() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
 
-  // Single Call — same as the web panel's per-row Call button (CallingBtn).
+  // Single Call — direct dial (desktop CallingBtn parity: login campaign + 90<id>).
   const singleCall = useCallback(
     async (row: Row) => {
       setCallMsg('');
       setCalling(true);
       try {
+        if (row._id) {
+          const logRes = await secureApi('users.callLogsForNewRegistration', {
+            _id: row._id,
+            who: {
+              userId: admin?._id,
+              userName: admin?.name,
+            },
+          });
+          if (!logRes.ok) {
+            setCallMsg(logRes.message || 'Failed to log call');
+            return;
+          }
+        }
         const res = await singleCallToDialer({
           lead: {
             _id: String(row._id || ''),

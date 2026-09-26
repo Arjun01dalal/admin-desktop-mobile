@@ -24,6 +24,14 @@ type WithdrawalToolbarProps = {
   mids: Array<{ label: string; mid: string; gateway: string }>;
   canManageBeneficiaries: boolean;
   onOpenBeneList: () => void;
+  onOpenTotalBeneList: () => void;
+  beneAccOptions: Array<{ name: string; pendingWithdrawalCount: number }>;
+  selectedBeneficiaryAccounts: string[];
+  draftBeneficiaryAccounts: string[];
+  setDraftBeneficiaryAccounts: React.Dispatch<React.SetStateAction<string[]>>;
+  benePendingOpen: boolean;
+  toggleBenePendingPanel: () => void;
+  applyBenePendingPanel: () => void;
   canDownload: boolean;
   requestSheetDownload: (filter: SheetDownloadFilter, run: () => void | Promise<boolean>) => void;
   downloadData: () => void | Promise<boolean>;
@@ -74,6 +82,14 @@ export function WithdrawalToolbar({
   mids,
   canManageBeneficiaries,
   onOpenBeneList,
+  onOpenTotalBeneList,
+  beneAccOptions,
+  selectedBeneficiaryAccounts,
+  draftBeneficiaryAccounts,
+  setDraftBeneficiaryAccounts,
+  benePendingOpen,
+  toggleBenePendingPanel,
+  applyBenePendingPanel,
   canDownload,
   requestSheetDownload,
   downloadData,
@@ -117,7 +133,10 @@ export function WithdrawalToolbar({
         >
           <Text style={[styles.chipText, toolsOpen && styles.chipTextActive]}>
             Tools {toolsOpen ? '▲' : '▼'}
-            {!toolsOpen && (sortChecked || bankAmt || midFilter) ? ' •' : ''}
+            {!toolsOpen &&
+            (sortChecked || bankAmt || midFilter || selectedBeneficiaryAccounts.length > 0)
+              ? ' •'
+              : ''}
           </Text>
         </TouchableOpacity>
       </View>
@@ -162,12 +181,85 @@ export function WithdrawalToolbar({
               {midFilter ? `Mid: ${midFilter}` : 'Mid Name'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.chip,
+              (benePendingOpen || selectedBeneficiaryAccounts.length > 0) && styles.chipActive,
+            ]}
+            onPress={toggleBenePendingPanel}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                (benePendingOpen || selectedBeneficiaryAccounts.length > 0) &&
+                  styles.chipTextActive,
+              ]}
+            >
+              {selectedBeneficiaryAccounts.length === 0
+                ? 'Bene Pending'
+                : selectedBeneficiaryAccounts.length === 1
+                  ? (() => {
+                      const name = selectedBeneficiaryAccounts[0];
+                      const opt = beneAccOptions.find((o) => o.name === name);
+                      return opt
+                        ? `${opt.name} (${opt.pendingWithdrawalCount})`
+                        : name;
+                    })()
+                  : `${selectedBeneficiaryAccounts.length} Bene`}
+            </Text>
+          </TouchableOpacity>
           {canManageBeneficiaries ? (
-            <TouchableOpacity style={styles.chip} onPress={onOpenBeneList}>
-              <Text style={styles.chipText}>Add Bene List</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity style={styles.chip} onPress={onOpenBeneList}>
+                <Text style={styles.chipText}>Add Bene List</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.chip} onPress={onOpenTotalBeneList}>
+                <Text style={styles.chipText}>Total Bene List</Text>
+              </TouchableOpacity>
+            </>
           ) : null}
         </View>
+      ) : null}
+      {toolsOpen && benePendingOpen ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
+          <TouchableOpacity
+            style={[
+              styles.chip,
+              draftBeneficiaryAccounts.length === 0 && styles.chipActive,
+            ]}
+            onPress={() => setDraftBeneficiaryAccounts([])}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                draftBeneficiaryAccounts.length === 0 && styles.chipTextActive,
+              ]}
+            >
+              All
+            </Text>
+          </TouchableOpacity>
+          {(beneAccOptions.length ? beneAccOptions : []).map((option) => {
+            const active = draftBeneficiaryAccounts.includes(option.name);
+            return (
+              <TouchableOpacity
+                key={option.name}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => {
+                  setDraftBeneficiaryAccounts((prev) =>
+                    active ? prev.filter((n) => n !== option.name) : [...prev, option.name],
+                  );
+                }}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {option.name} ({option.pendingWithdrawalCount})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity style={[styles.chip, styles.chipActive]} onPress={applyBenePendingPanel}>
+            <Text style={[styles.chipText, styles.chipTextActive]}>Done</Text>
+          </TouchableOpacity>
+        </ScrollView>
       ) : null}
       {toolsOpen && midFilterOpen ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>

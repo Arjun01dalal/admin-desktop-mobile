@@ -37,6 +37,7 @@ import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import { toast } from 'react-toastify';
 import {
   asPaged,
+  buildPushImageUploadFileName,
   emptyPushCampaignForm,
   fromIstInputValue,
   pushCampaignIntervalLabel,
@@ -523,7 +524,7 @@ export function PushNotificationsPage() {
       try {
         if (imageBase64 && imageFileName) {
           const upload = await secureApi('ops.bannersUploadImageEncrypted', {
-            File_Name: `push-notifications/${Date.now()}-${imageFileName}`,
+            File_Name: buildPushImageUploadFileName(imageFileName),
             Image: imageBase64,
           });
           if (!upload.ok) {

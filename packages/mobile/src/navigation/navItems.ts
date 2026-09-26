@@ -347,6 +347,11 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_Withdrawals,
   },
   {
+    id: 'activeUserWithdrawal',
+    label: 'Active User Withdrawal',
+    path: '/active-user-withdrawal',
+  },
+  {
     id: 'blockWithdrawal',
     label: 'Block Withdrawal',
     path: '/block-withdrawal',

@@ -108,6 +108,7 @@ export const TABS = [
   'Crazzy Wheel',
   'Settle SM Bets',
   'Settle Jetfair Bets',
+  'Indian Divas Settle',
   'Player RTP',
 ] as const;
 

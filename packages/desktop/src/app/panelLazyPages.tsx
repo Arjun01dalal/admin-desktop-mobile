@@ -207,6 +207,10 @@ const StateWiseDepositPage = lazyNamed(
   'StateWiseDepositPage',
 );
 const WithdrawalPage = lazyNamed(() => import('@/screens/panel/WithdrawalPage'), 'WithdrawalPage');
+const ActiveUserWithdrawalPage = lazyNamed(
+  () => import('@/screens/panel/ActiveUserWithdrawalPage'),
+  'ActiveUserWithdrawalPage',
+);
 const WithdrawalFundPage = lazyNamed(
   () => import('@/screens/panel/withdrawalFund'),
   'WithdrawalFundPage',
@@ -429,6 +433,7 @@ export {
   DepositPage,
   StateWiseDepositPage,
   WithdrawalPage,
+  ActiveUserWithdrawalPage,
   WithdrawalFundPage,
   WithdrawUserDataPage,
   FundRequestPage,
