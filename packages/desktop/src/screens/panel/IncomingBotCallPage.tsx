@@ -18,28 +18,29 @@ import {
 } from '@mui/material';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import SyncIcon from '@mui/icons-material/Sync';
 import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
-  buildIncomingBotCreatePayload,
-  buildIncomingBotUserMapByPhone,
-  buildIncomingBotUserMapBySid,
-  enrichIncomingCallsWithUsers,
+  buildIncomingBotSyncPayload,
   extractIncomingBotCallUsers,
-  extractIncomingBotDocId,
   formatIncomingBotCommentAuthor,
   formatIncomingBotCommentWhen,
+  formatIncomingBotSyncToast,
   getIncomingBotCallMobile,
-  getIncomingBotUntilFromSinceDate,
   INCOMING_BOT_DIALER,
-  incomingBotPhoneMatchKey,
+  incomingBotDefaultDateInputValue,
+  incomingBotMinDateInputValue,
+  mapIncomingBotUsersToCalls,
+  mergeIncomingBotCallsPreservingComments,
   mergeIncomingBotCommentOntoCalls,
-  normalizeIncomingBotPhone,
+  parseIncomingBotSyncStats,
   type IncomingBotCallerComment,
+  type IncomingBotCallRow,
 } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { getSessionUser, hasPermission } from '@/auth/permissions';
@@ -48,26 +49,8 @@ import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { display } from '@/screens/panel/shared';
-import { todayIST } from '@/utils/dates';
 
-type IncomingCall = {
-  sid: string;
-  from?: string;
-  to?: string;
-  direction?: string;
-  status?: string;
-  start_time?: string;
-  duration?: string | number;
-  recording_url?: string | null;
-  name?: string;
-  state?: string;
-  city?: string;
-  dp_id?: string;
-  app_name?: string;
-  mobile?: string;
-  doc_id?: string;
-  comments?: IncomingBotCallerComment[];
-};
+type IncomingCall = IncomingBotCallRow;
 
 type SummaryFlag = {
   flag?: unknown;
@@ -126,14 +109,21 @@ type SummaryView = {
   metrics: SummaryMetric[];
 };
 
-const ALLOWED_TO_NUMBERS = ['08040265157', '08040265127', '02048556172'];
-
 const orangeBtnSx = {
   bgcolor: '#ff9f0a',
   color: '#1a1200',
   fontWeight: 700,
   textTransform: 'none' as const,
   '&:hover': { bgcolor: '#e08c00' },
+};
+
+const syncBtnSx = {
+  bgcolor: '#1976d2',
+  color: '#fff',
+  fontWeight: 600,
+  textTransform: 'none' as const,
+  '&:hover': { bgcolor: '#1565c0' },
+  '&.Mui-disabled': { opacity: 0.65, color: '#fff' },
 };
 
 const dateFieldSx = {
@@ -150,29 +140,6 @@ const dialogPaperSx = {
   overflow: 'hidden',
 };
 
-function getLast10Digits(value?: string | null): string {
-  return incomingBotPhoneMatchKey(value);
-}
-
-const ALLOWED_TO_NORMALIZED = new Set(ALLOWED_TO_NUMBERS.map((num) => normalizeIncomingBotPhone(num)));
-
-function isAllowedToNumber(to?: string | null): boolean {
-  const normalized = normalizeIncomingBotPhone(to);
-  if (!normalized) return false;
-  if (ALLOWED_TO_NORMALIZED.has(normalized)) return true;
-  const last10 = getLast10Digits(to);
-  return Array.from(ALLOWED_TO_NORMALIZED).some(
-    (allowed) => allowed === last10 || getLast10Digits(allowed) === last10,
-  );
-}
-
-function startOfDayUtc(dateValue?: string): string {
-  const date = dateValue ? new Date(dateValue) : new Date();
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  ).toISOString();
-}
-
 function formatDateTime(value?: string): string {
   if (!value) return '—';
   return new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
@@ -181,7 +148,7 @@ function formatDateTime(value?: string): string {
 function formatDurationInMin(duration: string | number | undefined): string {
   const seconds = Number(duration);
   if (duration === undefined || duration === '' || Number.isNaN(seconds)) return '—';
-  return (seconds / 60).toFixed(2);
+  return `${(seconds / 60).toFixed(2)} min`;
 }
 
 function asText(value: unknown): string {
@@ -295,7 +262,9 @@ function SectionCard({ title, children }: { title: string; children: React.React
 export function IncomingBotCallPage() {
   const navigate = useNavigate();
   const canShowMobile = hasPermission('show_mobile');
-  const [sinceDate, setSinceDate] = useState(() => todayIST());
+  const minDate = useMemo(() => incomingBotMinDateInputValue(), []);
+  const [startDate, setStartDate] = useState(() => incomingBotDefaultDateInputValue());
+  const [endDate, setEndDate] = useState(() => incomingBotDefaultDateInputValue());
   const [searchFrom, setSearchFrom] = useState('');
   const [searchTo, setSearchTo] = useState('');
   const [searchSid, setSearchSid] = useState('');
@@ -304,6 +273,7 @@ export function IncomingBotCallPage() {
   const [appliedSid, setAppliedSid] = useState('');
   const [rows, setRows] = useState<IncomingCall[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
@@ -322,55 +292,63 @@ export function IncomingBotCallPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const since = startOfDayUtc(sinceDate);
-      const until = getIncomingBotUntilFromSinceDate(sinceDate);
-      const [listRes, usersRes] = await Promise.all([
-        secureApi<{ calls?: IncomingCall[] }>('incomingBot.list', { since, until }),
-        secureApi('incomingBot.getAll', {
-          pageNo: 1,
-          itemsPerPage: 500,
-          startDate: sinceDate,
-          endDate: sinceDate,
-          filter: {},
-        }),
-      ]);
+      const res = await secureApi('incomingBot.getAllExotel', {
+        pageNo: 1,
+        itemsPerPage: 500,
+        startDate,
+        endDate,
+        filter: {},
+      });
 
-      if (!listRes.ok) {
-        toast.error(listRes.message || 'Failed to load incoming calls');
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to fetch incoming calls');
         setRows([]);
         return;
       }
 
-      const calls = Array.isArray(listRes.data?.calls) ? listRes.data.calls : [];
-      const filtered = calls.filter((c) => isAllowedToNumber(c.to));
-
-      let enriched = filtered;
-      if (usersRes.ok) {
-        const users = extractIncomingBotCallUsers(usersRes.data);
-        enriched = enrichIncomingCallsWithUsers(
-          filtered,
-          buildIncomingBotUserMapByPhone(users),
-          buildIncomingBotUserMapBySid(users),
-        );
-      } else if (usersRes.message) {
-        toast.error(usersRes.message || 'Failed to fetch user details for matching');
-      }
-
-      setRows(enriched);
+      const users = extractIncomingBotCallUsers(res.data);
+      const mapped = mapIncomingBotUsersToCalls(users);
+      setRows((prev) => mergeIncomingBotCallsPreservingComments(mapped, prev));
     } finally {
       setLoading(false);
     }
-  }, [sinceDate]);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // Initial load only — date changes fetch via Apply
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSyncData = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await secureApi(
+        'incomingBot.sync',
+        buildIncomingBotSyncPayload(startDate, endDate),
+      );
+      if (!res.ok) {
+        toast.error(res.message || 'Failed to sync data');
+        return;
+      }
+      toast.success(formatIncomingBotSyncToast(parseIncomingBotSyncStats(res.data)));
+      await load();
+    } finally {
+      setSyncing(false);
+    }
+  }, [syncing, startDate, endDate, load]);
 
   const applySearch = useCallback(() => {
     setAppliedFrom(searchFrom.trim());
     setAppliedTo(searchTo.trim());
     setAppliedSid(searchSid.trim());
   }, [searchFrom, searchTo, searchSid]);
+
+  const applyFilters = useCallback(() => {
+    applySearch();
+    void load();
+  }, [applySearch, load]);
 
   const filteredRows = useMemo(() => {
     const fromQ = appliedFrom.toLowerCase();
@@ -442,6 +420,16 @@ export function IncomingBotCallPage() {
     [navigate],
   );
 
+  const copyDpId = useCallback(async (dpId?: string) => {
+    if (!dpId) return;
+    try {
+      await navigator.clipboard.writeText(dpId);
+      toast.success('DP ID copied');
+    } catch {
+      toast.error('Failed to copy DP ID');
+    }
+  }, []);
+
   const connectToDialer = useCallback(async (call: IncomingCall) => {
     const phone = getIncomingBotCallMobile(call);
     if (!phone) {
@@ -477,13 +465,12 @@ export function IncomingBotCallPage() {
 
   const openAddComment = useCallback((call: IncomingCall) => {
     const docId = String(call.doc_id || '').trim();
-    const sid = String(call.sid || '').trim();
-    if (!docId && !sid) {
+    if (!docId) {
       toast.error('Unable to add comment for this call');
       return;
     }
     setCommentDocId(docId);
-    setCommentCallSid(sid);
+    setCommentCallSid(String(call.sid || '').trim());
     setCommentInput('');
     setCommentOpen(true);
   }, []);
@@ -496,7 +483,7 @@ export function IncomingBotCallPage() {
         toast.error('Please enter a comment');
         return;
       }
-      if (!commentDocId && !commentCallSid) {
+      if (!commentDocId) {
         toast.error('Unable to add comment for this call');
         return;
       }
@@ -507,44 +494,11 @@ export function IncomingBotCallPage() {
         who: { userId: user?._id, userName: user?.name },
         date: new Date().toISOString(),
       };
-      const submittedDocId = commentDocId;
-      const submittedSid = commentCallSid;
-      const targetCall = rows.find(
-        (c) =>
-          (submittedSid && c.sid === submittedSid) ||
-          (submittedDocId && c.doc_id === submittedDocId),
-      );
 
       setCommentBusy(true);
       try {
-        let docIdForComment = submittedDocId;
-
-        // No doc_id → create record, then add-comment (Laxmi parity)
-        if (!docIdForComment) {
-          if (!targetCall) {
-            toast.error('Unable to add comment for this call');
-            return;
-          }
-          const createRes = await secureApi(
-            'incomingBot.create',
-            buildIncomingBotCreatePayload({
-              ...targetCall,
-              sid: targetCall.sid || submittedSid,
-            }),
-          );
-          if (!createRes.ok) {
-            toast.error(createRes.message || 'Failed to create comment record');
-            return;
-          }
-          docIdForComment = extractIncomingBotDocId(createRes.data);
-          if (!docIdForComment) {
-            toast.error('Failed to create comment record');
-            return;
-          }
-        }
-
         const res = await secureApi('incomingBot.addComment', {
-          _id: docIdForComment,
+          _id: commentDocId,
           comment: text,
         });
         if (!res.ok) {
@@ -554,8 +508,8 @@ export function IncomingBotCallPage() {
 
         setRows((prev) =>
           mergeIncomingBotCommentOntoCalls(prev, {
-            sid: submittedSid,
-            docId: docIdForComment,
+            sid: commentCallSid,
+            docId: commentDocId,
             comment: newComment,
           }),
         );
@@ -564,24 +518,11 @@ export function IncomingBotCallPage() {
         setCommentInput('');
         setCommentDocId('');
         setCommentCallSid('');
-
-        // Refresh getAll for doc_id, then re-apply local comment if server list lags
-        if (!submittedDocId) {
-          void load().then(() => {
-            setRows((prev) =>
-              mergeIncomingBotCommentOntoCalls(prev, {
-                sid: submittedSid,
-                docId: docIdForComment,
-                comment: newComment,
-              }),
-            );
-          });
-        }
       } finally {
         setCommentBusy(false);
       }
     },
-    [commentInput, commentDocId, commentCallSid, rows, load],
+    [commentInput, commentDocId, commentCallSid],
   );
 
   const openViewComments = useCallback((call: IncomingCall) => {
@@ -658,15 +599,35 @@ export function IncomingBotCallPage() {
         label: 'DP ID',
         render: (row) =>
           row.dp_id ? (
-            <Link
-              component="button"
-              type="button"
-              onClick={() => openUserReport(row)}
-              underline="hover"
-              sx={{ fontSize: 13, fontWeight: 600 }}
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              spacing={0.75}
+              sx={{ minWidth: 140 }}
             >
-              {row.dp_id}
-            </Link>
+              <Link
+                component="button"
+                type="button"
+                onClick={() => openUserReport(row)}
+                underline="hover"
+                sx={{ fontSize: 13, fontWeight: 600, textAlign: 'left', wordBreak: 'break-all' }}
+              >
+                {row.dp_id}
+              </Link>
+              <Tooltip title="Copy DP ID">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void copyDpId(row.dp_id);
+                  }}
+                  sx={{ color: 'text.secondary', flexShrink: 0 }}
+                >
+                  <ContentCopyIcon sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
           ) : (
             '—'
           ),
@@ -714,7 +675,7 @@ export function IncomingBotCallPage() {
       },
       {
         id: 'duration',
-        label: 'Duration',
+        label: 'Duration (min)',
         render: (row) => formatDurationInMin(row.duration),
       },
       {
@@ -796,6 +757,7 @@ export function IncomingBotCallPage() {
       applySearch,
       openSummary,
       openUserReport,
+      copyDpId,
       canShowMobile,
       dialerLoadingSid,
       connectToDialer,
@@ -803,6 +765,16 @@ export function IncomingBotCallPage() {
       openViewComments,
     ],
   );
+
+  const getRowSx = useCallback((row: IncomingCall) => {
+    const hasComment = (row.comments?.length || 0) > 0;
+    return {
+      bgcolor: hasComment ? 'rgba(34,197,94,0.08)' : 'rgba(255,159,10,0.08)',
+      '&:hover': {
+        bgcolor: hasComment ? 'rgba(34,197,94,0.14)' : 'rgba(255,159,10,0.14)',
+      },
+    };
+  }, []);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
@@ -817,20 +789,49 @@ export function IncomingBotCallPage() {
         <TextField
           size="small"
           type="date"
-          label="Since Date (UTC)"
+          label="Start Date"
           InputLabelProps={{ shrink: true }}
-          value={sinceDate}
-          onChange={(e) => setSinceDate(e.target.value)}
+          inputProps={{ min: minDate }}
+          value={startDate}
+          onChange={(e) => {
+            const next = e.target.value || minDate;
+            const clamped = next < minDate ? minDate : next;
+            setStartDate(clamped);
+            if (endDate < clamped) setEndDate(clamped);
+          }}
+          sx={dateFieldSx}
+        />
+        <TextField
+          size="small"
+          type="date"
+          label="End Date"
+          InputLabelProps={{ shrink: true }}
+          inputProps={{ min: minDate }}
+          value={endDate}
+          onChange={(e) => {
+            const next = e.target.value || minDate;
+            let clamped = next < minDate ? minDate : next;
+            if (clamped < startDate) clamped = startDate;
+            setEndDate(clamped);
+          }}
           sx={dateFieldSx}
         />
         <Button
           variant="contained"
-          startIcon={<RefreshIcon />}
-          onClick={() => void load()}
+          onClick={() => void applyFilters()}
           disabled={loading}
           sx={orangeBtnSx}
         >
-          Refresh
+          Apply
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={<SyncIcon />}
+          onClick={() => void handleSyncData()}
+          disabled={syncing || loading}
+          sx={syncBtnSx}
+        >
+          {syncing ? 'Syncing…' : 'Sync data'}
         </Button>
       </Stack>
 
@@ -839,7 +840,8 @@ export function IncomingBotCallPage() {
           columns={columns}
           rows={filteredRows}
           loading={loading}
-          getRowKey={(row) => row.sid}
+          getRowKey={(row) => row.sid || row.doc_id || `${row.from}-${row.start_time}`}
+          getRowSx={getRowSx}
           emptyMessage="No incoming calls found"
           virtualize={false}
           stickyHeader

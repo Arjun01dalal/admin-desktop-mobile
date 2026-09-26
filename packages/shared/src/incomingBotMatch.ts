@@ -1,6 +1,6 @@
 /**
- * Phone matching + user enrichment for Incoming Bot Call
- * (Laxmi admin-panel-domains IncomingBotCall parity).
+ * Incoming Bot Call helpers — parity with Laxmi admin-panel-domains
+ * (`getAll-exotel` single list + optional `/sync`).
  */
 export type IncomingBotCallerComment = {
   comment?: string;
@@ -13,12 +13,22 @@ export type IncomingBotCallerComment = {
   [key: string]: unknown;
 };
 
+/** Raw row from `/incoming-bot-call/getAll-exotel`. */
 export type IncomingBotCallUser = {
   _id?: string;
   id?: string;
   doc_id?: string;
   phone?: string;
   mobile?: string;
+  from?: string;
+  to?: string;
+  direction?: string;
+  status?: string;
+  start_time?: string;
+  startTime?: string;
+  duration?: string | number;
+  recording_url?: string | null;
+  recordingUrl?: string | null;
   client_name?: string;
   clientName?: string;
   name?: string;
@@ -29,9 +39,32 @@ export type IncomingBotCallUser = {
   userId?: string;
   app_name?: string;
   sid?: string;
-  comments?: IncomingBotCallerComment[];
-  comment?: IncomingBotCallerComment[];
+  createdOn?: string;
+  createdAt?: string;
+  created_on?: string;
+  comments?: IncomingBotCallerComment[] | string | IncomingBotCallerComment;
+  comment?: IncomingBotCallerComment[] | string | IncomingBotCallerComment;
   [key: string]: unknown;
+};
+
+/** Table / card row after mapping getAll-exotel. */
+export type IncomingBotCallRow = {
+  sid: string;
+  from: string;
+  to: string;
+  direction: string;
+  status: string;
+  start_time: string;
+  duration: string;
+  recording_url: string | null;
+  name?: string;
+  state?: string;
+  city?: string;
+  dp_id?: string;
+  app_name?: string;
+  mobile?: string;
+  doc_id?: string;
+  comments?: IncomingBotCallerComment[];
 };
 
 export type IncomingBotMatchedUser = {
@@ -41,58 +74,17 @@ export type IncomingBotMatchedUser = {
   dp_id: string;
   app_name: string;
   mobile: string;
-  /** Mongo id of incoming-bot-call getAll row — used for add-comment when present */
+  /** Mongo id of incoming-bot-call row — used for add-comment when present */
   doc_id: string;
   comments: IncomingBotCallerComment[];
 };
 
-/** Create payload when call has no doc_id (Laxmi IncomingBotCall parity). */
-export type IncomingBotCreatePayload = {
-  phone: string;
-  client_name: string;
-  state: string;
-  city: string;
-  userId: string;
-  app_name: string;
-  sid: string;
+export type IncomingBotSyncStats = {
+  fetched: number;
+  updated: number;
+  inserted: number;
+  skipped: number;
 };
-
-export function buildIncomingBotCreatePayload(call: {
-  sid?: string | null;
-  mobile?: string | null;
-  from?: string | null;
-}): IncomingBotCreatePayload {
-  return {
-    phone: getIncomingBotCallMobile(call),
-    client_name: 'sir',
-    state: 'Madhya Pradesh',
-    city: 'jabalpur',
-    userId: `${Date.now()}${Math.floor(Math.random() * 1000)}`,
-    app_name: 'OS',
-    sid: String(call.sid || ''),
-  };
-}
-
-/** Extract `_id` from decrypted create / getAll-style payloads. */
-export function extractIncomingBotDocId(data: unknown): string {
-  if (!data) return '';
-  if (typeof data === 'string') return data.trim();
-  if (typeof data !== 'object') return '';
-  const obj = data as Record<string, unknown>;
-  const payload =
-    obj.payload && typeof obj.payload === 'object'
-      ? (obj.payload as Record<string, unknown>)
-      : obj;
-  const nested =
-    (payload.item && typeof payload.item === 'object'
-      ? (payload.item as Record<string, unknown>)
-      : null) ||
-    (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
-      ? (payload.data as Record<string, unknown>)
-      : null) ||
-    payload;
-  return String(nested._id || nested.id || payload._id || payload.id || obj._id || obj.id || '').trim();
-}
 
 /** Normalize phone — handles 0..., 91..., +91... */
 export function normalizeIncomingBotPhone(value?: string | null): string {
@@ -109,7 +101,26 @@ export function incomingBotPhoneMatchKey(value?: string | null): string {
   return normalizeIncomingBotPhone(value).slice(-10);
 }
 
-/** until = from/since date plus 1 day, at 00:00:00.000Z */
+export function todayIncomingBotDateInputValue(): string {
+  return new Date().toISOString().split('T')[0]!;
+}
+
+/** Earliest selectable day is the 23rd of the current month (Laxmi parity). */
+export function incomingBotMinDateInputValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-23`;
+}
+
+/** Default selected date: today, but never before the 23rd min. */
+export function incomingBotDefaultDateInputValue(): string {
+  const today = todayIncomingBotDateInputValue();
+  const min = incomingBotMinDateInputValue();
+  return today < min ? min : today;
+}
+
+/** @deprecated Prefer getAll-exotel date range; kept for callers still using since/until. */
 export function getIncomingBotUntilFromSinceDate(sinceDate: string): string {
   const until = new Date(`${sinceDate}T00:00:00.000Z`);
   until.setUTCDate(until.getUTCDate() + 1);
@@ -119,21 +130,66 @@ export function getIncomingBotUntilFromSinceDate(sinceDate: string): string {
 export function extractIncomingBotCallUsers(decrypted: unknown): IncomingBotCallUser[] {
   if (Array.isArray(decrypted)) return decrypted as IncomingBotCallUser[];
   if (!decrypted || typeof decrypted !== 'object') return [];
-  const data = decrypted as Record<string, unknown>;
-  const payload = data.payload as Record<string, unknown> | unknown[] | undefined;
-  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    const items = (payload as Record<string, unknown>).items;
-    if (Array.isArray(items)) return items as IncomingBotCallUser[];
+  const data = decrypted as Record<string, any>;
+
+  const candidates = [
+    data.payload?.items,
+    data.payload?.list,
+    data.payload?.calls,
+    data.payload?.data,
+    data.payload,
+    data.items,
+    data.list,
+    data.calls,
+    data.data?.items,
+    data.data,
+    data.result,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate as IncomingBotCallUser[];
   }
-  if (Array.isArray(payload)) return payload as IncomingBotCallUser[];
-  if (Array.isArray(data.items)) return data.items as IncomingBotCallUser[];
-  if (Array.isArray(data.data)) return data.data as IncomingBotCallUser[];
   return [];
 }
 
 function extractComments(user: IncomingBotCallUser): IncomingBotCallerComment[] {
-  const comments = user.comments || user.comment || [];
-  return Array.isArray(comments) ? comments : [];
+  const raw: unknown = user.comments ?? user.comment;
+  if (!raw) return [];
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    return text ? [{ comment: text }] : [];
+  }
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (typeof item === 'string') return { comment: item };
+        if (item && typeof item === 'object') {
+          const obj = item as IncomingBotCallerComment & {
+            text?: string;
+            message?: string;
+          };
+          return {
+            ...obj,
+            comment: obj.comment || String(obj.text || obj.message || ''),
+          };
+        }
+        return null;
+      })
+      .filter(Boolean) as IncomingBotCallerComment[];
+  }
+  if (typeof raw === 'object') {
+    const obj = raw as IncomingBotCallerComment & {
+      text?: string;
+      message?: string;
+    };
+    return [
+      {
+        ...obj,
+        comment: obj.comment || String(obj.text || obj.message || ''),
+      },
+    ];
+  }
+  return [];
 }
 
 function toMatchedUser(user: IncomingBotCallUser, mobile: string): IncomingBotMatchedUser {
@@ -162,7 +218,7 @@ export function buildIncomingBotUserMapByPhone(
   return map;
 }
 
-/** Secondary match when phone fails — Laxmi buildUserMapBySid. */
+/** Secondary match when phone fails — legacy getAll merge. */
 export function buildIncomingBotUserMapBySid(
   users: IncomingBotCallUser[],
 ): Map<string, IncomingBotMatchedUser> {
@@ -200,6 +256,99 @@ export function enrichIncomingCallsWithUsers<T extends { from?: string; sid?: st
   });
 }
 
+/** Map getAll-exotel row → table IncomingCall (no Exotel merge). */
+export function mapIncomingBotUserToCall(user: IncomingBotCallUser): IncomingBotCallRow {
+  const from = String(user.from || user.phone || user.mobile || '');
+  const to = String(user.to || '');
+  const sid = String(user.sid || user._id || '');
+  const startTime = String(
+    user.start_time || user.startTime || user.createdOn || user.createdAt || '',
+  );
+  const recording = user.recording_url ?? user.recordingUrl ?? null;
+
+  return {
+    sid,
+    from,
+    to,
+    direction: String(user.direction || 'incoming'),
+    status: String(user.status || ''),
+    start_time: startTime,
+    duration: String(user.duration ?? ''),
+    recording_url: recording ? String(recording) : null,
+    name: String(user.client_name || user.name || '') || undefined,
+    state: String(user.state || '') || undefined,
+    city: String(user.city || '') || undefined,
+    dp_id: String(user.userId || user.dp_id || user.dpId || '') || undefined,
+    app_name: String(user.app_name || user.clientName || '') || undefined,
+    mobile: from || undefined,
+    doc_id: String(user._id || '') || undefined,
+    comments: extractComments(user),
+  };
+}
+
+export function mapIncomingBotUsersToCalls(users: IncomingBotCallUser[]): IncomingBotCallRow[] {
+  return users.map(mapIncomingBotUserToCall);
+}
+
+/**
+ * After refresh, keep fresher local comments / doc_id if the list is briefly stale.
+ */
+export function mergeIncomingBotCallsPreservingComments(
+  incoming: IncomingBotCallRow[],
+  previous: IncomingBotCallRow[],
+): IncomingBotCallRow[] {
+  return incoming.map((call) => {
+    const prevCall = previous.find(
+      (p) =>
+        (call.sid && p.sid === call.sid) || (call.doc_id && p.doc_id === call.doc_id),
+    );
+    if (!prevCall) return call;
+
+    const incomingComments = call.comments || [];
+    const previousComments = prevCall.comments || [];
+    const mergedComments =
+      incomingComments.length >= previousComments.length
+        ? incomingComments
+        : previousComments;
+
+    return {
+      ...call,
+      doc_id: call.doc_id || prevCall.doc_id,
+      comments: mergedComments,
+    };
+  });
+}
+
+/** Normalize `/incoming-bot-call/sync` response stats. */
+export function parseIncomingBotSyncStats(data: unknown): IncomingBotSyncStats {
+  let stats: any = data;
+  if (stats && typeof stats === 'object' && stats.payload) {
+    stats = stats.payload;
+  }
+  return {
+    fetched: Number(stats?.fetched ?? 0),
+    updated: Number(stats?.updated ?? 0),
+    inserted: Number(stats?.inserted ?? 0),
+    skipped: Number(stats?.skipped ?? 0),
+  };
+}
+
+export function formatIncomingBotSyncToast(stats: IncomingBotSyncStats): string {
+  return `Synced — fetched: ${stats.fetched}, updated: ${stats.updated}, inserted: ${stats.inserted}, skipped: ${stats.skipped}`;
+}
+
+/** Build sync body: startDate YYYY-MM-DD, endDate YYYY-MM-DD HH:mm:ss (local now). */
+export function buildIncomingBotSyncPayload(startDate: string, endDate: string) {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return {
+    startDate,
+    endDate: `${endDate} ${hh}:${mm}:${ss}`,
+  };
+}
+
 /** Dial number for Call button — matched mobile, else last-10 from `from`. */
 export function getIncomingBotCallMobile(call: {
   mobile?: string | null;
@@ -220,9 +369,7 @@ export const INCOMING_BOT_DIALER = {
 } as const;
 
 export function formatIncomingBotCommentAuthor(c: IncomingBotCallerComment): string {
-  return String(
-    c.who?.userName || c.who?.name || c.userName || c.commented_by || '—',
-  );
+  return String(c.who?.userName || c.who?.name || c.userName || c.commented_by || '—');
 }
 
 export function formatIncomingBotCommentWhen(c: IncomingBotCallerComment): string {
@@ -235,7 +382,7 @@ export function formatIncomingBotCommentWhen(c: IncomingBotCallerComment): strin
   }
 }
 
-/** After create+comment, keep local comment visible if getAll refresh lags. */
+/** After add-comment, keep local comment visible if list refresh lags. */
 export function mergeIncomingBotCommentOntoCalls<
   T extends { sid?: string; doc_id?: string; comments?: IncomingBotCallerComment[] },
 >(

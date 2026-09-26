@@ -1966,7 +1966,8 @@ module.exports = {
     decryptResponse: true,
   },
 
-  // Incoming Bot Call (external helper host + backend user match)
+  // Incoming Bot Call — list via getAll-exotel; sync pulls Exotel into DB;
+  // processCall stays on helper.callingbot.live (local); create/addComment for comments.
   'incomingBot.list': { type: 'local' },
   'incomingBot.processCall': { type: 'local' },
   'incomingBot.getAll': {
@@ -1975,10 +1976,16 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
-  'incomingBot.create': {
+  'incomingBot.getAllExotel': {
     method: 'POST',
-    path: '/incoming-bot-call',
+    path: '/incoming-bot-call/getAll-exotel',
     encryptRequest: true,
+    decryptResponse: true,
+  },
+  'incomingBot.sync': {
+    method: 'POST',
+    path: '/incoming-bot-call/sync',
+    encryptRequest: false,
     decryptResponse: true,
   },
   'incomingBot.addComment': {

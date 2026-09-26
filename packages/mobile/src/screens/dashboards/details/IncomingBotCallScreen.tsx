@@ -1,10 +1,9 @@
 /**
  * Incoming Bot Call — mobile port of desktop IncomingBotCallPage / Laxmi.
- * List hits helper.callingbot.live (with since+until). Users matched via
- * backend `incomingBot.getAll` for Name/State/City/DP ID/App Name.
- * Call → dialer (BOT_INC). Comments: add-comment when `doc_id` exists;
- * otherwise create (`POST /incoming-bot-call`) then add-comment.
- * View All uses comments from getAll.
+ * List from backend `incomingBot.getAllExotel` (single API). Optional
+ * `incomingBot.sync` pulls Exotel into DB. Call → dialer (BOT_INC).
+ * Comments require `doc_id` → `incomingBot.addComment` only.
+ * Summary still hits helper.callingbot.live process-call.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -21,25 +20,24 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
-  buildIncomingBotCreatePayload,
-  buildIncomingBotUserMapByPhone,
-  buildIncomingBotUserMapBySid,
-  enrichIncomingCallsWithUsers,
+  buildIncomingBotSyncPayload,
   extractIncomingBotCallUsers,
-  extractIncomingBotDocId,
   formatIncomingBotCommentAuthor,
   formatIncomingBotCommentWhen,
+  formatIncomingBotSyncToast,
   getIncomingBotCallMobile,
-  getIncomingBotUntilFromSinceDate,
   INCOMING_BOT_DIALER,
-  incomingBotPhoneMatchKey,
+  incomingBotDefaultDateInputValue,
+  incomingBotMinDateInputValue,
+  mapIncomingBotUsersToCalls,
+  mergeIncomingBotCallsPreservingComments,
   mergeIncomingBotCommentOntoCalls,
-  normalizeIncomingBotPhone,
+  parseIncomingBotSyncStats,
   type IncomingBotCallerComment,
+  type IncomingBotCallRow,
 } from '@astro/shared';
 import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
-import { todayIST } from '../../../utils/dates';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
@@ -49,48 +47,16 @@ import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSh
 import { RecordingPlayerModal } from '../../../components/RecordingPlayerModal';
 import { DateField } from '../../../components/DateField';
 import {
-  listIncomingCalls,
   processIncomingCall,
   type CallAnalysis,
   type CallSummaryData,
-  type IncomingCall as BaseIncomingCall,
 } from '../../../api/incomingBot';
 
-type IncomingCall = BaseIncomingCall & {
-  name?: string;
-  state?: string;
-  city?: string;
-  dp_id?: string;
-  app_name?: string;
-  mobile?: string;
-  doc_id?: string;
-  comments?: IncomingBotCallerComment[];
-};
-
-const ALLOWED_TO_NUMBERS = ['08040265157', '08040265127', '02048556172'];
+type IncomingCall = IncomingBotCallRow;
 
 function display(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
-}
-
-const ALLOWED_TO_NORMALIZED = new Set(ALLOWED_TO_NUMBERS.map((num) => normalizeIncomingBotPhone(num)));
-
-function isAllowedToNumber(to?: string | null): boolean {
-  const normalized = normalizeIncomingBotPhone(to);
-  if (!normalized) return false;
-  if (ALLOWED_TO_NORMALIZED.has(normalized)) return true;
-  const last10 = incomingBotPhoneMatchKey(to);
-  return Array.from(ALLOWED_TO_NORMALIZED).some(
-    (allowed) => allowed === last10 || incomingBotPhoneMatchKey(allowed) === last10,
-  );
-}
-
-function startOfDayUtc(dateValue?: string): string {
-  const date = dateValue ? new Date(dateValue) : new Date(todayIST());
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  ).toISOString();
 }
 
 function formatDateTime(value?: string): string {
@@ -101,7 +67,7 @@ function formatDateTime(value?: string): string {
 function formatDurationInMin(duration: string | number | undefined): string {
   const seconds = Number(duration);
   if (duration === undefined || duration === '' || Number.isNaN(seconds)) return '—';
-  return (seconds / 60).toFixed(2);
+  return `${(seconds / 60).toFixed(2)} min`;
 }
 
 function statusColor(status?: string): string {
@@ -150,12 +116,22 @@ function buildSummaryRows(summaryData: CallSummaryData | null) {
   ];
 }
 
+function clampIncomingBotDate(value: string, minDate: string, floor?: string): string {
+  let next = value || minDate;
+  if (next < minDate) next = minDate;
+  if (floor && next < floor) next = floor;
+  return next;
+}
+
 export function IncomingBotCallScreen() {
   const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   const canShowMobile = hasPermission('show_mobile');
   const admin = useMemo(() => getStoredUser<{ _id?: string; name?: string }>(), []);
-  const [sinceDate, setSinceDate] = useState(() => todayIST());
-  const [draftSince, setDraftSince] = useState(() => todayIST());
+  const minDate = useMemo(() => incomingBotMinDateInputValue(), []);
+  const [startDate, setStartDate] = useState(() => incomingBotDefaultDateInputValue());
+  const [endDate, setEndDate] = useState(() => incomingBotDefaultDateInputValue());
+  const [draftStart, setDraftStart] = useState(() => incomingBotDefaultDateInputValue());
+  const [draftEnd, setDraftEnd] = useState(() => incomingBotDefaultDateInputValue());
 
   const [searchFrom, setSearchFrom] = useState('');
   const [searchTo, setSearchTo] = useState('');
@@ -166,6 +142,7 @@ export function IncomingBotCallScreen() {
 
   const [rows, setRows] = useState<IncomingCall[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sheetRow, setSheetRow] = useState<IncomingCall | null>(null);
 
@@ -193,67 +170,79 @@ export function IncomingBotCallScreen() {
     setTimeout(open, Platform.OS === 'ios' ? 350 : 80);
   }, []);
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      let data: Awaited<ReturnType<typeof listIncomingCalls>>;
+  const load = useCallback(
+    async (override?: { startDate: string; endDate: string }) => {
+      const rangeStart = override?.startDate ?? startDate;
+      const rangeEnd = override?.endDate ?? endDate;
+      const gen = ++genRef.current;
+      setLoading(true);
+      setError(null);
       try {
-        data = await listIncomingCalls(
-          startOfDayUtc(sinceDate),
-          getIncomingBotUntilFromSinceDate(sinceDate),
-        );
-      } catch (err) {
-        if (gen !== genRef.current) return;
-        setError(err instanceof Error ? err.message : 'Failed to load incoming calls');
-        setRows([]);
-        return;
-      }
-      if (gen !== genRef.current) return;
-      const calls = (data.calls ?? []).filter((c) => isAllowedToNumber(c.to));
-
-      let enriched: IncomingCall[] = calls;
-      try {
-        const usersRes = await secureApi('incomingBot.getAll', {
+        const res = await secureApi('incomingBot.getAllExotel', {
           pageNo: 1,
           itemsPerPage: 500,
-          startDate: sinceDate,
-          endDate: sinceDate,
+          startDate: rangeStart,
+          endDate: rangeEnd,
           filter: {},
         });
         if (gen !== genRef.current) return;
-        if (usersRes.ok) {
-          const users = extractIncomingBotCallUsers(usersRes.data);
-          enriched = enrichIncomingCallsWithUsers(
-            calls,
-            buildIncomingBotUserMapByPhone(users),
-            buildIncomingBotUserMapBySid(users),
-          );
-        } else if (usersRes.message) {
-          Alert.alert('User match', usersRes.message);
+        if (!res.ok) {
+          setError(res.message || 'Failed to fetch incoming calls');
+          setRows([]);
+          return;
         }
-      } catch {
-        /* list still usable without enrichment */
+        const users = extractIncomingBotCallUsers(res.data);
+        const mapped = mapIncomingBotUsersToCalls(users);
+        setSheetRow(null);
+        setRows((prev) => mergeIncomingBotCallsPreservingComments(mapped, prev));
+      } catch (err) {
+        if (gen !== genRef.current) return;
+        setError(err instanceof Error ? err.message : 'Failed to fetch incoming calls');
+        setRows([]);
+      } finally {
+        if (gen === genRef.current) setLoading(false);
       }
-
-      setSheetRow(null);
-      setRows(enriched);
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
-  }, [sinceDate]);
+    },
+    [startDate, endDate],
+  );
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // Initial load only — date changes fetch via Apply
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const applySearch = useCallback(() => {
-    setSinceDate(draftSince.trim() || todayIST());
+  const handleSyncData = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await secureApi(
+        'incomingBot.sync',
+        buildIncomingBotSyncPayload(startDate, endDate),
+      );
+      if (!res.ok) {
+        Alert.alert('Sync', res.message || 'Failed to sync data');
+        return;
+      }
+      Alert.alert('Sync', formatIncomingBotSyncToast(parseIncomingBotSyncStats(res.data)));
+      await load();
+    } finally {
+      setSyncing(false);
+    }
+  }, [syncing, startDate, endDate, load]);
+
+  const applyFilters = useCallback(() => {
+    const nextStart = clampIncomingBotDate(draftStart.trim(), minDate);
+    const nextEnd = clampIncomingBotDate(draftEnd.trim(), minDate, nextStart);
+    setDraftStart(nextStart);
+    setDraftEnd(nextEnd);
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
     setAppliedFrom(searchFrom.trim());
     setAppliedTo(searchTo.trim());
     setAppliedSid(searchSid.trim());
-  }, [draftSince, searchFrom, searchTo, searchSid]);
+    void load({ startDate: nextStart, endDate: nextEnd });
+  }, [draftStart, draftEnd, minDate, searchFrom, searchTo, searchSid, load]);
 
   const filteredRows = useMemo(() => {
     const fromQ = appliedFrom.toLowerCase();
@@ -319,7 +308,7 @@ export function IncomingBotCallScreen() {
   );
 
   const closeSummary = useCallback(() => {
-    summaryGenRef.current += 1; // invalidate any in-flight summary fetch
+    summaryGenRef.current += 1;
     setSummaryOpen(false);
     setSummaryLoading(false);
     setSummaryError(null);
@@ -394,14 +383,13 @@ export function IncomingBotCallScreen() {
   const openAddComment = useCallback(
     (call: IncomingCall) => {
       const docId = String(call.doc_id || '').trim();
-      const sid = String(call.sid || '').trim();
-      if (!docId && !sid) {
+      if (!docId) {
         Alert.alert('Comment', 'Unable to add comment for this call');
         return;
       }
       const open = () => {
         setCommentDocId(docId);
-        setCommentCallSid(sid);
+        setCommentCallSid(String(call.sid || '').trim());
         setCommentInput('');
         setCommentOpen(true);
       };
@@ -417,7 +405,7 @@ export function IncomingBotCallScreen() {
       Alert.alert('Comment', 'Please enter a comment');
       return;
     }
-    if (!commentDocId && !commentCallSid) {
+    if (!commentDocId) {
       Alert.alert('Comment', 'Unable to add comment for this call');
       return;
     }
@@ -427,43 +415,11 @@ export function IncomingBotCallScreen() {
       who: { userId: String(admin?._id || ''), userName: String(admin?.name || '') },
       date: new Date().toISOString(),
     };
-    const submittedDocId = commentDocId;
-    const submittedSid = commentCallSid;
-    const targetCall = rows.find(
-      (c) =>
-        (submittedSid && c.sid === submittedSid) ||
-        (submittedDocId && c.doc_id === submittedDocId),
-    );
 
     setCommentBusy(true);
     try {
-      let docIdForComment = submittedDocId;
-
-      if (!docIdForComment) {
-        if (!targetCall) {
-          Alert.alert('Comment', 'Unable to add comment for this call');
-          return;
-        }
-        const createRes = await secureApi(
-          'incomingBot.create',
-          buildIncomingBotCreatePayload({
-            ...targetCall,
-            sid: targetCall.sid || submittedSid,
-          }),
-        );
-        if (!createRes.ok) {
-          Alert.alert('Comment', createRes.message || 'Failed to create comment record');
-          return;
-        }
-        docIdForComment = extractIncomingBotDocId(createRes.data);
-        if (!docIdForComment) {
-          Alert.alert('Comment', 'Failed to create comment record');
-          return;
-        }
-      }
-
       const res = await secureApi('incomingBot.addComment', {
-        _id: docIdForComment,
+        _id: commentDocId,
         comment: text,
       });
       if (!res.ok) {
@@ -472,8 +428,8 @@ export function IncomingBotCallScreen() {
       }
 
       const patchOpts = {
-        sid: submittedSid,
-        docId: docIdForComment,
+        sid: commentCallSid,
+        docId: commentDocId,
         comment: newComment,
       };
 
@@ -486,19 +442,10 @@ export function IncomingBotCallScreen() {
       setCommentDocId('');
       setCommentCallSid('');
       Alert.alert('Comment', 'Comment added successfully');
-
-      if (!submittedDocId) {
-        void load().then(() => {
-          setRows((prev) => mergeIncomingBotCommentOntoCalls(prev, patchOpts));
-          setSheetRow((prev) =>
-            prev ? mergeIncomingBotCommentOntoCalls([prev], patchOpts)[0] ?? prev : prev,
-          );
-        });
-      }
     } finally {
       setCommentBusy(false);
     }
-  }, [admin?._id, admin?.name, commentInput, commentDocId, commentCallSid, rows, load]);
+  }, [admin?._id, admin?.name, commentInput, commentDocId, commentCallSid]);
 
   const openViewComments = useCallback(
     (call: IncomingCall) => {
@@ -606,9 +553,27 @@ export function IncomingBotCallScreen() {
       <Text style={styles.title}>Incoming Bot Call</Text>
 
       <View style={styles.filterWrap}>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Since Date (UTC) · YYYY-MM-DD</Text>
-          <DateField style={styles.input} value={draftSince} onChange={setDraftSince} />
+        <View style={styles.dateRow}>
+          <View style={[styles.field, styles.dateField]}>
+            <Text style={styles.fieldLabel}>Start Date</Text>
+            <DateField
+              style={styles.input}
+              value={draftStart}
+              onChange={(v) => {
+                const next = clampIncomingBotDate(v, minDate);
+                setDraftStart(next);
+                if (draftEnd < next) setDraftEnd(next);
+              }}
+            />
+          </View>
+          <View style={[styles.field, styles.dateField]}>
+            <Text style={styles.fieldLabel}>End Date</Text>
+            <DateField
+              style={styles.input}
+              value={draftEnd}
+              onChange={(v) => setDraftEnd(clampIncomingBotDate(v, minDate, draftStart))}
+            />
+          </View>
         </View>
         <View style={styles.searchGrid}>
           <TextInput
@@ -636,13 +601,22 @@ export function IncomingBotCallScreen() {
             autoCapitalize="none"
           />
         </View>
-        <TouchableOpacity
-          style={[styles.applyBtn, loading && styles.btnDisabled]}
-          onPress={applySearch}
-          disabled={loading}
-        >
-          <Text style={styles.applyText}>Apply</Text>
-        </TouchableOpacity>
+        <View style={styles.filterActions}>
+          <TouchableOpacity
+            style={[styles.applyBtn, styles.filterActionBtn, loading && styles.btnDisabled]}
+            onPress={applyFilters}
+            disabled={loading}
+          >
+            <Text style={styles.applyText}>Apply</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.syncBtn, styles.filterActionBtn, (syncing || loading) && styles.btnDisabled]}
+            onPress={() => void handleSyncData()}
+            disabled={syncing || loading}
+          >
+            <Text style={styles.syncText}>{syncing ? 'Syncing…' : 'Sync data'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {error ? (
@@ -652,8 +626,9 @@ export function IncomingBotCallScreen() {
       ) : null}
 
       <Text style={styles.sub}>
-        {sinceDate} · {filteredRows.length.toLocaleString('en-IN')} calls · Tap card for recording &
-        summary
+        {startDate}
+        {endDate !== startDate ? ` → ${endDate}` : ''} · {filteredRows.length.toLocaleString('en-IN')}{' '}
+        calls · Tap card for recording & summary
       </Text>
 
       {loading && filteredRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
@@ -668,10 +643,11 @@ export function IncomingBotCallScreen() {
           const fromLabel =
             row.dp_id && !canShowMobile ? '**********' : display(mobile || row.from);
           const dialerBusy = dialerBusySid === String(row.sid || '');
+          const hasComment = (row.comments?.length || 0) > 0;
           return (
             <TouchableOpacity
-              key={`row-${index}-${String(row.sid || '')}`}
-              style={styles.card}
+              key={`row-${index}-${String(row.sid || row.doc_id || '')}`}
+              style={[styles.card, hasComment ? styles.cardHasComment : styles.cardNoComment]}
               activeOpacity={0.75}
               onPress={() => setSheetRow(row)}
             >
@@ -904,6 +880,8 @@ const styles = makeStyles({
     gap: spacing(2),
     marginBottom: spacing(3),
   },
+  dateRow: { flexDirection: 'row', gap: spacing(2) },
+  dateField: { flex: 1 },
   field: { gap: spacing(1) },
   fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   input: {
@@ -918,6 +896,8 @@ const styles = makeStyles({
   },
   searchGrid: { flexDirection: 'row', gap: spacing(2) },
   searchCell: { flex: 1 },
+  filterActions: { flexDirection: 'row', gap: spacing(2) },
+  filterActionBtn: { flex: 1 },
   applyBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
@@ -926,6 +906,14 @@ const styles = makeStyles({
     justifyContent: 'center',
   },
   applyText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  syncBtn: {
+    backgroundColor: '#1976d2',
+    borderRadius: radius.md,
+    paddingVertical: spacing(3),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.12)',
     borderWidth: 1,
@@ -934,6 +922,7 @@ const styles = makeStyles({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
+  errorText: { color: colors.destructive, fontSize: 13 },
   hint: { color: colors.muted, fontSize: 13, marginBottom: spacing(2) },
   list: { gap: spacing(2) },
   card: {
@@ -942,6 +931,20 @@ const styles = makeStyles({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing(3),
+  },
+  cardNoComment: {
+    backgroundColor: 'rgba(255,159,10,0.08)',
+    borderColor: 'rgba(255,159,10,0.28)',
+  },
+  cardHasComment: {
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderColor: 'rgba(34,197,94,0.28)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginBottom: spacing(1.5),
   },
   cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
   cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, minWidth: 0 },
@@ -955,7 +958,14 @@ const styles = makeStyles({
     maxWidth: 110,
     textAlign: 'center',
   },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(1.5) },
+  cardSplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    marginBottom: spacing(0.5),
+  },
+  cardSplitLeft: { color: colors.muted, fontSize: 12, flex: 1, minWidth: 0 },
+  cardSplitRight: { color: colors.muted, fontSize: 12, flexShrink: 0, maxWidth: '48%' },
   cardActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1019,6 +1029,8 @@ const styles = makeStyles({
     alignItems: 'center',
   },
   modalBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700' },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  backdropTouch: { flex: 1 },
   summarySheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
@@ -1034,7 +1046,7 @@ const styles = makeStyles({
     justifyContent: 'space-between',
     marginBottom: spacing(3),
   },
-  summaryTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700' },
+  summaryTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700', flex: 1, paddingRight: 8 },
   close: { color: colors.muted, fontSize: 18, fontWeight: '700' },
   summaryCard: {
     backgroundColor: colors.surfaceAlt,
@@ -1056,4 +1068,6 @@ const styles = makeStyles({
     fontSize: 14,
     paddingHorizontal: spacing(2),
   },
+  screen: { flex: 1 },
+  content: { padding: spacing(4), paddingBottom: spacing(10) },
 });
