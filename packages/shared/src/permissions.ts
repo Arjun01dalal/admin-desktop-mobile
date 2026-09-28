@@ -157,7 +157,7 @@ export const Permissions = {
   show_withdrawal_block: 'show_withdrawal_block',
   /** GGR Alert page (admin-panel GgrAlert). */
   show_ggr_alert: 'show_ggr_alert',
-  /** Set Whatsapp Mid page (admin-panel WhatsappMid). */
+  /** Set Gateway Mid page (admin-panel WhatsappMid / gateway-upi). */
   set_whatsapp_limit: 'set_whatsapp_limit',
   /** AAA Fraud Bet Report (external nodeadmin). */
   show_aaa_fraud_bets: 'show_aaa_fraud_bets',

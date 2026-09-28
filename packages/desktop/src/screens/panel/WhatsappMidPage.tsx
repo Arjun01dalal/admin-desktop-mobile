@@ -1,3 +1,6 @@
+/**
+ * Set Gateway Mid — port of admin-panel-domains WhatsappMid / gateway-upi.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -16,40 +19,35 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
+import {
+  EMPTY_GATEWAY_MID_FORM,
+  WHATSAPP_UP_RAJ_NUMBER,
+  availableGatewayMidPositions,
+  buildGatewayMidSavePayload,
+  buildGatewayMidStatusPayload,
+  dedupeStrings,
+  formStateFromGatewayMidRow,
+  formatGatewayTypeLabel,
+  getGatewayMidRowId,
+  groupGatewayMids,
+  isWhatsappType,
+  isWhatsappUpRajName,
+  parseDistinctMidOptions,
+  parseGatewayNameOptions,
+  parseGatewayUpisResponse,
+  validateGatewayMidForm,
+  type GatewayMidFormErrors,
+  type GatewayMidFormField,
+  type GatewayMidFormState,
+  type GatewayMidRow,
+} from '@astro/shared/gatewayMid';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
-import { asList, display } from '@/screens/panel/shared';
-
-type WhatsappMidRow = {
-  _id?: string;
-  id?: string;
-  name?: string;
-  mid?: string;
-  upiId?: string;
-  maxDepositAllowed?: number;
-  position?: number;
-  isCurrentlyActive?: boolean;
-  [key: string]: unknown;
-};
-
-type GatewayRow = {
-  name?: string;
-  displayName?: string;
-  mid?: string;
-  midArray?: string[];
-  [key: string]: unknown;
-};
-
-const getRowId = (item: WhatsappMidRow) => String(item._id || item.id || '').trim();
-
-const dedupe = (values: Array<string | undefined | null>) =>
-  Array.from(new Set(values.filter((value): value is string => !!value)));
-
-const isWhatsappGateway = (item: GatewayRow) =>
-  `${item?.name || ''}`.toLowerCase().includes('whatsapp');
+import { display } from '@/screens/panel/shared';
 
 const orangeBtnSx = {
   bgcolor: '#ff9f0a',
@@ -59,167 +57,169 @@ const orangeBtnSx = {
   '&:hover': { bgcolor: '#e08c00' },
 };
 
+const groupHeaderSx = {
+  mb: 1,
+  px: 1.5,
+  py: 1,
+  borderRadius: 1,
+  bgcolor: 'rgba(255, 159, 10, 0.12)',
+  border: '1px solid rgba(255, 159, 10, 0.35)',
+};
+
 export function WhatsappMidPage() {
-  const [rows, setRows] = useState<WhatsappMidRow[]>([]);
+  const [rows, setRows] = useState<GatewayMidRow[]>([]);
+  const [apiTypeOptions, setApiTypeOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [gatewayNameOptions, setGatewayNameOptions] = useState<string[]>([]);
   const [gatewayMidOptions, setGatewayMidOptions] = useState<string[]>([]);
 
-  const [addOpen, setAddOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeId, setActiveId] = useState('');
+  const [editingId, setEditingId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [manualMidEntry, setManualMidEntry] = useState(false);
 
-  const [name, setName] = useState('');
-  const [mid, setMid] = useState('');
-  const [upiId, setUpiId] = useState('');
-  const [maxDepositAllowed, setMaxDepositAllowed] = useState('');
-  const [position, setPosition] = useState('');
+  const [form, setForm] = useState<GatewayMidFormState>(EMPTY_GATEWAY_MID_FORM);
+  const [errors, setErrors] = useState<GatewayMidFormErrors>({});
 
-  const [nameError, setNameError] = useState('');
-  const [midError, setMidError] = useState('');
-  const [upiIdError, setUpiIdError] = useState('');
-  const [maxDepositError, setMaxDepositError] = useState('');
-  const [positionError, setPositionError] = useState('');
+  const setField = (field: GatewayMidFormField, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const resetForm = () => {
+    setForm(EMPTY_GATEWAY_MID_FORM);
+    setErrors({});
+    setManualMidEntry(false);
+    setEditingId('');
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await secureApi<unknown>('whatsappMid.list', {});
       if (!res.ok) {
-        toast.error(res.message || 'Failed to load WhatsApp MIDs');
+        toast.error(res.message || 'Failed to load Gateway MIDs');
         setRows([]);
+        setApiTypeOptions([]);
         return;
       }
-      setRows(asList<WhatsappMidRow>(res.data));
+      const { rows: nextRows, types } = parseGatewayUpisResponse(res.data);
+      setRows(nextRows);
+      setApiTypeOptions(types);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const loadGateways = useCallback(async () => {
-    const res = await secureApi<unknown>('depositProviders.list', {});
-    if (!res.ok) return;
-    const providers = asList<GatewayRow>(res.data).filter(isWhatsappGateway);
-    setGatewayNameOptions(dedupe(providers.map((g) => g.name || g.displayName)));
-    setGatewayMidOptions(
-      dedupe(providers.flatMap((g) => [g.mid, ...(Array.isArray(g.midArray) ? g.midArray : [])])),
-    );
+  const loadOptions = useCallback(async () => {
+    const [namesRes, midsRes] = await Promise.all([
+      secureApi<unknown>('depositProviders.list', {}),
+      secureApi<unknown>('depositProviders.distinctMids', {}),
+    ]);
+    if (namesRes.ok) setGatewayNameOptions(parseGatewayNameOptions(namesRes.data));
+    if (midsRes.ok) setGatewayMidOptions(parseDistinctMidOptions(midsRes.data));
   }, []);
 
   useEffect(() => {
     void load();
-    void loadGateways();
-  }, [load, loadGateways]);
+    void loadOptions();
+  }, [load, loadOptions]);
 
-  const resetForm = () => {
-    setName('');
-    setMid('');
-    setUpiId('');
-    setMaxDepositAllowed('');
-    setPosition('');
-    setNameError('');
-    setMidError('');
-    setUpiIdError('');
-    setMaxDepositError('');
-    setPositionError('');
-    setManualMidEntry(false);
-  };
+  const nameOptions = useMemo(
+    () => dedupeStrings([...gatewayNameOptions, ...rows.map((item) => item.name)]),
+    [gatewayNameOptions, rows],
+  );
 
-  const availablePositions = useMemo(() => {
-    const taken = name
-      ? rows.filter((item) => (item.name || '') === name).map((item) => Number(item.position))
-      : [];
-    return Array.from({ length: 15 }, (_, i) => i + 1).filter((pos) => !taken.includes(pos));
-  }, [rows, name]);
+  const midOptions = useMemo(
+    () => dedupeStrings([...gatewayMidOptions, ...rows.map((item) => item.mid)]),
+    [gatewayMidOptions, rows],
+  );
 
-  const sortedRows = useMemo(
-    () =>
-      [...rows].sort((a, b) => {
-        const byName = (a.name || '').localeCompare(b.name || '');
-        if (byName !== 0) return byName;
-        return (Number(a.position) || 0) - (Number(b.position) || 0);
-      }),
+  const typeOptions = useMemo(() => {
+    if (apiTypeOptions.length) return apiTypeOptions;
+    return dedupeStrings(rows.map((item) => item.type));
+  }, [apiTypeOptions, rows]);
+
+  const availablePositions = useMemo(
+    () => availableGatewayMidPositions(rows, form.name, editingId),
+    [rows, form.name, editingId],
+  );
+
+  const { groups: groupedByName, totalUpis, activeCount } = useMemo(
+    () => groupGatewayMids(rows),
     [rows],
   );
 
-  /** Group rows under each Name (same as mobile / Laxmi web rowSpan grouping). */
-  const groupedByName = useMemo(() => {
-    const groups: { name: string; items: WhatsappMidRow[] }[] = [];
-    const map = new Map<string, WhatsappMidRow[]>();
-    for (const row of sortedRows) {
-      const key = String(row.name || '').trim() || 'Untitled';
-      const list = map.get(key);
-      if (list) list.push(row);
-      else {
-        const next = [row];
-        map.set(key, next);
-        groups.push({ name: key, items: next });
-      }
-    }
-    return groups;
-  }, [sortedRows]);
-
-  const handleStatus = async (row: WhatsappMidRow, checked: boolean) => {
-    const rowId = getRowId(row);
-    if (!rowId) return;
-    const res = await secureApi('whatsappMid.update', {
-      id: rowId,
-      isCurrentlyActive: checked,
+  const openAdd = () => {
+    resetForm();
+    setDialogOpen(true);
+    void secureApi<unknown>('whatsappMid.list', {}).then((res) => {
+      if (!res.ok) return;
+      const { types } = parseGatewayUpisResponse(res.data);
+      if (types.length) setApiTypeOptions(types);
     });
-    if (!res.ok) {
-      toast.error(res.message || 'Failed to update status');
-      return;
-    }
-    setRows((prev) =>
-      prev.map((item) =>
-        getRowId(item) === rowId ? { ...item, isCurrentlyActive: checked } : item,
-      ),
-    );
   };
+
+  const openEdit = (row: GatewayMidRow) => {
+    const rowId = getGatewayMidRowId(row);
+    if (!rowId || submitting) return;
+    setEditingId(rowId);
+    setForm(formStateFromGatewayMidRow(row));
+    setErrors({});
+    setManualMidEntry(false);
+    setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    resetForm();
+  };
+
+  const handleStatus = useCallback(async (row: GatewayMidRow, checked: boolean) => {
+    const rowId = getGatewayMidRowId(row);
+    if (!rowId) return;
+    let snapshot: GatewayMidRow[] = [];
+    setRows((prev) => {
+      snapshot = prev;
+      return prev.map((item) =>
+        getGatewayMidRowId(item) === rowId ? { ...item, isCurrentlyActive: checked } : item,
+      );
+    });
+    const res = await secureApi('whatsappMid.update', buildGatewayMidStatusPayload(row, checked));
+    if (!res.ok) {
+      setRows(snapshot);
+      toast.error(res.message || 'Failed to update status');
+    }
+  }, []);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    let hasError = false;
-    if (!name.trim()) {
-      setNameError('Enter Name');
-      hasError = true;
-    }
-    if (!mid.trim()) {
-      setMidError('Enter MID');
-      hasError = true;
-    }
-    if (!upiId.trim()) {
-      setUpiIdError('Enter UPI Id');
-      hasError = true;
-    }
-    if (!maxDepositAllowed.trim()) {
-      setMaxDepositError('Enter Max Deposit Allowed');
-      hasError = true;
-    }
-    if (!position.trim()) {
-      setPositionError('Enter Position');
-      hasError = true;
-    }
-    if (hasError) return;
+    const nextErrors = validateGatewayMidForm(form);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length || submitting) return;
+
+    const isUpdate = Boolean(editingId);
+    const editingRow = isUpdate
+      ? rows.find((item) => getGatewayMidRowId(item) === editingId)
+      : undefined;
+    const payload = buildGatewayMidSavePayload(form, { editingId, editingRow });
 
     setSubmitting(true);
     try {
-      const res = await secureApi('whatsappMid.create', {
-        name: name.trim(),
-        mid: mid.trim(),
-        upiId: upiId.trim(),
-        maxDepositAllowed: Number(maxDepositAllowed),
-        position: Number(position),
-      });
+      const res = await secureApi(isUpdate ? 'whatsappMid.update' : 'whatsappMid.create', payload);
       if (!res.ok) {
-        toast.error(res.message || 'Failed to create WhatsApp MID');
+        toast.error(res.message || 'Failed to save Gateway MID');
         return;
       }
-      toast.success('WhatsApp MID added');
-      setAddOpen(false);
-      resetForm();
+      toast.success(isUpdate ? 'Gateway MID updated' : 'Gateway MID added');
+      closeDialog();
       await load();
     } finally {
       setSubmitting(false);
@@ -227,29 +227,57 @@ export function WhatsappMidPage() {
   };
 
   const handleDelete = async () => {
-    if (!activeId) return;
+    if (!activeId || submitting) return;
+    const row = rows.find((item) => getGatewayMidRowId(item) === activeId);
+    let snapshot: GatewayMidRow[] = [];
+    setDeleteOpen(false);
+    setRows((prev) => {
+      snapshot = prev;
+      return prev.filter((item) => getGatewayMidRowId(item) !== activeId);
+    });
     setSubmitting(true);
     try {
-      const res = await secureApi('whatsappMid.delete', { id: activeId });
+      const res = await secureApi('whatsappMid.delete', {
+        name: row?.name || '',
+        id: activeId,
+      });
       if (!res.ok) {
+        setRows(snapshot);
         toast.error(res.message || 'Failed to delete');
         return;
       }
-      setRows((prev) => prev.filter((item) => getRowId(item) !== activeId));
-      setDeleteOpen(false);
       setActiveId('');
-      toast.success('Deleted');
+      toast.success('Gateway MID deleted');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const columns: CommonTableColumn<WhatsappMidRow>[] = useMemo(
+  const showWhatsappNumber = isWhatsappType(form.type);
+  const isUpRaj = isWhatsappUpRajName(form.name);
+
+  const columns: CommonTableColumn<GatewayMidRow>[] = useMemo(
     () => [
       {
         id: 'mid',
         label: 'MID',
-        render: (row) => display(row.mid),
+        render: (row) => (
+          <Box>
+            <Typography variant="body2" fontWeight={600}>
+              {display(row.mid)}
+            </Typography>
+            {row.midName && row.midName !== row.mid ? (
+              <Typography variant="caption" color="text.secondary">
+                {row.midName}
+              </Typography>
+            ) : null}
+          </Box>
+        ),
+      },
+      {
+        id: 'type',
+        label: 'Type',
+        render: (row) => display(formatGatewayTypeLabel(row.type || '') || undefined),
       },
       {
         id: 'upiId',
@@ -257,9 +285,14 @@ export function WhatsappMidPage() {
         render: (row) => display(row.upiId),
       },
       {
+        id: 'whatsappNumber',
+        label: 'WhatsApp',
+        render: (row) => display(row.whatsappNumber || undefined),
+      },
+      {
         id: 'maxDepositAllowed',
-        label: 'Max Deposit Allowed',
-        render: (row) => display(row.maxDepositAllowed),
+        label: 'Max Deposit',
+        render: (row) => Number(row.maxDepositAllowed).toLocaleString('en-IN'),
       },
       {
         id: 'position',
@@ -273,6 +306,7 @@ export function WhatsappMidPage() {
           <Switch
             size="small"
             checked={Boolean(row.isCurrentlyActive)}
+            disabled={submitting}
             onChange={(_, checked) => void handleStatus(row, checked)}
           />
         ),
@@ -281,35 +315,50 @@ export function WhatsappMidPage() {
         id: 'action',
         label: 'Action',
         render: (row) => (
-          <IconButton
-            size="small"
-            color="error"
-            onClick={() => {
-              setActiveId(getRowId(row));
-              setDeleteOpen(true);
-            }}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+          <Stack direction="row" spacing={0.5}>
+            <IconButton
+              size="small"
+              color="primary"
+              disabled={submitting}
+              onClick={() => openEdit(row)}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              color="error"
+              disabled={submitting}
+              onClick={() => {
+                setActiveId(getGatewayMidRowId(row));
+                setDeleteOpen(true);
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Stack>
         ),
       },
     ],
-    // handleStatus closes over setRows; stable enough for table
-
-    [],
+    [handleStatus, submitting],
   );
 
   return (
     <Box sx={{ p: 2 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Typography variant="h6" fontWeight={700}>
-          Set Whatsapp Mid
-        </Typography>
+        <Box>
+          <Typography variant="h6" fontWeight={700}>
+            Set Gateway Mid
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {groupedByName.length} names · {totalUpis} UPIs · {activeCount} active
+          </Typography>
+        </Box>
         <Stack direction="row" spacing={1}>
           <Button
             size="small"
             startIcon={<RefreshIcon />}
             onClick={() => void load()}
+            disabled={loading || submitting}
             sx={orangeBtnSx}
           >
             Refresh
@@ -317,10 +366,8 @@ export function WhatsappMidPage() {
           <Button
             size="small"
             startIcon={<AddIcon />}
-            onClick={() => {
-              resetForm();
-              setAddOpen(true);
-            }}
+            onClick={openAdd}
+            disabled={submitting}
             sx={orangeBtnSx}
           >
             Add
@@ -342,7 +389,7 @@ export function WhatsappMidPage() {
             columns={columns}
             rows={[]}
             loading={false}
-            emptyMessage="No WhatsApp MIDs found"
+            emptyMessage="No Gateway MIDs found"
             maxHeight="100%"
           />
         ) : (
@@ -358,19 +405,7 @@ export function WhatsappMidPage() {
           >
             {groupedByName.map((group) => (
               <Box key={group.name} sx={{ flexShrink: 0 }}>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1.5}
-                  sx={{
-                    mb: 1,
-                    px: 1.5,
-                    py: 1,
-                    borderRadius: 1,
-                    bgcolor: 'rgba(255, 159, 10, 0.12)',
-                    border: '1px solid rgba(255, 159, 10, 0.35)',
-                  }}
-                >
+                <Stack direction="row" alignItems="center" spacing={1.5} sx={groupHeaderSx}>
                   <Box
                     sx={{
                       width: 4,
@@ -405,15 +440,15 @@ export function WhatsappMidPage() {
                       fontSize: 13,
                     }}
                   >
-                    {group.items.length}
+                    {group.rows.length}
                   </Box>
                 </Stack>
                 <CommonTable
                   columns={columns}
-                  rows={group.items}
+                  rows={group.rows}
                   loading={false}
                   virtualize={false}
-                  getRowKey={(row) => getRowId(row) || String(row.mid || Math.random())}
+                  getRowKey={(row) => getGatewayMidRowId(row) || String(row.mid || Math.random())}
                   paper
                 />
               </Box>
@@ -422,40 +457,74 @@ export function WhatsappMidPage() {
         )}
       </TablePanel>
 
-      <Dialog
-        open={addOpen}
-        onClose={() => {
-          setAddOpen(false);
-          resetForm();
-        }}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>Add Whatsapp Mid</DialogTitle>
+      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {editingId ? 'Update Gateway Mid' : 'Add Gateway Mid'}
+        </DialogTitle>
         <Box component="form" onSubmit={(e) => void handleSubmit(e)}>
           <DialogContent>
             <Stack spacing={2} sx={{ pt: 1 }}>
               <Autocomplete
                 freeSolo
-                options={gatewayNameOptions}
-                value={name}
-                onChange={(_e, v) => {
-                  setNameError('');
-                  setName(v || '');
-                  setPosition('');
+                options={typeOptions}
+                value={form.type || null}
+                getOptionLabel={(option) => formatGatewayTypeLabel(option) || option}
+                onChange={(_e, value) => {
+                  const nextType = value || '';
+                  setField('type', nextType);
+                  if (!isWhatsappType(nextType)) setField('whatsappNumber', '');
+                  else if (isWhatsappUpRajName(form.name)) {
+                    setField('whatsappNumber', WHATSAPP_UP_RAJ_NUMBER);
+                  }
                 }}
-                onInputChange={(_e, v) => {
-                  setNameError('');
-                  setName(v);
-                  setPosition('');
+                onInputChange={(_e, value, reason) => {
+                  if (reason !== 'input') return;
+                  setField('type', value);
+                  if (!isWhatsappType(value)) setField('whatsappNumber', '');
+                  else if (isWhatsappUpRajName(form.name)) {
+                    setField('whatsappNumber', WHATSAPP_UP_RAJ_NUMBER);
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Type"
+                    size="small"
+                    error={Boolean(errors.type)}
+                    helperText={
+                      errors.type ||
+                      (typeOptions.length ? `${typeOptions.length} types from API` : '')
+                    }
+                  />
+                )}
+              />
+
+              <Autocomplete
+                freeSolo
+                options={nameOptions}
+                value={form.name}
+                onChange={(_e, value) => {
+                  const nextName = value || '';
+                  setField('name', nextName);
+                  setField('position', '');
+                  if (isWhatsappUpRajName(nextName)) {
+                    setField('whatsappNumber', WHATSAPP_UP_RAJ_NUMBER);
+                  }
+                }}
+                onInputChange={(_e, value) => {
+                  setField('name', value);
+                  setField('position', '');
+                  if (isWhatsappUpRajName(value)) {
+                    setField('whatsappNumber', WHATSAPP_UP_RAJ_NUMBER);
+                  }
                 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="Name"
                     size="small"
-                    error={Boolean(nameError)}
-                    helperText={nameError}
+                    error={Boolean(errors.name)}
+                    helperText={errors.name}
                   />
                 )}
               />
@@ -465,34 +534,25 @@ export function WhatsappMidPage() {
                   label="MID"
                   size="small"
                   fullWidth
-                  value={mid}
-                  error={Boolean(midError)}
-                  helperText={midError}
-                  onChange={(e) => {
-                    setMidError('');
-                    setMid(e.target.value);
-                  }}
+                  value={form.mid}
+                  error={Boolean(errors.mid)}
+                  helperText={errors.mid}
+                  onChange={(e) => setField('mid', e.target.value)}
                 />
               ) : (
                 <Autocomplete
                   freeSolo
-                  options={gatewayMidOptions}
-                  value={mid}
-                  onChange={(_e, v) => {
-                    setMidError('');
-                    setMid(v || '');
-                  }}
-                  onInputChange={(_e, v) => {
-                    setMidError('');
-                    setMid(v);
-                  }}
+                  options={midOptions}
+                  value={form.mid}
+                  onChange={(_e, value) => setField('mid', value || '')}
+                  onInputChange={(_e, value) => setField('mid', value)}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="MID"
                       size="small"
-                      error={Boolean(midError)}
-                      helperText={midError}
+                      error={Boolean(errors.mid)}
+                      helperText={errors.mid}
                     />
                   )}
                 />
@@ -503,8 +563,7 @@ export function WhatsappMidPage() {
                 sx={{ cursor: 'pointer', alignSelf: 'flex-end', mt: -1 }}
                 onClick={() => {
                   setManualMidEntry((p) => !p);
-                  setMid('');
-                  setMidError('');
+                  setField('mid', '');
                 }}
               >
                 {manualMidEntry ? 'Choose from list instead' : 'Enter MID manually'}
@@ -514,44 +573,53 @@ export function WhatsappMidPage() {
                 label="UPI Id"
                 size="small"
                 fullWidth
-                value={upiId}
-                error={Boolean(upiIdError)}
-                helperText={upiIdError}
-                onChange={(e) => {
-                  setUpiIdError('');
-                  setUpiId(e.target.value);
-                }}
+                value={form.upiId}
+                error={Boolean(errors.upiId)}
+                helperText={errors.upiId}
+                onChange={(e) => setField('upiId', e.target.value)}
               />
+
+              {showWhatsappNumber ? (
+                <TextField
+                  label="WhatsApp Number"
+                  size="small"
+                  fullWidth
+                  value={form.whatsappNumber}
+                  error={Boolean(errors.whatsappNumber)}
+                  helperText={
+                    errors.whatsappNumber || (isUpRaj ? '' : 'Saved as 91XXXXXXXXXX')
+                  }
+                  onChange={(e) => setField('whatsappNumber', e.target.value)}
+                />
+              ) : null}
+
               <TextField
                 label="Max Deposit Allowed"
                 size="small"
                 type="number"
                 fullWidth
-                value={maxDepositAllowed}
-                error={Boolean(maxDepositError)}
-                helperText={maxDepositError}
-                onChange={(e) => {
-                  setMaxDepositError('');
-                  setMaxDepositAllowed(e.target.value);
-                }}
+                value={form.maxDepositAllowed}
+                error={Boolean(errors.maxDepositAllowed)}
+                helperText={errors.maxDepositAllowed}
+                onChange={(e) => setField('maxDepositAllowed', e.target.value)}
               />
-              {name ? (
+
+              {form.name ? (
                 <Autocomplete
                   options={availablePositions}
                   getOptionLabel={(o) => String(o)}
-                  value={position ? Number(position) : null}
-                  onChange={(_e, v) => {
-                    setPositionError('');
-                    setPosition(v != null ? String(v) : '');
-                  }}
+                  value={form.position ? Number(form.position) : null}
+                  onChange={(_e, value) =>
+                    setField('position', value != null ? String(value) : '')
+                  }
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="Position"
                       size="small"
-                      error={Boolean(positionError)}
+                      error={Boolean(errors.position)}
                       helperText={
-                        positionError ||
+                        errors.position ||
                         (availablePositions.length === 0
                           ? 'All positions (1-15) are already used for this name'
                           : '')
@@ -563,23 +631,16 @@ export function WhatsappMidPage() {
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button
-              onClick={() => {
-                setAddOpen(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </Button>
+            <Button onClick={closeDialog}>Cancel</Button>
             <Button type="submit" variant="contained" disabled={submitting} sx={orangeBtnSx}>
-              Submit
+              {editingId ? 'Update' : 'Submit'}
             </Button>
           </DialogActions>
         </Box>
       </Dialog>
 
       <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)}>
-        <DialogTitle>Delete WhatsApp MID?</DialogTitle>
+        <DialogTitle>Delete Gateway MID?</DialogTitle>
         <DialogContent>
           <Typography variant="body2">This action cannot be undone.</Typography>
         </DialogContent>

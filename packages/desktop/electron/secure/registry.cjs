@@ -2629,29 +2629,35 @@ module.exports = {
     decryptResponse: false,
   },
 
-  // Set Whatsapp Mid (admin-panel-domains WhatsappMid)
+  // Set Gateway Mid (admin-panel-domains WhatsappMid / gateway-upi)
   'whatsappMid.list': {
     method: 'GET',
-    path: '/SubAdmin/get-all-whatsapp-UPI-ids',
+    path: '/SubAdmin/get-all-gateway-upis',
     encryptRequest: false,
     decryptResponse: true,
   },
   'whatsappMid.create': {
     method: 'POST',
-    path: '/SubAdmin/create-whatsapp-UPI-id',
-    encryptRequest: true,
+    path: '/SubAdmin/create-gateway-upi',
+    encryptRequest: false,
     decryptResponse: true,
   },
   'whatsappMid.update': {
     method: 'POST',
-    path: '/SubAdmin/update-whatsapp-UPI-id',
-    encryptRequest: true,
+    path: '/SubAdmin/update-gateway-upi',
+    encryptRequest: false,
     decryptResponse: true,
   },
   'whatsappMid.delete': {
     method: 'POST',
-    path: '/SubAdmin/delete-whatsapp-UPI-id',
-    encryptRequest: true,
+    path: '/SubAdmin/delete-gateway-upi',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'depositProviders.distinctMids': {
+    method: 'POST',
+    path: '/payinAccounts/getAllDistinctMids',
+    encryptRequest: false,
     decryptResponse: true,
   },
 

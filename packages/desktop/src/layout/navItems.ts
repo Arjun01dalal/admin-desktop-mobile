@@ -388,7 +388,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'whatsappMid',
-    label: 'Set Whatsapp Mid',
+    label: 'Set Gateway Mid',
     path: '/whatsapp-mid',
     permission: Permissions.set_whatsapp_limit,
   },

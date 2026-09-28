@@ -117,6 +117,7 @@ export const SECURE_ACTIONS = [
   'instantDeposit.updateInstant',
   'instantDeposit.updateName',
   'depositProviders.list',
+  'depositProviders.distinctMids',
   'depositProviders.create',
   'depositProviders.update',
   'depositProviders.delete',

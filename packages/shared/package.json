@@ -21,6 +21,7 @@
     "./callLogs": "./src/callLogs.ts",
     "./states": "./src/states.ts",
     "./midLimits": "./src/midLimits.ts",
+    "./gatewayMid": "./src/gatewayMid.ts",
     "./updateGameImage": "./src/updateGameImage.ts",
     "./ludoRtp": "./src/ludoRtp.ts",
     "./walletOtp": "./src/walletOtp.ts",

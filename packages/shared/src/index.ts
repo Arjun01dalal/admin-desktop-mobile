@@ -17,6 +17,7 @@ export * from './callLogs';
 export * from './empCodeNameCache';
 export * from './dialerAssignee';
 export * from './midLimits';
+export * from './gatewayMid';
 export * from './updateGameImage';
 export * from './ludoRtp';
 export * from './walletOtp';
