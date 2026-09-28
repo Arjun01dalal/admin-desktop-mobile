@@ -1,15 +1,16 @@
 /**
  * WhatsApp inbox — native mobile port of desktop WhatsappPage.
- * Loads Exotel callbacks, groups conversations by phone, polls while the app
- * is active, and supports text/image replies.
+ * Chat list and the open thread load separately (admin-panel-domains WhatsappView).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  AppState,
   Image,
   KeyboardAvoidingView,
+  Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   RefreshControl,
   ScrollView,
@@ -21,230 +22,46 @@ import {
 import { makeStyles } from '../../../styles/common';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, radius, spacing } from '../../../theme';
+import {
+  WHATSAPP_NEAR_BOTTOM_PX,
+  WHATSAPP_NEAR_TOP_PX,
+  buildExotelWhatsappSend,
+  formatListTime,
+  getInitials,
+  getWhatsappMessageId,
+  isIncoming,
+  presentMessage,
+  toApiMobile,
+} from '@astro/shared/whatsappInbox';
+import { colors, isDarkTheme, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-
-type CallbackType = 'incoming_message' | 'outgoing_message' | 'dlr';
-
-type WhatsappContent =
-  | {
-      type: 'text';
-      text: { body?: string };
-      profile_name?: string;
-    }
-  | {
-      type: 'image';
-      image: { url?: string; caption?: string; s3_url?: string };
-      profile_name?: string;
-    };
-
-type WhatsappMessage = {
-  callback_type?: CallbackType | string;
-  from?: string;
-  to?: string;
-  timestamp?: string;
-  profile_name?: string;
-  description?: string;
-  content?: WhatsappContent;
-};
-
-type GroupedChats = Record<string, WhatsappMessage[]>;
-
-type ChatSummary = {
-  phone: string;
-  profileName: string;
-  preview: string;
-  timestamp: string;
-};
-
-const POLL_INTERVAL_MS = 4000;
-
-function unpackMessages(data: unknown): WhatsappMessage[] {
-  if (Array.isArray(data)) return data as WhatsappMessage[];
-  if (!data || typeof data !== 'object') return [];
-  const obj = data as Record<string, unknown>;
-  for (const key of ['payload', 'data', 'items', 'rows', 'result']) {
-    if (Array.isArray(obj[key])) return obj[key] as WhatsappMessage[];
-  }
-  return [];
-}
-
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  if (!digits) return phone.trim();
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
-  return `+${digits}`;
-}
-
-function formatWhatsappTo(phone: string): string {
-  const trimmed = phone.trim();
-  if (trimmed.startsWith('+')) return trimmed;
-  const digits = trimmed.replace(/\D/g, '');
-  return digits.length === 10 ? `+91${digits}` : `+${digits}`;
-}
-
-function groupChats(messages: WhatsappMessage[]): GroupedChats {
-  const grouped: GroupedChats = {};
-  for (const message of messages) {
-    const raw = message.callback_type === 'incoming_message' ? message.from : message.to;
-    if (!raw) continue;
-    const phone = normalizePhone(raw);
-    (grouped[phone] ||= []).push(message);
-  }
-  for (const chat of Object.values(grouped)) {
-    chat.sort(
-      (a, b) =>
-        new Date(String(a.timestamp || '')).getTime() -
-        new Date(String(b.timestamp || '')).getTime(),
-    );
-  }
-  return grouped;
-}
-
-function getProfileName(messages: WhatsappMessage[], phone: string): string {
-  const withName = [...messages]
-    .reverse()
-    .find((message) => message.profile_name || message.content?.profile_name);
-  return withName?.profile_name || withName?.content?.profile_name || phone;
-}
-
-function messagePreview(message: WhatsappMessage): string {
-  if (message.content?.type === 'text') {
-    return String(message.content.text.body || '');
-  }
-  if (message.content?.type === 'image') {
-    const caption = String(message.content.image.caption || '').trim();
-    return caption ? `📷 ${caption}` : '📷 Photo';
-  }
-  return String(message.description || '');
-}
-
-function buildSummaries(records: GroupedChats): ChatSummary[] {
-  return Object.entries(records)
-    .map(([phone, messages]) => {
-      const visible = messages.filter((message) => message.callback_type !== 'dlr');
-      const last = visible[visible.length - 1] || messages[messages.length - 1];
-      if (!last) return null;
-      return {
-        phone,
-        profileName: getProfileName(messages, phone),
-        preview: messagePreview(last),
-        timestamp: String(last.timestamp || ''),
-      };
-    })
-    .filter((item): item is ChatSummary => item !== null)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-}
-
-function formatTime(timestamp: string | undefined): string {
-  if (!timestamp) return '—';
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return timestamp;
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return date.toLocaleDateString([], {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-  });
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return (name || '?').slice(-2).toUpperCase();
-}
+import { useWhatsappInbox } from './whatsapp/useWhatsappInbox';
 
 function Avatar({ name }: { name: string }) {
   return (
     <View style={styles.avatar}>
-      <Text style={styles.avatarText}>{initials(name)}</Text>
+      <Text style={styles.avatarText}>{getInitials(name)}</Text>
     </View>
   );
 }
 
 export function WhatsappScreen() {
-  const [records, setRecords] = useState<GroupedChats | null>(null);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const inbox = useWhatsappInbox();
   const [message, setMessage] = useState('');
   const [image, setImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fetchingRef = useRef(false);
   const messagesRef = useRef<ScrollView>(null);
-
-  const fetchWhatsappData = useCallback(async (silent = false) => {
-    if (fetchingRef.current) return;
-    fetchingRef.current = true;
-    if (!silent) setLoading(true);
-    try {
-      const res = await secureApi<unknown>('whatsapp.getCallbacks', {});
-      if (!res.ok) {
-        if (!silent) setError(res.message || 'Failed to load chats');
-        return;
-      }
-      setError(null);
-      setRecords(groupChats(unpackMessages(res.data)));
-    } finally {
-      fetchingRef.current = false;
-      if (!silent) setLoading(false);
-    }
-  }, []);
+  const { selectedUser: openChat, activeMessages, stickToBottomRef } = inbox;
 
   useEffect(() => {
-    void fetchWhatsappData();
-    const timer = setInterval(() => {
-      if (AppState.currentState === 'active') void fetchWhatsappData(true);
-    }, POLL_INTERVAL_MS);
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void fetchWhatsappData(true);
+    if (!openChat || !stickToBottomRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      messagesRef.current?.scrollToEnd({ animated: false });
     });
-    return () => {
-      clearInterval(timer);
-      subscription.remove();
-    };
-  }, [fetchWhatsappData]);
-
-  const summaries = useMemo(() => (records ? buildSummaries(records) : []), [records]);
-
-  const filteredChats = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return summaries;
-    return summaries.filter(
-      (chat) =>
-        chat.phone.toLowerCase().includes(query) ||
-        chat.profileName.toLowerCase().includes(query) ||
-        chat.preview.toLowerCase().includes(query),
-    );
-  }, [search, summaries]);
-
-  const activeMessages = useMemo(() => {
-    if (!selectedUser || !records) return [];
-    return (records[normalizePhone(selectedUser)] || records[selectedUser] || []).filter(
-      (item) => item.callback_type !== 'dlr',
-    );
-  }, [records, selectedUser]);
-
-  const activeProfileName = useMemo(() => {
-    if (!selectedUser || !records) return '';
-    const messages = records[normalizePhone(selectedUser)] || records[selectedUser];
-    return messages ? getProfileName(messages, selectedUser) : selectedUser;
-  }, [records, selectedUser]);
-
-  useEffect(() => {
-    if (!selectedUser) return;
-    requestAnimationFrame(() => messagesRef.current?.scrollToEnd({ animated: false }));
-  }, [activeMessages.length, selectedUser]);
+    return () => cancelAnimationFrame(frame);
+  }, [openChat, activeMessages.length, stickToBottomRef]);
+  const contentHeightRef = useRef(0);
+  const pendingPrependHeightRef = useRef<number | null>(null);
 
   const pickImage = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -270,49 +87,86 @@ export function WhatsappScreen() {
 
   const sendMessage = useCallback(async () => {
     const text = message.trim();
-    if ((!text && !image) || !selectedUser || sending) return;
+    const recipient =
+      inbox.selectedMobileRef.current ||
+      (inbox.selectedUser ? toApiMobile(inbox.selectedUser) : '');
+    if ((!text && !image) || !recipient || !inbox.selectedUser || sending) return;
+
+    const plan = buildExotelWhatsappSend({ recipient, text, image });
+    if (!plan.ok) {
+      Alert.alert('Send failed', plan.error);
+      return;
+    }
+
     setSending(true);
     try {
-      const payload = image
-        ? {
-            to: formatWhatsappTo(selectedUser),
-            type: 'image' as const,
-            image,
-            caption: text,
-          }
-        : {
-            to: formatWhatsappTo(selectedUser),
-            type: 'text' as const,
-            text,
-          };
-      const res = await secureApi<unknown>('whatsapp.sendExotel', payload);
+      const res = await secureApi<unknown>('whatsapp.sendExotel', { ...plan.body });
       if (!res.ok) {
         Alert.alert('Send failed', res.message || 'Failed to send message');
         return;
       }
+      inbox.stickToBottomRef.current = true;
+      inbox.appendOptimisticMessage(plan.optimistic);
       setMessage('');
       setImage(null);
-      await fetchWhatsappData(true);
       requestAnimationFrame(() => messagesRef.current?.scrollToEnd({ animated: true }));
     } finally {
       setSending(false);
     }
-  }, [fetchWhatsappData, image, message, selectedUser, sending]);
+  }, [image, inbox, message, sending]);
 
-  if (!selectedUser) {
+  const onChatListScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 80;
+    if (nearBottom) inbox.loadMoreChats();
+  };
+
+  const onMessagesScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    inbox.stickToBottomRef.current = distanceFromBottom < WHATSAPP_NEAR_BOTTOM_PX;
+    const nearTop = contentOffset.y <= WHATSAPP_NEAR_TOP_PX;
+    if (nearTop !== inbox.showLoadPrevious) inbox.setShowLoadPrevious(nearTop);
+  };
+
+  const onMessagesContentSizeChange = (_width: number, height: number) => {
+    const previous = pendingPrependHeightRef.current;
+    contentHeightRef.current = height;
+    if (previous != null) {
+      pendingPrependHeightRef.current = null;
+      messagesRef.current?.scrollTo({
+        y: Math.max(0, height - previous),
+        animated: false,
+      });
+      return;
+    }
+    if (inbox.stickToBottomRef.current) {
+      messagesRef.current?.scrollToEnd({ animated: false });
+    }
+  };
+
+  const handleLoadPrevious = () => {
+    if (!inbox.hasMore || inbox.loadingOlder) return;
+    pendingPrependHeightRef.current = contentHeightRef.current;
+    void inbox.loadOlder().then((grew) => {
+      if (!grew) pendingPrependHeightRef.current = null;
+    });
+  };
+
+  if (!inbox.selectedUser) {
     return (
       <View style={styles.screen}>
         <View style={styles.listHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Whatsapp</Text>
-            <Text style={styles.sub}>{summaries.length} chats</Text>
+            <Text style={styles.sub}>{inbox.chatList.length} chats</Text>
           </View>
           <TouchableOpacity
             style={styles.refreshBtn}
-            onPress={() => void fetchWhatsappData()}
-            disabled={loading}
+            onPress={() => void inbox.refreshChats()}
+            disabled={inbox.loadingList}
           >
-            {loading ? (
+            {inbox.loadingList ? (
               <ActivityIndicator size="small" color={colors.primaryForeground} />
             ) : (
               <Text style={styles.refreshText}>Refresh</Text>
@@ -322,40 +176,45 @@ export function WhatsappScreen() {
 
         <TextInput
           style={styles.searchInput}
-          value={search}
-          onChangeText={setSearch}
+          value={inbox.search}
+          onChangeText={inbox.setSearch}
           placeholder="Search chats, phone or message…"
           placeholderTextColor={colors.muted}
           autoCapitalize="none"
           autoCorrect={false}
         />
 
-        {error ? (
+        {inbox.listError ? (
           <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorText}>{inbox.listError}</Text>
           </View>
         ) : null}
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.chatList}
+          onScroll={onChatListScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
-              refreshing={loading}
-              onRefresh={() => void fetchWhatsappData()}
+              refreshing={inbox.loadingList}
+              onRefresh={() => void inbox.refreshChats()}
               tintColor={colors.primary}
             />
           }
         >
-          {!loading && filteredChats.length === 0 ? (
-            <Text style={styles.emptyText}>{records ? 'No chats found' : 'Loading chats…'}</Text>
+          {inbox.chatListLoaded && inbox.filteredChats.length === 0 ? (
+            <Text style={styles.emptyText}>No chats found</Text>
           ) : null}
-          {filteredChats.map((chat, ci) => (
+          {!inbox.chatListLoaded && inbox.filteredChats.length === 0 ? (
+            <Text style={styles.emptyText}>Loading chats…</Text>
+          ) : null}
+          {inbox.filteredChats.map((chat) => (
             <TouchableOpacity
-              key={`chat-${ci}-${chat.phone || ''}`}
+              key={chat.phone}
               style={styles.chatCard}
               activeOpacity={0.75}
-              onPress={() => setSelectedUser(normalizePhone(chat.phone))}
+              onPress={() => inbox.selectChat(chat.phone)}
             >
               <Avatar name={chat.profileName} />
               <View style={styles.chatBody}>
@@ -363,7 +222,7 @@ export function WhatsappScreen() {
                   <Text style={styles.chatName} numberOfLines={1}>
                     {chat.profileName}
                   </Text>
-                  <Text style={styles.chatTime}>{formatTime(chat.timestamp)}</Text>
+                  <Text style={styles.chatTime}>{formatListTime(chat.timestamp)}</Text>
                 </View>
                 <Text style={styles.chatPhone} numberOfLines={1}>
                   {chat.phone}
@@ -374,10 +233,14 @@ export function WhatsappScreen() {
               </View>
             </TouchableOpacity>
           ))}
+          {inbox.loadingMore ? <Text style={styles.emptyText}>Loading more...</Text> : null}
         </ScrollView>
       </View>
     );
   }
+
+  const showLoadPrevious =
+    inbox.hasMore && (inbox.showLoadPrevious || inbox.loadingOlder) && inbox.activeMessages.length > 0;
 
   return (
     <KeyboardAvoidingView
@@ -389,48 +252,54 @@ export function WhatsappScreen() {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => {
-            setSelectedUser(null);
+            inbox.backToList();
             setImage(null);
             setMessage('');
           }}
         >
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-        <Avatar name={activeProfileName} />
+        <Avatar name={inbox.activeProfileName} />
         <View style={styles.conversationTitle}>
           <Text style={styles.chatName} numberOfLines={1}>
-            {activeProfileName}
+            {inbox.activeProfileName}
           </Text>
           <TouchableOpacity
             onPress={() => {
-              void Clipboard.setStringAsync(selectedUser);
+              void Clipboard.setStringAsync(inbox.selectedUser || '');
               Alert.alert('Copied', 'Phone number copied');
             }}
           >
             <Text style={styles.activePhone} numberOfLines={1}>
-              {selectedUser} · Copy
+              {inbox.selectedUser} · Copy
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      <View style={styles.messagesWrap}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         ref={messagesRef}
         style={styles.messages}
         contentContainerStyle={styles.messagesContent}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => messagesRef.current?.scrollToEnd({ animated: false })}
+        onScroll={onMessagesScroll}
+        scrollEventThrottle={16}
+        onContentSizeChange={onMessagesContentSizeChange}
       >
-        {activeMessages.length === 0 ? (
+        {inbox.messagesLoading && inbox.activeMessages.length === 0 ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing(8) }} />
+        ) : null}
+        {!inbox.messagesLoading && inbox.activeMessages.length === 0 ? (
           <Text style={styles.emptyText}>No messages in this chat.</Text>
         ) : null}
-        {activeMessages.map((item, index) => {
-          const incoming = item.callback_type === 'incoming_message';
-          const imageContent = item.content?.type === 'image' ? item.content.image : null;
+        {inbox.activeMessages.map((item, index) => {
+          const incoming = isIncoming(item);
+          const view = presentMessage(item);
           return (
             <View
-              key={`${item.timestamp || 'message'}-${item.callback_type || 'unknown'}-${index}`}
+              key={getWhatsappMessageId(item, index)}
               style={[
                 styles.messageRow,
                 incoming ? styles.messageRowIncoming : styles.messageRowOutgoing,
@@ -439,28 +308,43 @@ export function WhatsappScreen() {
               <View
                 style={[styles.bubble, incoming ? styles.bubbleIncoming : styles.bubbleOutgoing]}
               >
-                {item.content?.type === 'text' ? (
-                  <Text style={styles.messageText}>{String(item.content.text.body || '')}</Text>
+                {view.kind === 'text' ? <Text style={styles.messageText}>{view.text}</Text> : null}
+                {view.kind === 'image' && view.src ? (
+                  <Image source={{ uri: view.src }} style={styles.messageImage} resizeMode="cover" />
                 ) : null}
-                {imageContent?.s3_url || imageContent?.url ? (
-                  <Image
-                    source={{ uri: imageContent.s3_url || imageContent.url }}
-                    style={styles.messageImage}
-                    resizeMode="cover"
-                  />
+                {view.kind === 'image' && view.caption ? (
+                  <Text style={styles.messageText}>{view.caption}</Text>
                 ) : null}
-                {imageContent?.caption ? (
-                  <Text style={styles.messageText}>{imageContent.caption}</Text>
+                {view.kind === 'audio' ? (
+                  <TouchableOpacity
+                    disabled={!view.src}
+                    onPress={() => {
+                      if (view.src) void Linking.openURL(view.src);
+                    }}
+                  >
+                    <Text style={styles.messageText}>🎵 Audio</Text>
+                  </TouchableOpacity>
                 ) : null}
-                {!item.content && item.description ? (
-                  <Text style={styles.messageText}>{item.description}</Text>
-                ) : null}
-                <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+                <Text style={styles.messageTime}>{formatListTime(item.timestamp)}</Text>
               </View>
             </View>
           );
         })}
       </ScrollView>
+      {showLoadPrevious ? (
+        <View style={styles.loadOlderWrap} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.loadOlderBtn}
+            disabled={inbox.loadingOlder}
+            onPress={handleLoadPrevious}
+          >
+            <Text style={styles.loadOlderText}>
+              {inbox.loadingOlder ? 'Loading...' : 'Load previous'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      </View>
 
       {image ? (
         <View style={styles.previewRow}>
@@ -544,6 +428,7 @@ const styles = makeStyles({
     borderRadius: radius.md,
     padding: spacing(3),
   },
+  errorText: { color: colors.destructive, fontSize: 13 },
   chatList: { padding: spacing(4), paddingTop: spacing(1), gap: spacing(2) },
   emptyText: {
     color: colors.muted,
@@ -601,8 +486,25 @@ const styles = makeStyles({
   backText: { color: colors.foreground, fontSize: 30, lineHeight: 32 },
   conversationTitle: { flex: 1, minWidth: 0 },
   activePhone: { color: colors.primary, fontSize: 11, marginTop: 1 },
+  messagesWrap: { flex: 1 },
   messages: { flex: 1, backgroundColor: colors.background },
   messagesContent: { padding: spacing(3), gap: spacing(2), flexGrow: 1 },
+  loadOlderWrap: {
+    position: 'absolute',
+    top: spacing(2),
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  loadOlderBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  },
+  loadOlderText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
   messageRow: { flexDirection: 'row' },
   messageRowIncoming: { justifyContent: 'flex-start' },
   messageRowOutgoing: { justifyContent: 'flex-end' },
@@ -614,8 +516,8 @@ const styles = makeStyles({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(2),
   },
-  bubbleIncoming: { backgroundColor: '#1f3d32' },
-  bubbleOutgoing: { backgroundColor: colors.surfaceAlt },
+  bubbleIncoming: { backgroundColor: isDarkTheme() ? '#1f3d32' : '#d8f3e4' },
+  bubbleOutgoing: { backgroundColor: isDarkTheme() ? colors.surfaceAlt : colors.surface },
   messageText: { color: colors.foreground, fontSize: 14, lineHeight: 20 },
   messageTime: {
     color: colors.muted,

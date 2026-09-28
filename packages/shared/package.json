@@ -22,6 +22,7 @@
     "./states": "./src/states.ts",
     "./midLimits": "./src/midLimits.ts",
     "./gatewayMid": "./src/gatewayMid.ts",
+    "./whatsappInbox": "./src/whatsappInbox.ts",
     "./updateGameImage": "./src/updateGameImage.ts",
     "./ludoRtp": "./src/ludoRtp.ts",
     "./walletOtp": "./src/walletOtp.ts",

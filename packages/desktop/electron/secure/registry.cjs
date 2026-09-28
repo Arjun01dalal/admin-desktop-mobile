@@ -2615,7 +2615,13 @@ module.exports = {
     decryptResponse: true,
   },
 
-  // WhatsApp inbox
+  // WhatsApp inbox (admin-panel-domains WhatsappView)
+  'whatsapp.getChatList': {
+    method: 'POST',
+    path: '/SubAdmin/get-whatsapp-chatlist',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'whatsapp.getCallbacks': {
     method: 'POST',
     path: '/Subadmin/get-whatsapp-statuscallbacks',

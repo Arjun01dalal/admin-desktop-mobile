@@ -426,6 +426,7 @@ export const SECURE_ACTIONS = [
   'casinoTopup.qtechRemaining',
   'casinoTopup.addQtech',
   'casinoTopup.addBetconstruct',
+  'whatsapp.getChatList',
   'whatsapp.getCallbacks',
   'whatsapp.sendExotel',
   'whatsappMid.list',

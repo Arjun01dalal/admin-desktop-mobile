@@ -433,6 +433,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'casinoTopup.qtechRemaining': {"method":"POST","path":"/Qtech/topup-balance-remaining","encryptRequest":false,"decryptResponse":true},
   'casinoTopup.addQtech': {"method":"POST","path":"/change-percentage/qtech-topped-up-balance/add","encryptRequest":true,"decryptResponse":true},
   'casinoTopup.addBetconstruct': {"method":"POST","path":"/change-percentage/betconstruct-topped-up-balance/add","encryptRequest":true,"decryptResponse":true},
+  'whatsapp.getChatList': {"method":"POST","path":"/SubAdmin/get-whatsapp-chatlist","encryptRequest":true,"decryptResponse":true},
   'whatsapp.getCallbacks': {"method":"POST","path":"/Subadmin/get-whatsapp-statuscallbacks","encryptRequest":true,"decryptResponse":true},
   'whatsapp.sendExotel': {"method":"POST","path":"/subAdmin/send-exotel-whatsapp-message","encryptRequest":false,"decryptResponse":false},
   'whatsappMid.list': {"method":"GET","path":"/SubAdmin/get-all-gateway-upis","encryptRequest":false,"decryptResponse":true},
