@@ -853,6 +853,19 @@ async function execute(action, payload = {}, token = null) {
       payloadOut = data?.data?.payload ?? data?.data ?? data?.payload ?? data;
     }
 
+    // Live Match books add a sibling `filters` catalog. Keep it when the list
+    // itself is unwrapped to a bare array.
+    if (Array.isArray(payloadOut)) {
+      const inner = data?.data;
+      const host =
+        inner && typeof inner === 'object' && !Array.isArray(inner) && inner.filters != null
+          ? inner
+          : data;
+      if (host && typeof host === 'object' && host.filters != null) {
+        payloadOut = { data: payloadOut, filters: host.filters };
+      }
+    }
+
     return {
       ok: true,
       success: data?.success !== false,

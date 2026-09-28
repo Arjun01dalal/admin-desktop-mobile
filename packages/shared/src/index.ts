@@ -38,3 +38,4 @@ export * from './nandiPlatform';
 export * from './depositRules';
 export * from './rowComments';
 export * from './withdrawalFund';
+export * from './finalBook';

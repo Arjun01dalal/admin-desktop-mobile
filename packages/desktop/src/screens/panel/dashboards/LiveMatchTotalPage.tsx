@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
-import SearchIcon from '@mui/icons-material/Search';
 import {
   Accordion,
   AccordionDetails,
@@ -13,17 +12,26 @@ import {
   CircularProgress,
   Collapse,
   Grid,
-  InputAdornment,
   Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
+import {
+  buildFinalBookPayload,
+  EMPTY_FINAL_BOOK_FILTERS,
+  parseFinalBookResponse,
+  reconcileFinalBookSelection,
+  sameFinalBookFilters,
+  type FinalBookFilters,
+  type FinalBookSortBy,
+} from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 import { todayIST } from '@/utils/dates';
 import { LiveStreamModal } from './LiveStreamModal';
+import { LiveMatchBookFilters } from './LiveMatchBookFilters';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from './ops/jyotishMapping';
 
@@ -320,17 +328,6 @@ function getClosestKey(data: Record<string, number>, result: unknown): number | 
   );
 }
 
-function unpackBookList(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) return raw;
-  if (raw && typeof raw === 'object') {
-    const obj = raw as Record<string, unknown>;
-    if (Array.isArray(obj.data)) return obj.data;
-    if (Array.isArray(obj.payload)) return obj.payload;
-    if (Array.isArray(obj.result)) return obj.result;
-  }
-  return [];
-}
-
 /**
  * Live Match Total books — ported from laxminarayan LiveMatchTotal /
  * MasterLiveMatchTotal / BothLiveMatchTotal.
@@ -356,7 +353,11 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
   const [bookType, setBookType] = useState<'all' | 'live'>('live');
   const bookTypeRef = useRef<'all' | 'live'>(bookType);
   bookTypeRef.current = bookType;
-  const [searchQuery, setSearchQuery] = useState('');
+  const [sportName, setSportName] = useState('');
+  const [tournamentName, setTournamentName] = useState('');
+  const [gameName, setGameName] = useState('');
+  const [sortBy, setSortBy] = useState<'' | FinalBookSortBy>('');
+  const [bookFilters, setBookFilters] = useState<FinalBookFilters>(EMPTY_FINAL_BOOK_FILTERS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [groupedData, setGroupedData] = useState<Array<[string, MatchRow[]]>>([]);
@@ -364,6 +365,47 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [streamId, setStreamId] = useState('');
   const [streamOpen, setStreamOpen] = useState(false);
+
+  const resetBookOrder = () => {
+    firstLoad.current = true;
+    orderRef.current = [];
+  };
+
+  const handleSportName = (nextSport: string) => {
+    resetBookOrder();
+    setSportName(nextSport);
+    setTournamentName('');
+    setGameName('');
+  };
+
+  const handleTournament = (nextSport: string, nextTournament: string) => {
+    resetBookOrder();
+    if (!nextTournament) {
+      setTournamentName('');
+      setGameName('');
+      return;
+    }
+    setSportName(nextSport);
+    setTournamentName(nextTournament);
+    setGameName('');
+  };
+
+  const handleGame = (nextSport: string, nextTournament: string, nextGame: string) => {
+    resetBookOrder();
+    if (!nextGame) {
+      setGameName('');
+      return;
+    }
+    setSportName(nextSport);
+    setTournamentName(nextTournament);
+    setGameName(nextGame);
+  };
+
+  const handleSortBy = (nextSort: '' | FinalBookSortBy) => {
+    if (nextSort === sortBy) return;
+    resetBookOrder();
+    setSortBy(nextSort);
+  };
 
   const applyDates = useCallback(() => {
     if (!draftStart || !draftEnd) {
@@ -379,21 +421,6 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
     setStartDate(draftStart);
     setEndDate(draftEnd);
   }, [draftEnd, draftStart]);
-
-  const filteredGroupedData = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return groupedData;
-    return groupedData
-      .map(([sport, matches]) => {
-        const filtered = matches.filter((match) =>
-          String(match.matchName || '')
-            .toLowerCase()
-            .includes(query),
-        );
-        return [sport, filtered] as [string, MatchRow[]];
-      })
-      .filter(([, matches]) => matches.length > 0);
-  }, [groupedData, searchQuery]);
 
   const fetchAllData = useCallback(async () => {
     const effectiveBookType = bookTypeRef.current;
@@ -422,11 +449,18 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
 
       if (gen !== fetchGenRef.current) return;
 
-      const bookRes = await secureApi(BOOK_ACTION[variant], {
-        startDate,
-        endDate,
-        bookType: effectiveBookType,
-      });
+      const bookRes = await secureApi(
+        BOOK_ACTION[variant],
+        buildFinalBookPayload({
+          startDate,
+          endDate,
+          bookType: effectiveBookType,
+          sportName,
+          tournamentName,
+          gameName,
+          sortBy,
+        }),
+      );
       if (gen !== fetchGenRef.current) return;
       if (!bookRes.ok) {
         const msg = bookRes.message || 'Failed to load live match book';
@@ -436,7 +470,27 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         return;
       }
 
-      const finalBook = formatDataForUI(unpackBookList(bookRes.data), variant);
+      const parsed = parseFinalBookResponse(bookRes.data);
+      setBookFilters((prev) =>
+        sameFinalBookFilters(prev, parsed.filters) ? prev : parsed.filters,
+      );
+      const reconciled = reconcileFinalBookSelection(parsed.filters, {
+        sportName,
+        tournamentName,
+        gameName,
+        sortBy,
+      });
+      const selectionChanged =
+        reconciled.sportName !== sportName ||
+        reconciled.tournamentName !== tournamentName ||
+        reconciled.gameName !== gameName;
+      if (selectionChanged) {
+        resetBookOrder();
+        setSportName(reconciled.sportName);
+        setTournamentName(reconciled.tournamentName);
+        setGameName(reconciled.gameName);
+      }
+      const finalBook = formatDataForUI(parsed.rows, variant);
 
       // Master filters book rows to odds gameList when odds are available.
       let bookForMerge = finalBook;
@@ -461,7 +515,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
 
       const merged = mergeFinalData(bookForMerge, oddsForMerge);
 
-      if (firstLoad.current) {
+      if (sortBy === 'betVolume' || firstLoad.current) {
         orderRef.current = merged.map((m) => m.matchName);
       } else if (variant === 'master') {
         merged.forEach((match) => {
@@ -484,11 +538,11 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
       if (gen !== fetchGenRef.current) return;
       setError('');
       setGroupedData(sortSports(groupBySport(stableSorted)));
-      firstLoad.current = false;
+      if (!selectionChanged) firstLoad.current = false;
     } finally {
       if (gen === fetchGenRef.current) setLoading(false);
     }
-  }, [endDate, startDate, variant]);
+  }, [endDate, gameName, sortBy, sportName, startDate, tournamentName, variant]);
 
   const toggleAllDataBookType = useCallback(() => {
     const next = bookTypeRef.current === 'all' ? 'live' : 'all';
@@ -538,9 +592,10 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         direction="row"
         spacing={1.5}
         alignItems="center"
-        flexWrap="nowrap"
+        flexWrap="wrap"
+        useFlexGap
         mb={2}
-        sx={{ overflowX: 'auto', pt: 1, pb: 0.5 }}
+        sx={{ pt: 1 }}
       >
         <TextField
           label="From Date"
@@ -565,7 +620,7 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
           color="warning"
           onClick={applyDates}
           disabled={loading && groupedData.length === 0}
-          sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          sx={{ flexShrink: 0, whiteSpace: 'nowrap', height: 40 }}
         >
           Apply
         </Button>
@@ -574,23 +629,20 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
           color="warning"
           onClick={toggleAllDataBookType}
           disabled={loading && groupedData.length === 0}
-          sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+          sx={{ flexShrink: 0, whiteSpace: 'nowrap', height: 40 }}
         >
           All Data
         </Button>
-        <TextField
-          size="small"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search match name"
-          sx={{ minWidth: 220, flex: 1 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-              </InputAdornment>
-            ),
-          }}
+        <LiveMatchBookFilters
+          filters={bookFilters}
+          sportName={sportName}
+          tournamentName={tournamentName}
+          gameName={gameName}
+          sortBy={sortBy}
+          onSportName={handleSportName}
+          onTournament={handleTournament}
+          onGame={handleGame}
+          onSortBy={handleSortBy}
         />
       </Stack>
 
@@ -614,20 +666,9 @@ export function LiveMatchTotalPage({ variant = 'laxmi' }: Props) {
         </Paper>
       )}
 
-      {!loading &&
-        groupedData.length > 0 &&
-        filteredGroupedData.length === 0 &&
-        searchQuery.trim() && (
-          <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
-            <Typography color="text.secondary">
-              No matches found for “{searchQuery.trim()}”.
-            </Typography>
-          </Paper>
-        )}
-
-      {!loading && filteredGroupedData.length > 0 && (
+      {!loading && groupedData.length > 0 && (
         <Grid container spacing={2}>
-          {filteredGroupedData.map(([sport, matches]) => (
+          {groupedData.map(([sport, matches]) => (
             <Grid item xs={12} key={sport}>
               <Accordion defaultExpanded>
                 <AccordionSummary

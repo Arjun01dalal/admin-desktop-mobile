@@ -58,11 +58,26 @@ function pickMessage(body: unknown, fallback: string): string {
 function resolvePayloadOut(data: Record<string, unknown>, keepDataEnvelope?: boolean): unknown {
   if (Array.isArray(data)) return data;
   if (keepDataEnvelope) return data?.data ?? data;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.payload)) return data.payload;
 
-  const inner = data?.data as Record<string, unknown> | undefined;
-  return inner?.payload ?? data?.data ?? data?.payload ?? data;
+  const inner =
+    data?.data && typeof data.data === 'object' && !Array.isArray(data.data)
+      ? (data.data as Record<string, unknown>)
+      : undefined;
+
+  let payloadOut: unknown;
+  if (Array.isArray(data?.data)) payloadOut = data.data;
+  else if (Array.isArray(data?.payload)) payloadOut = data.payload;
+  else payloadOut = inner?.payload ?? data?.data ?? data?.payload ?? data;
+
+  // Live Match books add a sibling `filters` catalog. Keep it when the list
+  // itself is unwrapped to a bare array.
+  if (Array.isArray(payloadOut)) {
+    const host = inner?.filters != null ? inner : data;
+    if (host.filters != null) {
+      payloadOut = { data: payloadOut, filters: host.filters };
+    }
+  }
+  return payloadOut;
 }
 
 function maybeAuthFailure(

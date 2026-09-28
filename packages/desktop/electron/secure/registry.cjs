@@ -1473,17 +1473,19 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  // Live Match Total (Master) — same body/filters contract as final-book-laxmi
   'dashboard.finalBookVip': {
-    method: 'GET',
-    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/os/finalBookVIP',
+    method: 'POST',
+    path: '/SubAdmin/final-book-vip',
     encryptRequest: false,
-    decryptResponse: false,
+    decryptResponse: true,
   },
+  // Live Match Total (Master & Laxmi)
   'dashboard.finalBookBoth': {
-    method: 'GET',
-    path: 'https://nodeadmin.aaryapaar.exchange/api/v1/os/finalBook',
+    method: 'POST',
+    path: '/SubAdmin/final-book',
     encryptRequest: false,
-    decryptResponse: false,
+    decryptResponse: true,
   },
   'dashboard.zehnRiskOs': {
     method: 'GET',

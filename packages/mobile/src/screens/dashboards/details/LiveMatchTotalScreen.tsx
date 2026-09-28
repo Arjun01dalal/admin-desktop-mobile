@@ -2,8 +2,8 @@
  * Live Match Total — port of desktop LiveMatchTotalPage.
  * variant selects the book API:
  *   laxmi  -> dashboard.finalBookLaxmi (POST /SubAdmin/final-book-laxmi, decrypt)
- *   master -> dashboard.finalBookVip
- *   both   -> dashboard.finalBookBoth
+ *   master -> dashboard.finalBookVip (POST /SubAdmin/final-book-vip, decrypt)
+ *   both   -> dashboard.finalBookBoth (POST /SubAdmin/final-book, decrypt)
  * Also fetches dashboard.oddsGameList for live odds and merges by match name.
  * Polls every 5s while focused, plus pull-to-refresh.
  */
@@ -20,9 +20,19 @@ import {
 } from 'react-native';
 import { makeStyles } from '../../../styles/common';
 import { useIsFocused, useRoute } from '@react-navigation/native';
+import {
+  buildFinalBookPayload,
+  EMPTY_FINAL_BOOK_FILTERS,
+  parseFinalBookResponse,
+  reconcileFinalBookSelection,
+  sameFinalBookFilters,
+  type FinalBookFilters,
+  type FinalBookSortBy,
+} from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import type { SecureAction } from '../../../api/registry.generated';
 import { toNum } from '../../../dashboards/mergeMetrics';
+import { LiveMatchBookFilters } from './LiveMatchBookFilters';
 import { LiveStreamModal } from '../../../dashboards/ui/LiveStreamModal';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
@@ -206,17 +216,6 @@ function getClosestKey(data: Record<string, number>, result: unknown): number | 
   );
 }
 
-function unpackBookList(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) return raw;
-  if (raw && typeof raw === 'object') {
-    const obj = raw as Record<string, unknown>;
-    if (Array.isArray(obj.data)) return obj.data;
-    if (Array.isArray(obj.payload)) return obj.payload;
-    if (Array.isArray(obj.result)) return obj.result;
-  }
-  return [];
-}
-
 function fmt(value: number): string {
   return value.toLocaleString('en-IN', {
     minimumFractionDigits: 2,
@@ -254,6 +253,11 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   const [streamOpen, setStreamOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sportName, setSportName] = useState('');
+  const [tournamentName, setTournamentName] = useState('');
+  const [gameName, setGameName] = useState('');
+  const [sortBy, setSortBy] = useState<'' | FinalBookSortBy>('');
+  const [bookFilters, setBookFilters] = useState<FinalBookFilters>(EMPTY_FINAL_BOOK_FILTERS);
 
   const matchList = useMemo(
     () =>
@@ -299,6 +303,47 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
     }
   }, [matchList, selectedMatch]);
 
+  const resetBookOrder = () => {
+    firstLoad.current = true;
+    orderRef.current = [];
+  };
+
+  const handleSportName = (nextSport: string) => {
+    resetBookOrder();
+    setSportName(nextSport);
+    setTournamentName('');
+    setGameName('');
+  };
+
+  const handleTournament = (nextSport: string, nextTournament: string) => {
+    resetBookOrder();
+    if (!nextTournament) {
+      setTournamentName('');
+      setGameName('');
+      return;
+    }
+    setSportName(nextSport);
+    setTournamentName(nextTournament);
+    setGameName('');
+  };
+
+  const handleGame = (nextSport: string, nextTournament: string, nextGame: string) => {
+    resetBookOrder();
+    if (!nextGame) {
+      setGameName('');
+      return;
+    }
+    setSportName(nextSport);
+    setTournamentName(nextTournament);
+    setGameName(nextGame);
+  };
+
+  const handleSortBy = (nextSort: '' | FinalBookSortBy) => {
+    if (nextSort === sortBy) return;
+    resetBookOrder();
+    setSortBy(nextSort);
+  };
+
   const fetchAllData = useCallback(
     async (opts?: { silent?: boolean; force?: boolean }) => {
       const silent = opts?.silent === true;
@@ -333,11 +378,18 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         // Screen left / blur — stop applying odds + book updates (forced refresh still applies).
         if (!force && (!mountedRef.current || !pollingActiveRef.current)) return;
 
-        const bookRes = await secureApi(BOOK_ACTION[variant], {
-          startDate,
-          endDate,
-          bookType: effectiveBookType,
-        });
+        const bookRes = await secureApi(
+          BOOK_ACTION[variant],
+          buildFinalBookPayload({
+            startDate,
+            endDate,
+            bookType: effectiveBookType,
+            sportName,
+            tournamentName,
+            gameName,
+            sortBy,
+          }),
+        );
         if (gen !== fetchGenRef.current) return;
         if (!force && (!mountedRef.current || !pollingActiveRef.current)) return;
         if (!bookRes.ok) {
@@ -346,10 +398,31 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
           return;
         }
 
-        const finalBook = formatDataForUI(unpackBookList(bookRes.data));
+        const parsed = parseFinalBookResponse(bookRes.data);
+        setBookFilters((prev) =>
+          sameFinalBookFilters(prev, parsed.filters) ? prev : parsed.filters,
+        );
+        const reconciled = reconcileFinalBookSelection(parsed.filters, {
+          sportName,
+          tournamentName,
+          gameName,
+          sortBy,
+        });
+        const selectionChanged =
+          reconciled.sportName !== sportName ||
+          reconciled.tournamentName !== tournamentName ||
+          reconciled.gameName !== gameName;
+        if (selectionChanged) {
+          resetBookOrder();
+          setSportName(reconciled.sportName);
+          setTournamentName(reconciled.tournamentName);
+          setGameName(reconciled.gameName);
+        }
+
+        const finalBook = formatDataForUI(parsed.rows);
         const merged = mergeFinalData(finalBook, matches);
 
-        if (firstLoad.current) {
+        if (sortBy === 'betVolume' || firstLoad.current) {
           orderRef.current = merged.map((m) => m.matchName);
         }
 
@@ -361,7 +434,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         if (!force && (!mountedRef.current || !pollingActiveRef.current)) return;
         setError('');
         setGroupedData(sortSports(groupBySport(stableSorted)));
-        firstLoad.current = false;
+        if (!selectionChanged) firstLoad.current = false;
       } finally {
         if (gen === fetchGenRef.current) {
           fetchInFlightRef.current = false;
@@ -369,7 +442,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         }
       }
     },
-    [endDate, startDate, variant],
+    [endDate, gameName, sortBy, sportName, startDate, tournamentName, variant],
   );
 
   const toggleAllDataBookType = useCallback(() => {
@@ -476,6 +549,18 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
           <Text style={styles.bookTypeHint}>Filter: live</Text>
         )}
       </View>
+
+      <LiveMatchBookFilters
+        filters={bookFilters}
+        sportName={sportName}
+        tournamentName={tournamentName}
+        gameName={gameName}
+        sortBy={sortBy}
+        onSportName={handleSportName}
+        onTournament={handleTournament}
+        onGame={handleGame}
+        onSortBy={handleSortBy}
+      />
 
       <View style={styles.searchWrap}>
         <TextInput

@@ -36,7 +36,8 @@
     "./gameUserStats": "./src/gameUserStats.ts",
     "./depositRules": "./src/depositRules.ts",
     "./rowComments": "./src/rowComments.ts",
-    "./withdrawalFund": "./src/withdrawalFund.ts"
+    "./withdrawalFund": "./src/withdrawalFund.ts",
+    "./finalBook": "./src/finalBook.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
