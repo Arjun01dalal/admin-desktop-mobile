@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
-import { appCodeForName } from '@astro/shared';
+import { appCodeForName, registrationCommentsOf, withRegistrationComment } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -116,8 +116,7 @@ type RegistrationCallLog = {
 };
 
 function registrationComments(row: Row): RegistrationComment[] {
-  const raw = row.newRegistrationComments || row.registrationComments || row.comments || [];
-  return Array.isArray(raw) ? (raw as RegistrationComment[]) : [];
+  return registrationCommentsOf<RegistrationComment>(row);
 }
 
 function registrationCallLogs(row: Row): RegistrationCallLog[] {
@@ -498,11 +497,21 @@ export function NewRegistersScreen() {
       setCommentInput('');
       setCommentUserId('');
       setCommentUserName('');
-      void load();
+      setRows((prev) =>
+        prev.map((row) =>
+          row._id === commentUserId
+            ? withRegistrationComment(row, {
+                comment: text,
+                who: { userId: admin?._id, userName: admin?.name },
+                date: new Date().toISOString(),
+              })
+            : row,
+        ),
+      );
     } finally {
       setCommentSaving(false);
     }
-  }, [admin?._id, admin?.name, commentInput, commentUserId, load]);
+  }, [admin?._id, admin?.name, commentInput, commentUserId, setRows]);
 
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const cols: DataTableColumn<Row>[] = [

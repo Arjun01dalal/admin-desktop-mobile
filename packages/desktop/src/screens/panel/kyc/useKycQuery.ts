@@ -135,6 +135,10 @@ export function useKycQuery() {
     void load(page);
   }, [load, page]);
 
+  const patchRow = useCallback((id: string, patch: Partial<KycRow>) => {
+    setRows((prev) => prev.map((row) => (row._id === id ? { ...row, ...patch } : row)));
+  }, []);
+
   return {
     startDate,
     setStartDate,
@@ -156,5 +160,6 @@ export function useKycQuery() {
     loading,
     error,
     reload,
+    patchRow,
   };
 }

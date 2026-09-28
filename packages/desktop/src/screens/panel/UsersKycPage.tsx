@@ -24,7 +24,7 @@ export function UsersKycPage() {
   const { isNightLockActive, unlockNightLock } = useKycNightLock();
   const query = useKycQuery();
   const actions = useKycActions({
-    reload: query.reload,
+    patchRow: query.patchRow,
     unlockNightLock,
   });
 

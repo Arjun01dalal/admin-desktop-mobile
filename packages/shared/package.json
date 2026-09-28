@@ -33,7 +33,10 @@
     "./beneficiaryAccountCounts": "./src/beneficiaryAccountCounts.ts",
     "./llmChat": "./src/llmChat.ts",
     "./casinoTopup": "./src/casinoTopup.ts",
-    "./gameUserStats": "./src/gameUserStats.ts"
+    "./gameUserStats": "./src/gameUserStats.ts",
+    "./depositRules": "./src/depositRules.ts",
+    "./rowComments": "./src/rowComments.ts",
+    "./withdrawalFund": "./src/withdrawalFund.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

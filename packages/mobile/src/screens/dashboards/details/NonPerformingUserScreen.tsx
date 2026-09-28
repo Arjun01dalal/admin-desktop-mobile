@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
-import { appCodeForName, asPaged } from '@astro/shared';
+import { appCodeForName, asPaged, nonPerformingCommentsOf } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
@@ -61,14 +61,7 @@ type CommentItem = {
 
 /** Desktop tolerant comment lookup (nonPerformingComments | comments | …). */
 function commentsOf(row: Row | null): CommentItem[] {
-  if (!row) return [];
-  const c =
-    row.nonPerformingComments ||
-    (row as Record<string, unknown>).nonPerformingComment ||
-    (row as Record<string, unknown>).newRegistrationComments ||
-    row.comments ||
-    [];
-  return Array.isArray(c) ? (c as CommentItem[]) : [];
+  return nonPerformingCommentsOf<CommentItem>(row);
 }
 
 const PAGE_SIZE = 25;

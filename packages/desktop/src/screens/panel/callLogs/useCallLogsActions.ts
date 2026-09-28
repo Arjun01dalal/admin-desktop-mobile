@@ -34,6 +34,7 @@ type Params = {
   clearSelection: () => void;
   campaignId: string;
   getDateRange: () => { startDate: string; endDate: string };
+  onCommentSaved?: (callSid: string, comments: string, commentedBy?: string) => void;
 };
 
 export function useCallLogsActions({
@@ -43,6 +44,7 @@ export function useCallLogsActions({
   clearSelection,
   campaignId,
   getDateRange,
+  onCommentSaved,
 }: Params) {
   const [actionLoading, setActionLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryResponse | null>(null);
@@ -152,10 +154,10 @@ export function useCallLogsActions({
         return false;
       }
       toast.success('Comment saved');
-      await load();
+      onCommentSaved?.(callSid, trimmed, admin?.name);
       return true;
     },
-    [admin?.name, load],
+    [admin?.name, onCommentSaved],
   );
 
   const pauseBotCalls = useCallback(

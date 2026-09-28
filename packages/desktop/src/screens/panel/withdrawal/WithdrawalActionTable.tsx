@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Box,
   Button,
-  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -21,47 +19,31 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
-import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
-import { appCodeForName } from '@/constants/clientNames';
+import { CommonTable } from '@/components/CommonTable';
 import { useLocationController } from '@/controllers/LocationProvider';
 import {
-  formatAmount,
-  formatDisplayDate,
-  formatDisplayTime,
   getStoredUser,
 } from '@/utils/dates';
 import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '@/utils/empCodeNameCache';
-import { asList, display } from '@/screens/panel/shared';
-import { CallingBtn } from '@/screens/panel/users/CallingBtn';
+import { asList } from '@/screens/panel/shared';
 import type { UserRow } from '@/screens/panel/users/utils';
 import {
   orangeBtnSx,
   actionBtnSx,
-  filterSelectSx,
   type MidOption,
   unpackPayload,
 } from '@/screens/panel/transactions/shared';
 import {
   type WithdrawalRow,
   type ValidationItem,
-  DELAY_REASONS,
   MANUAL_GATEWAYS,
 } from '@/screens/panel/withdrawal/types';
 import {
   orderIdOf,
   midLabel,
   extractBeneficiaryAccounts,
-  sendToBankName,
   bothChecksOk,
-  canLockRow,
-  canUnlockRow,
-  canShowApproveAction,
-  canRejectRow,
   isTerminal,
-  pendingAgeColor,
-  withdrawalRowBg,
-  maskAccount,
-  maskIfsc,
 } from '@/screens/panel/withdrawal/logic';
 import { requireWithdrawalGeo } from '@/screens/panel/withdrawal/geo';
 import { ActionDialog } from '@/screens/panel/withdrawal/ActionDialog';
@@ -70,31 +52,11 @@ import { AddBeneDialog } from '@/screens/panel/withdrawal/AddBeneDialog';
 import { QrApproveDialog } from '@/screens/panel/withdrawal/QrApproveDialog';
 import { BeneListDialog } from '@/screens/panel/withdrawal/BeneListDialog';
 import { TotalBeneListDialog } from '@/screens/panel/withdrawal/TotalBeneListDialog';
-import { BeneficiarySelect } from '@/screens/panel/withdrawal/BeneficiarySelect';
 import { DepositWithdrawalMidModal } from '@/screens/panel/withdrawal/DepositWithdrawalMidModal';
-import { personCell, Copyable, UserNameMidReportCell } from '@/screens/panel/withdrawal/withdrawalCells';
+import { personCell } from '@/screens/panel/withdrawal/withdrawalCells';
+import { useWithdrawalColumns, type WithdrawalColumnFilterSlots } from '@/screens/panel/withdrawal/useWithdrawalColumns';
 
-const BOT_CHECK_HIDDEN_STATUSES = new Set(['Cancel', 'Rejected', 'Reverse', 'Failed']);
-
-export type WithdrawalColumnFilterSlots = Partial<
-  Record<
-    | 'userName'
-    | 'mobile'
-    | 'clientName'
-    | 'empCode'
-    | 'amount'
-    | 'state'
-    | 'city'
-    | 'playedGames'
-    | 'status'
-    | 'transactionId'
-    | 'dp_id'
-    | 'accountNo'
-    | 'ifscCode'
-    | 'mid',
-    ReactNode
-  >
->;
+export type { WithdrawalColumnFilterSlots };
 
 export type WithdrawalActionTableProps = {
   rows: WithdrawalRow[];
@@ -695,544 +657,7 @@ export function WithdrawalActionTable({
     [busyId, hideCheck, markChecked],
   );
 
-  const columns = useMemo<CommonTableColumn<WithdrawalRow>[]>(() => {
-    const showActionsCol = canAct || canReject || canReverse;
-
-    const cols: CommonTableColumn<WithdrawalRow>[] = [
-      {
-        id: 'select',
-        label: '#',
-        width: 64,
-        stickyLeft: true,
-        render: (row, index) => {
-          const id = orderIdOf(row);
-          const status = String(row.status || '');
-          const showBulkCheckbox =
-            canAct &&
-            Boolean(id) &&
-            status !== 'Approved' &&
-            status !== 'Cancel' &&
-            status !== 'Rejected' &&
-            status !== 'Reverse' &&
-            status !== 'Failed';
-          return (
-            <Stack direction="row" spacing={0.25} alignItems="center" justifyContent="center">
-              {showBulkCheckbox ? (
-                <Checkbox
-                  size="small"
-                  checked={selectedIds.includes(id)}
-                  onChange={(e) => toggleSelect(id, e.target.checked)}
-                  sx={{ color: '#ff9f0a', p: 0.25 }}
-                />
-              ) : null}
-              <span>{(page - 1) * pageSize + index + 1}</span>
-            </Stack>
-          );
-        },
-      },
-      {
-        id: 'userName',
-        label: 'User Name',
-        width: 148,
-        stickyLeft: true,
-        cellSx: { py: '6px !important', px: 0.75 },
-        filter: filterOf('userName'),
-        render: (row) => (
-          <UserNameMidReportCell
-            row={row}
-            canOpenUserReport={canOpenUserReport}
-            onOpenMidReport={(target) => {
-              setMidReportRow(target);
-              setMidReportOpen(true);
-            }}
-            onOpenUserReport={(target, label, userId) => {
-              navigate(
-                `/users/report/${encodeURIComponent(userId)}/${encodeURIComponent(
-                  target.userName || target.accountHolderName || label,
-                )}`,
-              );
-            }}
-          />
-        ),
-      },
-      {
-        id: 'sendToBank',
-        label: 'Name (Send to Bank)',
-        width: 140,
-        stickyLeft: true,
-        render: (row) => sendToBankName(row),
-      },
-      ...(!hideContact
-        ? [
-            {
-              id: 'mobile',
-              label: 'Mobile',
-              width: 180,
-              filter: filterOf('mobile'),
-              render: (row: WithdrawalRow) => (
-                <CallingBtn
-                  item={toCallingItem(row)}
-                  campaignName="WITHDRAWAL ALL APP"
-                  reasonList="Withdrawal"
-                  hideBotCall
-                />
-              ),
-            } satisfies CommonTableColumn<WithdrawalRow>,
-          ]
-        : []),
-      ...(canWhatsApp
-        ? [
-            {
-              id: 'whatsapp',
-              label: 'WhatsApp',
-              width: 72,
-              render: (row: WithdrawalRow) =>
-                String(row.status || '').toLowerCase() === 'pending' ? (
-                  <Box
-                    component="button"
-                    type="button"
-                    onClick={() => openWhatsApp(row)}
-                    sx={{
-                      border: 0,
-                      bgcolor: 'transparent',
-                      p: 0,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      lineHeight: 0,
-                    }}
-                    aria-label="Open WhatsApp"
-                  >
-                    <Box
-                      component="img"
-                      src="https://img.icons8.com/?size=1200&id=16713&format=jpg"
-                      alt="WhatsApp"
-                      sx={{ width: 36, height: 36, borderRadius: 1 }}
-                    />
-                  </Box>
-                ) : (
-                  '—'
-                ),
-            } satisfies CommonTableColumn<WithdrawalRow>,
-          ]
-        : []),
-      {
-        id: 'clientName',
-        label: 'App Name',
-        filter: filterOf('clientName'),
-        render: (row) => appCodeForName(row.clientName),
-      },
-      {
-        id: 'empCode',
-        label: 'Emp Code',
-        width: 110,
-        filter: filterOf('empCode'),
-        render: (row) => {
-          const code = String(row.empCode || '').trim();
-          const empName = code ? empCodeNameMap[code] : '';
-          return (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                lineHeight: 1.3,
-              }}
-            >
-              <span>{code || '—'}</span>
-              {empName ? (
-                <Typography
-                  component="span"
-                  sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }}
-                >
-                  {empName}
-                </Typography>
-              ) : null}
-            </Box>
-          );
-        },
-      },
-      {
-        id: 'amount',
-        label: 'Amount',
-        width: 100,
-        filter: filterOf('amount'),
-        render: (row) => {
-          const raw = row.amount ?? row.Amount;
-          return (
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#ff9f0a' }}>
-              {formatAmount(raw ?? 0)}
-            </Typography>
-          );
-        },
-      },
-      {
-        id: 'beneficiary',
-        label: 'Beneficiary Acc',
-        width: 175,
-        cellSx: {
-          maxWidth: 175,
-          overflow: 'hidden',
-          whiteSpace: 'normal',
-          verticalAlign: 'middle',
-        },
-        render: (row) => {
-          const list = extractBeneficiaryAccounts(row);
-          return (
-            <Stack
-              spacing={0.75}
-              alignItems="stretch"
-              sx={{ width: '100%', maxWidth: 165, mx: 'auto' }}
-            >
-              <BeneficiarySelect
-                beneficiaryAccounts={list}
-                selectId={`bene-select-${orderIdOf(row) || row._id || ''}`}
-              />
-              {canAct ? (
-                <Button
-                  size="small"
-                  variant="contained"
-                  sx={{ ...actionBtnSx, fontSize: 10 }}
-                  onClick={() => {
-                    setBeneRow(row);
-                    setBeneOpen(true);
-                  }}
-                >
-                  Add Bene
-                </Button>
-              ) : null}
-            </Stack>
-          );
-        },
-      },
-      {
-        id: 'state',
-        label: 'State',
-        filter: filterOf('state'),
-        render: (row) => display(row.state),
-      },
-      {
-        id: 'city',
-        label: 'City',
-        filter: filterOf('city'),
-        render: (row) => display(row.city),
-      },
-      {
-        id: 'bank',
-        label: 'User Bank Name',
-        render: (row) => display(row.userBankName || row.bankName),
-      },
-      {
-        id: 'winIn',
-        label: 'Win In',
-        filter: filterOf('playedGames'),
-        render: (row) => display(row.playedGames),
-      },
-      {
-        id: 'status',
-        label: 'Status',
-        filter: filterOf('status'),
-        render: (row) => display(row.status),
-      },
-      {
-        id: 'date',
-        label: 'Date',
-        render: (row) => (
-          <Typography
-            variant="body2"
-            sx={{ fontSize: 12, color: pendingAgeColor(row.createdOn) || 'inherit' }}
-          >
-            {formatDisplayDate(row.createdOn) || '—'}
-          </Typography>
-        ),
-      },
-      {
-        id: 'time',
-        label: 'Time',
-        render: (row) => (
-          <Typography
-            variant="body2"
-            sx={{ fontSize: 12, color: pendingAgeColor(row.createdOn) || 'inherit' }}
-          >
-            {formatDisplayTime(row.createdOn) || '—'}
-          </Typography>
-        ),
-      },
-      {
-        id: 'commission',
-        label: 'Commission Amount',
-        render: (row) => formatAmount(row.commissionAmount ?? 0),
-      },
-      {
-        id: 'transactionId',
-        label: 'Transaction Id',
-        filter: filterOf('transactionId'),
-        render: (row) => display(orderIdOf(row)),
-      },
-      {
-        id: 'dpId',
-        label: 'DP Id',
-        filter: filterOf('dp_id'),
-        render: (row) => display(row.dp_id),
-      },
-      {
-        id: 'accountNo',
-        label: 'Account No',
-        filter: filterOf('accountNo'),
-        render: (row) => <Copyable value={row.accountNo} masked={maskAccount(row.accountNo)} />,
-      },
-      {
-        id: 'bankName',
-        label: 'Bank Name',
-        render: (row) => display(row.bankName || row.userBankName),
-      },
-      {
-        id: 'ifscCode',
-        label: 'IFSC',
-        filter: filterOf('ifscCode'),
-        render: (row) => <Copyable value={row.ifscCode} masked={maskIfsc(row.ifscCode)} />,
-      },
-      {
-        id: 'botCheck',
-        label: 'Check By Bot',
-        width: 120,
-        render: (row) => {
-          if (BOT_CHECK_HIDDEN_STATUSES.has(String(row.status || ''))) return null;
-          if (!row.validationCheckedAt) return '—';
-          return (
-            <Stack spacing={0.5} alignItems="center">
-              <Typography variant="body2" sx={{ fontSize: 11 }}>
-                {formatDisplayDate(row.validationCheckedAt)}{' '}
-                {formatDisplayTime(row.validationCheckedAt)}
-                <br />
-                Pass Points:- {row.passedPoints ?? 0}/{row.totalPoints ?? '—'}
-              </Typography>
-              <Button
-                size="small"
-                variant="contained"
-                sx={{ ...actionBtnSx, fontSize: 10 }}
-                onClick={() => {
-                  setBotItems(row.validationResults || []);
-                  setBotOpen(true);
-                }}
-              >
-                Bot Report
-              </Button>
-            </Stack>
-          );
-        },
-      },
-      {
-        id: 'lockBy',
-        label: 'Lock By',
-        render: (row) => (row.lockBy?.name ? personCell(row.lockBy.name, row.lockBy.date) : '—'),
-      },
-      {
-        id: 'checkBy',
-        label: 'Check By',
-        width: 140,
-        render: (row) => renderCheckCell(row, 'first'),
-      },
-      ...(canDelay
-        ? [
-            {
-              id: 'delaySelect',
-              label: 'Select Delay Reason',
-              width: 180,
-              render: (row: WithdrawalRow) =>
-                isTerminal(row) ? (
-                  '—'
-                ) : (
-                  <TextField
-                    select
-                    size="small"
-                    fullWidth
-                    value=""
-                    onChange={(e) => void setDelayReason(row, e.target.value)}
-                    sx={filterSelectSx}
-                  >
-                    <MenuItem value="">Select</MenuItem>
-                    {DELAY_REASONS.map((r) => (
-                      <MenuItem key={r} value={r}>
-                        {r}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                ),
-            } satisfies CommonTableColumn<WithdrawalRow>,
-            {
-              id: 'delayReason',
-              label: 'Delay Reason',
-              width: 160,
-              render: (row: WithdrawalRow) => {
-                const d = row.delayReason;
-                if (!d?.reason) return '—';
-                return (
-                  <Box
-                    sx={{
-                      fontSize: 10,
-                      textAlign: 'left',
-                      border: '1px solid rgba(255,159,10,0.4)',
-                      borderRadius: 1,
-                      p: 0.75,
-                      bgcolor: 'rgba(255,159,10,0.08)',
-                    }}
-                  >
-                    <div>
-                      <b>Name:</b> {d.name || '—'}
-                    </div>
-                    <div>
-                      <b>Reason:</b> {d.reason}
-                    </div>
-                    <div>
-                      <b>Date:</b> {formatDisplayDate(d.date)} {formatDisplayTime(d.date)}
-                    </div>
-                  </Box>
-                );
-              },
-            } satisfies CommonTableColumn<WithdrawalRow>,
-          ]
-        : []),
-      {
-        id: 'crossCheckBy',
-        label: 'Cross Check By',
-        width: 140,
-        render: (row) => renderCheckCell(row, 'second'),
-      },
-      {
-        id: 'provider',
-        label: 'Withdrawal Provider',
-        filter: filterOf('mid'),
-        render: (row) => {
-          if (String(row.status || '').toLowerCase() !== 'approved') return '—';
-          const provider = display(row.withdrewalProviderName || row.paymentGatewayName, '');
-          const mid = row.mid != null && row.mid !== '' ? String(row.mid) : '';
-          if (!provider && !mid) return '—';
-          return mid ? `${provider} - ${mid}` : provider;
-        },
-      },
-    ];
-
-    if (showActionsCol) {
-      cols.push({
-        id: 'actions',
-        label: 'Actions',
-        width: 240,
-        render: (row) => {
-          const orderId = orderIdOf(row);
-          const busy = busyId === orderId;
-          const buttons: {
-            key: string;
-            label: string;
-            onClick: () => void;
-            disabled?: boolean;
-          }[] = [];
-
-          if (canAct) {
-            if (canUnlockRow(row)) {
-              buttons.push({
-                key: 'unlock',
-                label: 'Unlock',
-                onClick: () => void handleUnlock(row),
-                disabled: busy,
-              });
-            } else if (canLockRow(row)) {
-              buttons.push({
-                key: 'lock',
-                label: 'Lock',
-                onClick: () => void handleLock(row),
-                disabled: busy,
-              });
-            }
-          }
-          if (canAct && canShowApproveAction(row)) {
-            buttons.push(
-              { key: 'approve', label: 'Approve', onClick: () => openAction(row, 'Approved') },
-              {
-                key: 'manual',
-                label: 'Manual',
-                onClick: () => openAction(row, 'Manual Approved'),
-              },
-              { key: 'qr', label: 'QR Code', onClick: () => openQrApprove(row) },
-              { key: 'hold', label: 'On Hold', onClick: () => openAction(row, 'on hold') },
-            );
-          }
-          if (canReject && canRejectRow(row)) {
-            buttons.push({
-              key: 'reject',
-              label: 'Reject',
-              onClick: () => openAction(row, 'Rejected'),
-            });
-          }
-          if (canReverse && row.status !== 'Cancel') {
-            buttons.push({
-              key: 'reverse',
-              label: 'Reverse',
-              onClick: () => openAction(row, 'Reverse'),
-            });
-          }
-
-          return (
-            <Stack
-              direction="row"
-              flexWrap="wrap"
-              gap={0.5}
-              justifyContent="center"
-              sx={{ maxWidth: 230 }}
-            >
-              {buttons.map((b) => (
-                <Button
-                  key={b.key}
-                  size="small"
-                  variant="contained"
-                  disabled={b.disabled}
-                  onClick={b.onClick}
-                  sx={actionBtnSx}
-                >
-                  {b.label}
-                </Button>
-              ))}
-            </Stack>
-          );
-        },
-      });
-    }
-
-    cols.push(
-      {
-        id: 'updatedBy',
-        label: 'Updated By',
-        render: (row) =>
-          personCell(
-            row.action ? `${row.action.status || ''} by ${row.action.name || ''}` : '—',
-            row.updatedOn,
-          ),
-      },
-      {
-        id: 'pnlBefore',
-        label: 'PnL Before Withdrawal',
-        render: (row) => (
-          <Box
-            component="span"
-            sx={{
-              px: 0.75,
-              py: 0.25,
-              borderRadius: 0.5,
-              bgcolor: Number(row.pnl ?? 0) >= 0 ? 'rgba(76,175,80,0.25)' : 'rgba(244,67,54,0.25)',
-            }}
-          >
-            {formatAmount(row.pnl ?? 0)}
-          </Box>
-        ),
-      },
-      {
-        id: 'pnlAfter',
-        label: 'PnL After Withdrawal',
-        render: (row) => formatAmount(row.afterWithdrawalPnl ?? 0),
-      },
-    );
-
-    return cols;
-  }, [
+  const { columns, getRowSx } = useWithdrawalColumns({
     page,
     pageSize,
     canAct,
@@ -1256,34 +681,14 @@ export function WithdrawalActionTable({
     renderCheckCell,
     setDelayReason,
     navigate,
-  ]);
-
-  const getRowSx = useCallback(
-    (row: WithdrawalRow) => {
-      const bg = withdrawalRowBg(row, isLightMode ? 'light' : 'dark');
-      if (!bg) return undefined;
-      const text = isLightMode ? '#1a1a1f' : '#e8e8ea';
-      const border = isLightMode
-        ? 'rgba(0, 0, 0, 0.10) !important'
-        : 'rgba(255, 255, 255, 0.12) !important';
-      return {
-        bgcolor: `${bg} !important`,
-        '& td': {
-          bgcolor: `${bg} !important`,
-          color: `${text} !important`,
-          borderColor: border,
-        },
-        '& td[data-sticky-left="true"]': {
-          bgcolor: `${bg} !important`,
-          backgroundColor: `${bg} !important`,
-          zIndex: '30 !important',
-        },
-        '& .MuiTypography-root': { color: 'inherit !important' },
-        '& .MuiIconButton-root': { color: text },
-      };
-    },
-    [isLightMode],
-  );
+    isLightMode,
+    setMidReportRow,
+    setMidReportOpen,
+    setBeneRow,
+    setBeneOpen,
+    setBotItems,
+    setBotOpen,
+  });
 
   return (
     <>

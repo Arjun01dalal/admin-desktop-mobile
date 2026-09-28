@@ -455,19 +455,20 @@ export function CommonTable<T>({
   const stickyBodyBg = resolvedTone === 'light' ? '#fff' : '#1a1a1f';
   const overlayBg = resolvedTone === 'light' ? 'rgba(255,255,255,0.55)' : 'rgba(10, 10, 14, 0.55)';
 
+  // Windows DPI + Firefox: getBoundingClientRect on every row thrashes layout and hangs the window.
+  // Leaving measureElement undefined still measures if the row ref calls virtualizer.measureElement.
+  const measureRows =
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined' &&
+    !isWindowsUi &&
+    !navigator.userAgent.includes('Firefox');
+
   const virtualizer = useVirtualizer({
     count: shouldVirtualize ? rows.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
     overscan: isWindowsUi ? 6 : 12,
-    // Fixed row height on Windows / Firefox — measuring every row during scroll freezes UI.
-    measureElement:
-      typeof window !== 'undefined' &&
-      typeof document !== 'undefined' &&
-      !isWindowsUi &&
-      !navigator.userAgent.includes('Firefox')
-        ? (el) => el.getBoundingClientRect().height
-        : undefined,
+    measureElement: measureRows ? (el) => el.getBoundingClientRect().height : undefined,
   });
 
   const virtualItems = shouldVirtualize ? virtualizer.getVirtualItems() : [];
@@ -624,7 +625,7 @@ export function CommonTable<T>({
                   onRowClick={onRowClick}
                   getRowSx={getRowSx}
                   dataIndex={virtualRow.index}
-                  measureRef={virtualizer.measureElement}
+                  measureRef={measureRows ? virtualizer.measureElement : undefined}
                   stickyOffsets={stickyOffsets}
                   stickyBodyBg={stickyBodyBg}
                 />

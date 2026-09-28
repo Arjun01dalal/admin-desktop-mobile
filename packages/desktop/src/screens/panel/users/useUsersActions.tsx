@@ -6,14 +6,7 @@ import { secureApi } from '@/api/secureClient';
 import { getRoleName, hasPermission, Permissions } from '@/auth/permissions';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import { SHOW_EDIT_EMP_CODE, resolveBlockOtpMobile } from './constants';
-import {
-  MAX_REMARK,
-  extractRoleId,
-  extractRoleName,
-  normalizeRoleOptions,
-  type RoleOption,
-  type SubAdminEditType,
-} from './usersHelpers';
+import { MAX_REMARK, extractRoleId, normalizeRoleOptions, type RoleOption, type SubAdminEditType } from './usersHelpers';
 import type { UsersAdmin } from './useUsersQuery';
 import type { UserRow } from './utils';
 
@@ -187,8 +180,6 @@ export function useUsersActions({
         );
       });
       closeBlockDialog();
-      // Force fresh list from API
-      await load(page);
     } finally {
       setActionBusyId('');
     }
@@ -198,9 +189,7 @@ export function useUsersActions({
     blockNextStatus,
     blockTarget,
     closeBlockDialog,
-    load,
     otp,
-    page,
     remark,
     setRows,
   ]);
@@ -536,8 +525,15 @@ export function useUsersActions({
         return;
       }
       toast.success(res.message || 'Updated successfully');
+      const targetId = blockCallerTarget._id;
+      const nextBlocked = blockCallerNext;
+      const reason = blockCallerRemark.trim();
+      setRows((prev) =>
+        prev.map((row) =>
+          row._id === targetId ? { ...row, block: nextBlocked, blockUserReason: reason } : row,
+        ),
+      );
       setBlockCallerTarget(null);
-      void load(page);
     } finally {
       setBlockCallerBusy(false);
     }
@@ -547,8 +543,7 @@ export function useUsersActions({
     blockCallerOtp,
     blockCallerRemark,
     blockCallerTarget,
-    load,
-    page,
+    setRows,
   ]);
 
   return {

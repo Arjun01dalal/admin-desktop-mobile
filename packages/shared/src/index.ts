@@ -35,3 +35,6 @@ export * from './indianDivasSettle';
 export * from './beneficiaryAccountCounts';
 export * from './ggrAlert';
 export * from './nandiPlatform';
+export * from './depositRules';
+export * from './rowComments';
+export * from './withdrawalFund';

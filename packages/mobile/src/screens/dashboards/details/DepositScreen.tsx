@@ -25,7 +25,17 @@ import {
 import { makeStyles } from '../../../styles/common';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
+import {
+  appCodeForName,
+  asList,
+  asPaged,
+  canEditDeposit,
+  canShowCheckAction,
+  defaultSettleReason,
+  isUpiGateway,
+  settleReasonOptions,
+  unpackPayload,
+} from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
@@ -73,73 +83,11 @@ type DepositRow = {
   crossCheckBy?: CheckPerson;
 };
 
-// --- Manual settle helpers (desktop deposit/logic.ts parity) ---
-const UPI_GATEWAYS = new Set(['upi-payment', 'IMPS', 'NEFT']);
-const SETTLE_REASONS = [
-  'deposit-uco-trpl',
-  'Deposit Failure',
-  'instant-deposit-manual',
-  'deposit-upi-id',
-  'deposit-sapt-rishi',
-  'deposit-manual',
-];
-
-function isWithin3Days(date?: string): boolean {
-  if (!date) return false;
-  const requestDate = new Date(date);
-  if (Number.isNaN(requestDate.getTime())) return false;
-  const diffDays = (Date.now() - requestDate.getTime()) / (1000 * 60 * 60 * 24);
-  return diffDays <= 3;
-}
-
-/** Laxmi: (Deposit_Pensil && amount ≥ 10000) || (!within3Days && status !== Approved) */
-function canShowCheckAction(row: DepositRow, hasPencil: boolean): boolean {
-  const amount = Number(row.amount ?? 0);
-  if (hasPencil && amount >= 10000) return true;
-  const status = String(row.status || '');
-  return !isWithin3Days(row.createdOn) && status !== 'Approved';
-}
-
-/** Approve/settle only after both checks when amount ≥ 10000 or deposit is older than 3 days. */
-function canEditDeposit(row: DepositRow, hasPencil: boolean): boolean {
-  if (!hasPencil) return false;
-  const status = String(row.status || '').toLowerCase();
-  if (status !== 'pending' && status !== 'processing') return false;
-
-  const isOld = !isWithin3Days(row.createdOn);
-  const isChecked = !!(row.checkBy && row.crossCheckBy);
-  const isHighAmount = Number(row.amount ?? 0) >= 10000;
-
-  if (isOld) return isChecked;
-  if (!isHighAmount) return true;
-  return isChecked;
-}
-
 function formatCheckPerson(p?: CheckPerson): string {
   if (!p?.name) return '—';
   const bits = [p.name, p.city, p.state].filter(Boolean);
   const when = p.date ? `${formatDisplayDate(p.date)} ${formatDisplayTime(p.date)}`.trim() : '';
   return when ? `${bits.join(' · ')} · ${when}` : bits.join(' · ') || '—';
-}
-
-function defaultSettleReason(row: DepositRow): string {
-  const gateway = String(row.paymentGatewayName || '').replace(/\t/g, '');
-  if (String(row.status || '').toLowerCase() === 'pending') {
-    if (String(row.paymentType || '') === 'instant-deposit-manual') return 'instant-deposit-manual';
-    return gateway ? `manual-deposit-${gateway}` : 'deposit-manual';
-  }
-  return 'deposit-manual';
-}
-
-function settleReasonOptions(row: DepositRow): string[] {
-  const gateway = String(row.paymentGatewayName || '').replace(/\t/g, '');
-  const dynamic = gateway ? `manual-deposit-${gateway}` : '';
-  if (dynamic && !SETTLE_REASONS.includes(dynamic)) return [dynamic, ...SETTLE_REASONS];
-  return [...SETTLE_REASONS];
-}
-
-function isUpiGateway(gateway?: string): boolean {
-  return UPI_GATEWAYS.has(String(gateway || ''));
 }
 
 const STATUS_OPTIONS = ['', 'Pending', 'Approved', 'Rejected'] as const;

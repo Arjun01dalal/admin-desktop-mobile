@@ -1,3 +1,9 @@
+import {
+  parseAgentSummaries as parseAgentSummariesShared,
+  pickDocList as pickDocListShared,
+  sumGroupedTotal,
+} from '@astro/shared/withdrawalFund';
+
 export type WithdrawalDoc = {
   _id?: string;
   amount?: number;
@@ -139,49 +145,13 @@ export function transformWithdrawData(grouped: unknown): TypeGroup[] {
   return Object.values(groupedByType);
 }
 
-export function sumGroupedTotal(grouped: unknown): number {
-  if (!grouped || typeof grouped !== 'object') return 0;
-  let amount = 0;
-  Object.values(grouped as Record<string, unknown>).forEach((type) => {
-    Object.values((type as Record<string, unknown>) || {}).forEach((bank) => {
-      Object.values((bank as Record<string, unknown>) || {}).forEach((item) => {
-        amount += Number((item as { totalAmount?: number })?.totalAmount || 0);
-      });
-    });
-  });
-  return amount;
-}
-
-export function parseAgentSummaries(agentWiseSummary: unknown): AgentSummary[] {
-  if (!agentWiseSummary || typeof agentWiseSummary !== 'object') return [];
-  return Object.entries(agentWiseSummary as Record<string, unknown>).map(([name, summary]) => {
-    const s = summary as {
-      approvedCount?: number;
-      lockCount?: number;
-      totalApprovedAmount?: number;
-      approvedItems?: WithdrawalDoc[];
-      items?: WithdrawalDoc[];
-      withdrawals?: WithdrawalDoc[];
-      docs?: WithdrawalDoc[];
-    };
-    const withdrawals = pickDocList(s);
-    return {
-      name,
-      approvedCount: Number(s?.approvedCount ?? withdrawals.length ?? 0),
-      lockCount: Number(s?.lockCount ?? 0),
-      totalApprovedAmount: Number(s?.totalApprovedAmount ?? 0),
-      withdrawals,
-    };
-  });
-}
+export { sumGroupedTotal };
 
 /** Prefer docs / approvedItems / items / withdrawals from API mid/agent blobs. */
 export function pickDocList(source: unknown): WithdrawalDoc[] {
-  if (!source || typeof source !== 'object') return [];
-  const s = source as Record<string, unknown>;
-  for (const key of ['docs', 'approvedItems', 'withdrawals', 'items', 'list'] as const) {
-    const v = s[key];
-    if (Array.isArray(v)) return v as WithdrawalDoc[];
-  }
-  return [];
+  return pickDocListShared<WithdrawalDoc>(source);
+}
+
+export function parseAgentSummaries(agentWiseSummary: unknown): AgentSummary[] {
+  return parseAgentSummariesShared<WithdrawalDoc>(agentWiseSummary);
 }

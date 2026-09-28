@@ -177,7 +177,7 @@ export function NewRegistersPage() {
     ],
   );
 
-  const { rows, total, loading, load } = useNewRegistersQuery(
+  const { rows, setRows, total, loading, load } = useNewRegistersQuery(
     admin,
     page,
     itemsPerPage,
@@ -187,11 +187,7 @@ export function NewRegistersPage() {
   );
   const deferredRows = useDeferredValue(rows);
 
-  const { dialerLoading, addComment, addToDialer, block } = useNewRegistersActions(
-    admin,
-    load,
-    page,
-  );
+  const { dialerLoading, addComment, addToDialer, block } = useNewRegistersActions(admin, setRows);
 
   const applyFilters = useCallback(() => {
     setPage(1);

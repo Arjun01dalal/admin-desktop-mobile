@@ -149,5 +149,15 @@ export function useCallLogsQuery(
     return () => window.clearInterval(id);
   }, [load, options?.poll]);
 
-  return { calls, total, botSummary, loading, load, filtersRef };
+  const patchComment = useCallback((callSid: string, comments: string, commentedBy?: string) => {
+    setCalls((prev) =>
+      prev.map((row) =>
+        row.call_sid === callSid
+          ? { ...row, comments, commented_by: commentedBy || row.commented_by }
+          : row,
+      ),
+    );
+  }, []);
+
+  return { calls, total, botSummary, loading, load, filtersRef, patchComment };
 }

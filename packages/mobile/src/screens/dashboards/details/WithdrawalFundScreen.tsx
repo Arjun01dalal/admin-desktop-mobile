@@ -34,7 +34,7 @@ import {
   View,
 } from 'react-native';
 import { makeStyles } from '../../../styles/common';
-import { appCodeForName } from '@astro/shared';
+import { appCodeForName, parseAgentSummaries, pickDocList, sumGroupedTotal, unpackPayload } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
@@ -203,27 +203,6 @@ function istDateTime(utcDate?: string): string {
   });
 }
 
-/** Mirror desktop unpackPayload: unwrap a single `.payload` object. */
-function unpackPayload(data: unknown): Record<string, unknown> {
-  if (!data || typeof data !== 'object') return {};
-  const obj = data as Record<string, unknown>;
-  if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
-    return obj.payload as Record<string, unknown>;
-  }
-  return obj;
-}
-
-/** Prefer docs / approvedItems / items / withdrawals from API mid/agent blobs. */
-function pickDocList(source: unknown): WithdrawalDoc[] {
-  if (!source || typeof source !== 'object') return [];
-  const s = source as Record<string, unknown>;
-  for (const key of ['docs', 'approvedItems', 'withdrawals', 'items', 'list'] as const) {
-    const v = s[key];
-    if (Array.isArray(v)) return v as WithdrawalDoc[];
-  }
-  return [];
-}
-
 /** Transform API `grouped` tree → Type → Provider → MID rows (desktop parity). */
 function transformWithdrawData(grouped: unknown): TypeGroup[] {
   if (!grouped || typeof grouped !== 'object') return [];
@@ -239,7 +218,7 @@ function transformWithdrawData(grouped: unknown): TypeGroup[] {
               totalAmount?: number;
               count?: number;
             };
-            const withdrawals = pickDocList(midData);
+            const withdrawals = pickDocList<WithdrawalDoc>(midData);
             return {
               mid: midName,
               totalAmount: Number(md?.totalAmount || 0),
@@ -264,38 +243,6 @@ function transformWithdrawData(grouped: unknown): TypeGroup[] {
   });
 
   return Object.values(groupedByType);
-}
-
-function sumGroupedTotal(grouped: unknown): number {
-  if (!grouped || typeof grouped !== 'object') return 0;
-  let amount = 0;
-  Object.values(grouped as Record<string, unknown>).forEach((type) => {
-    Object.values((type as Record<string, unknown>) || {}).forEach((bank) => {
-      Object.values((bank as Record<string, unknown>) || {}).forEach((item) => {
-        amount += Number((item as { totalAmount?: number })?.totalAmount || 0);
-      });
-    });
-  });
-  return amount;
-}
-
-function parseAgentSummaries(agentWiseSummary: unknown): AgentSummary[] {
-  if (!agentWiseSummary || typeof agentWiseSummary !== 'object') return [];
-  return Object.entries(agentWiseSummary as Record<string, unknown>).map(([name, summary]) => {
-    const s = summary as {
-      approvedCount?: number;
-      lockCount?: number;
-      totalApprovedAmount?: number;
-    };
-    const withdrawals = pickDocList(summary);
-    return {
-      name,
-      approvedCount: Number(s?.approvedCount ?? withdrawals.length ?? 0),
-      lockCount: Number(s?.lockCount ?? 0),
-      totalApprovedAmount: Number(s?.totalApprovedAmount ?? 0),
-      withdrawals,
-    };
-  });
 }
 
 function countEmpCodes(rows: WithdrawalDoc[]): { empCode: string; count: number }[] {
@@ -450,7 +397,7 @@ export function WithdrawalFundScreen() {
       const body = unpackPayload(res.data);
       const g = body.grouped ?? null;
       setGrouped(g);
-      setAgentWise(parseAgentSummaries(body.agentWiseSummary));
+      setAgentWise(parseAgentSummaries<WithdrawalDoc>(body.agentWiseSummary));
       setTotalAmount(sumGroupedTotal(g));
     } finally {
       if (gen === genRef.current) setLoading(false);
@@ -483,7 +430,7 @@ export function WithdrawalFundScreen() {
         return;
       }
       const body = unpackPayload(res.data);
-      const agents = parseAgentSummaries(body.agentWiseSummary);
+      const agents = parseAgentSummaries<WithdrawalDoc>(body.agentWiseSummary);
       const agentRows: ChartCountRow[] = agents
         .map((a) => ({ name: a.name, count: a.approvedCount || a.withdrawals.length }))
         .sort((a, b) => b.count - a.count);

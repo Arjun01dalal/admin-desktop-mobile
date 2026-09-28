@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { makeStyles } from '../../../styles/common';
-import { appCodeForName } from '@astro/shared';
+import { appCodeForName, kycApprovedRowPatch, kycManualRowPatch, kycRejectedRowPatch } from '@astro/shared';
 import { colors, radius, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
@@ -45,6 +45,7 @@ type KycRow = {
   ifsc?: string;
   upiId?: string;
   kyc?: boolean;
+  currentKycNote?: string;
   createdOn?: string;
   aadhaarImageBase64?: string;
   bankName?: string;
@@ -421,13 +422,15 @@ export function UsersKycScreen() {
           return;
         }
         Alert.alert('KYC approved successfully');
+        setRows((prev) =>
+          prev.map((item) => (item._id === row._id ? { ...item, ...kycApprovedRowPatch(f) } : item)),
+        );
         setApproveTarget(null);
-        void load();
       } finally {
         setBusy(false);
       }
     })();
-  }, [approveTarget, approveStep, approveForm, sendKycOtp, updatedBy, load]);
+  }, [approveTarget, approveStep, approveForm, sendKycOtp, updatedBy]);
 
   // ---- Reject ----
   const [rejectTarget, setRejectTarget] = useState<KycRow | null>(null);
@@ -480,13 +483,17 @@ export function UsersKycScreen() {
           return;
         }
         Alert.alert('KYC rejected successfully');
+        setRows((prev) =>
+          prev.map((item) =>
+            item._id === row._id ? { ...item, ...kycRejectedRowPatch(updatedBy()) } : item,
+          ),
+        );
         setRejectTarget(null);
-        void load();
       } finally {
         setBusy(false);
       }
     })();
-  }, [rejectTarget, rejectOtp, rejectAdminOtp, updatedBy, load]);
+  }, [rejectTarget, rejectOtp, rejectAdminOtp, updatedBy]);
 
   // ---- Manual KYC update ----
   const [manualTarget, setManualTarget] = useState<KycRow | null>(null);
@@ -553,13 +560,17 @@ export function UsersKycScreen() {
           return;
         }
         Alert.alert('Manual KYC updated successfully');
+        setRows((prev) =>
+          prev.map((item) =>
+            item._id === row._id ? { ...item, ...kycManualRowPatch(f, updatedBy()) } : item,
+          ),
+        );
         setManualTarget(null);
-        void load();
       } finally {
         setBusy(false);
       }
     })();
-  }, [manualTarget, manualForm, updatedBy, load]);
+  }, [manualTarget, manualForm, updatedBy]);
 
   // ---- Call via dialer (web panel connectToDialer parity) ----
   /** Row for which the dialer call was sent; KYC action buttons unlock only for this row. */

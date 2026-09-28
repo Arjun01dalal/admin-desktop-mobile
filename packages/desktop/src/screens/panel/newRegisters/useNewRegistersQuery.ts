@@ -226,5 +226,5 @@ export function useNewRegistersQuery(
     columnFilters.nonPerforming,
   ]);
 
-  return { rows, total, loading, load };
+  return { rows, setRows, total, loading, load };
 }

@@ -1,17 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { mapUsersToDialerLeads } from '@/screens/panel/users/toolbarHelpers';
 import { resolveBlockOtpMobile } from '@/screens/panel/users/constants';
 import { CAMPAIGN_LIST } from './campaignList';
+import { withRegistrationComment } from '@astro/shared/rowComments';
 import type { NewRegistersAdmin, UserRow } from './types';
 
 const MAX_REMARK_LENGTH = 500;
 
 export function useNewRegistersActions(
   admin: NewRegistersAdmin | null | undefined,
-  load: (pageNo?: number) => Promise<void>,
-  page: number,
+  setRows: Dispatch<SetStateAction<UserRow[]>>,
 ) {
   const [dialerLoading, setDialerLoading] = useState(false);
   const [blockTarget, setBlockTarget] = useState<UserRow | null>(null);
@@ -109,12 +109,18 @@ export function useNewRegistersActions(
         return;
       }
       toast.success(nextBlocked ? 'User blocked' : 'User unblocked');
+      setRows((prev) =>
+        prev.map((row) =>
+          row._id === targetId
+            ? { ...row, blockUser: nextBlocked, block: nextBlocked, blockUserReason: reason }
+            : row,
+        ),
+      );
       closeBlockDialog();
-      await load(page);
     } finally {
       setActionBusyId('');
     }
-  }, [admin?.mobile, blockNextStatus, blockTarget, closeBlockDialog, load, otp, page, remark]);
+  }, [admin?.mobile, blockNextStatus, blockTarget, closeBlockDialog, otp, remark, setRows]);
 
   const addComment = useCallback(
     async (userId: string, comment: string) => {
@@ -134,11 +140,22 @@ export function useNewRegistersActions(
         toast.error(res.message || 'Failed to add comment');
         return false;
       }
+      const text = comment.trim();
+      setRows((prev) =>
+        prev.map((row) =>
+          row._id === userId
+            ? withRegistrationComment(row, {
+                comment: text,
+                who: { userId: admin?._id, userName: admin?.name },
+                date: new Date().toISOString(),
+              })
+            : row,
+        ),
+      );
       toast.success('Comment added successfully');
-      await load(page);
       return true;
     },
-    [admin?._id, admin?.name, load, page],
+    [admin?._id, admin?.name, setRows],
   );
 
   const addToDialer = useCallback(

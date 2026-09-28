@@ -27,6 +27,7 @@ import {
   StateFilter,
   UserComesFromFilter,
 } from './ColumnFilters';
+import { registrationCommentsOf } from '@astro/shared/rowComments';
 import type { RegistrationCallLog, RegistrationComment, UserRow } from './types';
 import {
   nestedDpId,
@@ -129,8 +130,7 @@ const CALLER_HIDDEN_COLUMN_IDS = new Set([
 ]);
 
 export function registrationComments(row: UserRow): RegistrationComment[] {
-  const raw = row.newRegistrationComments || row.registrationComments || row.comments || [];
-  return Array.isArray(raw) ? raw : [];
+  return registrationCommentsOf<RegistrationComment>(row);
 }
 
 export function registrationCallLogs(row: UserRow): RegistrationCallLog[] {

@@ -82,7 +82,10 @@ export function CallLogsPage() {
     commentFilter,
   };
 
-  const { calls, total, botSummary, loading, load, filtersRef } = useCallLogsQuery(filters, admin);
+  const { calls, total, botSummary, loading, load, filtersRef, patchComment } = useCallLogsQuery(
+    filters,
+    admin,
+  );
 
   return (
     <CallLogsSelectionProvider calls={calls}>
@@ -107,6 +110,7 @@ export function CallLogsPage() {
         botSummary={botSummary}
         loading={loading}
         load={load}
+        patchComment={patchComment}
         filtersRef={filtersRef}
         setStartDate={setStartDate}
         setEndDate={setEndDate}
@@ -156,6 +160,7 @@ type BodyProps = {
   botSummary: Record<string, unknown>;
   loading: boolean;
   load: () => Promise<void>;
+  patchComment: (callSid: string, comments: string, commentedBy?: string) => void;
   filtersRef: { current: CallLogsFilterState };
   setStartDate: (v: string) => void;
   setEndDate: (v: string) => void;
@@ -192,6 +197,7 @@ function CallLogsPageBody({
   botSummary,
   loading,
   load,
+  patchComment,
   filtersRef,
   setStartDate,
   setEndDate,
@@ -238,6 +244,7 @@ function CallLogsPageBody({
     clearSelection,
     campaignId,
     getDateRange,
+    onCommentSaved: patchComment,
   });
 
   const [pauseOpen, setPauseOpen] = useState(false);

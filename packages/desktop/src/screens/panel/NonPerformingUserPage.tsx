@@ -28,6 +28,7 @@ import { TablePanel } from '@/components/TablePanel';
 import { appCodeForName, CLIENT_NAMES } from '@/constants/clientNames';
 import { formatDisplayDate, formatDisplayTime, getStoredUser } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { nonPerformingCommentsOf } from '@astro/shared/rowComments';
 import { useReportQuery, asPaged, display, maskMobile } from './shared';
 
 type NonPerformingComment = {
@@ -137,14 +138,7 @@ function roundAmount(value: unknown): number {
 
 /** Tolerant comment lookup (admin-panel-domains / mobile parity). */
 function commentsOf(row: NonPerformingUserRow | null | undefined): NonPerformingComment[] {
-  if (!row) return [];
-  const raw =
-    row.nonPerformingComments ||
-    row.nonPerformingComment ||
-    row.newRegistrationComments ||
-    row.comments ||
-    [];
-  return Array.isArray(raw) ? raw : [];
+  return nonPerformingCommentsOf<NonPerformingComment>(row);
 }
 
 function commentAuthor(c: NonPerformingComment): string {
@@ -280,11 +274,10 @@ export function NonPerformingUserPage() {
       setCommentOpen(false);
       setCommentUserId('');
       setCommentInput('');
-      void load();
     } finally {
       setCommentBusy(false);
     }
-  }, [admin?._id, admin?.name, commentInput, commentUserId, load, setRows]);
+  }, [admin?._id, admin?.name, commentInput, commentUserId, setRows]);
 
   const columns = useMemo<CommonTableColumn<NonPerformingUserRow>[]>(
     () => [

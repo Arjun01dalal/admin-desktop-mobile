@@ -196,7 +196,7 @@ export function UniqueDepositPendingPage() {
 
   const unpack = useCallback((res: { data?: unknown }) => asPaged<UniquePendingRow>(res.data), []);
 
-  const { rows, total, totalPages, loading, load } = useReportQuery<UniquePendingRow>({
+  const { rows, setRows, total, totalPages, loading, load } = useReportQuery<UniquePendingRow>({
     action: 'uniquePending.list',
     buildPayload,
     unpack,
@@ -312,12 +312,25 @@ export function UniqueDepositPendingPage() {
           delete next[row._id];
           return next;
         });
-        void load();
+        setRows((prev) =>
+          prev.map((item) =>
+            item._id === row._id
+              ? {
+                  ...item,
+                  uniquePendingReason: {
+                    name: admin?.name || '',
+                    _id: admin?._id || '',
+                    reason,
+                  },
+                }
+              : item,
+          ),
+        );
       } finally {
         setSubmittingCommentId('');
       }
     },
-    [admin, comments, load],
+    [admin, comments, setRows],
   );
 
   const openStatusDialog = useCallback((orderId?: string) => {

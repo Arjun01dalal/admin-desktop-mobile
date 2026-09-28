@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getSessionUser } from '@/auth/permissions';
 import { apiFailed, type KycRow } from './types';
+import { kycApprovedRowPatch, kycManualRowPatch, kycRejectedRowPatch } from '@astro/shared/rowComments';
 import { updatedByPayload } from './utils';
 
 const EMPTY_APPROVE = {
@@ -28,11 +29,11 @@ const EMPTY_MANUAL = {
 };
 
 type Params = {
-  reload: () => void;
+  patchRow: (id: string, patch: Partial<KycRow>) => void;
   unlockNightLock: () => void;
 };
 
-export function useKycActions({ reload, unlockNightLock }: Params) {
+export function useKycActions({ patchRow, unlockNightLock }: Params) {
   const sendKycOtp = useCallback(async (row: KycRow, sendOTPToClient: boolean) => {
     const res = await secureApi('ops.kycSendOtp', {
       sendOTPToClient,
@@ -166,14 +167,14 @@ export function useKycActions({ reload, unlockNightLock }: Params) {
           return;
         }
         toast.success('KYC Approved Successfully');
+        patchRow(approveTarget._id, kycApprovedRowPatch(approveForm));
         setApproveTarget(null);
         setApproveStep('details');
-        reload();
       } finally {
         setApproveSubmitting(false);
       }
     },
-    [approveTarget, approveForm, approveStep, sendKycOtp, reload],
+    [approveTarget, approveForm, approveStep, sendKycOtp, patchRow],
   );
 
   // ---- Reject ----
@@ -221,15 +222,15 @@ export function useKycActions({ reload, unlockNightLock }: Params) {
           return;
         }
         toast.success('KYC Rejected Successfully');
+        patchRow(rejectTarget._id, kycRejectedRowPatch(updatedByPayload()));
         setRejectTarget(null);
         setRejectOtp('');
         setRejectAdminOtp('');
-        reload();
       } finally {
         setRejectSubmitting(false);
       }
     },
-    [rejectTarget, rejectOtp, rejectAdminOtp, reload],
+    [rejectTarget, rejectOtp, rejectAdminOtp, patchRow],
   );
 
   // ---- Manual ----
@@ -329,13 +330,13 @@ export function useKycActions({ reload, unlockNightLock }: Params) {
           return;
         }
         toast.success('Manual KYC Updated Successfully');
+        patchRow(manualTarget._id, kycManualRowPatch(manualForm, updatedByPayload()));
         setManualTarget(null);
-        reload();
       } finally {
         setManualSubmitting(false);
       }
     },
-    [manualTarget, manualForm, reload],
+    [manualTarget, manualForm, patchRow],
   );
 
   // ---- Dialer + UPI verify ----
