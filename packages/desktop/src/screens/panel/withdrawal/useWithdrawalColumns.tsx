@@ -433,12 +433,6 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
         label: 'Lock By',
         render: (row) => (row.lockBy?.name ? personCell(row.lockBy.name, row.lockBy.date) : '—'),
       },
-      {
-        id: 'checkBy',
-        label: 'Check By',
-        width: 140,
-        render: (row) => ctx.renderCheckCell(row, 'first'),
-      },
       ...(ctx.canDelay
         ? [
             {

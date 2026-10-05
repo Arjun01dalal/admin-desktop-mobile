@@ -14,7 +14,6 @@ import {
   RefreshControl,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -252,7 +251,12 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
   const [streamId, setStreamId] = useState('');
   const [streamOpen, setStreamOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  /** Book cards for the current filters. The list stays on screen until this opens. */
+  const [viewBooks, setViewBooks] = useState(false);
+  const [openingBooks, setOpeningBooks] = useState(false);
+  /** Open on the list. View Book forces it shut until the header is opened again. */
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const scrollRef = useRef<ScrollView>(null);
   const [sportName, setSportName] = useState('');
   const [tournamentName, setTournamentName] = useState('');
   const [gameName, setGameName] = useState('');
@@ -274,26 +278,29 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
     [groupedData],
   );
 
-  const filteredMatchList = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return matchList;
-    return matchList.filter((m) =>
-      String(m.matchName || '')
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [matchList, searchQuery]);
-
-  /** Detail view keeps only the picked match; list view shows every active match. */
+  /**
+   * Books for the open view.
+   * One tapped match, or every match in the current filters.
+   * No sport / tournament / game means the full list.
+   */
   const visibleGroups = useMemo(() => {
-    if (!selectedMatch) return groupedData;
+    if (selectedMatch) {
+      return groupedData
+        .map(
+          ([sport, matches]) =>
+            [sport, matches.filter((m) => m.matchName === selectedMatch)] as [string, MatchRow[]],
+        )
+        .filter(([, matches]) => matches.length > 0);
+    }
+    if (!viewBooks) return [];
+    const names = new Set(matchList.map((match) => match.matchName));
     return groupedData
       .map(
         ([sport, matches]) =>
-          [sport, matches.filter((m) => m.matchName === selectedMatch)] as [string, MatchRow[]],
+          [sport, matches.filter((match) => names.has(match.matchName))] as [string, MatchRow[]],
       )
       .filter(([, matches]) => matches.length > 0);
-  }, [groupedData, selectedMatch]);
+  }, [groupedData, matchList, selectedMatch, viewBooks]);
 
   useEffect(() => {
     if (!selectedMatch) return;
@@ -498,8 +505,27 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
     };
   }, [isFocused, fetchAllData]);
 
+  const showingBooks = Boolean(selectedMatch) || viewBooks;
+  const booksActive = viewBooks || openingBooks;
+  const showFilters = booksActive ? filtersExpanded && viewBooks : filtersExpanded;
+  const canViewBook = !showingBooks && !openingBooks && !loading && matchList.length > 0;
+
+  useEffect(() => {
+    if (!openingBooks || viewBooks) return undefined;
+    const frame = requestAnimationFrame(() => setViewBooks(true));
+    return () => cancelAnimationFrame(frame);
+  }, [openingBooks, viewBooks]);
+
+  useEffect(() => {
+    if (!viewBooks || !openingBooks) return undefined;
+    const frame = requestAnimationFrame(() => setOpeningBooks(false));
+    return () => cancelAnimationFrame(frame);
+  }, [openingBooks, viewBooks]);
+
   return (
+    <View style={styles.page}>
     <ScrollView
+      ref={scrollRef}
       showsVerticalScrollIndicator={false}
       style={styles.screen}
       contentContainerStyle={styles.content}
@@ -512,6 +538,16 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
       }
     >
       <Text style={styles.title}>{toDisplayText(TITLES[variant])}</Text>
+      <TouchableOpacity
+        style={styles.collapseHeader}
+        activeOpacity={0.8}
+        onPress={() => setFiltersExpanded((open) => !open)}
+      >
+        <Text style={styles.collapseTitle}>Filters</Text>
+        <Text style={styles.collapseChevron}>{showFilters ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {showFilters ? (
+        <>
       <DetailFilterBar
         startDate={draftStart}
         endDate={draftEnd}
@@ -561,31 +597,24 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         onGame={handleGame}
         onSortBy={handleSortBy}
       />
+      {viewBooks ? (
+        <TouchableOpacity
+          style={styles.backBtn}
+          activeOpacity={0.7}
+          onPress={() => {
+            setViewBooks(false);
+            setOpeningBooks(false);
+            setOpenKey(null);
+            setFiltersExpanded(true);
+          }}
+        >
+          <Text style={styles.backText}>‹ List</Text>
+        </TouchableOpacity>
+      ) : null}
+        </>
+      ) : null}
 
-      <View style={styles.searchWrap}>
-        <TextInput
-          style={styles.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search match name…"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
-        {searchQuery.trim() ? (
-          <TouchableOpacity
-            style={styles.searchClear}
-            onPress={() => setSearchQuery('')}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.searchClearText}>✕</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      {selectedMatch && filteredMatchList.length > 0 ? (
+      {selectedMatch && matchList.length > 0 ? (
         <View style={styles.switcherBox}>
           <View style={styles.switcherHeader}>
             <TouchableOpacity
@@ -598,14 +627,14 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
             >
               <Text style={styles.backText}>‹ All matches</Text>
             </TouchableOpacity>
-            <Text style={styles.matchCount}>{filteredMatchList.length}</Text>
+            <Text style={styles.matchCount}>{matchList.length}</Text>
           </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.switcherContent}
           >
-            {filteredMatchList.map((match, index) => {
+            {matchList.map((match, index) => {
               const active = match.matchName === selectedMatch;
               return (
                 <TouchableOpacity
@@ -648,9 +677,9 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
         </View>
       ) : null}
 
-      {!loading && !selectedMatch && filteredMatchList.length > 0
+      {!loading && !showingBooks && !openingBooks && matchList.length > 0
         ? (() => {
-            const bySport = filteredMatchList.reduce<Record<string, typeof filteredMatchList>>(
+            const bySport = matchList.reduce<Record<string, typeof matchList>>(
               (acc, item) => {
                 const key = item.sport || 'Other';
                 if (!acc[key]) acc[key] = [];
@@ -689,13 +718,7 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
           })()
         : null}
 
-      {!selectedMatch && !loading && matchList.length > 0 && filteredMatchList.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>No matches matching “{searchQuery.trim()}”.</Text>
-        </View>
-      ) : null}
-
-      {(selectedMatch && !loading ? visibleGroups : []).map(([sport, matches]) => (
+      {(showingBooks && !loading ? visibleGroups : []).map(([sport, matches]) => (
         <View style={styles.sportBlock} key={sport}>
           <Text style={styles.sportHeader}>{sport || 'Other'}</Text>
           {matches.map((match, mi) => {
@@ -823,10 +846,74 @@ export function LiveMatchTotalScreen({ variant }: { variant: Variant }) {
 
       <LiveStreamModal open={streamOpen} onClose={() => setStreamOpen(false)} streamId={streamId} />
     </ScrollView>
+    {canViewBook ? (
+      <View style={styles.viewBookBar}>
+        <TouchableOpacity
+          style={styles.viewBookBtn}
+          activeOpacity={0.85}
+          onPress={() => {
+            setSelectedMatch(null);
+            setOpenKey(null);
+            setFiltersExpanded(false);
+            scrollRef.current?.scrollTo({ y: 0, animated: false });
+            setOpeningBooks(true);
+          }}
+        >
+          <Text style={styles.viewBookText}>View Book</Text>
+        </TouchableOpacity>
+      </View>
+    ) : null}
+    {openingBooks ? (
+      <View style={styles.bookLoader}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    ) : null}
+    </View>
   );
 }
 
 const styles = makeStyles({
+  page: { flex: 1 },
+  viewBookBar: {
+    paddingHorizontal: spacing(4),
+    paddingTop: spacing(2),
+    paddingBottom: spacing(3),
+  },
+  viewBookBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(3),
+    alignItems: 'center',
+  },
+  viewBookText: {
+    color: colors.primaryForeground,
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  bookLoader: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  collapseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    marginBottom: spacing(2),
+  },
+  collapseTitle: { color: colors.foreground, fontWeight: '700', fontSize: 14 },
+  collapseChevron: { color: colors.muted, fontSize: 12 },
   bookTypeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -858,30 +945,6 @@ const styles = makeStyles({
     color: colors.muted,
     fontSize: 12,
   },
-  searchWrap: {
-    marginTop: spacing(3),
-    marginBottom: spacing(3),
-    position: 'relative',
-  },
-  searchInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    fontSize: 14,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    paddingRight: spacing(10),
-  },
-  searchClear: {
-    position: 'absolute',
-    right: spacing(3),
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-  },
-  searchClearText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
   switcherBox: {
     backgroundColor: colors.surface,
     borderWidth: 1,

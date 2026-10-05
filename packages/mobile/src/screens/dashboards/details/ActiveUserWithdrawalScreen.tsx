@@ -76,6 +76,7 @@ function maskMobile(value: string, canShow: boolean): string {
 
 export function ActiveUserWithdrawalScreen() {
   const user = getSessionUser() as Record<string, unknown> | null;
+
   const loginEmpCode = empCodeFromUser(user);
   const isCaller = isCallerRole(user);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
@@ -91,6 +92,7 @@ export function ActiveUserWithdrawalScreen() {
   const [beneficiaryAccounts, setBeneficiaryAccounts] = useState<string[]>([]);
   const [draftBeneficiaryAccounts, setDraftBeneficiaryAccounts] = useState<string[]>([]);
   const [benePendingOpen, setBenePendingOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const draftBeneRef = useRef<string[]>([]);
   draftBeneRef.current = draftBeneficiaryAccounts;
 
@@ -334,10 +336,17 @@ export function ActiveUserWithdrawalScreen() {
         3,
         0,
         { label: 'Mobile', value: maskMobile(pickWithdrawalMobile(selected), canShowMobile) },
-        { label: 'User Bank', value: String(selected.userBankName || '—') },
+        {
+          label: 'User Bank',
+          value: String(selected.userBankName || '—'),
+          copyable: true,
+          copyValue: String(selected.userBankName || '').trim(),
+        },
         {
           label: 'Account No',
           value: String(selected.accountNo || selected.accountNumber || '—'),
+          copyable: true,
+          copyValue: String(selected.accountNo || selected.accountNumber || '').trim(),
         },
         { label: 'Bank', value: String(selected.bankName || '—') },
         { label: 'Order ID', value: pickWithdrawalOrderId(selected) },
@@ -387,6 +396,16 @@ export function ActiveUserWithdrawalScreen() {
       </View>
 
       <View style={styles.filterBox}>
+        <TouchableOpacity
+          style={styles.filterHeader}
+          activeOpacity={0.8}
+          onPress={() => setFiltersExpanded((open) => !open)}
+        >
+          <Text style={styles.filterHeaderTitle}>Filters</Text>
+          <Text style={styles.filterHeaderChevron}>{filtersExpanded ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+        {filtersExpanded ? (
+          <>
         <Text style={styles.fieldLabel}>Emp Code</Text>
         <TextInput
           style={styles.textInput}
@@ -540,6 +559,8 @@ export function ActiveUserWithdrawalScreen() {
             <Text style={styles.formBtnGhostText}>Clear</Text>
           </TouchableOpacity>
         </View>
+          </>
+        ) : null}
       </View>
 
       {perms.actions ? (
@@ -756,6 +777,13 @@ const styles = makeStyles({
     padding: spacing(3),
     marginTop: spacing(3),
   },
+  filterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterHeaderTitle: { color: colors.foreground, fontWeight: '700', fontSize: 14 },
+  filterHeaderChevron: { color: colors.muted, fontSize: 12 },
   filterActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
   chipRow: { marginTop: spacing(1) },
   chip: {

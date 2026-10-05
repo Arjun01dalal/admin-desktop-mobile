@@ -3,9 +3,10 @@
  * - Gate password 123456789 → panel OTP login
  * - Any other password → api.astrothirdeye.com login-via-password → Astro site WebView
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +15,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  type KeyboardEvent,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,6 +53,28 @@ export function AstroLoginScreen({
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyboardPad, setKeyboardPad] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = (event: KeyboardEvent) => {
+      setKeyboardPad(event.endCoordinates.height);
+    };
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardPad(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (keyboardPad <= 0) return;
+    const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
+    return () => clearTimeout(id);
+  }, [keyboardPad]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +172,12 @@ export function AstroLoginScreen({
         style={styles.flex}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          ref={scrollRef}
+          contentContainerStyle={[
+            styles.scroll,
+            keyboardPad > 0 && styles.scrollKeyboard,
+            Platform.OS === 'android' ? { paddingBottom: spacing(5) + keyboardPad } : null,
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -165,7 +194,7 @@ export function AstroLoginScreen({
             <ErrorBanner message={error} />
 
             <Input
-              placeholder="Enter Email / Mobile"
+              placeholder="Enter Email"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -230,6 +259,9 @@ const styles = StyleSheet.create({
     padding: spacing(5),
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  scrollKeyboard: {
+    justifyContent: 'flex-start',
   },
   logo: { width: 96, height: 96, marginBottom: spacing(2) },
   overline: {

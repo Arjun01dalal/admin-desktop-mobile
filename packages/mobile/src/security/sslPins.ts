@@ -113,7 +113,7 @@ async function applyPins(publicKeyHashes: string[]): Promise<void> {
   for (const host of pinHosts()) {
     options[host] = {
       includeSubdomains: true,
-      publicKeyHashes: pins,
+      publicKeyHashes: pins.slice(),
     };
   }
   await initializeSslPinning(options);

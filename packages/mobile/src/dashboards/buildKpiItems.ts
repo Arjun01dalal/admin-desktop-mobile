@@ -78,6 +78,8 @@ export function buildKpiItems(
       label: KPI_MAP.totalPendingWithdrawal.jyotish,
       value: floorNum(dw.totalPendingWithdrawal ?? s.totalPendingWithdrawal),
       prefix: '₹',
+      href: '/withdrawal',
+      state: { status: 'Pending', startDate, endDate },
     },
     {
       id: 'instantDeposit',

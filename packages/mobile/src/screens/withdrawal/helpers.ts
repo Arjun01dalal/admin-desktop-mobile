@@ -7,6 +7,7 @@
  */
 import { Alert, Platform } from 'react-native';
 import * as Location from 'expo-location';
+import { readCurrentPosition, readLastKnownPosition } from '../../security/safeLocation';
 import { colors } from '../../theme';
 import { formatDisplayDate, formatDisplayTime } from '../../utils/dates';
 import { TERMINAL_STATUSES } from './constants';
@@ -205,8 +206,8 @@ export async function requireGeo(): Promise<Geo | null> {
   try {
     if (Platform.OS === 'web') throw new Error('unsupported');
     const pos =
-      (await Location.getLastKnownPositionAsync()) ??
-      (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+      (await readLastKnownPosition()) ??
+      (await readCurrentPosition({ accuracy: Location.Accuracy.Balanced }, 8_000, 'withdrawalGeo'));
     const { latitude, longitude } = pos.coords;
     let city = '';
     let state = '';

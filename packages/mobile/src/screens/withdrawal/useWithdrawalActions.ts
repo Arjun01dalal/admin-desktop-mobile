@@ -641,12 +641,6 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
       const checkFirst = checkOf(r, 'checkBy');
       const checkSecond = checkOf(r, 'crossCheckBy');
       const checksAllowed = checksAllowedFor(r, perms.checksDisabled);
-      if (!checkFirst && checksAllowed) {
-        acts.push(
-          { label: 'Check ✓', tone: 'primary', onPress: () => void doCheck(r, 'first', true) },
-          { label: 'Check ✗', tone: 'warning', onPress: () => void doCheck(r, 'first', false) },
-        );
-      }
       if (!checkSecond && checksAllowed && Boolean(checkFirst?.status)) {
         acts.push(
           {

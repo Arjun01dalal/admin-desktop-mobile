@@ -2,7 +2,7 @@
  * Funds — port of desktop FundsPage with full drill-down:
  * main list (funds.upiPaymentApproved) → row popup "View MID" → MID list
  * (desktop FundsMidPage) → tap a MID → transaction list (desktop FundsPayinPage,
- * funds.allPayment { mid, startDate, endDate }) with KPIs and the
+ * funds.allPayment { mid, startDate, endDate, paymentGateway? }) with KPIs and the
  * Automatic / Scanner Add / Scanner Remove selector.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +11,7 @@ import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { colors, radius, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { whatsappPaymentGatewayName } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -227,12 +228,20 @@ export function FundsScreen() {
       setPayinLoading(true);
       setPayinError(null);
       try {
-        const requestOnce = () =>
-          secureApi<unknown>('funds.allPayment', {
-            mid,
-            startDate: startDate || todayIST(),
-            endDate: endDate || todayIST(),
-          });
+        const midRow = drillMids.find((item) => String(item.mid || '').trim() === mid);
+        const paymentGateway = whatsappPaymentGatewayName(
+          typeof midRow?.paymentGateway === 'string' ? midRow.paymentGateway : undefined,
+          typeof midRow?.paymentGatewayName === 'string' ? midRow.paymentGatewayName : undefined,
+          midRow?.paymentGatewayCompany,
+          drillName,
+        );
+        const body: Record<string, unknown> = {
+          mid,
+          startDate: startDate || todayIST(),
+          endDate: endDate || todayIST(),
+        };
+        if (paymentGateway) body.paymentGateway = paymentGateway;
+        const requestOnce = () => secureApi<unknown>('funds.allPayment', body);
         let res = await requestOnce();
         // Desktop retries once on timeouts (the report is slow server-side).
         if (!res.ok && /timeout|etimedout|econnaborted|abort/i.test(String(res.message || ''))) {
@@ -292,7 +301,7 @@ export function FundsScreen() {
         if (gen === payinGenRef.current) setPayinLoading(false);
       }
     },
-    [startDate, endDate],
+    [drillMids, drillName, startDate, endDate],
   );
 
   const openMids = useCallback(

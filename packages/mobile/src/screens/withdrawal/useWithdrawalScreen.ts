@@ -1,6 +1,6 @@
 /** State, data loading, and filters for the withdrawal screen. Actions live in useWithdrawalActions. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
 import { secureApi } from '../../api/client';
 import { colors } from '../../theme';
@@ -24,12 +24,20 @@ import {
   type Summary,
 } from './helpers';
 
+type WithdrawalNavParams = {
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 export function useWithdrawalScreen() {
-  const [draftStart, setDraftStart] = useState(todayIST());
-  const [draftEnd, setDraftEnd] = useState(todayIST());
-  const [startDate, setStartDate] = useState(todayIST());
-  const [endDate, setEndDate] = useState(todayIST());
-  const [status, setStatus] = useState('');
+  const route = useRoute<RouteProp<Record<string, WithdrawalNavParams | undefined>, string>>();
+  const incoming = route.params;
+  const [draftStart, setDraftStart] = useState(incoming?.startDate || todayIST());
+  const [draftEnd, setDraftEnd] = useState(incoming?.endDate || todayIST());
+  const [startDate, setStartDate] = useState(incoming?.startDate || todayIST());
+  const [endDate, setEndDate] = useState(incoming?.endDate || todayIST());
+  const [status, setStatus] = useState(incoming?.status || '');
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const [searchField, setSearchField] = useState('userName');
@@ -169,6 +177,24 @@ export function useWithdrawalScreen() {
   useEffect(() => {
     void loadSummary();
   }, [loadSummary]);
+
+  useEffect(() => {
+    const hasNav =
+      incoming != null &&
+      (incoming.status !== undefined || Boolean(incoming.startDate) || Boolean(incoming.endDate));
+    if (!hasNav || !incoming) return;
+    if (incoming.status !== undefined) setStatus(incoming.status);
+    if (incoming.startDate) {
+      setDraftStart(incoming.startDate);
+      setStartDate(incoming.startDate);
+    }
+    if (incoming.endDate) {
+      setDraftEnd(incoming.endDate);
+      setEndDate(incoming.endDate);
+    }
+    setPage(1);
+  }, [incoming?.endDate, incoming?.startDate, incoming?.status]);
+
   useFocusEffect(
     useCallback(() => {
       void load();
@@ -344,17 +370,6 @@ export function useWithdrawalScreen() {
         render: (r) => {
           const l = r.lockBy as Rec | undefined;
           return l && typeof l === 'object' ? display(l.name) : display(l);
-        },
-      },
-      {
-        key: 'checkBy',
-        label: 'Check By',
-        width: 120,
-        render: (r) => {
-          const c = checkOf(r, 'checkBy');
-          return c
-            ? `${c.status === 'true' || c.status === true ? 'OK' : 'Not OK'} · ${display(c.name)}`
-            : '—';
         },
       },
       {

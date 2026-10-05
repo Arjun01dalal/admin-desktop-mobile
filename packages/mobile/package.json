@@ -30,8 +30,8 @@
     "expo-screen-orientation": "~57.0.2",
     "expo-secure-store": "~57.0.2",
     "expo-sharing": "~57.0.16",
+    "expo-stallion-plugin": "^1.0.4",
     "expo-status-bar": "~57.0.1",
-    "expo-updates": "~57.0.19",
     "freerasp-react-native": "^4.4.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -43,6 +43,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-ssl-public-key-pinning": "^1.2.6",
+    "react-native-stallion": "^2.4.2",
     "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2",
     "react-native-webview": "13.16.1",
@@ -51,6 +52,7 @@
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.2.4",
+    "stallion-cli": "^2.5.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -59,7 +61,11 @@
     "android": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo run:android",
     "ios": "mkdir -p .metro-tmp && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TMPDIR=\"$PWD/.metro-tmp\" && expo run:ios",
     "web": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo start --web",
-    "check:ota-signing": "node scripts/check-ota-signing.cjs",
+    "check:ota-config": "node scripts/check-ota-config.cjs",
+    "ota:export:android": "expo export:embed --platform android --dev false --reset-cache --bundle-output ./build-android/index.android.bundle --assets-dest ./build-android --bytecode",
+    "ota:export:ios": "expo export:embed --platform ios --dev false --reset-cache --bundle-output ./build-ios/main.jsbundle --assets-dest ./build-ios --bytecode",
+    "ota:publish:android": "npx stallion publish-bundle --upload-path=${STALLION_UPLOAD_PATH} --platform=android --custom-bundle-path=build-android",
+    "ota:publish:ios": "npx stallion publish-bundle --upload-path=${STALLION_UPLOAD_PATH} --platform=ios --custom-bundle-path=build-ios",
     "build:preview": "env TMPDIR=/tmp eas build --profile preview --platform all",
     "build:preview:android": "env TMPDIR=/tmp eas build --profile preview --platform android",
     "build:preview:ios": "env TMPDIR=/tmp eas build --profile preview --platform ios",

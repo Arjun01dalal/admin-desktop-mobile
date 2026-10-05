@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { toast } from 'react-toastify';
+import { whatsappPaymentGatewayName } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -161,12 +162,16 @@ export function FundsPayinPage() {
     if (!mid) return;
     setLoading(true);
     try {
-      const requestOnce = () =>
-        secureApi('funds.allPayment', {
-          mid,
-          startDate,
-          endDate,
-        });
+      const midRow = drill?.mids.find((item) => item.mid === mid);
+      const paymentGateway = whatsappPaymentGatewayName(
+        midRow?.paymentGateway,
+        midRow?.paymentGatewayCompany,
+        drill?.name,
+      );
+      const body: Record<string, unknown> = { mid, startDate, endDate };
+      if (paymentGateway) body.paymentGateway = paymentGateway;
+
+      const requestOnce = () => secureApi('funds.allPayment', body);
 
       let res = await requestOnce();
       const timedOut = !res.ok && /timeout|etimedout|econnaborted/i.test(String(res.message || ''));
@@ -192,7 +197,7 @@ export function FundsPayinPage() {
     } finally {
       setLoading(false);
     }
-  }, [mid, startDate, endDate, applyPayload]);
+  }, [drill?.mids, drill?.name, mid, startDate, endDate, applyPayload]);
 
   useEffect(() => {
     void load();

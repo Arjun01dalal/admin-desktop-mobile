@@ -4,6 +4,7 @@ import { registerRootComponent } from 'expo';
 // "Exception in HostFunction" during module load ("App entry not found").
 // These breadcrumbs pinpoint which module throws — remove once diagnosed.
 console.log('[boot] index start');
+require('./src/security/bridgeRejectionGuard');
 // Hermes has no crypto.getRandomValues — crypto-js AES needs it for secure
 // random (throws "Native crypto module could not be used..."). Polyfill on
 // native; browsers already provide it.
@@ -43,5 +44,19 @@ console.log('[boot] App module ok');
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
 // It also ensures that whether you load the app in Expo Go or in a native build,
 // the environment is set up appropriately
-registerRootComponent(App);
+let Root = App;
+if (Platform.OS !== 'web') {
+  try {
+    const Constants = require('expo-constants');
+    const inExpoGo =
+      Constants.executionEnvironment === 'storeClient' || Constants.appOwnership === 'expo';
+    if (!inExpoGo) {
+      const { withStallion } = require('react-native-stallion');
+      Root = withStallion(App);
+    }
+  } catch (err) {
+    console.warn('[boot] stallion skipped:', err instanceof Error ? err.message : err);
+  }
+}
+registerRootComponent(Root);
 console.log('[boot] registered');

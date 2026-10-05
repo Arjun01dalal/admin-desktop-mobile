@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -79,19 +80,28 @@ export function WithdrawalPage() {
 
   const canDownload = hasPermission('Download_Withdrawal') || hasPermission('show_download_botton');
   const showAllInProgress = hasPermission('show_all_withdrawal');
+  const location = useLocation();
+  const navState = (location.state ?? null) as {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  } | null;
   const today = todayIST();
 
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useState(navState?.startDate || today);
+  const [endDate, setEndDate] = useState(navState?.endDate || today);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
+  const [draft, setDraft] = useState<ColumnFilters>({
+    ...EMPTY_FILTERS,
+    status: navState?.status || '',
+  });
   const [query, setQuery] = useState<QueryState>({
-    startDate: today,
-    endDate: today,
+    startDate: navState?.startDate || today,
+    endDate: navState?.endDate || today,
     allData: false,
-    filters: EMPTY_FILTERS,
+    filters: { ...EMPTY_FILTERS, status: navState?.status || '' },
   });
 
   const [mids, setMids] = useState<MidOption[]>([]);
@@ -231,6 +241,26 @@ export function WithdrawalPage() {
   useEffect(() => {
     void loadSummary();
   }, [loadSummary]);
+
+  const appliedNavKey = useRef(location.key);
+  useEffect(() => {
+    if (location.key === appliedNavKey.current) return;
+    appliedNavKey.current = location.key;
+    if (!navState?.status) return;
+    const nextStart = navState.startDate || todayIST();
+    const nextEnd = navState.endDate || todayIST();
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+    setDraft((prev) => ({ ...prev, status: navState.status || '' }));
+    setQuery((prev) => ({
+      ...prev,
+      startDate: nextStart,
+      endDate: nextEnd,
+      allData: false,
+      filters: { ...prev.filters, status: navState.status || '' },
+    }));
+    setPage(1);
+  }, [location.key, navState]);
 
   const commitQuery = useCallback(
     (opts?: { allData?: boolean; filters?: ColumnFilters }) => {

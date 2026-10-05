@@ -4,19 +4,8 @@
     "slug": "astro",
     "version": "1.1.0",
     "scheme": "myastroapp",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
     "updates": {
-      "enabled": true,
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/676d4bd3-ff79-4e37-9694-dc2d6332a0e2",
-      "codeSigningCertificate": "./certs/certificate.pem",
-      "codeSigningMetadata": {
-        "keyid": "main",
-        "alg": "rsa-v1_5-sha256"
-      }
+      "enabled": false
     },
     "orientation": "portrait",
     "icon": "./assets/icon.png",

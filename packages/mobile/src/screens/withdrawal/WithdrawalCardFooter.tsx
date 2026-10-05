@@ -183,85 +183,44 @@ export function WithdrawalCardFooter({
           </TouchableOpacity>
         </View>
       ) : null}
-      {checksAllowed ? (
-        <>
-          <View style={styles.checkGroup}>
-            <Text style={styles.sectionLabel}>Check</Text>
-            {checkFirst ? (
-              <View style={styles.checkDoneChip}>
-                <Text
-                  style={[
-                    styles.checkSymbol,
-                    checkFirst.status ? styles.checkOk : styles.checkNotOk,
-                  ]}
-                >
-                  {checkFirst.status ? '✓' : '✗'}
-                </Text>
-                <Text style={styles.checkDoneName} numberOfLines={1}>
-                  by {display(checkFirst.name)}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.checkActions}>
-                <TouchableOpacity
-                  style={[styles.iconBtn, styles.iconBtnOk, busy && styles.checkBtnDisabled]}
-                  disabled={busy}
-                  onPress={() => void onCheck(r, 'first', true)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <MaterialCommunityIcons name="check" size={18} color={colors.success} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.iconBtn, styles.iconBtnCross, busy && styles.checkBtnDisabled]}
-                  disabled={busy}
-                  onPress={() => void onCheck(r, 'first', false)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <MaterialCommunityIcons name="close" size={18} color={colors.destructive} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-          {checkFirst?.status ? (
-            <View style={styles.checkGroup}>
-              <Text style={styles.sectionLabel}>Cross Check</Text>
-              {checkSecond ? (
-                <View style={styles.checkDoneChip}>
-                  <Text
-                    style={[
-                      styles.checkSymbol,
-                      checkSecond.status ? styles.checkOk : styles.checkNotOk,
-                    ]}
-                  >
-                    {checkSecond.status ? '✓' : '✗'}
-                  </Text>
-                  <Text style={styles.checkDoneName} numberOfLines={1}>
-                    by {display(checkSecond.name)}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.checkActions}>
-                  <TouchableOpacity
-                    style={[styles.iconBtn, styles.iconBtnOk, busy && styles.checkBtnDisabled]}
-                    disabled={busy}
-                    onPress={() => void onCheck(r, 'second', true)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <MaterialCommunityIcons name="check" size={18} color={colors.success} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.iconBtn, styles.iconBtnCross, busy && styles.checkBtnDisabled]}
-                    disabled={busy}
-                    onPress={() => void onCheck(r, 'second', false)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <MaterialCommunityIcons name="close" size={18} color={colors.destructive} />
-                  </TouchableOpacity>
-                </View>
-              )}
+      {checksAllowed && checkFirst?.status ? (
+        <View style={styles.checkGroup}>
+          <Text style={styles.sectionLabel}>Cross Check</Text>
+          {checkSecond ? (
+            <View style={styles.checkDoneChip}>
+              <Text
+                style={[
+                  styles.checkSymbol,
+                  checkSecond.status ? styles.checkOk : styles.checkNotOk,
+                ]}
+              >
+                {checkSecond.status ? '✓' : '✗'}
+              </Text>
+              <Text style={styles.checkDoneName} numberOfLines={1}>
+                by {display(checkSecond.name)}
+              </Text>
             </View>
-          ) : null}
-        </>
+          ) : (
+            <View style={styles.checkActions}>
+              <TouchableOpacity
+                style={[styles.iconBtn, styles.iconBtnOk, busy && styles.checkBtnDisabled]}
+                disabled={busy}
+                onPress={() => void onCheck(r, 'second', true)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialCommunityIcons name="check" size={18} color={colors.success} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconBtn, styles.iconBtnCross, busy && styles.checkBtnDisabled]}
+                disabled={busy}
+                onPress={() => void onCheck(r, 'second', false)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={colors.destructive} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       ) : null}
     </View>
   );

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Location from 'expo-location';
+import { readCurrentPosition, readLastKnownPosition } from '../security/safeLocation';
 import { secureApi, setAuthFailureHandler } from '../api/client';
 import { eraseSessionSecrets, persistToken, persistUser } from '../lib/secureStorage';
 import { appStorage } from '../lib/webShim';
@@ -22,32 +23,6 @@ const FALLBACK_LNG = 79.9864;
 const POSITION_TIMEOUT_MS = 6_000;
 const ADDRESS_BUDGET_MS = 3_500;
 const LAST_KNOWN_MAX_AGE_MS = 15 * 60_000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    let settled = false;
-    const id = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error(`${label} timed out`));
-    }, ms);
-
-    promise.then(
-      (value) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(id);
-        resolve(value);
-      },
-      (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(id);
-        reject(err);
-      },
-    );
-  });
-}
 
 type AuthState = {
   ready: boolean;
@@ -198,7 +173,7 @@ export async function resolveLocation(): Promise<OtpLocation> {
   let gotFix = false;
 
   try {
-    const last = await Location.getLastKnownPositionAsync({
+    const last = await readLastKnownPosition({
       maxAge: LAST_KNOWN_MAX_AGE_MS,
       requiredAccuracy: 5_000,
     });
@@ -213,10 +188,8 @@ export async function resolveLocation(): Promise<OtpLocation> {
 
   if (!gotFix) {
     try {
-      const pos = await withTimeout(
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Low,
-        }),
+      const pos = await readCurrentPosition(
+        { accuracy: Location.Accuracy.Low },
         POSITION_TIMEOUT_MS,
         'loginLocation',
       );

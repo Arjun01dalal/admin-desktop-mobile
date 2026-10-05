@@ -231,8 +231,19 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
 
       <KpiGrid
         items={kpiItems}
-        isItemTappable={(item) => canOpenPanelPath(item.href)}
-        onItemPress={(item) => openPanelTarget(navigation, { href: item.href, state: item.state })}
+        isItemTappable={(item) => canOpenPanelPath(item.href) || item.href === '/withdrawal'}
+        onItemPress={(item) => {
+          if (item.href === '/withdrawal') {
+            const state = item.state;
+            navigation.navigate('withdrawal' as never, {
+              status: typeof state?.status === 'string' ? state.status : '',
+              startDate: typeof state?.startDate === 'string' ? state.startDate : undefined,
+              endDate: typeof state?.endDate === 'string' ? state.endDate : undefined,
+            } as never);
+            return;
+          }
+          openPanelTarget(navigation, { href: item.href, state: item.state });
+        }}
       />
 
       {visibleCards.map((card) => (

@@ -84,9 +84,8 @@ export function applyStoredTheme(): void {
 }
 
 /**
- * Safe JS reload after a theme change. Avoids expo-updates in Expo Go / dev
- * (missing or disabled native module → crash) and only calls reloadAsync when
- * Updates.isEnabled is true.
+ * Safe JS reload after a theme change. Avoids Stallion/native restart in
+ * Expo Go / dev (missing module → crash). Production uses Stallion.restart.
  */
 export async function reloadAppForTheme(opts?: { silent?: boolean }): Promise<void> {
   if (Platform.OS === 'web') {
@@ -110,12 +109,9 @@ export async function reloadAppForTheme(opts?: { silent?: boolean }): Promise<vo
         return;
       }
     } else {
-      // Static import can crash Expo Go (no native module). Dynamic only in prod path.
-      const Updates = await import('expo-updates');
-      if (Updates.isEnabled) {
-        await Updates.reloadAsync();
-        return;
-      }
+      const { restart } = await import('react-native-stallion');
+      restart();
+      return;
     }
   } catch {
     /* fall through to manual-restart prompt */

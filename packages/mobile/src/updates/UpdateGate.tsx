@@ -1,88 +1,79 @@
 /**
- * UpdateGate — OTA update prompt (EAS Update / expo-updates).
+ * UpdateGate — OTA prompt (Stallion).
  *
- * Every time you publish new code with `eas update`, the app checks for it on
- * launch and when it returns to the foreground. If a newer bundle is available,
- * a popup appears: "Update available" → tapping "Update now" downloads the new
- * JS bundle and reloads the app into it.
+ * Stallion syncs on launch/resume. When a production release is downloaded
+ * and waiting, this prompt lets the user restart into it.
  *
- * No-op in Expo Go / dev (Updates.isEnabled === false) so local development is
- * unaffected — this only runs in real dev/preview/production builds.
+ * No-op on web / Expo Go / Metro (__DEV__) — Stallion only applies in
+ * preview/production native builds.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  AppState,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as Updates from 'expo-updates';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { restart, useStallionUpdate } from 'react-native-stallion';
 import { colors, radius, spacing } from '../theme';
 
+function stallionOtaEnabled(): boolean {
+  if (Platform.OS === 'web' || __DEV__) return false;
+  const inExpoGo =
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+    Constants.appOwnership === 'expo';
+  return !inExpoGo;
+}
+
 export function UpdateGate() {
-  const [available, setAvailable] = useState(false);
+  if (!stallionOtaEnabled()) return null;
+  return <StallionUpdatePrompt />;
+}
+
+function StallionUpdatePrompt() {
+  const { isRestartRequired, newReleaseBundle } = useStallionUpdate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [dismissed, setDismissed] = useState(false);
 
-  const check = useCallback(async () => {
-    // Disabled in Expo Go / dev builds without updates configured.
-    if (!Updates.isEnabled) return;
-    try {
-      const result = await Updates.checkForUpdateAsync();
-      if (result.isAvailable) setAvailable(true);
-    } catch {
-      /* offline or no update server — ignore silently */
-    }
-  }, []);
-
-  // Check on mount and whenever the app comes back to the foreground.
-  useEffect(() => {
-    void check();
-    const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void check();
-    });
-    return () => sub.remove();
-  }, [check]);
-
-  const applyUpdate = useCallback(async () => {
+  const applyUpdate = useCallback(() => {
     setBusy(true);
     setError('');
     try {
-      const fetched = await Updates.fetchUpdateAsync();
-      if (fetched.isNew) {
-        await Updates.reloadAsync(); // restarts into the new bundle
-      } else {
-        setAvailable(false);
-      }
+      restart();
     } catch {
       setError('Update failed. Please check your connection and try again.');
       setBusy(false);
     }
   }, []);
 
-  if (!available) return null;
+  if (!isRestartRequired || dismissed) return null;
+
+  const notes =
+    typeof newReleaseBundle?.releaseNote === 'string' && newReleaseBundle.releaseNote.trim()
+      ? newReleaseBundle.releaseNote.trim()
+      : 'A new version of Astro Admin is ready. Update now to get the latest features and fixes.';
 
   return (
     <Modal
       visible
       transparent
       animationType="fade"
-      onRequestClose={() => !busy && setAvailable(false)}
+      onRequestClose={() => !busy && setDismissed(true)}
     >
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.icon}>⬇️</Text>
           <Text style={styles.title}>Update available</Text>
-          <Text style={styles.body}>
-            A new version of Astro Admin is ready. Update now to get the latest features and fixes.
-          </Text>
+          <Text style={styles.body}>{notes}</Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <TouchableOpacity
             style={[styles.primaryBtn, busy && styles.btnDisabled]}
-            onPress={() => void applyUpdate()}
+            onPress={applyUpdate}
             disabled={busy}
           >
             {busy ? (
@@ -92,11 +83,11 @@ export function UpdateGate() {
             )}
           </TouchableOpacity>
           {!busy ? (
-            <TouchableOpacity style={styles.laterBtn} onPress={() => setAvailable(false)}>
+            <TouchableOpacity style={styles.laterBtn} onPress={() => setDismissed(true)}>
               <Text style={styles.laterText}>Later</Text>
             </TouchableOpacity>
           ) : (
-            <Text style={styles.downloading}>Downloading update…</Text>
+            <Text style={styles.downloading}>Restarting…</Text>
           )}
         </View>
       </View>

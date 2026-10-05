@@ -69,7 +69,10 @@ export default function App() {
         // System mode: follow OS light/dark changes (requires JS reload).
         stopWatch = watchSystemThemeChanges();
       }
-    })();
+    })().catch((err) => {
+      console.warn('[boot] startup failed:', err instanceof Error ? err.message : err);
+      if (alive) setBooted(true);
+    });
     return () => {
       alive = false;
       stopWatch?.();

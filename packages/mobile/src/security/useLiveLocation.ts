@@ -15,6 +15,8 @@ import { AppState, Linking, Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 
+import { readCurrentPosition, readLastKnownPosition, runWhenLocationIdle } from './safeLocation';
+
 export type LiveLocation = {
   lat: number;
   lng: number;
@@ -32,7 +34,6 @@ const PERMISSION_DENIED_MESSAGE =
 const GATE_POSITION_TIMEOUT_MS = 6_000;
 const GATE_LAST_KNOWN_MAX_AGE_MS = 15 * 60_000;
 const GATE_LAST_KNOWN_ACCURACY_M = 5_000;
-const HEALTH_CHECK_TIMEOUT_MS = 5_000;
 
 /** Android/iOS emulators often have no GPS fix — use a stable fallback so panel isn't blocked. */
 function isEmulator(): boolean {
@@ -100,34 +101,6 @@ async function ensureForegroundPermission(): Promise<void> {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    let settled = false;
-    const id = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error(`${label} timed out`));
-    }, ms);
-
-    promise.then(
-      (value) => {
-        // Late resolve after timeout must be swallowed — otherwise Android can
-        // throw uncaught "Array already consumed" from the orphaned native call.
-        if (settled) return;
-        settled = true;
-        clearTimeout(id);
-        resolve(value);
-      },
-      (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(id);
-        reject(err);
-      },
-    );
-  });
-}
-
 async function tryOsLocation(): Promise<LiveLocation> {
   if (Platform.OS === 'web') {
     throw {
@@ -155,7 +128,7 @@ async function tryOsLocation(): Promise<LiveLocation> {
 
   // Fast path: last known fix (avoids indoor GPS timeouts / OEM flakes).
   try {
-    const last = await Location.getLastKnownPositionAsync({
+    const last = await readLastKnownPosition({
       maxAge: GATE_LAST_KNOWN_MAX_AGE_MS,
       requiredAccuracy: GATE_LAST_KNOWN_ACCURACY_M,
     });
@@ -167,10 +140,9 @@ async function tryOsLocation(): Promise<LiveLocation> {
   try {
     // Low accuracy + short timeout unlocks the panel quickly (network/wifi).
     // Balanced GPS can hang 15s+ indoors and is not needed for the gate.
-    const pos = await withTimeout(
-      Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Low,
-      }),
+    // Do not start another native location call until this one settles.
+    const pos = await readCurrentPosition(
+      { accuracy: Location.Accuracy.Low },
       GATE_POSITION_TIMEOUT_MS,
       'getCurrentPosition',
     );
@@ -214,19 +186,16 @@ async function checkLocationStillAllowed(): Promise<LocationFailure | null> {
   if (servicesOn) return null;
 
   try {
-    const last = await Location.getLastKnownPositionAsync({
+    // Last-known only. A live getCurrentPosition while the watcher is active
+    // throws "Array already consumed" on Android. A cached fix means Location
+    // is actually on, even if hasServicesEnabledAsync said otherwise.
+    const last = await readLastKnownPosition({
       maxAge: GATE_LAST_KNOWN_MAX_AGE_MS,
       requiredAccuracy: GATE_LAST_KNOWN_ACCURACY_M,
     });
     if (last) return null;
-
-    await withTimeout(
-      Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Lowest,
-      }),
-      HEALTH_CHECK_TIMEOUT_MS,
-      'healthCheckPosition',
-    );
+    // No cached fix to confirm the services flag. Do not re-block — a second
+    // live GPS read while the watcher is running crashes the Android bridge.
     return null;
   } catch (err) {
     const classified = classifyPositionError(err);
@@ -254,6 +223,7 @@ export function useLiveLocation(enabled: boolean): {
   const locationRef = useRef<LiveLocation | null>(null);
   const inflightRef = useRef<Promise<LiveLocation | null> | null>(null);
   const watcher = useRef<Location.LocationSubscription | null>(null);
+  const watchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     locationRef.current = location;
@@ -264,6 +234,8 @@ export function useLiveLocation(enabled: boolean): {
     locationRef.current = null;
     setError(message);
     setBlocked(true);
+    if (watchTimer.current) clearTimeout(watchTimer.current);
+    watchTimer.current = null;
     watcher.current?.remove();
     watcher.current = null;
   }, []);
@@ -279,12 +251,18 @@ export function useLiveLocation(enabled: boolean): {
     // Emulator GPS watch is flaky / empty — mock fix is enough for local testing.
     if (Platform.OS === 'web' || watcher.current || isEmulator()) return;
     try {
-      const sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Low, timeInterval: 30000, distanceInterval: 50 },
-        (pos) => {
-          markSuccess(toLiveLocation(pos));
-        },
+      const sub = await runWhenLocationIdle(() =>
+        Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Low, timeInterval: 30000, distanceInterval: 50 },
+          (pos) => {
+            markSuccess(toLiveLocation(pos));
+          },
+        ),
       );
+      if (watcher.current) {
+        sub.remove();
+        return;
+      }
       watcher.current = sub;
     } catch {
       /* watch is best-effort; polling / getCurrent covers hard failures */
@@ -302,7 +280,12 @@ export function useLiveLocation(enabled: boolean): {
         try {
           const next = await tryOsLocation();
           markSuccess(next);
-          await startWatch();
+          // Let the one-shot native request release its result before watch starts.
+          if (watchTimer.current) clearTimeout(watchTimer.current);
+          watchTimer.current = setTimeout(() => {
+            watchTimer.current = null;
+            void startWatch();
+          }, 800);
           return next;
         } catch (err) {
           const failure = err as LocationFailure;
@@ -358,6 +341,8 @@ export function useLiveLocation(enabled: boolean): {
     void requestLocation({ force: true });
 
     return () => {
+      if (watchTimer.current) clearTimeout(watchTimer.current);
+      watchTimer.current = null;
       watcher.current?.remove();
       watcher.current = null;
     };

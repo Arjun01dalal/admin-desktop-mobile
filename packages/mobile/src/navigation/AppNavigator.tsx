@@ -256,7 +256,19 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
             focused={current === screenNameFor(item)}
             activeTintColor={colors.primary}
             inactiveTintColor={colors.muted}
-            onPress={() => rest.navigation.navigate(screenNameFor(item))}
+            onPress={() => {
+              const nav = rest.navigation;
+              if (item.id === 'activeUserWithdrawal') {
+                // This list's layout was sliding the drawer open. Show it on
+                // the root stack, above the drawer, so the menu cannot cover it.
+                nav.closeDrawer();
+                const parent = nav.getParent();
+                if (parent) parent.navigate('/active-user-withdrawal' as never);
+                return;
+              }
+              nav.navigate(screenNameFor(item));
+              nav.closeDrawer();
+            }}
             style={styles.drawerItem}
             labelStyle={styles.drawerItemLabel}
           />
@@ -351,15 +363,17 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
-      {items.map((item) => {
-        const Impl = IMPLEMENTED[item.path];
-        const title = toDisplayText(item.label);
-        return (
-          <Drawer.Screen key={item.id} name={screenNameFor(item)} options={{ title }}>
-            {() => <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>}
-          </Drawer.Screen>
-        );
-      })}
+      {items
+        .filter((item) => item.id !== 'activeUserWithdrawal')
+        .map((item) => {
+          const Impl = IMPLEMENTED[item.path];
+          const title = toDisplayText(item.label);
+          return (
+            <Drawer.Screen key={item.id} name={screenNameFor(item)} options={{ title }}>
+              {() => <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>}
+            </Drawer.Screen>
+          );
+        })}
     </Drawer.Navigator>
   );
 }
@@ -402,6 +416,16 @@ export function AppNavigator() {
               {() => (
                 <Screened>
                   <ProfileScreen />
+                </Screened>
+              )}
+            </RootStack.Screen>
+            <RootStack.Screen
+              name="/active-user-withdrawal"
+              options={{ title: toDisplayText('Active User Withdrawal') }}
+            >
+              {() => (
+                <Screened>
+                  <ActiveUserWithdrawalScreen />
                 </Screened>
               )}
             </RootStack.Screen>

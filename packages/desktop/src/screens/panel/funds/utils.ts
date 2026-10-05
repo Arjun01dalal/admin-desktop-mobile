@@ -14,6 +14,7 @@ export type FundsMidRow = {
   coinAdd?: number;
   coinRemove?: number;
   netCoin?: number;
+  paymentGateway?: string;
   paymentGatewayCompany?: string;
   companyGroup?: string;
 };
@@ -96,6 +97,7 @@ export function normalizeMids(raw: unknown): FundsMidRow[] {
       coinAdd: Number(item.coinAdd) || 0,
       coinRemove: Number(item.coinRemove) || 0,
       netCoin: Number(item.netCoin) || 0,
+      paymentGateway: String(item.paymentGateway ?? item.paymentGatewayName ?? '').trim(),
       paymentGatewayCompany: String(item.paymentGatewayCompany ?? ''),
       companyGroup: String(item.companyGroup ?? ''),
     }))

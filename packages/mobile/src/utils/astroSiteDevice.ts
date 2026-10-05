@@ -2,10 +2,13 @@
  * Device id + push token helpers for Astro site (customer) password login.
  */
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Location from 'expo-location';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { readCurrentPosition } from '../security/safeLocation';
 
 const DEVICE_ID_KEY = 'astro_site_device_id_v1';
 
@@ -91,9 +94,11 @@ export async function resolveAstroSiteGeo(): Promise<{
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return { latitude, longitude };
-    const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
+    const pos = await readCurrentPosition(
+      { accuracy: Location.Accuracy.Balanced },
+      8_000,
+      'astroSiteGeo',
+    );
     if (Number.isFinite(pos.coords.latitude) && Number.isFinite(pos.coords.longitude)) {
       latitude = String(pos.coords.latitude);
       longitude = String(pos.coords.longitude);
