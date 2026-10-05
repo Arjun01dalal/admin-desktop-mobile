@@ -21,14 +21,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { CLIENT_NAMES, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors, spacing} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './FundRequestScreen.styles';
 
 // ---- summary payload shapes (desktop transactions/shared.ts parity) ----
 
@@ -1149,152 +1149,3 @@ export function FundRequestScreen() {
   );
 }
 
-const styles = makeStyles({
-  centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
-  empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(4) },
-  hint: { color: colors.muted, textAlign: 'center', marginTop: spacing(4), fontSize: 12 },
-  backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
-  loaderWrap: { alignItems: 'center', paddingVertical: spacing(8) },
-  allDataBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    marginTop: spacing(3),
-    marginBottom: spacing(3),
-  },
-  allDataText: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
-  kpiCard: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing(2.5),
-  },
-  kpiLabel: { fontSize: 12, fontWeight: '800' },
-  kpiValue: { color: colors.foreground, fontSize: 14, fontWeight: '700', marginTop: spacing(1) },
-  sectionTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: spacing(2),
-  },
-  chip: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.25),
-    marginRight: spacing(1.5),
-  },
-  chipText: { color: colors.foreground, fontSize: 12 },
-  chipTextActive: { color: colors.primaryForeground, fontWeight: '700' },
-  filterRow: {
-    flexDirection: 'row',
-    gap: spacing(2),
-    marginBottom: spacing(2),
-    alignItems: 'center',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    fontSize: 13,
-  },
-  applyBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-  },
-  applyBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(2),
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing(2),
-  },
-  cardName: {
-    color: colors.foreground,
-    fontSize: 15,
-    fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
-  },
-  pill: { borderRadius: 999, paddingHorizontal: spacing(2.5), paddingVertical: spacing(0.75) },
-  pillText: { fontSize: 11, fontWeight: '700' },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cardCell: { width: '50%', marginBottom: spacing(1.5) },
-  cardLabel: { color: colors.muted, fontSize: 11 },
-  cardValue: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
-  editBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#d9770622',
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    marginTop: spacing(1),
-  },
-  editBtnText: { color: '#d97706', fontSize: 12, fontWeight: '700' },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(2),
-  },
-  pagerBtn: { color: colors.primary, fontWeight: '700', padding: spacing(2) },
-  pagerDisabled: { color: colors.muted },
-  pagerLabel: { color: colors.foreground, fontSize: 13 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing(4),
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing(4),
-    paddingBottom: spacing(6),
-  },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: spacing(3),
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  cancelBtn: {
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-  },
-  cancelBtnText: { color: colors.foreground, fontSize: 13 },
-});

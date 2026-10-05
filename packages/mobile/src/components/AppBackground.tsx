@@ -6,7 +6,8 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { colors, isDarkTheme } from '../theme';
+import { styles } from './AppBackground.styles';
+import { isDarkTheme } from '../theme';
 
 function makeStars(count: number, w: number, h: number) {
   const stars: { x: number; y: number; r: number; o: number }[] = [];
@@ -54,6 +55,3 @@ export function AppBackground() {
   );
 }
 
-const styles = StyleSheet.create({
-  base: { backgroundColor: colors.background },
-});

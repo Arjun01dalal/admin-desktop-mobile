@@ -16,11 +16,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { hasPermission, Permissions, canAccessNavItem } from '../../../auth/permissions';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import {
   formatDisplayDate,
@@ -32,6 +31,7 @@ import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { pickPageSizes } from '@astro/shared';
+import { styles } from './HouseGamesScreen.styles';
 
 type TxnRow = {
   _id?: string;
@@ -982,176 +982,3 @@ export function HouseGamesScreen() {
   );
 }
 
-const styles = makeStyles({
-  sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  filterToggle: { marginBottom: spacing(3) },
-  filterToggleText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  filterPanel: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-    gap: spacing(2),
-  },
-  filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
-  filterInput: {
-    flexGrow: 1,
-    flexBasis: '45%',
-    minWidth: 130,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(2.5),
-    paddingVertical: spacing(2),
-    color: colors.foreground,
-    fontSize: 13,
-    backgroundColor: colors.background,
-  },
-  dateBarWrap: { marginTop: spacing(3) },
-  rowsSelector: { marginTop: spacing(3), marginBottom: spacing(3) },
-  chipGroupRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing(2) },
-  chipGroupLabel: { color: colors.muted, fontSize: 12, width: 44 },
-  chip: {
-    paddingHorizontal: spacing(2.5),
-    paddingVertical: spacing(1),
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: '#fff' },
-  filterActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2) },
-  clearBtn: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  clearBtnText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
-  applyBtn: {
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(1.5),
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-  },
-  applyBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  totalsLine: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(4),
-    marginBottom: spacing(3),
-  },
-  totalsText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  editIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,159,10,0.16)',
-    marginRight: spacing(1),
-  },
-  editIconText: { color: '#ff9f0a', fontSize: 14, fontWeight: '700' },
-  trophyIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(245,166,35,0.18)',
-    marginRight: spacing(1),
-  },
-  trophyIconText: { fontSize: 13 },
-  editCityBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    backgroundColor: colors.surfaceAlt,
-  },
-  editCityText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  pagerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing(3),
-  },
-  pagerBtn: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  pagerBtnDisabled: { opacity: 0.4 },
-  pagerBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
-  editBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    padding: spacing(4),
-  },
-  editCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing(4),
-    borderWidth: 1,
-    borderColor: colors.border,
-    width: '100%',
-    maxWidth: 380,
-    alignSelf: 'center',
-  },
-  editTitle: {
-    color: colors.foreground,
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: spacing(3),
-  },
-  editLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: spacing(1),
-    marginTop: spacing(2),
-  },
-  editValue: {
-    color: colors.foreground,
-    fontSize: 13,
-    marginBottom: spacing(1),
-  },
-  editInput: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(2.5),
-    paddingVertical: spacing(2),
-    color: colors.foreground,
-    fontSize: 13,
-    backgroundColor: colors.background,
-    minHeight: 40,
-    maxHeight: 44,
-  },
-  editActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing(2),
-    marginTop: spacing(4),
-  },
-});

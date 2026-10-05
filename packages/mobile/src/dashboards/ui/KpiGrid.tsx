@@ -1,9 +1,9 @@
 /** Responsive KPI tile grid — mirrors desktop KpiStatGrid (2 cols on phones). */
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { colors, radius, spacing } from '../../theme';
+import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { toDisplayText } from '../jyotish/jyotishMapping';
 import type { KpiItem } from '../types';
+import { styles } from './KpiGrid.styles';
 
 function formatValue(item: KpiItem): string {
   if (typeof item.value === 'number') {
@@ -66,25 +66,3 @@ export function KpiGrid({
   );
 }
 
-const styles = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginBottom: spacing(3),
-  },
-  tile: {
-    flexGrow: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    minHeight: 74,
-    justifyContent: 'space-between',
-  },
-  tileTappable: { borderColor: colors.primary },
-  label: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  labelLink: { color: colors.primary },
-  value: { color: colors.foreground, fontSize: 17, fontWeight: '700', marginTop: spacing(1) },
-});

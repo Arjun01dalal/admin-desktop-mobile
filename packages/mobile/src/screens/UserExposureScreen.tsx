@@ -13,15 +13,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getSessionUser } from '../auth/permissions';
-import { colors, radius, spacing } from '../theme';
+import { colors} from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import { type DataTableColumn } from '../dashboards/ui/DataTable';
 import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
 import { secureApi } from '../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../utils/dates';
+import { styles } from './UserExposureScreen.styles';
 
 type Rec = Record<string, unknown>;
 type ExposureProvider =
@@ -648,163 +648,3 @@ export function UserExposureScreen() {
   );
 }
 
-const styles = makeStyles({
-  wrap: { flex: 1 },
-  content: { padding: spacing(3), paddingBottom: spacing(8) },
-  pageTitle: {
-    color: colors.foreground,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  sub: { color: colors.muted, fontSize: 12, marginBottom: spacing(2.5) },
-  muted: { color: colors.muted, fontSize: 12 },
-  loader: { marginVertical: spacing(8) },
-  chipRow: {
-    gap: spacing(1.5),
-    paddingBottom: spacing(1),
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  chip: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.75),
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  plutusList: { gap: spacing(2) },
-  plutusCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing(2.5),
-    paddingHorizontal: spacing(3),
-  },
-  plutusCardCollapsed: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-  },
-  plutusCardMid: { flex: 1, minWidth: 0 },
-  plutusCardTitle: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  plutusCardSub: {
-    color: colors.muted,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  plutusChevron: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  plutusFieldGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(1.5),
-  },
-  plutusField: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(2),
-    minWidth: '46%',
-    flexGrow: 1,
-  },
-  plutusFieldLabel: { color: colors.muted, fontSize: 10, marginBottom: 2 },
-  plutusFieldValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  plutusModalCard: { maxHeight: '80%' },
-  plutusModalScroll: { maxHeight: 420, marginTop: spacing(1) },
-  plutusModalClose: {
-    marginTop: spacing(3),
-    alignSelf: 'flex-end',
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-  },
-  plutusModalCloseText: {
-    color: colors.primaryForeground,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  pagerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing(1.5),
-    marginBottom: spacing(2),
-    marginTop: spacing(1),
-  },
-  formLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: spacing(1.5),
-  },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 14,
-    marginTop: spacing(2),
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  pagerBtn: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-  },
-  pagerBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(5),
-    alignItems: 'center',
-  },
-  submitBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  disabled: { opacity: 0.4 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    padding: spacing(4),
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-  },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: spacing(3),
-  },
-});

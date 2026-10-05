@@ -22,7 +22,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import {
@@ -36,7 +35,7 @@ import {
   settleReasonOptions,
   unpackPayload,
 } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -47,6 +46,7 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { SlipOcrWebView, extractUtrFromText } from './utrOcr';
 import { DateField } from '../../../components/DateField';
+import { styles } from './DepositScreen.styles';
 
 type CheckPerson = { name?: string; city?: string; state?: string; date?: string };
 
@@ -1090,209 +1090,3 @@ export function DepositScreen() {
   );
 }
 
-const styles = makeStyles({
-  chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
-  chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  errorBox: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 12 },
-  empty: { color: colors.muted, fontSize: 13, marginTop: spacing(6), textAlign: 'center' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(2.5),
-    marginTop: spacing(2),
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardName: {
-    color: colors.foreground,
-    fontSize: 14,
-    fontWeight: '700',
-    flex: 1,
-    marginRight: spacing(2),
-  },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), flexShrink: 0 },
-  statusPill: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 999,
-    paddingHorizontal: spacing(2),
-    paddingVertical: 3,
-  },
-  statusPillText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  approveIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(22,163,74,0.12)',
-  },
-  cardAmount: { color: colors.foreground, fontSize: 16, fontWeight: '800', marginTop: spacing(1) },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(1.5) },
-  cardCell: { minWidth: '45%', flexGrow: 1, maxWidth: '48%' },
-  cardLabel: { color: colors.muted, fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
-  cardValue: { color: colors.foreground, fontSize: 12, marginTop: 1 },
-  cardEmpName: { color: colors.muted, fontSize: 10, fontWeight: '500', marginTop: 1 },
-  sheetChatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    marginBottom: spacing(3),
-  },
-  sheetChatIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetChatWa: { backgroundColor: '#25D366' },
-  sheetChatTg: { backgroundColor: '#2AABEE' },
-  appRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1),
-    marginTop: 1,
-  },
-  appValue: { flex: 1, minWidth: 0, marginTop: 0 },
-  secondaryChip: {
-    flexShrink: 0,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-  },
-  secondaryChipText: { color: colors.foreground, fontSize: 10, fontWeight: '700' },
-  cardBtnRow: { flexDirection: 'row', gap: spacing(1.5), marginTop: spacing(2) },
-  approveBtn: {
-    backgroundColor: '#16a34a',
-    borderRadius: radius.sm,
-    paddingVertical: spacing(1.75),
-    alignItems: 'center',
-    flex: 1,
-  },
-  approveBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  checkBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(1.75),
-    alignItems: 'center',
-    flex: 1,
-  },
-  checkBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
-  checkDone: {
-    flex: 1,
-    color: '#16a34a',
-    fontSize: 11,
-    fontWeight: '700',
-    paddingVertical: spacing(1.5),
-  },
-  checkHint: {
-    color: '#d97706',
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: spacing(1.25),
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing(4),
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-    maxHeight: '88%',
-  },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  modalSub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  modalNote: { color: colors.muted, fontSize: 12, marginTop: spacing(2) },
-  fieldLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    marginTop: spacing(3),
-  },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 13,
-    marginTop: spacing(1.5),
-  },
-  optionWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(1.5),
-  },
-  optionRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(1.5) },
-  optionChip: {
-    paddingHorizontal: spacing(2.5),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  optionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  optionChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  optionChipTextActive: { color: colors.primaryForeground },
-  uploadBtn: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    marginTop: spacing(1.5),
-  },
-  uploadBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  modalBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
-  cancelBtn: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    flex: 1,
-  },
-  cancelBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  modalSubmitBtn: { flex: 1 },
-  cardHint: { color: colors.muted, fontSize: 9, marginTop: spacing(1.25), textAlign: 'center' },
-  pager: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing(4),
-    marginTop: spacing(4),
-  },
-  pagerBtn: { color: colors.primary, fontSize: 13, fontWeight: '700', padding: spacing(2) },
-  pagerLabel: { color: colors.foreground, fontSize: 12 },
-});

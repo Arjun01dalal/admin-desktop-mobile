@@ -26,11 +26,11 @@ import {
   type WithdrawalBlockEditMode,
   type WithdrawalBlockItem,
 } from '@astro/shared';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './BlockWithdrawalScreen.styles';
 
 export function BlockWithdrawalScreen() {
   const [userIdDraft, setUserIdDraft] = useState('');
@@ -486,99 +486,3 @@ export function BlockWithdrawalScreen() {
   );
 }
 
-const styles = makeStyles({
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-  },
-  addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  filterBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  filterActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
-  chipRow: { marginTop: spacing(1) },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    marginRight: spacing(1.5),
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipActive: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primary },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(1) },
-  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  cardTitle: { color: colors.foreground, fontSize: 15, fontWeight: '700' },
-  cardMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  pillOk: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  pillDanger: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: spacing(2) },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 14,
-    marginTop: spacing(1),
-  },
-  modeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1.5), marginTop: spacing(1) },
-  modeBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    backgroundColor: colors.surfaceAlt,
-  },
-  modeBtnActive: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
-  modeBtnDanger: {},
-  modeBtnDangerActive: { borderColor: colors.destructive, backgroundColor: 'rgba(239,68,68,0.12)' },
-  modeBtnText: { color: colors.muted, fontWeight: '700', fontSize: 12 },
-  modeBtnTextActive: { color: colors.primary },
-  modeBtnTextDanger: { color: colors.destructive },
-  formSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-  },
-  formTitle: { color: colors.foreground, fontSize: 17, fontWeight: '700', marginBottom: spacing(1) },
-  formActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
-  formBtn: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formBtnGhost: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
-  formBtnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
-  formBtnPrimary: { backgroundColor: colors.primary },
-  formBtnDanger: { backgroundColor: colors.destructive },
-  formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  formMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
-  btnDisabled: { opacity: 0.5 },
-});

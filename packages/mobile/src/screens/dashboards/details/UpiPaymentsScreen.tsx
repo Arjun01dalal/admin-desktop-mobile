@@ -18,9 +18,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { pickPageSizes, CLIENT_NAMES, asPaged } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
@@ -28,6 +27,7 @@ import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './UpiPaymentsScreen.styles';
 
 type NotifRow = {
   _id?: string;
@@ -887,70 +887,3 @@ export function UpiPaymentsScreen() {
   );
 }
 
-const styles = makeStyles({
-  tabsRow: { flexDirection: 'row', marginTop: spacing(3), gap: spacing(2) },
-  tabBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  tabBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  tabTextActive: { color: colors.primaryForeground },
-  chipsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  chipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(1.5),
-  },
-  chipsLabel: { color: colors.muted, fontSize: 12 },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    maxWidth: '36%',
-  },
-  statusNeutral: { color: colors.muted, backgroundColor: 'rgba(148,163,184,0.18)' },
-  modalSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.md * 2,
-    borderTopRightRadius: radius.md * 2,
-    padding: spacing(4),
-  },
-  modalLabel: { color: colors.muted, fontSize: 12, marginTop: spacing(3) },
-  modalNote: { color: colors.muted, fontSize: 13, marginTop: spacing(2) },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-    fontSize: 14,
-    marginTop: spacing(2),
-  },
-  submitText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 14 },
-});

@@ -33,9 +33,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { appCodeForName, parseAgentSummaries, pickDocList, sumGroupedTotal, unpackPayload } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -50,6 +49,7 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/d
 import { DetailFilterBar } from './DetailFilterBar';
 import { EmpCodePieChartModal, type ChartCountRow } from './EmpCodePieChartModal';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './WithdrawalFundScreen.styles';
 
 /** Current Month Chart — 9608010101 + full_access / dev_full_access. */
 const WITHDRAWAL_FUND_CHART_MOBILES = new Set(['9608010101']);
@@ -1086,128 +1086,3 @@ export function WithdrawalFundScreen() {
   }
 }
 
-const styles = makeStyles({
-  commentBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing(5),
-  },
-  commentCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-    gap: spacing(2),
-  },
-  commentTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  commentHint: { color: colors.muted, fontSize: 12 },
-  commentInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    padding: spacing(3),
-    minHeight: 80,
-    textAlignVertical: 'top',
-    fontSize: 14,
-    backgroundColor: colors.surfaceAlt,
-  },
-  commentBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing(3),
-    marginTop: spacing(1),
-  },
-  commentCancelBtn: { paddingVertical: spacing(2), paddingHorizontal: spacing(3) },
-  commentCancelText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
-  commentSaveBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(4),
-  },
-  commentSaveBtnDisabled: { opacity: 0.5 },
-  commentSaveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  chartBtn: {
-    marginTop: spacing(3),
-    marginBottom: spacing(1),
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    paddingHorizontal: spacing(4),
-    alignItems: 'center',
-  },
-  chartBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  backLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginBottom: spacing(2) },
-  agentWrap: { marginTop: spacing(3), gap: spacing(2) },
-  rowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  agentGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-  },
-  agentCard: {
-    flexBasis: '30%',
-    flexGrow: 1,
-    maxWidth: '32%',
-    backgroundColor: 'rgba(66,165,245,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(66,165,245,0.35)',
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(1.5),
-    gap: 2,
-  },
-  agentName: {
-    color: '#42a5f5',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  agentCount: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  agentAmount: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-    alignItems: 'center',
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipMatched: { backgroundColor: 'rgba(22,163,74,0.15)', borderColor: 'rgba(22,163,74,0.4)' },
-  chipWarn: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.4)' },
-  chipDanger: { backgroundColor: 'rgba(220,38,38,0.15)', borderColor: 'rgba(220,38,38,0.4)' },
-  kpiChip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    backgroundColor: colors.surfaceAlt,
-  },
-  kpiChipText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    textAlign: 'right',
-  },
-});

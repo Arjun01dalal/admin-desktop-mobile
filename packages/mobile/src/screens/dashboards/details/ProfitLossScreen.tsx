@@ -6,16 +6,16 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { pickPageSizes } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './ProfitLossScreen.styles';
 
 type PLRow = {
   _id?: string;
@@ -354,76 +354,3 @@ export function ProfitLossScreen() {
   );
 }
 
-const styles = makeStyles({
-  sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  searchCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(3),
-    gap: spacing(2),
-    marginBottom: spacing(3),
-  },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(2) },
-  chipRowSpaced: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginBottom: spacing(3),
-  },
-  chipRowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  searchBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2.5),
-  },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  editCityBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    backgroundColor: colors.surfaceAlt,
-  },
-  editCityText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  pagerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing(3),
-    gap: spacing(2),
-  },
-  pagerBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    backgroundColor: colors.surface,
-  },
-  pagerBtnDisabled: { opacity: 0.4 },
-  pagerBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
-  pagerInfo: { color: colors.muted, fontSize: 12, flexShrink: 1, textAlign: 'center' },
-});

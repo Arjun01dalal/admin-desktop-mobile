@@ -7,15 +7,14 @@ import {
   Modal,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
+import { styles } from './MidGroupsScreen.styles';
 
 type MidGroupMap = Record<string, string[]>;
 
@@ -450,86 +449,3 @@ export function MidGroupsScreen() {
   );
 }
 
-const styles = makeStyles({
-  screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing(4), paddingBottom: spacing(10), gap: spacing(2) },
-  sub: { color: colors.muted, fontSize: 13 },
-  statsRow: { flexDirection: 'row', gap: spacing(2) },
-  stat: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(2),
-  },
-  statLabel: { color: colors.muted, fontSize: 11 },
-  statValue: { color: colors.foreground, fontWeight: '700', fontSize: 18, marginTop: 2 },
-  toolbar: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
-  section: {
-    color: colors.foreground,
-    fontWeight: '700',
-    fontSize: 15,
-    marginTop: spacing(2),
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    gap: spacing(2),
-  },
-  waCard: { borderColor: 'rgba(245,179,1,0.45)' },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: spacing(2) },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(245,179,1,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: colors.primary, fontWeight: '800', fontSize: 12 },
-  cardTitle: { color: colors.foreground, fontWeight: '700', fontSize: 15 },
-  cardMeta: { color: colors.muted, fontSize: 12 },
-  row: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
-  flex: { flex: 1 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(2),
-    color: colors.foreground,
-    backgroundColor: colors.background,
-  },
-  btn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    borderRadius: radius.sm,
-  },
-  btnText: { color: colors.primaryForeground, fontWeight: '700' },
-  cancelBtn: { paddingHorizontal: spacing(3), paddingVertical: spacing(2) },
-  cancelText: { color: colors.muted, fontWeight: '600' },
-  midRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  midText: { color: colors.foreground, flex: 1, marginRight: 8 },
-  danger: { color: colors.destructive, fontWeight: '700' },
-  hint: { color: colors.muted, fontSize: 12 },
-  error: { color: colors.destructive },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    padding: spacing(4),
-    gap: spacing(2),
-  },
-});

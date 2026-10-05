@@ -15,11 +15,35 @@ const isPreviewOrDev =
 
 const omitFreeRasp = raspDisabledExplicitly || isPreviewOrDev;
 
+const stallionProjectId = String(process.env.STALLION_PROJECT_ID || '').trim();
+const stallionAppToken = String(process.env.STALLION_APP_TOKEN || '').trim();
+const stallionPublicSigningKey = String(process.env.STALLION_PUBLIC_SIGNING_KEY || '').trim();
+const isEasBuild = process.env.EAS_BUILD === '1';
+const needsStallionOta =
+  isEasBuild && profile !== 'development' && profile !== 'development-simulator';
+
+if (needsStallionOta && (!stallionProjectId || !stallionAppToken)) {
+  throw new Error(
+    'STALLION_PROJECT_ID and STALLION_APP_TOKEN are required for preview/production EAS builds (Stallion OTA).',
+  );
+}
+
 const basePlugins = (appJson.expo.plugins || []).filter((plugin) => {
   const name = Array.isArray(plugin) ? plugin[0] : plugin;
   if (omitFreeRasp && name === 'freerasp-react-native') return false;
   return true;
 });
+
+if (stallionProjectId && stallionAppToken) {
+  const stallionPlugin = {
+    projectId: stallionProjectId,
+    appToken: stallionAppToken,
+  };
+  if (stallionPublicSigningKey) {
+    stallionPlugin.publicSigningKey = stallionPublicSigningKey;
+  }
+  basePlugins.push(['expo-stallion-plugin', stallionPlugin]);
+}
 
 /** Raise Gradle/Kotlin heap + metaspace; skip release lint (OOM on 16GB local builds). */
 function withAndroidJvmMemory(config) {

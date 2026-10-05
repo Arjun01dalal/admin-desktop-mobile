@@ -14,18 +14,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import {
   buildUpdateGameImagePayload,
   type GameImageUpdateTarget,
 } from '@astro/shared/updateGameImage';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { UpdateGameImageModal } from './UpdateGameImageModal';
+import { styles } from './TopGamesScreen.styles';
 
 type Item = {
   _id?: string;
@@ -434,44 +434,3 @@ export function TopGamesScreen() {
   );
 }
 
-const styles = makeStyles({
-  chipRow: { alignItems: 'center', paddingVertical: spacing(2), marginTop: spacing(2) },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    marginRight: spacing(2),
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(2) },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-    fontSize: 14,
-    marginRight: spacing(2),
-  },
-  searchBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    paddingHorizontal: spacing(4),
-  },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-});

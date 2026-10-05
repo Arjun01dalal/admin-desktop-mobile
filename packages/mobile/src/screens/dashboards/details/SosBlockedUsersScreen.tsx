@@ -4,12 +4,12 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './SosBlockedUsersScreen.styles';
 
 type Row = {
   _id?: string;
@@ -169,13 +169,3 @@ export function SosBlockedUsersScreen() {
   );
 }
 
-const styles = makeStyles({
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: 8,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-});

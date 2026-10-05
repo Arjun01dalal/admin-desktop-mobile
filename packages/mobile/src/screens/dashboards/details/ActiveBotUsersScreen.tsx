@@ -4,16 +4,16 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { RESP_SHOW_MOBILE, type CallerRow } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
-import { colors, spacing } from '../../../theme';
+import { colors } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './ActiveBotUsersScreen.styles';
 
 type ListParams = {
   activeBotUsers?: CallerRow[];
@@ -146,8 +146,6 @@ export function ActiveBotUsersScreen() {
     ];
   }, [selected, canShowMobile]);
 
-  const styles = useStyles();
-
   return (
     <View style={styles.root}>
       <ScrollView
@@ -188,15 +186,3 @@ export function ActiveBotUsersScreen() {
     </View>
   );
 }
-
-const useStyles = makeStyles(() => ({
-  root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing(4), paddingBottom: spacing(10) },
-  title: {
-    color: colors.foreground,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: spacing(3),
-  },
-  loadingBox: { paddingVertical: spacing(8), alignItems: 'center' as const },
-}));

@@ -5,9 +5,8 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import {
   getMetric,
@@ -17,6 +16,7 @@ import {
 } from '../../../dashboards/activityUtils';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './PlayerActivityDetailsScreen.styles';
 
 type DetailRow = {
   id: string;
@@ -210,15 +210,3 @@ export function PlayerActivityDetailsScreen() {
   );
 }
 
-const styles = makeStyles({
-  centerBox: { justifyContent: 'center', alignItems: 'center', padding: spacing(6) },
-  empty: {
-    color: colors.muted,
-    textAlign: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-  },
-});

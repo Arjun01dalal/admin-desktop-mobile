@@ -23,15 +23,15 @@ import {
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { makeStyles } from '../../../styles/common';
 import { appCodeForName, kycApprovedRowPatch, kycManualRowPatch, kycRejectedRowPatch } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { sendKycCallToDialer } from '../../../utils/externalDialer';
+import { styles } from './UsersKycScreen.styles';
 
 type CheckStamp = { name?: string; date?: string } | undefined;
 
@@ -1175,149 +1175,3 @@ function Field({
   );
 }
 
-const styles = makeStyles({
-  centered: { alignItems: 'center', justifyContent: 'center', padding: spacing(6) },
-  cardDoneBy: { color: '#16a34a', fontSize: 9, fontWeight: '600', marginTop: spacing(0.5) },
-  errorBox: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  errorText: { color: colors.destructive, fontSize: 12 },
-  empty: { color: colors.muted, fontSize: 13, marginTop: spacing(6), textAlign: 'center' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(2),
-    marginTop: spacing(1.5),
-  },
-  cardCalled: { borderColor: colors.primary },
-  callIconBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: 'transparent',
-    flexShrink: 0,
-  },
-  callIconBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  callIconBtnDisabled: { opacity: 0.45 },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1.5),
-  },
-  cardTopMain: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1),
-    minWidth: 0,
-  },
-  cardName: {
-    color: colors.foreground,
-    fontSize: 12,
-    fontWeight: '700',
-    flex: 1,
-    minWidth: 0,
-  },
-  statusPill: {
-    borderRadius: 999,
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 1,
-    flexShrink: 0,
-  },
-  statusPillText: { color: '#fff', fontSize: 9, fontWeight: '700' },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1), marginTop: spacing(1) },
-  cardCell: { minWidth: '42%', flexGrow: 1 },
-  cardLabel: { color: colors.muted, fontSize: 8, fontWeight: '600', textTransform: 'uppercase' },
-  cardValue: { color: colors.foreground, fontSize: 11, marginTop: 0, fontWeight: '600' },
-  pager: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing(4),
-    marginTop: spacing(4),
-  },
-  pagerBtn: { color: colors.primary, fontSize: 13, fontWeight: '700', padding: spacing(2) },
-  pagerLabel: { color: colors.foreground, fontSize: 12 },
-  aadhaarImage: {
-    width: '100%',
-    height: 220,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-    marginTop: spacing(3),
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing(4),
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-    maxHeight: '88%',
-  },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  modalSub: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  fieldLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    marginTop: spacing(3),
-  },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 13,
-    marginTop: spacing(1.5),
-  },
-  modalBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
-  cancelBtn: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    flex: 1,
-  },
-  cancelBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  primaryBtn: {
-    backgroundColor: '#16a34a',
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    flex: 1,
-  },
-  destructiveBtn: {
-    backgroundColor: '#dc2626',
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    flex: 1,
-  },
-  primaryBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  btnDisabled: { opacity: 0.5 },
-});

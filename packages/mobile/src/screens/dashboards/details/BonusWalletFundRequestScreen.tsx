@@ -11,9 +11,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { pickPageSizes, asPaged, unpackPayload } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -21,6 +20,7 @@ import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './BonusWalletFundRequestScreen.styles';
 
 type NavType = 'approved' | 'pending' | 'totalData';
 
@@ -675,70 +675,3 @@ export function BonusWalletFundRequestScreen() {
   );
 }
 
-const styles = makeStyles({
-  backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
-  toggleRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  pageSizeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    alignItems: 'center',
-    marginTop: spacing(2),
-    marginBottom: spacing(2),
-  },
-  pageSizeLabel: { color: colors.muted, fontSize: 12 },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  cardsWrap: { gap: spacing(3), marginTop: spacing(4) },
-  kpiCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(4),
-  },
-  kpiLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  kpiValue: { color: colors.primary, fontSize: 18, fontWeight: '800', marginTop: spacing(2) },
-  kpiHint: { color: colors.muted, fontSize: 11, marginTop: spacing(2) },
-  hint: { color: colors.muted, fontSize: 13, marginTop: spacing(2), marginBottom: spacing(2) },
-  list: { gap: spacing(2), marginTop: spacing(2) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(3),
-  },
-  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
-  cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1, minWidth: 0 },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(2),
-    paddingVertical: 3,
-    borderRadius: 999,
-    overflow: 'hidden',
-    maxWidth: 110,
-    textAlign: 'center',
-  },
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: 1,
-  },
-});

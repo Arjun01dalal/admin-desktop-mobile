@@ -7,13 +7,11 @@ import {
   FlatList,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useIsFocused } from '@react-navigation/native';
 import {
   CAMPAIGN_LIST,
@@ -24,8 +22,9 @@ import {
 import { secureApi } from '../../../api/client';
 import { canAccessNavItem, Permissions } from '../../../auth/permissions';
 import { DateField } from '../../../components/DateField';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { styles } from './DialerPushDataScreen.styles';
 
 type Row = Record<string, unknown>;
 
@@ -870,134 +869,3 @@ export function DialerPushDataScreen() {
   );
 }
 
-const styles = makeStyles({
-  headerBlock: { marginBottom: spacing(1) },
-  sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  datesRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing(2),
-    marginBottom: spacing(2.5),
-  },
-  halfField: { flex: 1, minWidth: 0 },
-  fieldLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: spacing(1),
-  },
-  dateInput: {
-    backgroundColor: colors.surface,
-    minHeight: 42,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    color: colors.foreground,
-    backgroundColor: colors.surface,
-    fontSize: 13,
-    minHeight: 42,
-  },
-  label: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: spacing(1.5),
-    marginTop: spacing(0.5),
-  },
-  chipRowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: spacing(2),
-    marginBottom: spacing(2.5),
-    gap: spacing(2),
-  },
-  chipRowWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginBottom: spacing(2.5),
-  },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
-  applyBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    marginBottom: spacing(3),
-  },
-  applyBtnText: { color: '#fff', fontWeight: '700' },
-  loadingBox: { alignItems: 'center', gap: spacing(2), paddingVertical: spacing(4) },
-  campaignBlock: {
-    marginBottom: spacing(3),
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-  },
-  campaignHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    backgroundColor: colors.surfaceAlt,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  campaignChevron: { color: colors.primary, fontSize: 12, fontWeight: '700', width: 14 },
-  campaignHeaderMain: { flex: 1, minWidth: 0 },
-  campaignTitle: { color: colors.foreground, fontSize: 13, fontWeight: '800' },
-  campaignCount: { color: colors.muted, fontSize: 11, marginTop: 2, fontWeight: '600' },
-  campaignPager: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing(3),
-    paddingVertical: spacing(2),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  card: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    padding: spacing(3),
-    backgroundColor: colors.surface,
-  },
-  cardTitle: { color: colors.foreground, fontWeight: '700', fontSize: 15 },
-  cardLine: { color: colors.foreground, fontSize: 12, marginTop: 4 },
-  cardMuted: { color: colors.muted, fontSize: 11, marginTop: 6 },
-  hint: { color: colors.muted, textAlign: 'center', marginTop: spacing(4) },
-  error: { color: '#ef5350', marginVertical: spacing(2) },
-  pager: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing(2),
-    marginBottom: spacing(4),
-  },
-  pagerBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    backgroundColor: colors.surface,
-  },
-  pagerText: { color: colors.foreground, fontWeight: '600' },
-  pagerLabel: { color: colors.muted },
-  disabled: { opacity: 0.4 },
-});

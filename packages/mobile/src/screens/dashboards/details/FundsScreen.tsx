@@ -7,9 +7,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
-import { colors, radius, spacing } from '../../../theme';
+import { colors, spacing} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { whatsappPaymentGatewayName } from '@astro/shared';
 import { secureApi } from '../../../api/client';
@@ -19,6 +18,7 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
 import { rowsToCsv, shareCsvFile } from '../../../utils/shareCsv';
+import { styles } from './FundsScreen.styles';
 
 type Row = {
   name: string;
@@ -935,76 +935,3 @@ export function FundsScreen() {
   );
 }
 
-const styles = makeStyles({
-  backLink: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-    marginBottom: spacing(2),
-  },
-  totalBox: {
-    marginTop: spacing(3),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-  },
-  totalText: { color: colors.foreground, fontSize: 14, fontWeight: '700' },
-  midGroupsBtn: {
-    marginTop: spacing(2),
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    borderRadius: radius.sm,
-  },
-  midGroupsBtnText: {
-    color: colors.primaryForeground,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  kpiWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  kpiBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-  },
-  kpiText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  downloadChip: { borderColor: colors.primary },
-  downloadChipText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  cardDisabled: { opacity: 0.55 },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    maxWidth: '50%',
-    textAlign: 'right',
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '40%' },
-});

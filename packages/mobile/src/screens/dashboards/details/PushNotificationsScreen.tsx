@@ -33,11 +33,11 @@ import {
   type PushCampaignForm,
   type PushCampaignStatus,
 } from '@astro/shared';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './PushNotificationsScreen.styles';
 
 type ConfirmAction = 'pause' | 'resume' | 'cancel' | 'send-now' | 'restart';
 
@@ -750,125 +750,3 @@ export function PushNotificationsScreen() {
   );
 }
 
-const styles = makeStyles({
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-  },
-  addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  filterBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(3),
-  },
-  filterActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
-  chipRow: { marginTop: spacing(1) },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    marginRight: spacing(1.5),
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipActive: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  chipTextActive: { color: colors.primary },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    marginBottom: spacing(1),
-  },
-  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  cardTitle: { color: colors.foreground, fontSize: 15, fontWeight: '700', flex: 1 },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    textTransform: 'capitalize',
-  },
-  thumb: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.sm,
-    marginBottom: spacing(1.5),
-    backgroundColor: colors.surfaceAlt,
-  },
-  cardBody: { color: colors.foreground, fontSize: 13, marginBottom: spacing(1) },
-  cardMeta: { color: colors.muted, fontSize: 11 },
-  cardHint: { color: colors.muted, fontSize: 11, marginTop: spacing(1.5) },
-  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: spacing(2) },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 14,
-    marginTop: spacing(1),
-  },
-  multiline: { minHeight: 96 },
-  formSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: '88%',
-  },
-  formSheetContent: { padding: spacing(4), paddingBottom: spacing(8) },
-  formTitle: {
-    color: colors.foreground,
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: spacing(2),
-  },
-  imageRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(1) },
-  preview: {
-    width: 96,
-    height: 96,
-    borderRadius: radius.md,
-    marginTop: spacing(2),
-    backgroundColor: colors.surfaceAlt,
-  },
-  radioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  radioMark: { color: colors.primary, fontSize: 16, width: 20 },
-  radioLabel: { color: colors.foreground, fontSize: 14, fontWeight: '600' },
-  intervalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    marginTop: spacing(1),
-  },
-  formActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
-  formBtn: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formBtnGhost: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
-  formBtnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
-  formBtnPrimary: { backgroundColor: colors.primary },
-  formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  formMsg: { color: colors.destructive, fontSize: 12, marginTop: spacing(2) },
-  btnDisabled: { opacity: 0.5 },
-});

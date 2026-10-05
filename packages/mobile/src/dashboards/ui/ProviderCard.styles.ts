@@ -1,0 +1,85 @@
+/** Styles for ProviderCard — shared presets from styles/common plus screen-specific keys. */
+import { makeStyles } from '../../styles/common';
+import { StyleSheet } from 'react-native';
+import { colors, radius, spacing } from '../../theme';
+
+export const styles = makeStyles({
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing(3.5),
+    marginBottom: spacing(3),
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing(2),
+  },
+  title: { color: colors.primary, fontSize: 15, fontWeight: '700', flex: 1 },
+  chevron: {
+    color: colors.muted,
+    fontSize: 20,
+    fontWeight: '700',
+    marginRight: spacing(1),
+  },
+  ludoSelectWrap: { marginBottom: spacing(2) },
+  activeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing(1.5),
+    marginBottom: spacing(1),
+    gap: spacing(2),
+  },
+  activeLink: { color: colors.primary, textDecorationLine: 'underline' },
+  selectRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(1.5),
+    paddingBottom: spacing(2),
+  },
+  selChip: {
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1),
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  selChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  selChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  selChipTextActive: { color: colors.primaryForeground },
+  rows: {},
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: spacing(2),
+    gap: spacing(2),
+  },
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  rowLabel: { color: colors.muted, fontSize: 13, flexShrink: 1 },
+  rowValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
+  negative: { color: colors.destructive },
+  ggrPos: { color: colors.success },
+  ggrUnderline: { textDecorationLine: 'underline' },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing(4),
+    marginTop: spacing(2),
+    paddingTop: spacing(2),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  actionLink: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+});

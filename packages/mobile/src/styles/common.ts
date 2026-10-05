@@ -258,6 +258,20 @@ export const common = StyleSheet.create({
   },
   pagerLabel: { color: colors.muted, fontSize: 13 },
   pagerDisabled: { color: colors.muted, opacity: 0.5 },
+
+  // ── Repeated across screens ──────────────────────────────────────────
+  pagerBtnDisabled: { opacity: 0.4 },
+  formBtn: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing(3),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  formBtnPrimary: { backgroundColor: colors.primary },
+  formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
+  formBtnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
+  reportBtnText: { color: colors.primaryForeground, fontSize: 10, fontWeight: '700' },
 });
 
 export type CommonStyles = typeof common;

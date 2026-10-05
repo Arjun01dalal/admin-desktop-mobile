@@ -4,10 +4,9 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { pickLastActivity } from '../../../dashboards/userRowUtils';
 import { secureApi } from '../../../api/client';
@@ -16,6 +15,7 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/d
 import { getStoredUser } from '../../../lib/webShim';
 import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './TodaysActiveScreen.styles';
 
 /** Search fields mirroring desktop TodaysActivePage per-column filters. */
 function todaysActiveSearchFields(hideContact: boolean): readonly SearchFieldOption[] {
@@ -418,18 +418,3 @@ export function TodaysActiveScreen() {
   );
 }
 
-const styles = makeStyles({
-  reportBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    flexShrink: 0,
-  },
-  reportBtnText: {
-    color: colors.primaryForeground,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  cardValue: { color: colors.foreground, fontSize: 11, flex: 1, textAlign: 'right' },
-});

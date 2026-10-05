@@ -4,14 +4,15 @@
  * Intercepts myastroapp://login?logged_out=1 → native Astro login.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 import { buildAstroSiteSsoUrl } from '../api/astroSiteAuth';
 import { isAllowedAstroSiteUrl } from '../security/astroSiteNavigation';
-import { colors, spacing } from '../theme';
+import { colors} from '../theme';
 import { parseAstroDeepLink } from '../utils/astroDeepLink';
+import { styles } from './AstroSiteScreen.styles';
 
 type Props = {
   accessToken: string;
@@ -82,26 +83,3 @@ export function AstroSiteScreen({ accessToken, onBackToNativeLogin, onLogoutDeep
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0b0b0f' },
-  frame: { flex: 1, backgroundColor: '#0b0b0f' },
-  webview: { flex: 1, backgroundColor: '#0b0b0f' },
-  loader: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing(2),
-    zIndex: 2,
-    backgroundColor: '#0b0b0f',
-  },
-  loaderText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  footer: {
-    height: 52,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: '#121218',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
-});

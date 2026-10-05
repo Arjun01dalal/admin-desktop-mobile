@@ -1,0 +1,76 @@
+/** Styles for ActiveUserWithdrawalScreen — shared presets from styles/common plus screen-specific keys. */
+import { makeStyles } from '../../../styles/common';
+import { colors, radius, spacing } from '../../../theme';
+
+export const styles = makeStyles({
+  filterBox: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing(3),
+    marginTop: spacing(3),
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterHeaderTitle: { color: colors.foreground, fontWeight: '700', fontSize: 14 },
+  filterHeaderChevron: { color: colors.muted, fontSize: 12 },
+  filterActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
+  chipRow: { marginTop: spacing(1) },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+    marginRight: spacing(1.5),
+    backgroundColor: colors.surfaceAlt,
+  },
+  chipActive: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
+  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: colors.primary },
+  cardBulkSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(37,99,235,0.08)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing(1),
+  },
+  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  cardTitle: { color: colors.foreground, fontSize: 15, fontWeight: '700' },
+  cardMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  statusPill: {
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    color: '#166534',
+    backgroundColor: 'rgba(22,163,74,0.18)',
+  },
+  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: spacing(2) },
+  textInput: {
+    marginTop: spacing(1),
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    color: colors.foreground,
+    backgroundColor: colors.surfaceAlt,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  formBtnGhost: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+});

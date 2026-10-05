@@ -108,7 +108,6 @@ export const styles = makeStyles({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(1.5),
   },
-  pagerBtnDisabled: { opacity: 0.4 },
   pagerBtnText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   pagerText: { color: colors.muted, fontSize: 12 },
   formCard: {

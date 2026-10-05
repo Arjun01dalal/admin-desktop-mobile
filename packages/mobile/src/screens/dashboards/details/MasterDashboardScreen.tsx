@@ -5,9 +5,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
-import { colors, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { secureApi } from '../../../api/client';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
@@ -15,6 +14,7 @@ import type { ProviderCardModel } from '../../../dashboards/types';
 import { ProviderCard } from '../../../dashboards/ui/ProviderCard';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
+import { styles } from './MasterDashboardScreen.styles';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -208,15 +208,3 @@ export function MasterDashboardScreen() {
   );
 }
 
-const styles = makeStyles({
-  description: { color: colors.muted, fontSize: 13, marginTop: spacing(1) },
-  dates: { color: colors.muted, fontSize: 13, marginBottom: spacing(3) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: 10,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-});

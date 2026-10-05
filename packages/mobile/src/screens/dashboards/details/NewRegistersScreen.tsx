@@ -16,10 +16,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { appCodeForName, registrationCommentsOf, withRegistrationComment } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import {
@@ -45,6 +44,7 @@ import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './NewRegistersScreen.styles';
 
 /** Search fields mirroring desktop NewRegistersPage per-column filters (filter keys match).
  *  Contact-identifier fields are withheld for restricted roles like the desktop column filters. */
@@ -1111,127 +1111,3 @@ export function NewRegistersScreen() {
   );
 }
 
-const styles = makeStyles({
-  cardApp: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-  },
-  quickRow: { marginTop: spacing(3), flexGrow: 0 },
-  chip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    marginRight: spacing(2),
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  dialerHeader: { marginTop: spacing(3) },
-  dialerHeaderText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  dialerCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginTop: spacing(2),
-  },
-  dialerLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginBottom: spacing(1) },
-  dialerHint: { color: colors.muted, fontSize: 11, marginTop: spacing(2) },
-  dialerBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    marginTop: spacing(2),
-  },
-  dialerBtnDisabled: { opacity: 0.5 },
-  dialerBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  dialerMsg: { color: colors.foreground, fontSize: 12, marginTop: spacing(2), textAlign: 'center' },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing(4),
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(4),
-    gap: spacing(3),
-    maxHeight: '80%',
-  },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  modalSub: { color: colors.muted, fontSize: 12 },
-  commentInput: {
-    minHeight: 96,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 14,
-  },
-  modalActions: { flexDirection: 'row', gap: spacing(2) },
-  modalCancel: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCancelText: { color: colors.foreground, fontWeight: '600', fontSize: 13 },
-  modalCloseBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCloseBtnText: { color: colors.foreground, fontWeight: '700', fontSize: 14 },
-  modalSubmit: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalSubmitDisabled: { opacity: 0.6 },
-  modalSubmitText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  modalList: { flexGrow: 0, maxHeight: 360 },
-  modalEmpty: {
-    color: colors.muted,
-    fontSize: 14,
-    textAlign: 'center',
-    paddingVertical: spacing(6),
-  },
-  logCard: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(2),
-  },
-  logTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', marginBottom: spacing(1) },
-  logBody: {
-    color: colors.foreground,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: spacing(1),
-  },
-  logMeta: { color: colors.muted, fontSize: 12 },
-});

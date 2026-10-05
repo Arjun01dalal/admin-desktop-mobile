@@ -1,5 +1,4 @@
 /** Styles for BannersScreen — shared presets from styles/common plus screen-specific keys. */
-import { StyleSheet } from 'react-native';
 import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 
@@ -30,7 +29,7 @@ export const styles = makeStyles({
     paddingVertical: spacing(10),
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  backdropTouch: { ...StyleSheet.absoluteFillObject },
+  backdropTouch: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
   modalSheet: {
     backgroundColor: colors.background,
     borderWidth: 1,

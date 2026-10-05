@@ -16,10 +16,9 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { asPaged, unpackPayload } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors, spacing} from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -27,6 +26,7 @@ import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './BonusWalletRequestsScreen.styles';
 
 type BonusRow = {
   _id: string;
@@ -553,38 +553,3 @@ export function BonusWalletRequestsScreen() {
   );
 }
 
-const styles = makeStyles({
-  chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
-  chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(3) },
-  summaryChip: {
-    backgroundColor: 'rgba(255,159,10,0.15)',
-    borderRadius: 999,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-  },
-  summaryText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  reportBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-  },
-  reportBtnText: { color: colors.primaryForeground, fontSize: 10, fontWeight: '700' },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    textAlign: 'right',
-  },
-});

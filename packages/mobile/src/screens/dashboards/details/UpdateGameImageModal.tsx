@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -12,8 +11,9 @@ import {
   View,
 } from 'react-native';
 import type { GameImageUpdateTarget } from '@astro/shared/updateGameImage';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
+import { styles } from './UpdateGameImageModal.styles';
 
 type Props = {
   visible: boolean;
@@ -127,73 +127,3 @@ export function UpdateGameImageModal({ visible, loading, target, onClose, onSubm
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
-  sheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingHorizontal: spacing(4),
-    paddingBottom: spacing(6),
-    paddingTop: spacing(2),
-    borderTopWidth: 1,
-    borderColor: colors.border,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginBottom: spacing(3),
-  },
-  title: { color: colors.foreground, fontSize: 18, fontWeight: '800' },
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(3), marginTop: spacing(3) },
-  metaBlock: { minWidth: '28%', flex: 1 },
-  metaLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  metaValue: { color: colors.foreground, fontSize: 13, fontWeight: '700', marginTop: 2 },
-  fieldLabel: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: spacing(4) },
-  input: {
-    marginTop: spacing(1.5),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    fontSize: 14,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-  },
-  previewRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(3) },
-  previewBlock: { flex: 1, minWidth: 0 },
-  previewLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginBottom: spacing(1) },
-  previewImage: {
-    width: '100%',
-    height: 110,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  previewEmpty: { color: colors.muted, fontSize: 12, paddingVertical: spacing(4) },
-  actions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
-  cancelBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-  },
-  cancelBtnText: { color: colors.foreground, fontWeight: '700' },
-  saveBtn: {
-    flex: 1,
-    backgroundColor: '#ff9f0a',
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-  },
-  saveBtnText: { color: '#1a1200', fontWeight: '700' },
-  btnDisabled: { opacity: 0.55 },
-});

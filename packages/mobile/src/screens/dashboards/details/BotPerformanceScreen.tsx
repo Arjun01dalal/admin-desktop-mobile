@@ -14,10 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useIsFocused } from '@react-navigation/native';
 import { appCodeForName, asPaged } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
@@ -27,6 +26,7 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { CAMPAIGN_LIST } from '../../../utils/campaignList';
 import { addToDialerBatch } from '../../../utils/externalDialer';
+import { styles } from './BotPerformanceScreen.styles';
 
 type BotPerfRow = {
   _id: string;
@@ -570,135 +570,3 @@ export function BotPerformanceScreen() {
   );
 }
 
-const styles = makeStyles({
-  chipScroll: { marginTop: spacing(3), flexGrow: 0 },
-  chip: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    marginRight: spacing(2),
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  collapseHeader: {
-    marginTop: spacing(3),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-  },
-  collapseTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  filterCard: {
-    marginTop: spacing(2),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    marginBottom: spacing(2),
-  },
-  filterLabel: { color: colors.muted, fontSize: 12, width: 120 },
-  filterInput: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    color: colors.foreground,
-    paddingHorizontal: spacing(2.5),
-    paddingVertical: spacing(1.5),
-    fontSize: 13,
-  },
-  filterBtnRow: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(1) },
-  dialerHint: {
-    color: colors.muted,
-    fontSize: 11,
-    marginTop: spacing(2),
-    marginBottom: spacing(2),
-  },
-  dialerMsg: { color: colors.foreground, fontSize: 12, marginTop: spacing(2), textAlign: 'center' },
-  searchBtn: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-  },
-  clearBtn: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-  },
-  clearBtnText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    marginTop: spacing(3),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-  },
-  loadingBox: { alignItems: 'center', paddingVertical: spacing(10), gap: spacing(3) },
-  loadingText: { color: colors.muted, fontSize: 13 },
-  cardCheck: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceAlt,
-  },
-  cardCheckOn: { borderColor: colors.primary, backgroundColor: 'rgba(37,99,235,0.12)' },
-  cardCheckText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
-  cardCheckTextOn: { color: colors.primary },
-  selectAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing(3),
-    marginBottom: spacing(1),
-  },
-  selectAllBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    backgroundColor: colors.surface,
-  },
-  selectAllText: { color: colors.foreground, fontSize: 12, fontWeight: '700' },
-  selectedCount: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  pagerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing(3),
-    gap: spacing(2),
-  },
-  pagerBtn: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3.5),
-    paddingVertical: spacing(2),
-  },
-  pagerBtnDisabled: { opacity: 0.4 },
-  pagerBtnText: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  pagerInfo: { color: colors.muted, fontSize: 12, flexShrink: 1, textAlign: 'center' },
-});

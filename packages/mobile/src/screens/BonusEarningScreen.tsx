@@ -8,17 +8,17 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { hasPermission } from '../auth/permissions';
-import { colors, radius, spacing } from '../theme';
+import { colors} from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import { secureApi } from '../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../utils/dates';
+import { styles } from './BonusEarningScreen.styles';
 
 type Rec = Record<string, unknown>;
 type BonusKind = 'bonus' | 'referral' | 'availedBonus';
@@ -330,141 +330,3 @@ export function BonusEarningScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1 },
-  content: { padding: spacing(3), paddingBottom: spacing(8) },
-  pageTitle: {
-    color: colors.foreground,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  sub: { color: colors.muted, fontSize: 12, marginBottom: spacing(2) },
-  muted: { color: colors.muted, fontSize: 12 },
-  loader: { marginVertical: spacing(8) },
-  cardList: { gap: spacing(2) },
-  cardHint: {
-    color: colors.muted,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: spacing(1.5),
-  },
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(3),
-    gap: spacing(3),
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(245, 179, 1, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 179, 1, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: colors.primary,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  userCardMid: { flex: 1, minWidth: 0, gap: 2 },
-  userCardName: {
-    color: colors.foreground,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  userCardSub: { color: colors.muted, fontSize: 12 },
-  userCardTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing(1.5),
-    marginTop: spacing(1),
-  },
-  tagApp: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    maxWidth: '100%',
-  },
-  tagState: { backgroundColor: 'rgba(59, 130, 246, 0.08)' },
-  tagAppText: { color: colors.foreground, fontSize: 10, fontWeight: '600' },
-  chevron: { color: colors.muted, fontSize: 22, fontWeight: '300' },
-  pagerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing(2),
-  },
-  pagerBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-  },
-  pagerBtnText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  disabled: { opacity: 0.4 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    padding: spacing(4),
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: spacing(2),
-  },
-  modalScroll: { maxHeight: 420 },
-  fieldGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(1.5),
-  },
-  fieldChip: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(2),
-    minWidth: '46%',
-    flexGrow: 1,
-  },
-  fieldLabel: { color: colors.muted, fontSize: 10, marginBottom: 2 },
-  fieldValue: { color: colors.foreground, fontSize: 13, fontWeight: '700' },
-  modalClose: {
-    marginTop: spacing(3),
-    alignSelf: 'flex-end',
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-  },
-  modalCloseText: {
-    color: colors.primaryForeground,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-});

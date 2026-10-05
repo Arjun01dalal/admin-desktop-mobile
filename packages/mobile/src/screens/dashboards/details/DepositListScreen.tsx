@@ -24,10 +24,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, pickPageSizes } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
@@ -35,6 +34,7 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/d
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { DateField } from '../../../components/DateField';
+import { styles } from './DepositListScreen.styles';
 
 type MidTotal = { mid?: string; amount?: number | string; count?: number | string };
 
@@ -720,153 +720,3 @@ export function DepositListScreen() {
   );
 }
 
-const styles = makeStyles({
-  backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
-  sectionLabel: {
-    color: colors.foreground,
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: spacing(3),
-    marginBottom: spacing(1),
-  },
-  totalsRow: {
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing(2),
-    marginTop: spacing(3),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-  },
-  kpiText: {
-    color: colors.foreground,
-    fontSize: 12,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
-  filterWrap: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(3),
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  datesRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'flex-end' },
-  dateField: { flex: 1, minWidth: 0 },
-  dateLabel: { color: colors.muted, fontSize: 11, marginBottom: spacing(1) },
-  dateInput: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    fontSize: 14,
-  },
-  actionBtnsRow: {
-    flexDirection: 'row',
-    gap: spacing(2),
-    marginTop: spacing(1),
-  },
-  actionBtnFlex: { flex: 1 },
-  applyBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearBtn: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  clearBtnText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
-  chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
-  chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  searchInputWrap: {
-    flex: 1,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  searchInput: {
-    width: '100%',
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingRight: spacing(9),
-    paddingVertical: spacing(2),
-    fontSize: 14,
-  },
-  clearSearchBtn: {
-    position: 'absolute',
-    right: spacing(2),
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearSearchText: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  perPageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  hint: { color: colors.muted, marginTop: spacing(2), marginBottom: spacing(1) },
-  list: { gap: spacing(2), marginTop: spacing(2) },
-  reportBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    flexShrink: 0,
-  },
-  reportBtnText: {
-    color: colors.primaryForeground,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    textAlign: 'right',
-  },
-});

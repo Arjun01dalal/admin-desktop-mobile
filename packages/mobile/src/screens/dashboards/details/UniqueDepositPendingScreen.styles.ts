@@ -1,0 +1,82 @@
+/** Styles for UniqueDepositPendingScreen — shared presets from styles/common plus screen-specific keys. */
+import { makeStyles } from '../../../styles/common';
+import { colors, radius, spacing } from '../../../theme';
+
+export const styles = makeStyles({
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
+  summaryChip: {
+    backgroundColor: 'rgba(255,159,10,0.15)',
+    borderRadius: 999,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  },
+  summaryText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  downloadChip: {
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(1.5),
+  },
+  downloadChipText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
+  reportBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing(2),
+    paddingVertical: spacing(1),
+    flexShrink: 0,
+  },
+  cardSplitRight: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
+    textAlign: 'right',
+  },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing(4),
+    paddingTop: spacing(3),
+    paddingBottom: spacing(6),
+    gap: spacing(2),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: spacing(2),
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1 },
+  modalClose: { color: colors.muted, fontSize: 18, paddingHorizontal: spacing(2) },
+  fieldLabel: { color: colors.muted, fontSize: 12, marginTop: spacing(2) },
+  modalInput: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    color: colors.foreground,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+    fontSize: 14,
+  },
+  modalTextArea: { minHeight: 80, textAlignVertical: 'top' },
+  submitBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing(3),
+    alignItems: 'center',
+    marginTop: spacing(3),
+  },
+});

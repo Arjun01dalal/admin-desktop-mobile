@@ -5,9 +5,8 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { makeStyles } from '../../styles/common';
 import { CLIENT_NAMES } from '@astro/shared';
-import { colors, spacing } from '../../theme';
+import { colors} from '../../theme';
 import { buildKpiItems } from '../../dashboards/buildKpiItems';
 import { buildProviderCards } from '../../dashboards/buildProviderCards';
 import { VIP_CLIENT_NAMES } from '../../dashboards/constants';
@@ -21,6 +20,7 @@ import { ProviderCard } from '../../dashboards/ui/ProviderCard';
 import { todayIST } from '../../utils/dates';
 import { useNavigation } from '@react-navigation/native';
 import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
+import { styles } from './OpsDashboardScreen.styles';
 
 const TITLES: Record<DashboardMode, { title: string; description: string }> = {
   main: {
@@ -295,20 +295,3 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
   );
 }
 
-const styles = makeStyles({
-  description: {
-    color: colors.muted,
-    fontSize: 13,
-    marginTop: spacing(1),
-    marginBottom: spacing(3),
-  },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: 10,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
-});

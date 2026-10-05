@@ -6,8 +6,9 @@
  * the picked image in as base64. UTR-extraction regex logic is a 1:1 port.
  */
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { styles } from './utrOcr.styles';
 
 const cleanUtr = (value: string): string => value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
 
@@ -132,6 +133,3 @@ export function SlipOcrWebView({ imageBase64, onText, onError }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  hidden: { width: 1, height: 1, opacity: 0, position: 'absolute' },
-});

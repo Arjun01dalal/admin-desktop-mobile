@@ -6,8 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { colors, radius, spacing } from '../../../theme';
-import { makeStyles } from '../../../styles/common';
+import { colors} from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import {
   normalizeActivityList,
@@ -19,6 +18,7 @@ import { todayIST } from '../../../utils/dates';
 import { resolveGameId, resolveGameName } from '@astro/shared/gameUserStats';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './GameActivityDetailsScreen.styles';
 
 type GameRow = Record<string, unknown>;
 
@@ -293,16 +293,3 @@ export function GameActivityDetailsScreen() {
   );
 }
 
-const styles = makeStyles({
-  centerBox: { justifyContent: 'center', alignItems: 'center', padding: spacing(6) },
-  // Boxed empty state rather than the shared bare-text one.
-  empty: {
-    color: colors.muted,
-    textAlign: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-  },
-});

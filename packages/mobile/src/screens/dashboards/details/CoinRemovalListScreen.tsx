@@ -4,13 +4,13 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './CoinRemovalListScreen.styles';
 
 type Row = {
   _id?: string;
@@ -393,31 +393,3 @@ export function CoinRemovalListScreen() {
   );
 }
 
-const styles = makeStyles({
-  backLink: { color: colors.primary, fontWeight: '700', fontSize: 14, marginBottom: spacing(2) },
-  cardBadge: {
-    color: colors.primaryForeground,
-    backgroundColor: colors.primary,
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    maxWidth: 90,
-  },
-  actionBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    flexShrink: 0,
-  },
-  actionBtnText: {
-    color: colors.primaryForeground,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '40%' },
-  cardValue: { color: colors.foreground, fontSize: 11, flex: 1, textAlign: 'right' },
-});

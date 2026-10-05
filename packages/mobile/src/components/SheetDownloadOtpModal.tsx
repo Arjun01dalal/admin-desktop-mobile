@@ -11,18 +11,17 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { makeStyles } from '../styles/common';
 import { secureApi } from '../api/client';
 import { getSessionUser } from '../auth/permissions';
-import { colors, radius, spacing } from '../theme';
+import { colors} from '../theme';
 import { logSheetDownload, type SheetDownloadFilter } from '../utils/sheetDownloadAudit';
+import { styles } from './SheetDownloadOtpModal.styles';
 
 function apiFailed(res: { ok: boolean; success?: boolean }): boolean {
   return !res.ok || res.success === false;
@@ -217,49 +216,3 @@ export function SheetDownloadOtpModal({ visible, filter, onClose, onVerified }: 
   );
 }
 
-const styles = makeStyles({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' },
-  backdropTouch: { ...StyleSheet.absoluteFillObject },
-  card: {
-    marginHorizontal: spacing(6),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(4),
-    paddingBottom: spacing(6),
-  },
-  title: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  sendingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  sendingText: { color: colors.muted, fontSize: 13 },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 16,
-    letterSpacing: 4,
-    textAlign: 'center',
-    marginTop: spacing(3),
-  },
-  actions: { flexDirection: 'row', gap: spacing(1.5), marginTop: spacing(4) },
-  btn: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnGhost: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
-  btnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 12 },
-  btnPrimary: { backgroundColor: colors.primary },
-  btnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 12 },
-});

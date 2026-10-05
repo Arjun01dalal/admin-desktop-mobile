@@ -17,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { appCodeForName, CLIENT_NAMES } from '@astro/shared';
@@ -26,11 +25,12 @@ import { CALLER_ROLE_IDS, RESP_SHOW_MOBILE, type CallerRow } from '../../../auth
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
 import { singleCallToDialer } from '../../../utils/externalDialer';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './CallerDepositListScreen.styles';
 
 type ListParams = {
   list?: CallerRow;
@@ -931,105 +931,3 @@ export function CallerDepositListScreen() {
   );
 }
 
-const styles = makeStyles({
-  emptyWrap: { flex: 1, padding: spacing(4) },
-  backRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(1),
-    alignSelf: 'flex-start',
-    marginBottom: spacing(2),
-    paddingVertical: spacing(1),
-  },
-  backText: { color: colors.foreground, fontSize: 15, fontWeight: '600' },
-  title: { color: colors.foreground, fontSize: 18, fontWeight: '700', marginBottom: spacing(3) },
-  muted: { color: colors.muted, fontSize: 13 },
-  chipScroll: { marginBottom: spacing(2) },
-  statusChipScroll: { marginTop: spacing(3), marginBottom: spacing(2) },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(2) },
-  chipLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 14,
-    marginBottom: spacing(2),
-  },
-  amountRow: { flexDirection: 'row', gap: spacing(2) },
-  amountInput: { flex: 1 },
-  applyBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2.5),
-    marginBottom: spacing(3),
-  },
-  applyBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  totalsCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    gap: spacing(1),
-    marginBottom: spacing(3),
-  },
-  totalLine: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  loadingBox: { paddingVertical: spacing(10), alignItems: 'center' },
-  emptyList: { color: colors.muted, textAlign: 'center', marginTop: spacing(4) },
-  cardApp: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: '700',
-    maxWidth: 72,
-  },
-  callBtn: {
-    alignSelf: 'flex-start',
-    marginTop: spacing(1.5),
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-  },
-  callBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
-  pager: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing(3),
-    marginTop: spacing(3),
-  },
-  pageBtn: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageBtnText: { color: colors.foreground, fontWeight: '600', fontSize: 13 },
-  pageLabel: { color: colors.muted, fontSize: 13, fontWeight: '600' },
-});

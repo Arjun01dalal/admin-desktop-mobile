@@ -10,12 +10,11 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import * as Clipboard from 'expo-clipboard';
 import { CLIENT_APP_CODES, CLIENT_NAMES } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
 import { useAuth } from '../../../auth/AuthContext';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './MobileAppScreen.styles';
 
 /** CDN used for Mobile App registration / deposit links (mirrors desktop default). */
 const MOBILE_CDN_BASE = 'https://d2opi4jisa0j0o.cloudfront.net';
@@ -162,19 +161,3 @@ export function MobileAppScreen() {
   );
 }
 
-const styles = makeStyles({
-  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1), marginBottom: spacing(2) },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(2) },
-  appCard: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(4),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appCode: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  hint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: spacing(3) },
-});

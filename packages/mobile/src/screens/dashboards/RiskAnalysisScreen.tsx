@@ -4,10 +4,9 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { makeStyles } from '../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { CLIENT_NAMES } from '@astro/shared';
-import { colors, spacing } from '../../theme';
+import { colors} from '../../theme';
 import { floorNum, toNum } from '../../dashboards/mergeMetrics';
 import type { KpiItem, ProviderCardModel, ProviderFilter } from '../../dashboards/types';
 import {
@@ -21,6 +20,7 @@ import { KpiGrid } from '../../dashboards/ui/KpiGrid';
 import { ProviderCard } from '../../dashboards/ui/ProviderCard';
 import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
 import { todayIST } from '../../utils/dates';
+import { styles } from './RiskAnalysisScreen.styles';
 
 function row(label: string, value: unknown) {
   return { label: metricJyotishLabel(label), value: floorNum(value) };
@@ -215,19 +215,3 @@ export function RiskAnalysisScreen() {
   );
 }
 
-const styles = makeStyles({
-  description: {
-    color: colors.muted,
-    fontSize: 13,
-    marginTop: spacing(1),
-    marginBottom: spacing(3),
-  },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: 10,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-});

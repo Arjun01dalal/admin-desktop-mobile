@@ -12,15 +12,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { providerWiseActive, toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './ActiveUserDataScreen.styles';
 
 type UserRow = {
   _id?: string;
@@ -255,83 +255,3 @@ export function ActiveUserDataScreen() {
   );
 }
 
-const styles = makeStyles({
-  description: {
-    color: colors.muted,
-    fontSize: 13,
-    marginTop: spacing(1),
-    marginBottom: spacing(3),
-  },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: 10,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  loadingBox: { paddingVertical: spacing(8), alignItems: 'center' },
-  emptyBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(4),
-    marginBottom: spacing(3),
-  },
-  emptyText: { color: colors.muted, fontSize: 13 },
-  emptyTextCenter: {
-    color: colors.muted,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: spacing(4),
-  },
-  list: { marginTop: spacing(2), gap: spacing(2) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    marginBottom: spacing(2),
-  },
-  cardIndex: { color: colors.muted, fontSize: 11, fontWeight: '700', minWidth: 28 },
-  cardTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700', flex: 1 },
-  kycPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  kycYes: { color: colors.success, backgroundColor: 'rgba(34,197,94,0.12)' },
-  kycNo: { color: colors.muted, backgroundColor: colors.surfaceAlt },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
-  cardCell: { width: '47%', flexGrow: 1, minWidth: '45%' },
-  cardLabel: { color: colors.muted, fontSize: 10, fontWeight: '600', marginBottom: 2 },
-  cardValue: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  cardAmount: { color: colors.primary, fontWeight: '700' },
-  cardHint: { color: colors.muted, fontSize: 10, marginTop: spacing(2) },
-  pager: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing(3),
-    marginTop: spacing(4),
-  },
-  pageBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageBtnText: { color: '#1a1200', fontWeight: '700', fontSize: 13 },
-  pageLabel: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
-});

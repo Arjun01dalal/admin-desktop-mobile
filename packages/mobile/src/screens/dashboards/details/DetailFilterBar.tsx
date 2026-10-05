@@ -13,10 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { CLIENT_NAMES, appCodeForName, pickPageSizes } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { DateField } from '../../../components/DateField';
+import { styles } from './DetailFilterBar.styles';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -224,74 +224,3 @@ export function DetailFilterBar(props: Props) {
   );
 }
 
-const styles = makeStyles({
-  wrap: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(3),
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  datesRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'flex-end' },
-  dateField: { flex: 1 },
-  dateLabel: { color: colors.muted, fontSize: 11, marginBottom: spacing(1) },
-  dateInput: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    fontSize: 14,
-  },
-  applyBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  row: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
-  searchWrap: { gap: spacing(2) },
-  searchInputWrap: {
-    flex: 1,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  searchInput: {
-    flex: undefined,
-    width: '100%',
-    paddingRight: spacing(9),
-  },
-  clearSearchBtn: {
-    position: 'absolute',
-    right: spacing(2),
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearSearchText: {
-    color: colors.foreground,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  rowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-});

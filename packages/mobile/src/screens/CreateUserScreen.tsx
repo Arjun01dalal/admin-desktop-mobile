@@ -17,10 +17,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../styles/common';
 import { CLIENT_NAMES, INDIA_STATES, appCodeForName } from '@astro/shared';
 import { secureApi } from '../api/client';
-import { colors, radius, spacing } from '../theme';
+import { colors} from '../theme';
+import { styles } from './CreateUserScreen.styles';
 
 type Mode = 'user' | 'admin';
 
@@ -301,110 +301,3 @@ export function CreateUserScreen() {
   );
 }
 
-const styles = makeStyles({
-  root: { flex: 1, backgroundColor: 'transparent' },
-  scroll: { padding: spacing(4), paddingBottom: spacing(10) },
-  modeRow: { flexDirection: 'row', gap: spacing(2), marginBottom: spacing(3) },
-  modeChip: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-  },
-  modeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  modeChipText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
-  modeChipTextActive: { color: colors.primaryForeground },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(4),
-  },
-  title: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginBottom: spacing(3) },
-  field: { marginBottom: spacing(3) },
-  label: { color: colors.muted, fontSize: 12, marginBottom: spacing(1) },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 14,
-  },
-  errorText: { color: colors.destructive, fontSize: 11, marginTop: spacing(1) },
-  passwordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 0,
-  },
-  passwordInput: { flex: 1, color: colors.foreground, fontSize: 14, paddingVertical: spacing(2.5) },
-  eye: { fontSize: 16, paddingLeft: spacing(2) },
-  selectInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  selectValue: { color: colors.foreground, fontSize: 14 },
-  selectPlaceholder: { color: colors.muted, fontSize: 14 },
-  selectChevron: { color: colors.muted, fontSize: 12 },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-    marginTop: spacing(2),
-  },
-  submitText: {
-    color: colors.primaryForeground,
-    fontWeight: '800',
-    fontSize: 14,
-    letterSpacing: 1,
-  },
-  btnDisabled: { opacity: 0.6 },
-  pickerBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing(5),
-  },
-  pickerCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(3),
-    maxHeight: '75%',
-  },
-  pickerTitle: { color: colors.foreground, fontWeight: '700', fontSize: 15 },
-  pickerSearch: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    fontSize: 13,
-    marginVertical: spacing(2),
-  },
-  pickerList: { flexGrow: 0 },
-  pickerRow: {
-    paddingVertical: spacing(2.5),
-    paddingHorizontal: spacing(2),
-    borderRadius: radius.sm,
-  },
-  pickerRowActive: { backgroundColor: colors.surfaceAlt },
-  pickerRowText: { color: colors.foreground, fontSize: 14 },
-  pickerRowTextActive: { color: colors.primary, fontWeight: '700' },
-  pickerClose: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    alignItems: 'center',
-    marginTop: spacing(2),
-  },
-  pickerCloseText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
-});

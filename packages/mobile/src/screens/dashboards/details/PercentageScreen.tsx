@@ -17,11 +17,11 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors, spacing} from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './PercentageScreen.styles';
 
 type Row = {
   _id?: string;
@@ -412,23 +412,3 @@ export function PercentageScreen() {
   );
 }
 
-const styles = makeStyles({
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(4),
-  },
-  addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-    fontSize: 14,
-  },
-  modalInputDisabled: { opacity: 0.5 },
-});

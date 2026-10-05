@@ -15,19 +15,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import {
   buildUpdateGameImagePayload,
   type GameImageUpdateTarget,
 } from '@astro/shared/updateGameImage';
 import { pickPageSizes } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { UpdateGameImageModal } from './UpdateGameImageModal';
+import { styles } from './CasinoGamesScreen.styles';
 
 type Row = {
   _id?: string;
@@ -666,79 +666,3 @@ export function CasinoGamesScreen() {
   );
 }
 
-const styles = makeStyles({
-  searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(3) },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-    fontSize: 14,
-    marginRight: spacing(2),
-  },
-  searchBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    paddingHorizontal: spacing(4),
-  },
-  filterBlock: { marginTop: spacing(3) },
-  filterLabel: { color: colors.muted, fontSize: 12, marginBottom: spacing(1) },
-  chipScroll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(2),
-    paddingVertical: spacing(1),
-    paddingRight: spacing(2),
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-  },
-  chipsLabel: { color: colors.muted, fontSize: 12 },
-  countsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginTop: spacing(3),
-    justifyContent: 'flex-end',
-  },
-  countPill: {
-    borderRadius: 16,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  countPillSelected: { borderColor: colors.border },
-  countAll: { backgroundColor: '#eef2f7' },
-  countActive: { backgroundColor: '#e8f7ee' },
-  countInactive: { backgroundColor: '#fdecec' },
-  countPillText: { fontSize: 11, fontWeight: '500', color: '#334155' },
-  countPillValue: { fontWeight: '700', fontSize: 11 },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-});

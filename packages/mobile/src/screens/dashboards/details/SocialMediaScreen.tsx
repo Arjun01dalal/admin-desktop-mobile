@@ -23,10 +23,10 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './SocialMediaScreen.styles';
 
 type Row = {
   _id: string;
@@ -314,79 +314,3 @@ export function SocialMediaScreen() {
   );
 }
 
-const styles = makeStyles({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing(3),
-  },
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-  },
-  addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
-  card: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(4),
-    paddingHorizontal: spacing(2),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardName: { color: colors.foreground, fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  hint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: spacing(3) },
-  formSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing(4),
-    gap: spacing(1),
-  },
-  formTitle: {
-    color: colors.foreground,
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: spacing(2),
-  },
-  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: spacing(2) },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2.5),
-    fontSize: 14,
-    marginTop: spacing(1),
-  },
-  formActions: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(4) },
-  formBtn: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formBtnGhost: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
-  formBtnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
-  formBtnPrimary: { backgroundColor: colors.primary },
-  formBtnPrimaryText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-});

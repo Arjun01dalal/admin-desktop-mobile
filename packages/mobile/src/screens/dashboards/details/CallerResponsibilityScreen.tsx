@@ -15,7 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
@@ -28,11 +27,12 @@ import {
   type CallerRow,
 } from '../../../auth/callerRoles';
 import { openPanelTarget } from '../../../navigation/panelDetail';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './CallerResponsibilityScreen.styles';
 
 type StoredCallerUser = {
   _id?: string;
@@ -764,79 +764,3 @@ export function CallerResponsibilityScreen() {
   );
 }
 
-const styles = makeStyles({
-  sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  chipScroll: { marginTop: spacing(3) },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(2) },
-  chipRowLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  botLine: { color: colors.foreground, fontSize: 13, marginTop: spacing(3) },
-  botCount: { fontWeight: '700', color: colors.primary },
-  sectionTitle: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: spacing(4),
-    marginBottom: spacing(2),
-  },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
-  summaryCard: {
-    flexGrow: 1,
-    flexBasis: '47%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-  },
-  summaryLabel: { color: colors.muted, fontSize: 11 },
-  summaryValue: {
-    color: colors.foreground,
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: spacing(1),
-  },
-  loadingBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing(10),
-    gap: spacing(2),
-  },
-  loadingText: {
-    color: colors.muted,
-    fontSize: 13,
-  },
-  emptyList: { color: colors.muted, textAlign: 'center', marginTop: spacing(4) },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    marginBottom: spacing(2),
-    gap: 2,
-  },
-  cardPressed: { backgroundColor: colors.surfaceAlt },
-  cardMeta: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
-    flexShrink: 0,
-    maxWidth: '36%',
-  },
-  cardHeadLine: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: spacing(1),
-  },
-});

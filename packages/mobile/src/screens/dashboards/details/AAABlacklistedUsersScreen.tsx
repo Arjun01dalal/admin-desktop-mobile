@@ -3,10 +3,10 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './AAABlacklistedUsersScreen.styles';
 
 const PREFERRED_LIST_KEYS = [
   'reports',
@@ -249,85 +249,3 @@ export function AAABlacklistedUsersScreen() {
   );
 }
 
-const styles = makeStyles({
-  root: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing(4), paddingBottom: spacing(10), flexGrow: 1 },
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing(3),
-  },
-  heading: { flex: 1 },
-  subtitle: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  btn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: radius.sm,
-  },
-  btnDisabled: { opacity: 0.55 },
-  btnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 12 },
-  errorCard: {
-    backgroundColor: 'rgba(239,68,68,0.1)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(4),
-    marginTop: spacing(4),
-  },
-  errorTitle: { color: colors.destructive, fontSize: 15, fontWeight: '700' },
-  errorText: { color: colors.foreground, fontSize: 12, marginTop: spacing(1) },
-  retryBtn: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    marginTop: spacing(3),
-  },
-  retryText: { color: colors.destructive, fontSize: 12, fontWeight: '700' },
-  emptyCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing(6),
-    paddingVertical: spacing(8),
-    marginTop: spacing(5),
-  },
-  emptyIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(34,197,94,0.14)',
-    marginBottom: spacing(3),
-  },
-  emptyIconText: { color: '#16a34a', fontSize: 22, fontWeight: '800' },
-  emptyTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
-    marginTop: spacing(1.5),
-  },
-  loadingCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(5),
-    marginTop: spacing(5),
-  },
-  loadingTitle: { color: colors.foreground, fontSize: 14, fontWeight: '700' },
-  loadingText: { color: colors.muted, fontSize: 12, marginTop: spacing(1) },
-  list: { gap: spacing(2), marginTop: spacing(4) },
-  cardTitle: { color: colors.foreground, fontSize: 13, fontWeight: '700', flex: 1 },
-  detailsText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-});

@@ -4,17 +4,17 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { ResponsiveTable } from '../../../dashboards/ui/ResponsiveTable';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './BetConstructGamesListScreen.styles';
 
 type GameRow = {
   gameId?: string;
@@ -223,28 +223,3 @@ export function BetConstructGamesListScreen() {
   );
 }
 
-const styles = makeStyles({
-  sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing(2),
-    marginBottom: spacing(3),
-  },
-  summaryCard: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-  },
-  summaryLabel: { color: colors.muted, fontSize: 11 },
-  summaryValue: {
-    color: colors.foreground,
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: spacing(1),
-  },
-  error: { color: colors.destructive, fontSize: 13, marginBottom: spacing(3) },
-});

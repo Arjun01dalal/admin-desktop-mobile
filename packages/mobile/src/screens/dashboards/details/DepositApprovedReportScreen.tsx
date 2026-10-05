@@ -19,10 +19,9 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
-import { colors, radius, spacing } from '../../../theme';
+import { colors, spacing} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -30,6 +29,7 @@ import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
 import { shareCsvFile } from '../../../utils/shareCsv';
+import { styles } from './DepositApprovedReportScreen.styles';
 
 type RequestType = 'automaticDeposit' | 'scannerDeposit';
 
@@ -838,47 +838,3 @@ export function DepositApprovedReportScreen() {
   );
 }
 
-const styles = makeStyles({
-  downloadBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-  },
-  downloadBtnDisabled: { opacity: 0.5 },
-  downloadBtnText: { color: colors.primaryForeground, fontSize: 12, fontWeight: '700' },
-  chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
-  chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  chip: {
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2), marginTop: spacing(3) },
-  summaryChip: {
-    backgroundColor: 'rgba(255,159,10,0.15)',
-    borderRadius: 999,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(1.5),
-  },
-  summaryText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  reportBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-  },
-  reportBtnText: { color: colors.primaryForeground, fontSize: 10, fontWeight: '700' },
-  cardSplitRight: {
-    color: colors.foreground,
-    fontSize: 11,
-    fontWeight: '700',
-    flexShrink: 0,
-    textAlign: 'right',
-  },
-  approvedText: { color: '#16a34a' },
-});

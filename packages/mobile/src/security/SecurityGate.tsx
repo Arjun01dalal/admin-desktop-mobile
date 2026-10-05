@@ -4,10 +4,11 @@
  * replaces the UI with a lockout screen instead of the app content.
  */
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius, spacing } from '../theme';
+import { colors} from '../theme';
 import { useSecurity } from './useSecurity';
+import { styles } from './SecurityGate.styles';
 
 const LABELS: Record<string, string> = {
   privilegedAccess: 'Rooted / jailbroken device',
@@ -62,34 +63,3 @@ export function SecurityGate({ children }: { children: React.ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing(5),
-  },
-  icon: { fontSize: 48, marginBottom: spacing(3) },
-  title: { color: colors.foreground, fontSize: 22, fontWeight: '700', marginBottom: spacing(2) },
-  subtitle: {
-    color: colors.muted,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: spacing(4),
-    maxWidth: 320,
-  },
-  list: { alignSelf: 'stretch', paddingHorizontal: spacing(4) },
-  reason: { color: colors.destructive, fontSize: 14, marginBottom: spacing(1) },
-  button: {
-    marginTop: spacing(5),
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(3),
-    paddingHorizontal: spacing(6),
-    minWidth: 180,
-    alignItems: 'center',
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 15 },
-});

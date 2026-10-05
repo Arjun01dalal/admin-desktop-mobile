@@ -4,13 +4,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayTime } from '../../../utils/dates';
 import { roleNamesMap } from '../../../data/rolesData';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './LoginReportScreen.styles';
 
 type Item = {
   _id?: string;
@@ -198,26 +198,3 @@ export function LoginReportScreen() {
   );
 }
 
-const styles = makeStyles({
-  quickRow: { marginTop: spacing(3), flexGrow: 0 },
-  chip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    marginRight: spacing(2),
-  },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-});

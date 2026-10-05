@@ -6,13 +6,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './CustomerAllotmentScreen.styles';
 
 type Stat = { count?: number | string; totalAmount?: number | string; [key: string]: unknown };
 type DepositEntry = {
@@ -331,36 +331,3 @@ export function CustomerAllotmentScreen() {
   );
 }
 
-const styles = makeStyles({
-  searchWrap: { marginTop: spacing(3) },
-  chipRow: { alignItems: 'center', paddingVertical: spacing(1) },
-  rowLabel: { color: colors.muted, fontSize: 12, marginRight: spacing(2) },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    marginRight: spacing(2),
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing(2) },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    color: colors.foreground,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3),
-    fontSize: 14,
-    marginRight: spacing(2),
-  },
-  searchBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2.5),
-    paddingHorizontal: spacing(4),
-  },
-});

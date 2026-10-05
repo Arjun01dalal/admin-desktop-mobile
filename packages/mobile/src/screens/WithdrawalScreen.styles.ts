@@ -67,7 +67,6 @@ export const styles = makeStyles({
     paddingHorizontal: spacing(3),
     backgroundColor: colors.surface,
   },
-  pagerBtnDisabled: { opacity: 0.4 },
   pagerBtnText: { color: colors.foreground, fontSize: 13 },
   pagerText: { color: colors.muted, fontSize: 13 },
   modalBackdrop: {

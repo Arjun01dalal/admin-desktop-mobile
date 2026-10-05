@@ -15,14 +15,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
+import { styles } from './LeaderboardScreen.styles';
 
 type LeaderboardRow = {
   _id?: string;
@@ -371,83 +371,3 @@ export function LeaderboardScreen() {
   );
 }
 
-const styles = makeStyles({
-  sub: { color: colors.muted, fontSize: 13, marginTop: spacing(1), marginBottom: spacing(3) },
-  cityScroll: { marginTop: spacing(3), marginBottom: spacing(3) },
-  cityRow: { flexDirection: 'row', gap: spacing(2) },
-  cityCard: {
-    minWidth: 110,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing(3),
-  },
-  cityLabel: { color: colors.muted, fontSize: 12 },
-  cityValue: { color: colors.foreground, fontSize: 16, fontWeight: '700', marginTop: spacing(1) },
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: radius.md,
-    padding: spacing(3),
-    marginBottom: spacing(3),
-  },
-  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  editCityBtn: {
-    alignSelf: 'flex-start',
-    marginTop: spacing(1),
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    backgroundColor: colors.surfaceAlt,
-  },
-  editCityText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: spacing(6),
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(4),
-    gap: spacing(3),
-  },
-  modalTitle: { color: colors.foreground, fontSize: 16, fontWeight: '700' },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    color: colors.foreground,
-    fontSize: 14,
-    backgroundColor: colors.background,
-  },
-  modalError: { color: colors.destructive, fontSize: 12 },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2) },
-  modalCancel: {
-    paddingHorizontal: spacing(4),
-    paddingVertical: spacing(2),
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalCancelText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
-  modalSave: {
-    paddingHorizontal: spacing(5),
-    paddingVertical: spacing(2),
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  modalSaveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-});

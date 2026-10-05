@@ -8,13 +8,13 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { colors, radius, spacing } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { toDisplayText } from '../jyotish/jyotishMapping';
+import { styles } from './DataTable.styles';
 
 export type DataTableColumn<Row> = {
   key: string;
@@ -33,7 +33,7 @@ export type DataTableColumn<Row> = {
   /** Makes the header tappable (sorting). */
   onHeaderPress?: () => void;
   /** Optional per-column filter control shown in a row under the header. */
-  filter?: React.ReactNode;
+  filter?: () => React.ReactElement | null;
 };
 
 type Props<Row> = {
@@ -51,6 +51,17 @@ type Props<Row> = {
   /** Hint text under the table. */
   hint?: string;
 };
+
+function FilterCell({
+  width,
+  render,
+}: {
+  width: number;
+  render?: () => React.ReactElement | null;
+}) {
+  const child = render?.() ?? null;
+  return <View style={[styles.filterCell, { width }]}>{child as never}</View>;
+}
 
 export function DataTable<Row>({
   columns,
@@ -109,12 +120,10 @@ export function DataTable<Row>({
         )}
       </View>
 
-      {columns.some((c) => c.filter != null) ? (
+      {columns.some((c) => c.filter) ? (
         <View style={[styles.row, styles.filterRow]}>
           {columns.map((col) => (
-            <View key={col.key} style={[styles.filterCell, { width: col.width }]}>
-              {col.filter ?? null}
-            </View>
+            <FilterCell key={col.key} width={col.width} render={col.filter} />
           ))}
         </View>
       ) : null}
@@ -234,55 +243,3 @@ export function DataTable<Row>({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing(3),
-    marginTop: spacing(3),
-    overflow: 'hidden',
-  },
-  tableClip: { overflow: 'hidden' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing(2),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    overflow: 'hidden',
-  },
-  headRow: { borderBottomColor: colors.primary },
-  badgeCell: { paddingHorizontal: spacing(0.5) },
-  badge: {
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing(2),
-    paddingVertical: spacing(1),
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-  },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  badgeSub: { color: '#fff', fontSize: 10, opacity: 0.9 },
-  filterRow: { paddingVertical: spacing(1) },
-  filterCell: { paddingHorizontal: spacing(0.5) },
-  footerRow: { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.primary },
-  headText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 12,
-    paddingHorizontal: spacing(1),
-  },
-  cell: {
-    color: colors.foreground,
-    fontSize: 12,
-    paddingHorizontal: spacing(1),
-    overflow: 'hidden',
-  },
-  right: { textAlign: 'right' },
-  center: { textAlign: 'center' },
-  link: { color: colors.primary, textDecorationLine: 'underline' },
-  spinner: { marginVertical: spacing(6) },
-  empty: { color: colors.muted, textAlign: 'center', marginVertical: spacing(6) },
-  hint: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: spacing(2) },
-});

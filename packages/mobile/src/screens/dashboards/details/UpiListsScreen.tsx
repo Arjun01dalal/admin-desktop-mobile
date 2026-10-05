@@ -11,19 +11,18 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { makeStyles } from '../../../styles/common';
-import { colors, radius, spacing } from '../../../theme';
+import { colors} from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { styles } from './UpiListsScreen.styles';
 
 type Row = {
   _id?: string;
@@ -376,50 +375,3 @@ export function UpiListsScreen() {
   );
 }
 
-const styles = makeStyles({
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(3.5),
-  },
-  addBtnText: { color: colors.primaryForeground, fontWeight: '700', fontSize: 13 },
-  statusPill: {
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: spacing(1.5),
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  statusOn: { color: '#166534', backgroundColor: 'rgba(22,163,74,0.18)' },
-  statusOff: { color: '#991b1b', backgroundColor: 'rgba(220,38,38,0.18)' },
-  backdrop: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing(6),
-    paddingVertical: spacing(12),
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  backdropTouch: { ...StyleSheet.absoluteFillObject },
-  modalSheet: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md * 2,
-    padding: spacing(4),
-    maxHeight: '100%',
-  },
-  modalScroll: { flexGrow: 0 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(2) },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(3),
-    backgroundColor: colors.surface,
-  },
-  chipText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
-});
