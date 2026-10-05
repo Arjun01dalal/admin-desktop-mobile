@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { appCodeForName, asPaged } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';

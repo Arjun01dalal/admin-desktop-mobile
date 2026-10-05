@@ -81,7 +81,7 @@ export function CallLogsScreen() {
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
   const isCaller = isCallLogsCaller(admin);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
-  const assignedBots = useMemo(() => getAssignedBotIds(admin as never), [admin]);
+  const assignedBots = useMemo(() => getAssignedBotIds(admin), [admin]);
   const campaignOptions = useMemo(
     () => campaignsForLoginUser(admin, { assignedOnly: isCaller }),
     [admin, isCaller],

@@ -22,7 +22,7 @@ import {
 import { secureApi } from '../../../api/client';
 import { canAccessNavItem, Permissions } from '../../../auth/permissions';
 import { DateField } from '../../../components/DateField';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { styles } from './DialerPushDataScreen.styles';
 

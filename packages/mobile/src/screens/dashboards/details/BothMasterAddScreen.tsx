@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { secureApi } from '../../../api/client';
 import { toNum } from '../../../dashboards/mergeMetrics';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { styles } from './BothMasterAddScreen.styles';
 

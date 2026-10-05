@@ -36,7 +36,7 @@ import {
   type IncomingBotCallerComment,
   type IncomingBotCallRow,
 } from '@astro/shared';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';

@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';

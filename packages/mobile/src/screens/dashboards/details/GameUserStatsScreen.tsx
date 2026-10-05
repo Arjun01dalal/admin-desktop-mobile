@@ -28,7 +28,7 @@ import {
   type GameUserStatsSortConfig,
   type GameUserStatsSortKey,
 } from '@astro/shared/gameUserStats';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';

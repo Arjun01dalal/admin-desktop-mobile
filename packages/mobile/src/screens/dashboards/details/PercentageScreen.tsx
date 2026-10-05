@@ -17,7 +17,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';

@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { secureApi } from '../../../api/client';
 import { floorNum, toNum } from '../../../dashboards/mergeMetrics';

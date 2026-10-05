@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { CLIENT_NAMES, appCodeForName, pickPageSizes } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { DateField } from '../../../components/DateField';
 import { styles } from './DetailFilterBar.styles';
 

@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './OfflineGate.styles';
 
 type Props = {

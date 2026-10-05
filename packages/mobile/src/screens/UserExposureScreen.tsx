@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getSessionUser } from '../auth/permissions';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import { type DataTableColumn } from '../dashboards/ui/DataTable';
 import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';

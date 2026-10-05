@@ -17,7 +17,7 @@ import {
   View,
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';

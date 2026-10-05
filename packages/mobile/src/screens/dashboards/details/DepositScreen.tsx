@@ -35,7 +35,7 @@ import {
   settleReasonOptions,
   unpackPayload,
 } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';

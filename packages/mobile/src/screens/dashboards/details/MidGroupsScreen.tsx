@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { styles } from './MidGroupsScreen.styles';
 

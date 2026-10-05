@@ -26,7 +26,7 @@ import {
   type WithdrawalBlockEditMode,
   type WithdrawalBlockItem,
 } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';

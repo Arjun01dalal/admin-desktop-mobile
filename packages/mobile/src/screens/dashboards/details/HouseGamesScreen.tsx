@@ -19,7 +19,7 @@ import {
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { hasPermission, Permissions, canAccessNavItem } from '../../../auth/permissions';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import {
   formatDisplayDate,
@@ -83,8 +83,11 @@ const INITIAL_FILTERS = {
   maxAmount: '',
 };
 type FiltersState = typeof INITIAL_FILTERS;
+type TextFilterKey = {
+  [K in keyof FiltersState]: FiltersState[K] extends string ? K : never;
+}[keyof FiltersState];
 
-const TEXT_FILTER_FIELDS: { key: keyof FiltersState; placeholder: string; numeric?: boolean }[] = [
+const TEXT_FILTER_FIELDS: { key: TextFilterKey; placeholder: string; numeric?: boolean }[] = [
   { key: 'name', placeholder: 'Name' },
   { key: 'userId', placeholder: 'User ID' },
   { key: 'txnId', placeholder: 'Txn ID' },
@@ -579,7 +582,7 @@ export function HouseGamesScreen() {
                   value={String(draftFilters[f.key] ?? '')}
                   keyboardType={f.numeric ? 'numeric' : 'default'}
                   autoCapitalize="none"
-                  onChangeText={(t) => setDraft(f.key, t as never)}
+                  onChangeText={(t) => setDraft(f.key, t)}
                   returnKeyType="search"
                   onSubmitEditing={applyAll}
                 />

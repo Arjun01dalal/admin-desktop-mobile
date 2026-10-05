@@ -13,7 +13,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { DateField } from '../../../components/DateField';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';

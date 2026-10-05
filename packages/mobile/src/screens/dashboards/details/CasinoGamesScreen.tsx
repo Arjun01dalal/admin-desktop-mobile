@@ -20,7 +20,7 @@ import {
   type GameImageUpdateTarget,
 } from '@astro/shared/updateGameImage';
 import { pickPageSizes } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';

@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';

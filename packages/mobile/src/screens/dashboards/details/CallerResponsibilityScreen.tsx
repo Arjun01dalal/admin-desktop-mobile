@@ -27,7 +27,7 @@ import {
   type CallerRow,
 } from '../../../auth/callerRoles';
 import { openPanelTarget } from '../../../navigation/panelDetail';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';

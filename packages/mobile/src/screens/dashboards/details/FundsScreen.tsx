@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { whatsappPaymentGatewayName } from '@astro/shared';
 import { secureApi } from '../../../api/client';
@@ -260,15 +260,6 @@ export function FundsScreen() {
           return;
         }
         const payload = unpackPayload(res.data);
-        // Diagnostic: surfaces the response shape in tunnel logs.
-        console.log(
-          `[funds.allPayment] mid=${mid} keys=${JSON.stringify(Object.keys(payload))} ` +
-            `dataKeys=${
-              res.data && typeof res.data === 'object'
-                ? JSON.stringify(Object.keys(res.data as object))
-                : typeof res.data
-            }`,
-        );
         // Tables are nested under payload.data ({ data: {...}, summary: {...} }).
         const inner =
           payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)

@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { DetailFilterBar } from './DetailFilterBar';
 import { styles } from './EmpCodePieChartModal.styles';
 

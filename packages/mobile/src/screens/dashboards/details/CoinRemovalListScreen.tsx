@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';

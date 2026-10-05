@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { Modal, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './DateField.styles';
 
 function toYmd(d: Date): string {

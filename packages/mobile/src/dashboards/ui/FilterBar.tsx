@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { PROVIDER_FILTERS } from '../constants';
 import type { ProviderFilter } from '../types';
 import { daysAgoIST, monthStartIST, todayIST } from '../../utils/dates';

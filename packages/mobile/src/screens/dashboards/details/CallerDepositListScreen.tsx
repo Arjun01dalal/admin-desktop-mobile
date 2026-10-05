@@ -25,7 +25,7 @@ import { CALLER_ROLE_IDS, RESP_SHOW_MOBILE, type CallerRow } from '../../../auth
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
 import { singleCallToDialer } from '../../../utils/externalDialer';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';

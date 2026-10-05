@@ -32,7 +32,7 @@ import type { SecureAction } from '../../../api/registry.generated';
 import { toNum } from '../../../dashboards/mergeMetrics';
 import { LiveMatchBookFilters } from './LiveMatchBookFilters';
 import { LiveStreamModal } from '../../../dashboards/ui/LiveStreamModal';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';

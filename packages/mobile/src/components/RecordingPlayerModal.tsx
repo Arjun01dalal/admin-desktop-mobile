@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import {
   isAllowedRecordingUrl,
   normalizeRecordingUrl,

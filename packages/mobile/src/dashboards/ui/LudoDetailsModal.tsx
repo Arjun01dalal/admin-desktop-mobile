@@ -14,7 +14,7 @@ import {
 import { formatLudoRtp, parseLudoRtpList, type LudoRtpRow } from '@astro/shared/ludoRtp';
 import { apiOtpFailed, maskOtpMobile, resolveLudoRtpOtpMobile } from '@astro/shared/walletOtp';
 import { secureApi } from '../../api/client';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { Button, Input } from '../../components/UI';
 import { styles } from './LudoDetailsModal.styles';
 

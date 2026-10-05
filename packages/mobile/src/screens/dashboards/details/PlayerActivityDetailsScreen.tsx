@@ -6,7 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import {
   getMetric,

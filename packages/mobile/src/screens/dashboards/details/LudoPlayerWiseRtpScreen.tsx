@@ -21,7 +21,7 @@ import { useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { parseLudoGameOptions } from '../../../dashboards/gameMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './LudoPlayerWiseRtpScreen.styles';
 

@@ -60,7 +60,11 @@ function FilterCell({
   render?: () => React.ReactElement | null;
 }) {
   const child = render?.() ?? null;
-  return <View style={[styles.filterCell, { width }]}>{child as never}</View>;
+  return (
+    <View style={[styles.filterCell, { width }]}>
+      {child ? <React.Fragment>{child}</React.Fragment> : null}
+    </View>
+  );
 }
 
 export function DataTable<Row>({

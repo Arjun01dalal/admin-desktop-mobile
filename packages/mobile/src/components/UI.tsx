@@ -8,7 +8,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './UI.styles';
 
 export function Button({

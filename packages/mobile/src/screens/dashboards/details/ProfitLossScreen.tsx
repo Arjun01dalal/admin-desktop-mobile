@@ -11,7 +11,7 @@ import { pickPageSizes } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';

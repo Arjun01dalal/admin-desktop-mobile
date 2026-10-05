@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { hasPermission } from '../auth/permissions';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import { secureApi } from '../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../utils/dates';

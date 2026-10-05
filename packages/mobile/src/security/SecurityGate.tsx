@@ -6,7 +6,7 @@
 import React from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { useSecurity } from './useSecurity';
 import { styles } from './SecurityGate.styles';
 

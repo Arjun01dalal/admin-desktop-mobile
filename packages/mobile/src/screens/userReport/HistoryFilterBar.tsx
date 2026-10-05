@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { DateField } from '../../components/DateField';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { styles } from './HistoryFilterBar.styles';
 
 /** Drop empty strings so the API only gets active Laxmi filters. */

@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { CLIENT_NAMES, INDIA_STATES, appCodeForName } from '@astro/shared';
 import { secureApi } from '../api/client';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './CreateUserScreen.styles';
 
 type Mode = 'user' | 'admin';

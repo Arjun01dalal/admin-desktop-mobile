@@ -20,7 +20,7 @@ import {
   type IndianDivasPendingBet,
 } from '@astro/shared/indianDivasSettle';
 import { secureApi } from '../../api/client';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { styles } from './IndianDivasSettleTab.styles';
 
 export function IndianDivasSettleTab({ userId }: { userId: string }) {

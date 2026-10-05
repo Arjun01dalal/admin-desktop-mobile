@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { CALLER_HEAD_ROLE_IDS, CALLER_ROLE_IDS, OFFICE_LOCATIONS } from '../../../auth/callerRoles';
 import { canUpdateCallerAllotmentEmpCode } from '../../../auth/permissions';

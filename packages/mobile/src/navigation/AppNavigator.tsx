@@ -11,7 +11,10 @@ import {
   DrawerItem,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {
+  createNativeStackNavigator,
+  type NativeStackNavigationProp,
+} from '@react-navigation/native-stack';
 import {
   Text,
   TextInput,
@@ -112,7 +115,15 @@ import { getAppVersion } from '../utils/appVersion';
 import { styles } from './AppNavigator.styles';
 
 const Drawer = createDrawerNavigator();
-const RootStack = createNativeStackNavigator();
+
+type RootStackParamList = {
+  panel: undefined;
+  profile: undefined;
+  '/active-user-withdrawal': undefined;
+  [route: string]: undefined;
+};
+
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 type AnyScreen = React.ComponentType<Record<string, unknown>>;
 
@@ -262,8 +273,8 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
                 // This list's layout was sliding the drawer open. Show it on
                 // the root stack, above the drawer, so the menu cannot cover it.
                 nav.closeDrawer();
-                const parent = nav.getParent();
-                if (parent) parent.navigate('/active-user-withdrawal' as never);
+                const parent = nav.getParent<NativeStackNavigationProp<RootStackParamList>>();
+                if (parent) parent.navigate('/active-user-withdrawal');
                 return;
               }
               nav.navigate(screenNameFor(item));
@@ -329,9 +340,9 @@ function ProfileHeaderButton() {
       style={styles.headerIconBtn}
       onPress={() => {
         // Profile lives on the root stack above the drawer.
-        const parent = navigation.getParent();
-        if (parent) parent.navigate('profile' as never);
-        else navigation.navigate('profile' as never);
+        const parent = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+        if (parent) parent.navigate('profile');
+        else (navigation as NativeStackNavigationProp<RootStackParamList>).navigate('profile');
       }}
       accessibilityLabel="Profile"
     >

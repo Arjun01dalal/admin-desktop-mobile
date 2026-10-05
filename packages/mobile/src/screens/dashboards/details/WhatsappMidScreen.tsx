@@ -36,7 +36,7 @@ import {
   type GatewayMidRow,
 } from '@astro/shared/gatewayMid';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './WhatsappMidScreen.styles';

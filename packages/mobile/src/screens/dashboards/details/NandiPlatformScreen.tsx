@@ -33,7 +33,7 @@ import {
 } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar, PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';

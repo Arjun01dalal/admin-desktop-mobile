@@ -3,7 +3,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './AAABlacklistedUsersScreen.styles';

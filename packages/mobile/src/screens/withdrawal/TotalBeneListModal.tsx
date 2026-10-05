@@ -15,7 +15,7 @@ import {
   type BeneAccountCountItem,
 } from '@astro/shared/beneficiaryAccountCounts';
 import { secureApi } from '../../api/client';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { styles } from './TotalBeneListModal.styles';
 
 type Props = {

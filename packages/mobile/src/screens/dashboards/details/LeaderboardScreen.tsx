@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';

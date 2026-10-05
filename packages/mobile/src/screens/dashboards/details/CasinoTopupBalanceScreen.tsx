@@ -16,7 +16,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { secureApi } from '../../../api/client';
 import { hasPermission, canAccessNavItem } from '../../../auth/permissions';

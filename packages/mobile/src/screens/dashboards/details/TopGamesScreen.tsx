@@ -18,7 +18,7 @@ import {
   buildUpdateGameImagePayload,
   type GameImageUpdateTarget,
 } from '@astro/shared/updateGameImage';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';

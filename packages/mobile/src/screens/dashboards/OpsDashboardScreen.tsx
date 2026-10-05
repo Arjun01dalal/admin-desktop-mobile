@@ -6,7 +6,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { CLIENT_NAMES } from '@astro/shared';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { buildKpiItems } from '../../dashboards/buildKpiItems';
 import { buildProviderCards } from '../../dashboards/buildProviderCards';
 import { VIP_CLIENT_NAMES } from '../../dashboards/constants';
@@ -235,11 +235,11 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
         onItemPress={(item) => {
           if (item.href === '/withdrawal') {
             const state = item.state;
-            navigation.navigate('withdrawal' as never, {
+            navigation.navigate('withdrawal', {
               status: typeof state?.status === 'string' ? state.status : '',
               startDate: typeof state?.startDate === 'string' ? state.startDate : undefined,
               endDate: typeof state?.endDate === 'string' ? state.endDate : undefined,
-            } as never);
+            });
             return;
           }
           openPanelTarget(navigation, { href: item.href, state: item.state });

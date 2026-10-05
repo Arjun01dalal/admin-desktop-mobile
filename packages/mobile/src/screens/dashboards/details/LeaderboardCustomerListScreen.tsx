@@ -9,7 +9,7 @@ import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } f
 import { useRoute } from '@react-navigation/native';
 import { appCodeForName, CLIENT_NAMES } from '@astro/shared';
 import { secureApi } from '../../../api/client';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { hasPermission } from '../../../auth/permissions';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';

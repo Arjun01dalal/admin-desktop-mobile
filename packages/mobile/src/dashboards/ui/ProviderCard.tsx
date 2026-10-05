@@ -1,7 +1,7 @@
 /** Provider metric card — mirrors desktop ProviderMetricCard. */
 import React from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { toDisplayText } from '../jyotish/jyotishMapping';
 import type { ProviderCardModel } from '../types';
 import { LudoGameStatsPicker } from './LudoGameStatsPicker';

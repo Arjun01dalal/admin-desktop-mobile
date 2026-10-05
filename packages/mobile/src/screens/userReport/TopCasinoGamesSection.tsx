@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { secureApi } from '../../api/client';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { styles } from './TopCasinoGamesSection.styles';
 
 type Row = {

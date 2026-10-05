@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { appCodeForName, registrationCommentsOf, withRegistrationComment } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import {

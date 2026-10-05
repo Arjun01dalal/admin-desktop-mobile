@@ -46,7 +46,7 @@ import {
   type RoleGroup,
   type SubAdminOption,
 } from '@astro/shared/midLimits';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { canEditMidLimits, canViewMidLimits, getSessionUser } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';

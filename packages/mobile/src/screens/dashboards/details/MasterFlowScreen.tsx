@@ -11,7 +11,7 @@ import { secureApi } from '../../../api/client';
 import type { SecureAction } from '../../../api/registry.generated';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';

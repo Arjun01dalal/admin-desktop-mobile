@@ -36,7 +36,7 @@ import {
   type ActiveUserWithdrawalSortBy,
   type ActiveUserWithdrawalSortOrder,
 } from '@astro/shared';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, isCallerRole } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';

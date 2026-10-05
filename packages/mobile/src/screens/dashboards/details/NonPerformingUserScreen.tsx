@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asPaged, nonPerformingCommentsOf } from '@astro/shared';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';

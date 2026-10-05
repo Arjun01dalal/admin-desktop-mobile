@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { INDIA_STATES, appCodeForName, asPaged } from '@astro/shared';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';

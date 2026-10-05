@@ -68,12 +68,7 @@ export function toMinSec(second: unknown): string {
   return m <= 0 ? `${s} sec` : `${m} min ${s} sec`;
 }
 
-export function getAssignedBotIds(
-  user: {
-    botIds?: Array<string | number> | string;
-    botNo?: Array<string | number> | string;
-  } | null,
-): number[] {
+export function getAssignedBotIds(user: Record<string, unknown> | null | undefined): number[] {
   const raw = user?.botIds ?? user?.botNo;
   if (raw == null || raw === '') return [];
   const list = Array.isArray(raw)
@@ -93,10 +88,22 @@ export function normalizeCallerRoleName(value: string): string {
 }
 
 /** Caller (not caller-head) — same rule as desktop isCallLogsCaller. */
+function roleLookupUser(user: Record<string, unknown> | null) {
+  if (!user) return null;
+  return {
+    Role_ID: typeof user.Role_ID === 'string' ? user.Role_ID : undefined,
+    Role_Name: typeof user.Role_Name === 'string' ? user.Role_Name : undefined,
+    role: user.role,
+    roleName: user.roleName,
+    roles: user.roles,
+  };
+}
+
 export function isCallLogsCaller(user: Record<string, unknown> | null): boolean {
-  const roleId = getRoleId(user as never).trim();
+  const roleUser = roleLookupUser(user);
+  const roleId = getRoleId(roleUser).trim();
   if (roleId && CALLER_ROLE_IDS.has(roleId)) return true;
-  const name = normalizeCallerRoleName(getRoleName(user as never));
+  const name = normalizeCallerRoleName(getRoleName(roleUser));
   if (!name) return false;
   if (name === 'caller' || name === 'caller_new' || name === 'callernew') return true;
   if (name.startsWith('caller_head')) return false;

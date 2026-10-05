@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './CalculatorScreen.styles';
 
 const UNLOCK_CODE = '9100';

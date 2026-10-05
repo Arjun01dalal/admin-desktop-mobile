@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { styles } from './SkyTalkScreen.styles';
 
 const SKYTALK_URL = 'https://skytalk.site';

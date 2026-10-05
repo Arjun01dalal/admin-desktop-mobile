@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { ActivityIndicator, Modal, Text, TouchableOpacity, View } from 'react-native';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './LocationRequiredGate.styles';
 
 type Props = {

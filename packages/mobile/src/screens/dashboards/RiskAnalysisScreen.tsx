@@ -6,7 +6,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { CLIENT_NAMES } from '@astro/shared';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { floorNum, toNum } from '../../dashboards/mergeMetrics';
 import type { KpiItem, ProviderCardModel, ProviderFilter } from '../../dashboards/types';
 import {

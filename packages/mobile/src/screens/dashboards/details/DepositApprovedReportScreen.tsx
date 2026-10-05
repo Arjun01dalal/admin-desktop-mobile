@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';

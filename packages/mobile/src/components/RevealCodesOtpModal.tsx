@@ -20,7 +20,7 @@ import {
 import { secureApi } from '../api/client';
 import { getSessionUser } from '../auth/permissions';
 import { activateRevealCodes, REVEAL_CODES_TTL_MS } from '../context/revealCodesStore';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './RevealCodesOtpModal.styles';
 
 function apiFailed(res: { ok: boolean; success?: boolean }): boolean {

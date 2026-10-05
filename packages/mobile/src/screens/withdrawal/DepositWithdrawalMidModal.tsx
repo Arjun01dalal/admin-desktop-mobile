@@ -14,7 +14,7 @@ import {
 } from '@astro/shared/depositWithdrawalReport';
 import { secureApi } from '../../api/client';
 import { Button } from '../../components/UI';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { styles } from './DepositWithdrawalMidModal.styles';
 
 type Rec = Record<string, unknown>;

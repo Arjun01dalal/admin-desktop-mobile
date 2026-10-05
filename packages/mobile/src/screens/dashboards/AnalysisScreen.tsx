@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../api/client';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { DataTable, type DataTableColumn } from '../../dashboards/ui/DataTable';
 import { styles } from './AnalysisScreen.styles';
 

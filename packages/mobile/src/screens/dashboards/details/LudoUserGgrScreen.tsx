@@ -14,7 +14,7 @@ import { parseLudoGameOptions } from '../../../dashboards/gameMetrics';
 import { toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';

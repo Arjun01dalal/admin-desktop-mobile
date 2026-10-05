@@ -32,7 +32,7 @@ import {
   presentMessage,
   toApiMobile,
 } from '@astro/shared/whatsappInbox';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { useWhatsappInbox } from './whatsapp/useWhatsappInbox';
 import { styles } from './WhatsappScreen.styles';

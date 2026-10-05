@@ -25,7 +25,7 @@ import {
   View,
 } from 'react-native';
 import { asList } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { CoinPermissionScreen } from './CoinPermissionScreen';

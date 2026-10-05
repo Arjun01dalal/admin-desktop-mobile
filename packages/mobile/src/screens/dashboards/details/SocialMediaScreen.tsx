@@ -23,7 +23,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './SocialMediaScreen.styles';

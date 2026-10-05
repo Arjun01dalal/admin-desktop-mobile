@@ -27,7 +27,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asPaged, unpackPayload } from '@astro/shared';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import {
   canShowUniqueDepositEmpCode,

@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { secureApi } from '../api/client';
 import { getSessionUser } from '../auth/permissions';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { logSheetDownload, type SheetDownloadFilter } from '../utils/sheetDownloadAudit';
 import { styles } from './SheetDownloadOtpModal.styles';
 

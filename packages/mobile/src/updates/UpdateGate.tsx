@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { restart, useStallionUpdate } from 'react-native-stallion';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { styles } from './UpdateGate.styles';
 
 function stallionOtaEnabled(): boolean {

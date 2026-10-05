@@ -17,7 +17,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { colors} from '../../theme';
+import { colors } from '../../theme';
 import { toDisplayText } from '../jyotish/jyotishMapping';
 import { DataTable, type DataTableColumn } from './DataTable';
 import { RowDetailSheet, type SheetField } from '../../screens/dashboards/details/RowDetailSheet';

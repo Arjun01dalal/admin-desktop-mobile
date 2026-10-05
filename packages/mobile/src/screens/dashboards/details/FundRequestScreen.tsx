@@ -22,7 +22,7 @@ import {
   View,
 } from 'react-native';
 import { CLIENT_NAMES, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';

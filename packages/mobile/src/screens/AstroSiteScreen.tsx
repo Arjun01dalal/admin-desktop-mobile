@@ -10,7 +10,7 @@ import { WebView } from 'react-native-webview';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 import { buildAstroSiteSsoUrl } from '../api/astroSiteAuth';
 import { isAllowedAstroSiteUrl } from '../security/astroSiteNavigation';
-import { colors} from '../theme';
+import { colors } from '../theme';
 import { parseAstroDeepLink } from '../utils/astroDeepLink';
 import { styles } from './AstroSiteScreen.styles';
 

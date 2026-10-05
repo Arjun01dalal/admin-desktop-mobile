@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { colors} from '../../../theme';
+import { colors } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { providerWiseActive, toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';

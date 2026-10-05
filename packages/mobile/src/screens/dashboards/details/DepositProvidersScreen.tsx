@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { CLIENT_NAMES } from '@astro/shared';
-import { colors, spacing} from '../../../theme';
+import { colors, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
