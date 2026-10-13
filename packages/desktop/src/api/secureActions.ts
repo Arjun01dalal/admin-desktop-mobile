@@ -21,6 +21,8 @@ export const SECURE_ACTIONS = [
   'caller.depositByEmpcodeOffice',
   'caller.subadminsByRole',
   'caller.activeUsersFromCalls',
+  'caller.activeUsersFromCallsByAutomationBot',
+  'caller.automationBotCallsSummary',
   'caller.withdrawalByEmpcode',
   'caller.uniquePendingDeposits',
   'caller.approvedDepositsByEmpcode',

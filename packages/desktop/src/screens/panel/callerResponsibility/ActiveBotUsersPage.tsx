@@ -1,7 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { toast } from 'react-toastify';
+import {
+  flattenActiveBotUsersPayload,
+  formatAutomationBotLabel,
+  type ActiveBotSummaryItem,
+  type ActiveBotUserRow,
+} from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -12,7 +28,9 @@ import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
 import type { StoredCallerUser } from './utils';
 
 type NavState = {
-  activeBotUsers?: CallerRow[];
+  activeBotUsers?: ActiveBotUserRow[];
+  activeBotUsersCount?: number;
+  botSummary?: ActiveBotSummaryItem[];
   startDate?: string;
   endDate?: string;
 };
@@ -23,7 +41,7 @@ function formatBalance(value: unknown): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
-function firstBotId(row: CallerRow): string {
+function firstBotId(row: ActiveBotUserRow): string {
   const ids = row.botIds;
   if (Array.isArray(ids) && ids.length > 0) return String(ids[0] ?? '-');
   if (ids != null && ids !== '') return String(ids);
@@ -36,37 +54,57 @@ export function ActiveBotUsersPage() {
   const nav = (location.state || {}) as NavState;
   const user = getStoredUser<StoredCallerUser>();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
+  const hadNavUsers = Array.isArray(nav.activeBotUsers) && nav.activeBotUsers.length > 0;
 
   const [startDate, setStartDate] = useState(() => nav.startDate || todayIST());
   const [endDate, setEndDate] = useState(() => nav.endDate || todayIST());
-  const [rows, setRows] = useState<CallerRow[]>(() => nav.activeBotUsers || []);
-  const [total, setTotal] = useState(0);
+  const [rows, setRows] = useState<ActiveBotUserRow[]>(() => nav.activeBotUsers || []);
+  const [total, setTotal] = useState(() =>
+    Number(nav.activeBotUsersCount ?? nav.activeBotUsers?.length ?? 0),
+  );
+  const [botSummary, setBotSummary] = useState<ActiveBotSummaryItem[]>(() => nav.botSummary || []);
+  const [botFilter, setBotFilter] = useState('');
   const [loading, setLoading] = useState(false);
+  const loadGenRef = useRef(0);
+  const skippedInitialFetch = useRef(hadNavUsers);
 
   const load = useCallback(async () => {
+    const gen = ++loadGenRef.current;
     setLoading(true);
     try {
-      const res = await secureApi<{ users?: CallerRow[]; total?: number }>(
-        'caller.activeUsersFromCalls',
-        { startDate, endDate },
-      );
+      const res = await secureApi('caller.activeUsersFromCallsByAutomationBot', {
+        startDate,
+        endDate,
+      });
+      if (gen !== loadGenRef.current) return;
       if (!res.ok) {
         toast.error(res.message || 'Failed to load bot users');
         return;
       }
-      setRows(res.data?.users || []);
-      setTotal(Number(res.data?.total ?? res.data?.users?.length ?? 0));
+      const flat = flattenActiveBotUsersPayload(res.data);
+      setRows(flat.users);
+      setTotal(flat.total);
+      setBotSummary(flat.summary);
     } finally {
-      setLoading(false);
+      if (gen === loadGenRef.current) setLoading(false);
     }
   }, [startDate, endDate]);
 
+  // Nav state already has users from Caller Responsibility — skip duplicate fetch.
+  // Otherwise fetch once on mount; later loads only via Apply.
   useEffect(() => {
+    if (skippedInitialFetch.current) return;
     void load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const columns = useMemo<CommonTableColumn<CallerRow>[]>(() => {
-    const cols: CommonTableColumn<CallerRow>[] = [
+  const filteredRows = useMemo(() => {
+    if (!botFilter) return rows;
+    return rows.filter((r) => String(r.botType || '') === botFilter);
+  }, [rows, botFilter]);
+
+  const columns = useMemo<CommonTableColumn<ActiveBotUserRow>[]>(() => {
+    const cols: CommonTableColumn<ActiveBotUserRow>[] = [
       { id: 'sr', label: 'SR.No', width: 64, render: (_r, i) => i + 1 },
       {
         id: 'name',
@@ -90,6 +128,11 @@ export function ActiveBotUsersPage() {
         id: 'dp',
         label: 'DP ID',
         render: (r) => <CopyText value={String(r._id || r.userId || '')} />,
+      },
+      {
+        id: 'botType',
+        label: 'Bot',
+        render: (r) => formatAutomationBotLabel(String(r.botType || firstBotId(r))),
       },
       {
         id: 'bot',
@@ -121,7 +164,7 @@ export function ActiveBotUsersPage() {
         label: 'Last Activity',
         render: (r) => {
           const raw = r.activeUser ?? r.lastActivity ?? r.updatedOn ?? r.updatedAt;
-          return raw ? formatDisplayDate(raw) : '-';
+          return raw ? formatDisplayDate(String(raw)) : '-';
         },
       },
       {
@@ -140,16 +183,25 @@ export function ActiveBotUsersPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={2}>
-        Active Bot Users ({total || rows.length})
-      </Typography>
-
-      <Paper sx={{ p: 2, mb: 2, bgcolor: 'background.paper' }}>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          alignItems={{ xs: 'stretch', sm: 'center' }}
-        >
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography variant="h6" fontWeight={800} sx={{ mr: 1 }}>
+            Active Bot Users
+          </Typography>
+          <Chip size="small" label={`Total: ${total}`} sx={{ fontWeight: 700 }} />
+          {botSummary.map((b) => (
+            <Chip
+              key={b.bot}
+              size="small"
+              label={`${formatAutomationBotLabel(b.bot)}: ${b.count}`}
+              onClick={() => setBotFilter((prev) => (prev === b.bot ? '' : b.bot))}
+              color={botFilter === b.bot ? 'primary' : 'default'}
+              variant={botFilter === b.bot ? 'filled' : 'outlined'}
+              sx={{ fontWeight: 700 }}
+            />
+          ))}
+        </Stack>
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap mt={1.5}>
           <TextField
             type="date"
             label="From Date"
@@ -157,7 +209,7 @@ export function ActiveBotUsersPage() {
             InputLabelProps={{ shrink: true }}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            sx={{ width: { xs: '100%', sm: 170 } }}
+            sx={{ width: 170 }}
           />
           <TextField
             type="date"
@@ -166,24 +218,37 @@ export function ActiveBotUsersPage() {
             InputLabelProps={{ shrink: true }}
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            sx={{ width: { xs: '100%', sm: 170 } }}
+            sx={{ width: 170 }}
           />
-          <Button variant="contained" onClick={() => void load()} disabled={loading}>
+          <TextField
+            select
+            label="Bot filter"
+            size="small"
+            value={botFilter}
+            onChange={(e) => setBotFilter(e.target.value)}
+            sx={{ width: 180 }}
+          >
+            <MenuItem value="">All bots</MenuItem>
+            {botSummary.map((b) => (
+              <MenuItem key={b.bot} value={b.bot}>
+                {formatAutomationBotLabel(b.bot)}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button variant="contained" disabled={loading} onClick={() => void load()} sx={{ fontWeight: 700 }}>
             Apply
           </Button>
-          {loading && <CircularProgress size={22} />}
+          {loading ? <CircularProgress size={22} /> : null}
         </Stack>
       </Paper>
 
       <TablePanel>
         <CommonTable
-          columns={columns}
-          rows={rows}
+          columns={columns as CommonTableColumn<CallerRow>[]}
+          rows={filteredRows as CallerRow[]}
           getRowKey={(r, i) => String(r._id || r.userId || i)}
           loading={loading}
-          emptyMessage="No bot users"
-          minWidth={1100}
-          maxHeight="100%"
+          emptyMessage="No active bot users"
         />
       </TablePanel>
     </Box>

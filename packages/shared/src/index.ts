@@ -6,6 +6,7 @@ export * from './clientNames';
 export * from './api';
 export * from './states';
 export * from './callerRoles';
+export * from './callerResponsibilityBots';
 export * from './permissions';
 export * from './campaignList';
 export * from './callerDialerIds';

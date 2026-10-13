@@ -86,6 +86,8 @@ export const Permissions = {
   bot_data_upload: 'bot_data_upload',
   bot_performance: 'bot_performance',
   show_incoming_bot: 'show_incoming_bot',
+  /** Caller Responsibility automation-bot summary + active users by bot. */
+  show_bot_automatic_data: 'show_bot_automatic_data',
   /** Sky Talk toggle on Incoming Bot Call (admin-panel-domains Responsibilities.show_skyTalk). */
   show_skyTalk: 'show_skyTalk',
   view_live_chat: 'view_live_chat',

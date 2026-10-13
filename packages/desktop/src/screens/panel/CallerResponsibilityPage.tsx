@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -14,14 +14,33 @@ import {
   Typography,
 } from '@mui/material';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CurrencyExchangeOutlinedIcon from '@mui/icons-material/CurrencyExchangeOutlined';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined';
+import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
+import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TuneIcon from '@mui/icons-material/Tune';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { toast } from 'react-toastify';
+import {
+  flattenActiveBotUsersPayload,
+  formatAutomationBotLabel,
+  getActiveBotCountByType,
+  parseAutomationBotCallsSummary,
+  toDdMmYyyy,
+  type ActiveBotSummaryItem,
+  type ActiveBotUserRow,
+  type AutomationBotCallsSummary,
+} from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
+import { hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { todayIST, getStoredUser } from '@/utils/dates';
@@ -60,6 +79,28 @@ const viewIconBtnSx = {
 /** Header labels split with `\n`: keep each line intact so it stays 2 lines. */
 const twoLineHeadSx = { whiteSpace: 'nowrap', lineHeight: 1.3, py: 0.9 } as const;
 
+function botSummaryVisual(bot: string): {
+  icon: ReactNode;
+  accent: string;
+} {
+  const key = String(bot || '')
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  if (key === 'new_user' || key.includes('new')) {
+    return { icon: <PersonAddAltIcon sx={{ fontSize: 18 }} />, accent: '#60a5fa' };
+  }
+  if (key === 'non_performing' || key.includes('non_perform')) {
+    return { icon: <WarningAmberIcon sx={{ fontSize: 18 }} />, accent: '#fbbf24' };
+  }
+  if (key === 'inactive') {
+    return { icon: <PauseCircleOutlineIcon sx={{ fontSize: 18 }} />, accent: '#94a3b8' };
+  }
+  if (key === 'active') {
+    return { icon: <TrendingUpIcon sx={{ fontSize: 18 }} />, accent: '#34d399' };
+  }
+  return { icon: <SmartToyOutlinedIcon sx={{ fontSize: 18 }} />, accent: '#ff9f0a' };
+}
+
 export function CallerResponsibilityPage() {
   const navigate = useNavigate();
   const user = getStoredUser<StoredCallerUser>();
@@ -69,6 +110,7 @@ export function CallerResponsibilityPage() {
   const showLocation = !isCaller || isFullAllotment;
   const showOfficeSummary = showTotalDeposit && showLocation;
   const showAssignedCallerTotal = isCallerHead && !showOfficeSummary;
+  const canShowBotAutomaticData = hasPermission(Permissions.show_bot_automatic_data, user);
 
   // Always open on today's IST date (Laxmi default); still persist when user changes filters.
   const [startDate, setStartDate] = useState(() => todayIST());
@@ -79,11 +121,16 @@ export function CallerResponsibilityPage() {
   const [callerRows, setCallerRows] = useState<CallerRow[]>([]);
   const [locationRows, setLocationRows] = useState<CallerRow[]>([]);
   const [payload, setPayload] = useState<CallerRow>({});
-  const [botUsers, setBotUsers] = useState<CallerRow[]>([]);
+  const [botUsers, setBotUsers] = useState<ActiveBotUserRow[]>([]);
   const [botCount, setBotCount] = useState(0);
+  const [botSummary, setBotSummary] = useState<ActiveBotSummaryItem[]>([]);
+  const [automationBotCallsSummary, setAutomationBotCallsSummary] =
+    useState<AutomationBotCallsSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [validateOpen, setValidateOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const loadGenRef = useRef(0);
+  const didInitialLoad = useRef(false);
 
   useEffect(() => {
     localStorage.setItem('callerResponsibilityStartDate', startDate);
@@ -102,7 +149,9 @@ export function CallerResponsibilityPage() {
     setHeads(merged);
   }, []);
 
+  /** One Apply/refresh cycle — deposit + (optional) bot APIs, no duplicate in-flight runs. */
   const loadMain = useCallback(async () => {
+    const gen = ++loadGenRef.current;
     setLoading(true);
     try {
       const body: Record<string, unknown> = {
@@ -112,13 +161,22 @@ export function CallerResponsibilityPage() {
       };
       if (office) body.officeLocation = office;
 
-      const [depRes, botRes] = await Promise.all([
+      const botTasks = canShowBotAutomaticData
+        ? ([
+            secureApi('caller.activeUsersFromCallsByAutomationBot', { startDate, endDate }),
+            secureApi('caller.automationBotCallsSummary', {
+              startDate: toDdMmYyyy(startDate),
+              endDate: toDdMmYyyy(endDate),
+            }),
+          ] as const)
+        : null;
+
+      const [depRes, botRes, summaryRes] = await Promise.all([
         secureApi<CallerRow>('caller.depositByEmpcodeOffice', body),
-        secureApi<{ users?: CallerRow[]; total?: number }>('caller.activeUsersFromCalls', {
-          startDate,
-          endDate,
-        }),
+        botTasks ? botTasks[0] : Promise.resolve(null),
+        botTasks ? botTasks[1] : Promise.resolve(null),
       ]);
+      if (gen !== loadGenRef.current) return;
 
       if (!depRes.ok) {
         toast.error(depRes.message || 'Failed to load caller data');
@@ -138,28 +196,65 @@ export function CallerResponsibilityPage() {
         setPayload(data);
       }
 
-      if (botRes.ok) {
-        setBotUsers(botRes.data?.users || []);
-        setBotCount(Number(botRes.data?.total ?? botRes.data?.users?.length ?? 0));
+      if (botRes?.ok) {
+        const flat = flattenActiveBotUsersPayload(botRes.data);
+        setBotUsers(flat.users);
+        setBotCount(flat.total);
+        setBotSummary(flat.summary);
+      } else if (canShowBotAutomaticData) {
+        setBotUsers([]);
+        setBotCount(0);
+        setBotSummary([]);
+      }
+
+      if (summaryRes?.ok) {
+        setAutomationBotCallsSummary(parseAutomationBotCallsSummary(summaryRes.data));
+      } else if (canShowBotAutomaticData) {
+        setAutomationBotCallsSummary(null);
       }
     } finally {
-      setLoading(false);
+      if (gen === loadGenRef.current) setLoading(false);
     }
-  }, [startDate, endDate, callerHead, office, isCallerHead, isCaller, showTotalDeposit, user]);
+  }, [
+    startDate,
+    endDate,
+    callerHead,
+    office,
+    isCallerHead,
+    isCaller,
+    showTotalDeposit,
+    user,
+    canShowBotAutomaticData,
+  ]);
 
   useEffect(() => {
+    if (didInitialLoad.current) return;
+    didInitialLoad.current = true;
     void loadHeads();
     void loadMain();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadHeads, loadMain]);
 
   const displayedBotCount = isCaller ? 0 : botCount;
+  const newUserBotCount = isCaller
+    ? 0
+    : getActiveBotCountByType(botSummary, 'new_user', 'new user');
+  const activeBotTypeCount = isCaller
+    ? 0
+    : getActiveBotCountByType(botSummary, 'active', 'non_performing', 'non performing');
+  const inactiveBotCount = isCaller ? 0 : getActiveBotCountByType(botSummary, 'inactive');
 
   const openBotUsers = useCallback(() => {
     if (isCaller || displayedBotCount <= 0) return;
     navigate('/caller-responsibility/bot-users', {
-      state: { activeBotUsers: botUsers, startDate, endDate },
+      state: {
+        activeBotUsers: botUsers,
+        activeBotUsersCount: botCount,
+        botSummary,
+        startDate,
+        endDate,
+      },
     });
-  }, [isCaller, displayedBotCount, navigate, botUsers, startDate, endDate]);
+  }, [isCaller, displayedBotCount, navigate, botUsers, botCount, botSummary, startDate, endDate]);
 
   const summaryRow = useMemo(() => {
     const summary = (payload.summary || {}) as CallerRow;
@@ -717,21 +812,146 @@ export function CallerResponsibilityPage() {
               )}
               {loading && <CircularProgress size={22} />}
             </Stack>
-
-            <Typography
-              variant="body2"
-              mt={1.25}
-              onClick={openBotUsers}
-              sx={{
-                cursor: displayedBotCount > 0 ? 'pointer' : 'default',
-                width: 'fit-content',
-              }}
-            >
-              <strong>Active Customer (By Bots):-</strong> {displayedBotCount}
-            </Typography>
           </Box>
         </Collapse>
       </Box>
+
+      {canShowBotAutomaticData ? (
+        <Stack spacing={1.25} mb={2.5}>
+          <Box
+            onClick={openBotUsers}
+            sx={{
+              cursor: !isCaller && displayedBotCount > 0 ? 'pointer' : 'default',
+              width: 'fit-content',
+              maxWidth: '100%',
+            }}
+          >
+            <Typography variant="body2" fontWeight={700} sx={{ mb: 0.75 }}>
+              Active Customer (By Bots): {displayedBotCount}
+            </Typography>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+              <Chip
+                size="small"
+                label={`New User: ${newUserBotCount}`}
+                sx={{ fontWeight: 700, bgcolor: 'rgba(59,130,246,0.14)', color: '#93c5fd' }}
+              />
+              <Chip
+                size="small"
+                label={`Active: ${activeBotTypeCount}`}
+                sx={{ fontWeight: 700, bgcolor: 'rgba(16,185,129,0.14)', color: '#6ee7b7' }}
+              />
+              <Chip
+                size="small"
+                label={`Inactive: ${inactiveBotCount}`}
+                sx={{ fontWeight: 700, bgcolor: 'rgba(148,163,184,0.16)', color: '#cbd5e1' }}
+              />
+            </Stack>
+          </Box>
+
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'rgba(255,255,255,0.03)',
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
+              <SmartToyOutlinedIcon sx={{ fontSize: 20, color: '#ff9f0a' }} />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle2" fontWeight={800}>
+                  Automation Bot Calls Summary
+                </Typography>
+                <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  <Typography variant="caption" color="text.secondary">
+                    {automationBotCallsSummary?.startDate
+                      ? `${automationBotCallsSummary.startDate} – ${automationBotCallsSummary.endDate}`
+                      : `${startDate} – ${endDate}`}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    ·
+                  </Typography>
+                  <PhoneInTalkOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                    Total {automationBotCallsSummary?.total ?? 0}
+                  </Typography>
+                </Stack>
+              </Box>
+            </Stack>
+            {(automationBotCallsSummary?.bots || []).length ? (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.25,
+                  // Fluid grid: 2+ cards per row as width allows (not stuck at 1 column).
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))',
+                }}
+              >
+                {(automationBotCallsSummary?.bots || []).map((item) => {
+                  const visual = botSummaryVisual(item.bot);
+                  return (
+                    <Box
+                      key={item.bot}
+                      sx={{
+                        p: 1.25,
+                        borderRadius: 1.5,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'background.paper',
+                      }}
+                    >
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
+                        <Box
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 1,
+                            display: 'grid',
+                            placeItems: 'center',
+                            bgcolor: `${visual.accent}22`,
+                            color: visual.accent,
+                          }}
+                        >
+                          {visual.icon}
+                        </Box>
+                        <Typography variant="body2" fontWeight={800} noWrap>
+                          {formatAutomationBotLabel(item.bot)}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }}>
+                        <CheckCircleOutlineIcon sx={{ fontSize: 15, color: '#4ade80' }} />
+                        <Typography variant="caption" sx={{ color: '#4ade80' }}>
+                          Successful: {item.successful}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }}>
+                        <HighlightOffIcon sx={{ fontSize: 15, color: '#f87171' }} />
+                        <Typography variant="caption" sx={{ color: '#f87171' }}>
+                          Unsuccessful: {item.unsuccessful}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" alignItems="center" spacing={0.75}>
+                        <PhoneInTalkOutlinedIcon sx={{ fontSize: 15 }} />
+                        <Typography variant="caption" fontWeight={700}>
+                          Total: {item.total}
+                        </Typography>
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Box>
+            ) : (
+              <Stack direction="row" alignItems="center" spacing={0.75}>
+                <SmartToyOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary">
+                  No automation bot call records
+                </Typography>
+              </Stack>
+            )}
+          </Box>
+        </Stack>
+      ) : null}
 
       {showTotalDeposit && (
         <Box mb={3} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>

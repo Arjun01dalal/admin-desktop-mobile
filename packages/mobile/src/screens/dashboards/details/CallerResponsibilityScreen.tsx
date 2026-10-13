@@ -4,7 +4,7 @@
  * By Office Location table and Caller Data cards with a bottom detail sheet.
  * (Desktop's CSV validate + drill-down subpages are not ported yet.)
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,9 +13,21 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  flattenActiveBotUsersPayload,
+  formatAutomationBotLabel,
+  getActiveBotCountByType,
+  parseAutomationBotCallsSummary,
+  toDdMmYyyy,
+  type ActiveBotSummaryItem,
+  type ActiveBotUserRow,
+  type AutomationBotCallsSummary,
+} from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import {
@@ -26,6 +38,7 @@ import {
   RESP_TOTAL_DEPOSIT,
   type CallerRow,
 } from '../../../auth/callerRoles';
+import { hasPermission, Permissions } from '../../../auth/permissions';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { colors } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
@@ -33,6 +46,28 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CallerResponsibilityScreen.styles';
+
+function botSummaryIcon(bot: string): React.ComponentProps<typeof MaterialCommunityIcons>['name'] {
+  const key = String(bot || '')
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  if (key === 'new_user' || key.includes('new')) return 'account-plus';
+  if (key === 'non_performing' || key.includes('non_perform')) return 'alert-circle-outline';
+  if (key === 'inactive') return 'pause-circle-outline';
+  if (key === 'active') return 'trending-up';
+  return 'robot-outline';
+}
+
+function botSummaryAccent(bot: string): string {
+  const key = String(bot || '')
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  if (key === 'new_user' || key.includes('new')) return '#60a5fa';
+  if (key === 'non_performing' || key.includes('non_perform')) return '#fbbf24';
+  if (key === 'inactive') return '#94a3b8';
+  if (key === 'active') return '#34d399';
+  return colors.primary;
+}
 
 type StoredCallerUser = {
   _id?: string;
@@ -119,11 +154,15 @@ export function CallerResponsibilityScreen() {
   const navigation = useNavigation<{
     navigate: (name: string, params?: Record<string, unknown>) => void;
   }>();
+  const { width: windowWidth } = useWindowDimensions();
   const user = getStoredUser<StoredCallerUser>();
   const { isCaller, isCallerHead, isCallerOrHead, isFullAllotment } = roleFlags(user?.Role_ID);
   const showTotalDeposit = canSeeTotalDeposit(user);
   const showCallerHead = !isCallerOrHead || isFullAllotment;
   const showLocation = !isCaller || isFullAllotment;
+  const canShowBotAutomaticData = hasPermission(Permissions.show_bot_automatic_data, user);
+  // Phone: 2 cols · tablet+: 3 cols
+  const autoSummaryThreeCol = windowWidth >= 520;
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -135,12 +174,16 @@ export function CallerResponsibilityScreen() {
   const [callerRows, setCallerRows] = useState<CallerRow[]>([]);
   const [locationRows, setLocationRows] = useState<CallerRow[]>([]);
   const [payload, setPayload] = useState<CallerRow>({});
-  const [botUsers, setBotUsers] = useState<CallerRow[]>([]);
+  const [botUsers, setBotUsers] = useState<ActiveBotUserRow[]>([]);
   const [botCount, setBotCount] = useState(0);
+  const [botSummary, setBotSummary] = useState<ActiveBotSummaryItem[]>([]);
+  const [automationBotCallsSummary, setAutomationBotCallsSummary] =
+    useState<AutomationBotCallsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: CallerRow; index: number } | null>(null);
-  const genRef = React.useRef(0);
+  const genRef = useRef(0);
+  const didInitialLoad = useRef(false);
 
   const openDepositList = useCallback(
     (row: CallerRow, type: 'deposit' | 'withdrawal' | 'uniquePending' = 'deposit') => {
@@ -200,9 +243,20 @@ export function CallerResponsibilityScreen() {
       };
       if (office) body.officeLocation = office;
 
-      const [depRes, botRes] = await Promise.all([
+      const botTasks = canShowBotAutomaticData
+        ? ([
+            secureApi('caller.activeUsersFromCallsByAutomationBot', { startDate, endDate }),
+            secureApi('caller.automationBotCallsSummary', {
+              startDate: toDdMmYyyy(startDate),
+              endDate: toDdMmYyyy(endDate),
+            }),
+          ] as const)
+        : null;
+
+      const [depRes, botRes, summaryRes] = await Promise.all([
         secureApi('caller.depositByEmpcodeOffice', body),
-        secureApi('caller.activeUsersFromCalls', { startDate, endDate }),
+        botTasks ? botTasks[0] : Promise.resolve(null),
+        botTasks ? botTasks[1] : Promise.resolve(null),
       ]);
       if (gen !== genRef.current) return; // stale response
 
@@ -222,36 +276,73 @@ export function CallerResponsibilityScreen() {
         setError('');
       }
 
-      if (botRes.ok && botRes.success !== false) {
-        const bot = botRes.data as { users?: CallerRow[]; total?: number } | undefined;
-        setBotUsers(bot?.users || []);
-        setBotCount(Number(bot?.total ?? bot?.users?.length ?? 0));
+      if (botRes && botRes.ok && botRes.success !== false) {
+        const flat = flattenActiveBotUsersPayload(botRes.data);
+        setBotUsers(flat.users);
+        setBotCount(flat.total);
+        setBotSummary(flat.summary);
+      } else if (canShowBotAutomaticData) {
+        setBotUsers([]);
+        setBotCount(0);
+        setBotSummary([]);
+      }
+
+      if (summaryRes && summaryRes.ok && summaryRes.success !== false) {
+        setAutomationBotCallsSummary(parseAutomationBotCallsSummary(summaryRes.data));
+      } else if (canShowBotAutomaticData) {
+        setAutomationBotCallsSummary(null);
       }
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate, callerHead, office, isCallerHead, isCaller, showTotalDeposit]);
+  }, [
+    startDate,
+    endDate,
+    callerHead,
+    office,
+    isCallerHead,
+    isCaller,
+    showTotalDeposit,
+    canShowBotAutomaticData,
+  ]);
 
   useEffect(() => {
     void loadHeads();
   }, [loadHeads]);
 
-  // Reload only when filters change — not when returning from deposit/refund/unique lists.
-  // Pull-to-refresh still calls loadMain() manually.
+  // Mount once + when applied filters change (Apply). Avoid double fire from Strict Mode.
   useEffect(() => {
+    if (!didInitialLoad.current) {
+      didInitialLoad.current = true;
+      void loadMain();
+      return;
+    }
     void loadMain();
-  }, [loadMain]);
+  }, [startDate, endDate, callerHead, office]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const displayedBotCount = isCaller ? 0 : botCount;
+  const newUserBotCount = isCaller
+    ? 0
+    : getActiveBotCountByType(botSummary, 'new_user', 'new user');
+  const activeBotTypeCount = isCaller
+    ? 0
+    : getActiveBotCountByType(botSummary, 'active', 'non_performing', 'non performing');
+  const inactiveBotCount = isCaller ? 0 : getActiveBotCountByType(botSummary, 'inactive');
 
   const openBotUsers = useCallback(() => {
     if (isCaller || displayedBotCount <= 0) return;
     openPanelTarget(navigation, {
       href: '/caller-responsibility/bot-users',
-      state: { activeBotUsers: botUsers, startDate, endDate },
+      state: {
+        activeBotUsers: botUsers,
+        activeBotUsersCount: botCount,
+        botSummary,
+        startDate,
+        endDate,
+      },
     });
-  }, [isCaller, displayedBotCount, navigation, botUsers, startDate, endDate]);
+  }, [isCaller, displayedBotCount, navigation, botUsers, botCount, botSummary, startDate, endDate]);
 
   const summaryItems = useMemo(() => {
     const summary = (payload.summary || {}) as CallerRow;
@@ -559,16 +650,105 @@ export function CallerResponsibilityScreen() {
               </ScrollView>
             )}
 
-            <TouchableOpacity
-              onPress={openBotUsers}
-              disabled={isCaller || displayedBotCount <= 0}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.botLine}>
-                Active Customer (By Bots):{' '}
-                <Text style={styles.botCount}>{displayedBotCount}</Text>
-              </Text>
-            </TouchableOpacity>
+            {canShowBotAutomaticData ? (
+              <View style={styles.botPanel}>
+                <TouchableOpacity
+                  onPress={openBotUsers}
+                  disabled={isCaller || displayedBotCount <= 0}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.botLine}>
+                    Active Customer (By Bots):{' '}
+                    <Text style={styles.botCount}>{displayedBotCount}</Text>
+                  </Text>
+                  <View style={styles.botChipRow}>
+                    <Text style={[styles.botChip, styles.botChipNew]}>New User: {newUserBotCount}</Text>
+                    <Text style={[styles.botChip, styles.botChipActive]}>
+                      Active: {activeBotTypeCount}
+                    </Text>
+                    <Text style={[styles.botChip, styles.botChipInactive]}>
+                      Inactive: {inactiveBotCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={styles.autoSummaryHeader}>
+                  <MaterialCommunityIcons name="robot" size={18} color={colors.primary} />
+                  <View style={styles.autoSummaryHeaderText}>
+                    <Text style={styles.autoSummaryTitle}>Automation Bot Calls Summary</Text>
+                    <View style={styles.autoSummaryMetaRow}>
+                      <Text style={styles.autoSummaryMeta}>
+                        {automationBotCallsSummary?.startDate
+                          ? `${automationBotCallsSummary.startDate} – ${automationBotCallsSummary.endDate}`
+                          : `${startDate} – ${endDate}`}
+                      </Text>
+                      <Text style={styles.autoSummaryMeta}>·</Text>
+                      <MaterialCommunityIcons name="phone-in-talk" size={13} color={colors.muted} />
+                      <Text style={styles.autoSummaryMeta}>
+                        Total {automationBotCallsSummary?.total ?? 0}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                {(automationBotCallsSummary?.bots || []).length ? (
+                  <View style={styles.autoSummaryGrid}>
+                    {(automationBotCallsSummary?.bots || []).map((item) => {
+                      const accent = botSummaryAccent(item.bot);
+                      return (
+                        <View
+                          key={item.bot}
+                          style={[
+                            styles.autoSummaryCard,
+                            autoSummaryThreeCol && styles.autoSummaryCardWide,
+                          ]}
+                        >
+                          <View style={styles.autoSummaryBotRow}>
+                            <View style={[styles.autoSummaryIconWrap, { backgroundColor: `${accent}22` }]}>
+                              <MaterialCommunityIcons
+                                name={botSummaryIcon(item.bot)}
+                                size={18}
+                                color={accent}
+                              />
+                            </View>
+                            <Text style={styles.autoSummaryBot} numberOfLines={1}>
+                              {formatAutomationBotLabel(item.bot)}
+                            </Text>
+                          </View>
+                          <View style={styles.autoStatRow}>
+                            <MaterialCommunityIcons name="check-circle" size={14} color="#16a34a" />
+                            <Text style={styles.autoOk}>Successful: {item.successful}</Text>
+                          </View>
+                          <View style={styles.autoStatRow}>
+                            <MaterialCommunityIcons name="close-circle" size={14} color="#dc2626" />
+                            <Text style={styles.autoFail}>Unsuccessful: {item.unsuccessful}</Text>
+                          </View>
+                          <View style={styles.autoStatRow}>
+                            <MaterialCommunityIcons name="phone" size={14} color={colors.foreground} />
+                            <Text style={styles.autoTotal}>Total: {item.total}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={styles.autoEmptyRow}>
+                    <MaterialCommunityIcons name="robot-off-outline" size={16} color={colors.muted} />
+                    <Text style={styles.autoEmpty}>No automation bot call records</Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={openBotUsers}
+                disabled={isCaller || displayedBotCount <= 0}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.botLine}>
+                  Active Customer (By Bots):{' '}
+                  <Text style={styles.botCount}>{displayedBotCount}</Text>
+                </Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -638,6 +818,14 @@ export function CallerResponsibilityScreen() {
       office,
       displayedBotCount,
       openBotUsers,
+      canShowBotAutomaticData,
+      newUserBotCount,
+      activeBotTypeCount,
+      inactiveBotCount,
+      automationBotCallsSummary,
+      autoSummaryThreeCol,
+      startDate,
+      endDate,
       error,
       showTotalDeposit,
       summaryItems,

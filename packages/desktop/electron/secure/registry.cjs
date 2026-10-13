@@ -119,6 +119,20 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  /** Caller Responsibility — Active Customer (By Bots); payload.bots[].users */
+  'caller.activeUsersFromCallsByAutomationBot': {
+    method: 'POST',
+    path: '/SubAdmin/active-users-from-calls-by-automation-bot',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  /** Caller Responsibility — Automation Bot Calls Summary (dates as DD/MM/YYYY) */
+  'caller.automationBotCallsSummary': {
+    method: 'POST',
+    path: '/SubAdmin/automation-bot-calls-summary',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   'caller.withdrawalByEmpcode': {
     method: 'POST',
     path: '/SubAdmin/withdrawal-by-empcode',
