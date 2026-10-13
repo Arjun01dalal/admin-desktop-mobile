@@ -32,7 +32,16 @@ export type LlmDialerLead = {
 
 export const LLM_CHAT_HISTORY_KEY = 'llm_chat_messages';
 export const LLM_CHAT_OPEN_KEY = 'llm_chat_open';
+/** Turns sent to the LLM API (keep small for token cost). */
 export const LLM_CHAT_MAX_HISTORY = 12;
+/** Max messages kept in UI state + local storage (prevents unbounded memory). */
+export const LLM_CHAT_MAX_STORED_MESSAGES = 80;
+
+/** Keep the most recent messages for UI / persistence. */
+export function trimLlmChatMessages<T>(messages: T[], max = LLM_CHAT_MAX_STORED_MESSAGES): T[] {
+  if (messages.length <= max) return messages;
+  return messages.slice(-max);
+}
 
 export function clearLlmChatStorage(storage: { removeItem: (key: string) => void }): void {
   storage.removeItem(LLM_CHAT_HISTORY_KEY);

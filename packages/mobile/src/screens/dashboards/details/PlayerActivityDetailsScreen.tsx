@@ -16,7 +16,7 @@ import {
 } from '../../../dashboards/activityUtils';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { styles } from './PlayerActivityDetailsScreen.styles';
+import { styles } from './activityDetails.styles';
 
 type DetailRow = {
   id: string;

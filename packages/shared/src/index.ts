@@ -40,3 +40,8 @@ export * from './rowComments';
 export * from './withdrawalFund';
 export * from './finalBook';
 export * from './fundsRequest';
+export * from './playedTodayYesterday';
+export * from './gtelCalls';
+export * from './opsDashboard';
+export * from './display';
+

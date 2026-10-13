@@ -10,6 +10,7 @@ import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './SosBlockedUsersScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -26,11 +27,6 @@ type Row = {
 };
 
 const MAIN_KEYS = new Set(['idx', 'blockedByName', 'type', 'status']);
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatWhen(row: Row): string {
   const ts = row.blockedAt || row.createdAt || row.updatedAt;

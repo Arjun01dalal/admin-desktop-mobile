@@ -35,10 +35,12 @@
     "./casinoTopup": "./src/casinoTopup.ts",
     "./gameUserStats": "./src/gameUserStats.ts",
     "./depositRules": "./src/depositRules.ts",
+    "./gtelCalls": "./src/gtelCalls.ts",
     "./rowComments": "./src/rowComments.ts",
     "./withdrawalFund": "./src/withdrawalFund.ts",
     "./finalBook": "./src/finalBook.ts",
-    "./fundsRequest": "./src/fundsRequest.ts"
+    "./fundsRequest": "./src/fundsRequest.ts",
+    "./opsDashboard": "./src/opsDashboard/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -21,6 +21,7 @@ import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { formatDisplayDate, formatDisplayTime, getStoredUser, todayIST } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { unpackPayload } from '@astro/shared';
 import { appCodeForName } from '@/constants/clientNames';
 import { display } from '@/screens/panel/shared';
 
@@ -82,15 +83,6 @@ const orangeBtnSx = {
 const filterSelectSx = {
   '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 12 },
 };
-
-function unpackPayload(data: unknown): Record<string, unknown> {
-  if (!data || typeof data !== 'object') return {};
-  const obj = data as Record<string, unknown>;
-  if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
-    return obj.payload as Record<string, unknown>;
-  }
-  return obj;
-}
 
 function withdrawalPct(deposit?: number, withdrawal?: number): string {
   if (!deposit) return '0';

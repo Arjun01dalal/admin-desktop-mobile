@@ -1,5 +1,6 @@
 /** Shared MID limits types and parsers — desktop + mobile. */
 import { asList, unpackPayload } from './api/parse';
+import { parseDistinctMidOptions } from './gatewayMid';
 
 export type MidOption = {
   _id?: string;
@@ -505,11 +506,20 @@ export function parseMidOptions(data: unknown): MidOption[] {
         if (unwrapped && typeof unwrapped === 'object') {
           const body = unwrapped as Record<string, unknown>;
           if (Array.isArray(body.items)) return body.items;
+          if (Array.isArray(body.payload)) return body.payload;
+          if (Array.isArray(body.midList)) return body.midList;
+          const midList = body.midList;
+          if (midList && typeof midList === 'object' && !Array.isArray(midList)) {
+            const nested = midList as Record<string, unknown>;
+            if (Array.isArray(nested.mids)) return nested.mids;
+            if (Array.isArray(nested.data)) return nested.data;
+            if (Array.isArray(nested.items)) return nested.items;
+          }
         }
         return asList<unknown>(data);
       })();
 
-  return raw
+  const parsed = raw
     .map((option): MidOption | null => {
       if (typeof option === 'string') {
         const label = option.trim();
@@ -536,6 +546,15 @@ export function parseMidOptions(data: unknown): MidOption[] {
       };
     })
     .filter((option): option is MidOption => Boolean(option?.mid && String(option.mid).trim()));
+
+  if (parsed.length) return parsed;
+
+  // getAllDistinctMids fallback when body shape differs from getAllMidOld.
+  return parseDistinctMidOptions(data).map((mid) => ({
+    mid,
+    name: mid,
+    paymentGatewayName: mid,
+  }));
 }
 
 export function parseRecipientsConfig(data: unknown): RecipientsConfig {
@@ -787,7 +806,7 @@ export function formatMidLimitAmount(value: number | undefined | null): string {
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value);
 }
 
-/** Gateway column label — falls back to MID when getAllMidOld returns names only. */
+/** Gateway column label — falls back to MID when distinct-MID API returns names only. */
 export function midLimitGatewayLabel(row: Pick<MidLimitRow, 'mid' | 'gatewayName'>): string {
   return String(row.gatewayName || row.mid || '').trim();
 }

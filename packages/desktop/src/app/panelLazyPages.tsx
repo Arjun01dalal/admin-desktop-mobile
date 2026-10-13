@@ -265,6 +265,10 @@ const TodaysActivePage = lazyNamed(
   () => import('@/screens/panel/TodaysActivePage'),
   'TodaysActivePage',
 );
+const PlayedTodayYesterdayPage = lazyNamed(
+  () => import('@/screens/panel/PlayedTodayYesterdayPage'),
+  'PlayedTodayYesterdayPage',
+);
 const NewDepositsPage = lazyNamed(
   () => import('@/screens/panel/NewDepositsPage'),
   'NewDepositsPage',
@@ -452,6 +456,7 @@ export {
   BetConstructGamesPage,
   NonPerformingUserPage,
   TodaysActivePage,
+  PlayedTodayYesterdayPage,
   NewDepositsPage,
   PlayerRtpPage,
   PlayerRtpDetailsPage,

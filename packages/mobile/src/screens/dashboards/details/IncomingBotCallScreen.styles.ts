@@ -3,7 +3,56 @@ import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 
 export const styles = makeStyles({
-  title: { color: colors.foreground, fontSize: 20, fontWeight: '700', marginBottom: spacing(1) },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+    marginBottom: spacing(1),
+  },
+  title: { color: colors.foreground, fontSize: 20, fontWeight: '700', flexShrink: 1 },
+  skyTalkToggleBtn: {
+    backgroundColor: '#1976d2',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2),
+  },
+  skyTalkToggleText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  skyTalkRoot: {
+    flex: 1,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing(3),
+    paddingTop: spacing(2),
+    paddingBottom: spacing(2),
+    gap: spacing(2),
+  },
+  skyTalkHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing(2),
+  },
+  skyTalkFrame: {
+    flex: 1,
+    minHeight: 0,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  skyTalkWebview: { flex: 1, backgroundColor: 'transparent' },
+  skyTalkLoader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
   sub: { color: colors.muted, fontSize: 12, marginBottom: spacing(3) },
   filterWrap: {
     backgroundColor: colors.surface,

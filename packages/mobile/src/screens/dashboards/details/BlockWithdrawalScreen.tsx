@@ -2,19 +2,19 @@
  * Block Withdrawal — mobile port of desktop BlockWithdrawalPage / Laxmi BlockWithdrawal.
  * Card list + bottom sheets for add/edit (limit / full / remove).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import {
   formatWithdrawalDate,
@@ -27,7 +27,9 @@ import {
   type WithdrawalBlockItem,
 } from '@astro/shared';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { usePagedSecureQuery } from '../../../hooks/usePagedSecureQuery';
 import { PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './BlockWithdrawalScreen.styles';
@@ -37,11 +39,6 @@ export function BlockWithdrawalScreen() {
   const [appliedUserId, setAppliedUserId] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[1] ?? 25);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<WithdrawalBlockItem[]>([]);
   const [sheetRow, setSheetRow] = useState<WithdrawalBlockItem | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -56,37 +53,35 @@ export function BlockWithdrawalScreen() {
   const [saving, setSaving] = useState(false);
   const [formMsg, setFormMsg] = useState('');
 
-  const genRef = useRef(0);
+  const buildPayload = useCallback(
+    () => ({
+      pageNo: page,
+      itemsPerPage: pageSize,
+      filter: { userId: appliedUserId.trim() },
+    }),
+    [page, pageSize, appliedUserId],
+  );
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await secureApi<unknown>('ops.withdrawalBlockGetAll', {
-        pageNo: page,
-        itemsPerPage: pageSize,
-        filter: { userId: appliedUserId.trim() },
-      });
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load withdrawal blocks');
-        setRows([]);
-        return;
-      }
-      const parsed = normalizeWithdrawalBlockRows(res.data);
-      setRows(parsed.rows);
-      setTotal(parsed.total);
-      setTotalPages(Math.max(1, parsed.totalPages));
-      setSheetRow(null);
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
-  }, [page, pageSize, appliedUserId]);
+  const unpack = useCallback((data: unknown) => {
+    const parsed = normalizeWithdrawalBlockRows(data);
+    return {
+      rows: parsed.rows,
+      total: parsed.total,
+      totalPages: Math.max(1, parsed.totalPages),
+    };
+  }, []);
+
+  const { rows, total, totalPages, loading, error, load, setError } = usePagedSecureQuery<WithdrawalBlockItem>({
+    action: 'ops.withdrawalBlockGetAll',
+    buildPayload,
+    unpack,
+    autoDeps: [page, pageSize, appliedUserId],
+    errorMessage: 'Failed to load withdrawal blocks',
+  });
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setSheetRow(null);
+  }, [rows]);
 
   const openAdd = () => {
     setAddUserId('');
@@ -172,15 +167,26 @@ export function BlockWithdrawalScreen() {
     }
   };
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.primary} />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: WithdrawalBlockItem, index: number) => row._id || `${row.userId}-${index}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<WithdrawalBlockItem>) => (
+      <BlockWithdrawalCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onPress={() => setSheetRow(row)}
+      />
+    ),
+    [page, pageSize],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Block Withdrawal</Text>
@@ -248,46 +254,47 @@ export function BlockWithdrawalScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No withdrawal blocks found</Text> : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const full = isFullWithdrawalBlock(row.amount);
-          return (
-            <TouchableOpacity
-              key={row._id || `${row.userId}-${index}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={[styles.statusPill, full ? styles.pillDanger : styles.pillOk]}>
-                  {full ? 'Full Block' : 'Amount Limit'}
-                </Text>
-              </View>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {row.userId}
-              </Text>
-              {(row.userName || row.name) ? (
-                <Text style={styles.cardMeta} numberOfLines={1}>
-                  {row.userName || row.name}
-                </Text>
-              ) : null}
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>
-                  {full ? 'All blocked' : `₹${formatWithdrawalMoney(row.amount)}`}
-                </Text>
-                <Text style={styles.cardSplitRight}>
-                  {formatWithdrawalDate(row.updatedAt || row.createdAt)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+  const listFooter =
+    rows.length > 0 ? (
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+          onPress={() => page > 1 && setPage((p) => p - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {page} / {totalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+          onPress={() => page < totalPages && setPage((p) => p + 1)}
+        >
+          Next ›
+        </Text>
       </View>
+    ) : null;
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No withdrawal blocks found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!addOpen && !editOpen}
+        keyboardShouldPersistTaps="handled"
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -462,27 +469,51 @@ export function BlockWithdrawalScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      {rows.length > 0 ? (
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-            onPress={() => page > 1 && setPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {page} / {totalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-            onPress={() => page < totalPages && setPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
-      ) : null}
-    </ScrollView>
+    </View>
   );
 }
+
+type BlockWithdrawalCardProps = {
+  row: WithdrawalBlockItem;
+  index: number;
+  page: number;
+  pageSize: number;
+  onPress: () => void;
+};
+
+const BlockWithdrawalCard = memo(function BlockWithdrawalCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onPress,
+}: BlockWithdrawalCardProps) {
+  const full = isFullWithdrawalBlock(row.amount);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={[styles.statusPill, full ? styles.pillDanger : styles.pillOk]}>
+          {full ? 'Full Block' : 'Amount Limit'}
+        </Text>
+      </View>
+      <Text style={styles.cardTitle} numberOfLines={1}>
+        {row.userId}
+      </Text>
+      {row.userName || row.name ? (
+        <Text style={styles.cardMeta} numberOfLines={1}>
+          {row.userName || row.name}
+        </Text>
+      ) : null}
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>
+          {full ? 'All blocked' : `₹${formatWithdrawalMoney(row.amount)}`}
+        </Text>
+        <Text style={styles.cardSplitRight}>
+          {formatWithdrawalDate(row.updatedAt || row.createdAt)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
 

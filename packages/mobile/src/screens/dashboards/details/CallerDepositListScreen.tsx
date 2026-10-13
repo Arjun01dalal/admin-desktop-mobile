@@ -6,16 +6,15 @@
  * - Refund: `caller.withdrawalByEmpcode`
  * - Unique Pending: `caller.uniquePendingDeposits`
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -28,9 +27,11 @@ import { singleCallToDialer } from '../../../utils/externalDialer';
 import { colors } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './CallerDepositListScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 type ListParams = {
   list?: CallerRow;
@@ -41,16 +42,6 @@ type ListParams = {
 };
 
 type StatusTotal = { count?: number; amount?: number };
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatAmount(value: unknown): string {
   const n = Number(value);
@@ -601,19 +592,29 @@ export function CallerDepositListScreen() {
     );
   }
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void loadRemote()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: CallerRow, index: number) => String(row._id || row.orderId || index),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<CallerRow>) => (
+      <CallerDepositListCard
+        row={row}
+        index={index}
+        isWithdrawal={isWithdrawal}
+        isUniquePending={isUniquePending}
+        canShowMobile={!!canShowMobile}
+        calling={calling}
+        onOpenSheet={() => setSelected({ row, index })}
+        onCall={() => addToDialer(row)}
+      />
+    ),
+    [isWithdrawal, isUniquePending, canShowMobile, calling, addToDialer],
+  );
+
+  const listHeader = (
+    <>
       <TouchableOpacity style={styles.backRow} onPress={goBack} accessibilityLabel="Go back">
         <MaterialIcons name="arrow-back" size={22} color={colors.foreground} />
         <Text style={styles.backText}>Back</Text>
@@ -820,105 +821,47 @@ export function CallerDepositListScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {rows.length === 0 ? (
-            <Text style={styles.emptyList}>No records</Text>
-          ) : (
-            rows.map((row, index) => {
-              const userName = display(row.userName || row.name);
-              const amount = formatAmount(row.amount || row.Amount);
-              const statusVal = display(row.status);
-              const app = display(
-                appCodeForName(
-                  row.clientName || row.appName || row.app_name || row.AppName || row.subDomain,
-                ),
-              );
-              const mobileVal = maskMobile(
-                isWithdrawal ? row.mobile || row.userMobile : row.userMobile || row.mobile,
-                canShowMobile,
-              );
-              const created =
-                formatDisplayDate(row.createdOn || row.createdAt || row.created_at) ||
-                display(row.createdOn || row.createdAt);
-              const hasMobile = Boolean(row.userMobile || row.mobile);
-              return (
-                <TouchableOpacity
-                  key={String(row._id || row.orderId || index)}
-                  style={styles.card}
-                  activeOpacity={0.75}
-                  onPress={() => setSelected({ row, index })}
-                >
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardIndex}>#{index + 1}</Text>
-                    <Text style={styles.cardTitle} numberOfLines={1}>
-                      {userName}
-                    </Text>
-                    {app !== '—' ? (
-                      <Text style={styles.cardApp} numberOfLines={1}>
-                        {app}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <View style={styles.cardSplitRow}>
-                    <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                      Amount: ₹{amount}
-                    </Text>
-                    <Text style={styles.cardSplitRight} numberOfLines={1}>
-                      {statusVal}
-                    </Text>
-                  </View>
-                  <View style={styles.cardSplitRow}>
-                    <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                      Mobile: {mobileVal}
-                    </Text>
-                    <Text style={styles.cardSplitRight} numberOfLines={1}>
-                      {created}
-                    </Text>
-                  </View>
-                  {isUniquePending && hasMobile ? (
-                    <TouchableOpacity
-                      style={styles.callBtn}
-                      onPress={() => addToDialer(row)}
-                      disabled={calling}
-                    >
-                      <Text style={styles.callBtnText}>{calling ? 'Calling…' : 'Call'}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  <Text style={styles.cardHint}>Tap card for all details</Text>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-      )}
+  const listFooter =
+    (isWithdrawal || isUniquePending || isDeposit) && rows.length > 0 && totalPages > 1 ? (
+      <View style={styles.pager}>
+        <TouchableOpacity
+          style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+          disabled={page <= 1 || loading}
+          onPress={() => setPage((p) => Math.max(1, p - 1))}
+        >
+          <Text style={styles.pageBtnText}>Prev</Text>
+        </TouchableOpacity>
+        <Text style={styles.pageLabel}>
+          {Math.min(page, totalPages)} / {totalPages}
+        </Text>
+        <TouchableOpacity
+          style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+          disabled={page >= totalPages || loading}
+          onPress={() => setPage((p) => p + 1)}
+        >
+          <Text style={styles.pageBtnText}>Next</Text>
+        </TouchableOpacity>
+      </View>
+    ) : null;
 
-      {(isWithdrawal || isUniquePending || isDeposit) && rows.length > 0 && totalPages > 1 ? (
-        <View style={styles.pager}>
-          <TouchableOpacity
-            style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-            disabled={page <= 1 || loading}
-            onPress={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            <Text style={styles.pageBtnText}>Prev</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageLabel}>
-            {Math.min(page, totalPages)} / {totalPages}
-          </Text>
-          <TouchableOpacity
-            style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-            disabled={page >= totalPages || loading}
-            onPress={() => setPage((p) => p + 1)}
-          >
-            <Text style={styles.pageBtnText}>Next</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No records"
+        refreshing={loading}
+        onRefresh={() => void loadRemote()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -927,7 +870,82 @@ export function CallerDepositListScreen() {
         actions={sheetActions}
         onClose={() => setSelected(null)}
       />
-    </ScrollView>
+    </View>
   );
 }
+
+type CallerDepositListCardProps = {
+  row: CallerRow;
+  index: number;
+  isWithdrawal: boolean;
+  isUniquePending: boolean;
+  canShowMobile: boolean;
+  calling: boolean;
+  onOpenSheet: () => void;
+  onCall: () => void;
+};
+
+const CallerDepositListCard = memo(function CallerDepositListCard({
+  row,
+  index,
+  isWithdrawal,
+  isUniquePending,
+  canShowMobile,
+  calling,
+  onOpenSheet,
+  onCall,
+}: CallerDepositListCardProps) {
+  const userName = display(row.userName || row.name);
+  const amount = formatAmount(row.amount || row.Amount);
+  const statusVal = display(row.status);
+  const app = display(
+    appCodeForName(row.clientName || row.appName || row.app_name || row.AppName || row.subDomain),
+  );
+  const mobileVal = maskMobile(
+    isWithdrawal ? row.mobile || row.userMobile : row.userMobile || row.mobile,
+    canShowMobile,
+  );
+  const created =
+    formatDisplayDate(row.createdOn || row.createdAt || row.created_at) ||
+    display(row.createdOn || row.createdAt);
+  const hasMobile = Boolean(row.userMobile || row.mobile);
+
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {userName}
+        </Text>
+        {app !== '—' ? (
+          <Text style={styles.cardApp} numberOfLines={1}>
+            {app}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Amount: ₹{amount}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {statusVal}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Mobile: {mobileVal}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {created}
+        </Text>
+      </View>
+      {isUniquePending && hasMobile ? (
+        <TouchableOpacity style={styles.callBtn} onPress={onCall} disabled={calling}>
+          <Text style={styles.callBtnText}>{calling ? 'Calling…' : 'Call'}</Text>
+        </TouchableOpacity>
+      ) : null}
+      <Text style={styles.cardHint}>Tap card for all details</Text>
+    </TouchableOpacity>
+  );
+});
 

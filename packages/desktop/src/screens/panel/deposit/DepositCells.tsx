@@ -24,6 +24,7 @@ import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { copyToClipboard } from '@/utils/clipboard';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
+import { buildDepositWhatsAppMessage } from '@astro/shared';
 import { display } from '@/screens/panel/shared';
 
 export type DepositRow = {
@@ -100,16 +101,7 @@ export function openWhatsApp(row: DepositRow) {
   const raw = row.userMobile || row.mobile;
   if (!raw) return;
   const formatted = formatPhone(raw);
-  const state = row.userState || row.state || '';
-  const stateWiseMsg =
-    state === 'Karnataka'
-      ? `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nನೀವು ಠೇವಣಿ ಮಾಡಲು ಪ್ರಯತ್ನಿಸುತ್ತಿರುವಿರಿ ಎಂದು ಕಾಣುತ್ತದೆ. ನಾನು ಇಂದು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?`
-      : ['Telangana', 'Andhra Pradesh'].includes(state)
-        ? `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nమీరు డిపాజిట్ చేయడానికి ప్రయత్నిస్తున్నారని నేను చూస్తున్నాను. నేను ఈ రోజు మీకు ఎలా సహాయం చేయగలను?`
-        : ['Tamil Nadu', 'Tiruchirappalli'].includes(state)
-          ? `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nநீங்கள் டெப்பாசிட் செய்ய முயற்சிக்கிறீர்கள் என்று பார்க்கிறேன். இன்று நான் உங்களுக்கு எப்படி உதவலாம்?`
-          : `Hello {USER_NAME} Sir,\nWelcome to ${row.clientName || ''} Games.\nI see you're trying to make a deposit. How can I assist you today?`;
-  const message = stateWiseMsg.replace('{USER_NAME}', (row.userName || '').split(' ')[0] || '');
+  const message = buildDepositWhatsAppMessage(row);
   const encoded = encodeURIComponent(message);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (isMobile) {

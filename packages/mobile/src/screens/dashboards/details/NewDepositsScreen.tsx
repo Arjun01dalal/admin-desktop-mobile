@@ -5,26 +5,27 @@
  * detail sheet with every desktop column. Mobile/email masked unless show_mobile.
  * accessibleStates (from stored user) filters rows client-side, mirroring desktop.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
-import { secureApi } from '../../../api/client';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
+import { usePagedSecureQuery } from '../../../hooks/usePagedSecureQuery';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { display, maskMobile } from '../../../utils/display';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './NewDepositsScreen.styles';
@@ -62,15 +63,6 @@ type Row = {
 type Filters = { name: string; mobile: string };
 
 const EMPTY_FILTERS: Filters = { name: '', mobile: '' };
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (value === undefined || value === null || value === '') return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function formatAmount(value: unknown): string {
   const n = Number(value ?? 0);
@@ -79,27 +71,29 @@ function formatAmount(value: unknown): string {
 }
 
 /** Tolerant paged unpack: list under items/users/docs/payload(.items), count from total/count. */
-function asPaged<T>(data: unknown): { list: T[]; total: number } {
-  if (Array.isArray(data)) return { list: data as T[], total: (data as T[]).length };
+function unpackNewDeposits(data: unknown): { rows: Row[]; total: number; totalPages: number } {
+  if (Array.isArray(data)) {
+    return { rows: data as Row[], total: data.length, totalPages: 1 };
+  }
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
     const nested =
       obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
         ? (obj.payload as Record<string, unknown>)
         : obj;
-    let list: T[] = [];
+    let list: Row[] = [];
     for (const key of ['items', 'users', 'docs', 'data']) {
       const v = nested[key] ?? obj[key];
       if (Array.isArray(v)) {
-        list = v as T[];
+        list = v as Row[];
         break;
       }
     }
     const total =
       Number(nested.total ?? nested.count ?? obj.total ?? obj.count ?? 0) || list.length;
-    return { list, total };
+    return { rows: list, total, totalPages: 1 };
   }
-  return { list: [], total: 0 };
+  return { rows: [], total: 0, totalPages: 1 };
 }
 
 export function NewDepositsScreen() {
@@ -113,15 +107,10 @@ export function NewDepositsScreen() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rawRows, setRawRows] = useState<Row[]>([]);
-  const [total, setTotal] = useState(0);
   const [sheetRow, setSheetRow] = useState<Row | null>(null);
   // Search modal.
   const [searchOpen, setSearchOpen] = useState(false);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
-  const genRef = useRef(0);
 
   const canShowMobile = hasPermission('show_mobile');
 
@@ -132,40 +121,36 @@ export function NewDepositsScreen() {
     return raw.filter((v): v is string => typeof v === 'string').map((v) => v.toLowerCase());
   }, []);
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const filter: Record<string, unknown> = {};
-      if (applied.name.trim()) filter.name = applied.name.trim();
-      if (applied.mobile.trim()) filter.mobile = applied.mobile.trim();
-      const res = await secureApi<unknown>('ops.newDeposits', {
-        itemsPerPage: pageSize,
-        pageNo: page,
-        startDate: startDate || todayIST(),
-        endDate: endDate || todayIST(),
-        filter,
-      });
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load new deposits');
-        setRawRows([]);
-        setTotal(0);
-        return;
-      }
-      const { list, total: count } = asPaged<Row>(res.data);
-      setSheetRow(null);
-      setRawRows(list);
-      setTotal(count);
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
+  const buildPayload = useCallback(() => {
+    const filter: Record<string, unknown> = {};
+    if (applied.name.trim()) filter.name = applied.name.trim();
+    if (applied.mobile.trim()) filter.mobile = applied.mobile.trim();
+    return {
+      itemsPerPage: pageSize,
+      pageNo: page,
+      startDate: startDate || todayIST(),
+      endDate: endDate || todayIST(),
+      filter,
+    };
   }, [page, pageSize, applied, startDate, endDate]);
 
+  const {
+    rows: rawRows,
+    total,
+    loading,
+    error,
+    load,
+  } = usePagedSecureQuery<Row>({
+    action: 'ops.newDeposits',
+    buildPayload,
+    unpack: unpackNewDeposits,
+    autoDeps: [page, pageSize, applied, startDate, endDate],
+    errorMessage: 'Failed to load new deposits',
+  });
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    setSheetRow(null);
+  }, [rawRows]);
 
   const rows = useMemo(() => {
     if (accessibleStates.length === 0) return rawRows;
@@ -312,19 +297,28 @@ export function NewDepositsScreen() {
     [page, pageSize, canShowMobile],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <NewDepositCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        canShowMobile={!!canShowMobile}
+        onOpenSheet={() => setSheetRow(row)}
+        onOpenReport={() => openUserReport(row)}
+      />
+    ),
+    [page, pageSize, canShowMobile, openUserReport],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <Text style={styles.title}>New Deposits</Text>
         <TouchableOpacity
@@ -378,63 +372,45 @@ export function NewDepositsScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No new deposits found</Text>
-      ) : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {display(row.name)}
-              </Text>
-              {row._id ? (
-                <TouchableOpacity
-                  style={styles.reportBtn}
-                  onPress={() => openUserReport(row)}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                >
-                  <Text style={styles.reportBtnText}>User Report</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Balance</Text>
-              <Text style={styles.cardValue}>{formatAmount(row.balance ?? 0)}</Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                Mobile: {maskMobile(row.mobile, canShowMobile)}
-              </Text>
-              <Text style={styles.cardSplitRight} numberOfLines={1}>
-                State: {display(row.state)}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>City</Text>
-              <Text style={styles.cardValue}>{display(row.city)}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Created</Text>
-              <Text style={styles.cardValue}>
-                {row.createdOn
-                  ? `${formatDisplayDate(row.createdOn)} ${formatDisplayTime(row.createdOn)}`
-                  : '—'}
-              </Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for full details</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No new deposits found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!searchOpen}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -519,25 +495,71 @@ export function NewDepositsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
+type NewDepositCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  canShowMobile: boolean;
+  onOpenSheet: () => void;
+  onOpenReport: () => void;
+};
+
+const NewDepositCard = memo(function NewDepositCard({
+  row,
+  index,
+  page,
+  pageSize,
+  canShowMobile,
+  onOpenSheet,
+  onOpenReport,
+}: NewDepositCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        {row._id ? (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={onOpenReport}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Text style={styles.reportBtnText}>User Report</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Balance</Text>
+        <Text style={styles.cardValue}>{formatAmount(row.balance ?? 0)}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Mobile: {maskMobile(row.mobile, canShowMobile)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          State: {display(row.state)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>City</Text>
+        <Text style={styles.cardValue}>{display(row.city)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Created</Text>
+        <Text style={styles.cardValue}>
+          {row.createdOn
+            ? `${formatDisplayDate(row.createdOn)} ${formatDisplayTime(row.createdOn)}`
+            : '—'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for full details</Text>
+    </TouchableOpacity>
+  );
+});

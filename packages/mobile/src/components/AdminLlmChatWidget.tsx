@@ -41,6 +41,7 @@ import {
   parseLlmSendResult,
   rowsFromLlmPayload,
   clearLlmChatStorage,
+  trimLlmChatMessages,
   type LlmChatMessage,
 } from '@astro/shared';
 import { secureApi } from '../api/client';
@@ -55,7 +56,7 @@ function loadStoredMessages(): LlmChatMessage[] {
     const raw = appStorage.getItem(LLM_CHAT_HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return trimLlmChatMessages(Array.isArray(parsed) ? (parsed as LlmChatMessage[]) : []);
   } catch {
     return [];
   }
@@ -241,7 +242,12 @@ export function AdminLlmChatHeaderButton() {
   }, [open]);
 
   useEffect(() => {
-    appStorage.setItem(LLM_CHAT_HISTORY_KEY, JSON.stringify(messages));
+    const capped = trimLlmChatMessages(messages);
+    if (capped.length !== messages.length) {
+      setMessages(capped);
+      return;
+    }
+    appStorage.setItem(LLM_CHAT_HISTORY_KEY, JSON.stringify(capped));
   }, [messages]);
 
   useEffect(() => {
@@ -282,6 +288,18 @@ export function AdminLlmChatHeaderButton() {
     }
     setRecordingMs(0);
   }, [open, recording, audioRecorder]);
+
+  // Stop mic + timer if the header button unmounts mid-recording (logout / nav).
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) {
+        clearInterval(recordTimerRef.current);
+        recordTimerRef.current = null;
+      }
+      cancelRecordingRef.current = true;
+      void audioRecorder.stop().catch(() => undefined);
+    };
+  }, [audioRecorder]);
 
   const startNewChat = () => {
     setMessages([]);

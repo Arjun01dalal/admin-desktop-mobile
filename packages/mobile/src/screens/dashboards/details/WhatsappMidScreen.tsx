@@ -1,20 +1,21 @@
 /**
  * Set Gateway Mid — mobile port of desktop WhatsappMidPage / admin-panel gateway-upi.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import {
   EMPTY_GATEWAY_MID_FORM,
   WHATSAPP_UP_RAJ_NUMBER,
@@ -40,11 +41,7 @@ import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './WhatsappMidScreen.styles';
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
+import { display } from '../../../utils/display';
 
 function ChipRow({
   options,
@@ -288,19 +285,21 @@ export function WhatsappMidScreen() {
       ]
     : [];
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback((group: { name: string }) => group.name, []);
+
+  const renderItem = useCallback(
+    ({ item: group }: ListRenderItemInfo<{ name: string; rows: GatewayMidRow[] }>) => (
+      <WhatsappMidGroupCard
+        group={group}
+        onOpenRow={setSheetRow}
+        onToggleStatus={(row, v) => void toggleStatus(row, v)}
+      />
+    ),
+    [toggleStatus],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <View style={styles.headerText}>
           <Text style={styles.title}>Set Gateway Mid</Text>
@@ -318,56 +317,24 @@ export function WhatsappMidScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No Gateway MIDs found</Text>
-      ) : null}
-
-      <View style={styles.list}>
-        {groupedByName.map((group) => (
-          <View key={group.name} style={styles.group}>
-            <View style={styles.groupHeader}>
-              <View style={styles.groupAccent} />
-              <View style={styles.groupHeaderText}>
-                <Text style={styles.groupLabel}>NAME</Text>
-                <Text style={styles.groupTitle} numberOfLines={1}>
-                  {group.name}
-                </Text>
-              </View>
-              <View style={styles.groupBadge}>
-                <Text style={styles.groupCount}>{group.rows.length}</Text>
-              </View>
-            </View>
-            {group.rows.map((row, i) => (
-              <TouchableOpacity
-                key={getGatewayMidRowId(row) || `${group.name}-${i}`}
-                style={styles.card}
-                onPress={() => setSheetRow(row)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardTop}>
-                  <Text style={styles.cardName} numberOfLines={1}>
-                    MID: {display(row.mid)}
-                  </Text>
-                  <Switch
-                    value={Boolean(row.isCurrentlyActive)}
-                    onValueChange={(v) => void toggleStatus(row, v)}
-                    style={styles.cardSwitch}
-                  />
-                </View>
-                <Text style={styles.cardMeta} numberOfLines={1}>
-                  {formatGatewayTypeLabel(row.type || '') || '—'} · UPI: {display(row.upiId)}
-                </Text>
-                <Text style={styles.cardMeta} numberOfLines={1}>
-                  Max {display(row.maxDepositAllowed)} · Pos {display(row.position)}
-                  {row.whatsappNumber ? ` · ${row.whatsappNumber}` : ''}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={groupedByName}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No Gateway MIDs found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!formOpen}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -558,7 +525,62 @@ export function WhatsappMidScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
+
+type WhatsappMidGroupCardProps = {
+  group: { name: string; rows: GatewayMidRow[] };
+  onOpenRow: (row: GatewayMidRow) => void;
+  onToggleStatus: (row: GatewayMidRow, checked: boolean) => void;
+};
+
+const WhatsappMidGroupCard = memo(function WhatsappMidGroupCard({
+  group,
+  onOpenRow,
+  onToggleStatus,
+}: WhatsappMidGroupCardProps) {
+  return (
+    <View style={styles.group}>
+      <View style={styles.groupHeader}>
+        <View style={styles.groupAccent} />
+        <View style={styles.groupHeaderText}>
+          <Text style={styles.groupLabel}>NAME</Text>
+          <Text style={styles.groupTitle} numberOfLines={1}>
+            {group.name}
+          </Text>
+        </View>
+        <View style={styles.groupBadge}>
+          <Text style={styles.groupCount}>{group.rows.length}</Text>
+        </View>
+      </View>
+      {group.rows.map((row, i) => (
+        <TouchableOpacity
+          key={getGatewayMidRowId(row) || `${group.name}-${i}`}
+          style={styles.card}
+          onPress={() => onOpenRow(row)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardTop}>
+            <Text style={styles.cardName} numberOfLines={1}>
+              MID: {display(row.mid)}
+            </Text>
+            <Switch
+              value={Boolean(row.isCurrentlyActive)}
+              onValueChange={(v) => onToggleStatus(row, v)}
+              style={styles.cardSwitch}
+            />
+          </View>
+          <Text style={styles.cardMeta} numberOfLines={1}>
+            {formatGatewayTypeLabel(row.type || '') || '—'} · UPI: {display(row.upiId)}
+          </Text>
+          <Text style={styles.cardMeta} numberOfLines={1}>
+            Max {display(row.maxDepositAllowed)} · Pos {display(row.position)}
+            {row.whatsappNumber ? ` · ${row.whatsappNumber}` : ''}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+});
 

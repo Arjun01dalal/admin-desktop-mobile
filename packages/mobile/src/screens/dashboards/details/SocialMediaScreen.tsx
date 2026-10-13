@@ -8,25 +8,26 @@
  * clipboard dependency, so "copy" is implemented as a native share of the URL.
  * Row tap opens the detail sheet with Share / Edit / Delete actions.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   Share,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './SocialMediaScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id: string;
@@ -39,11 +40,6 @@ type Row = {
 const SHARE_DECOY_URL = 'https://astropixel.live/';
 /** Every Nth tap on a name shares that row's real link. */
 const COPY_LINK_EVERY_N_TAPS = 6;
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function asList(data: unknown): Row[] {
   if (Array.isArray(data)) return data as Row[];
@@ -201,19 +197,20 @@ export function SocialMediaScreen() {
     ];
   }, [sheetRow, shareLink, openEdit, handleDelete]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row }: ListRenderItemInfo<Row>) => (
+      <SocialMediaCard row={row} onPress={() => setSheetRow(row)} />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Social Media</Text>
         <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
@@ -226,26 +223,29 @@ export function SocialMediaScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No social media links found</Text>
-      ) : null}
-      <View style={styles.grid}>
-        {rows.map((row, i) => (
-          <TouchableOpacity
-            key={`row-${i}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.7}
-            onPress={() => setSheetRow(row)}
-          >
-            <Text style={styles.cardName} numberOfLines={2}>
-              {display(row.name)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      {rows.length ? <Text style={styles.hint}>Tap a card to Share / Edit / Delete</Text> : null}
+  const listFooter = rows.length ? (
+    <Text style={styles.hint}>Tap a card to Share / Edit / Delete</Text>
+  ) : null;
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No social media links found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!formOpen}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -310,7 +310,21 @@ export function SocialMediaScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
+type SocialMediaCardProps = {
+  row: Row;
+  onPress: () => void;
+};
+
+const SocialMediaCard = memo(function SocialMediaCard({ row, onPress }: SocialMediaCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={onPress}>
+      <Text style={styles.cardName} numberOfLines={2}>
+        {display(row.name)}
+      </Text>
+    </TouchableOpacity>
+  );
+});

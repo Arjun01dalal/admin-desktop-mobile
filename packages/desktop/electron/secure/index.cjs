@@ -782,6 +782,23 @@ async function execute(action, payload = {}, token = null) {
         .toUpperCase();
     }
 
+    // Registry paths may include `{param}` placeholders (e.g. /dialer/call/{callId}).
+    let resolvedPath = String(def.path || '');
+    if (
+      resolvedPath.includes('{') &&
+      requestPayload &&
+      typeof requestPayload === 'object' &&
+      !Array.isArray(requestPayload)
+    ) {
+      const nextPayload = { ...requestPayload };
+      resolvedPath = resolvedPath.replace(/\{(\w+)\}/g, (_match, key) => {
+        const value = nextPayload[key];
+        delete nextPayload[key];
+        return encodeURIComponent(String(value ?? ''));
+      });
+      requestPayload = nextPayload;
+    }
+
     const method = String(def.method || 'POST').toUpperCase();
     const isGet = method === 'GET';
     const body = def.encryptRequest ? { token: encrypt(requestPayload) } : requestPayload;
@@ -797,14 +814,14 @@ async function execute(action, payload = {}, token = null) {
     };
 
     // Match laxminarayan Live Match calls: dates go in the query string for GET.
-    let url = def.path;
+    let url = resolvedPath;
     if (isGet) {
       const entries = Object.entries(requestPayload || {}).filter(
         ([, v]) => v != null && String(v).length > 0,
       );
       if (entries.length > 0) {
         const qs = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
-        url = `${def.path}${def.path.includes('?') ? '&' : '?'}${qs}`;
+        url = `${resolvedPath}${resolvedPath.includes('?') ? '&' : '?'}${qs}`;
       }
     }
 

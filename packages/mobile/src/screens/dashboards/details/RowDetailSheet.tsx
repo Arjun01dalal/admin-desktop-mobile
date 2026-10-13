@@ -6,7 +6,6 @@
 import React, { type ReactNode } from 'react';
 import {
   Alert,
-  Image,
   Modal,
   ScrollView,
   Text,
@@ -16,6 +15,8 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CachedImage } from '../../../components/CachedImage';
 import { colors, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { styles } from './RowDetailSheet.styles';
@@ -102,13 +103,16 @@ export function RowDetailSheet({
   imageUri,
   footer,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, spacing(3));
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={styles.backdropTouch} />
         </TouchableWithoutFeedback>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: bottomPad }]}>
           <View style={styles.handle} />
           <View style={styles.headerRow}>
             <Text style={styles.title} numberOfLines={1}>
@@ -124,10 +128,16 @@ export function RowDetailSheet({
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={{ paddingBottom: spacing(8) }}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
           >
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
+              <CachedImage
+                source={{ uri: imageUri }}
+                style={styles.image}
+                resizeMode="contain"
+                recyclingKey={imageUri}
+              />
             ) : null}
             {footer}
             {actions && actions.length > 0 ? (

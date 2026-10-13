@@ -2,15 +2,16 @@
  * Coin Removal List — port of desktop CoinRemovalPage + CoinRemovalDetailsPage.
  * users.coinRemovalUsers; card tap → details / transactions (users.getTransactionHistory).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../../theme';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
 import { floorNum } from '../../../dashboards/mergeMetrics';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CoinRemovalListScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -37,11 +38,6 @@ type Txn = {
 };
 
 const PAGE_SIZE = 25;
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatTs(ts?: string): string {
   if (!ts) return '—';
@@ -168,21 +164,45 @@ export function CoinRemovalListScreen() {
     { label: 'Time', value: formatTs(t.createdOn) },
   ];
 
+  const userKeyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderUserItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <CoinRemovalUserCard
+        row={row}
+        index={index}
+        page={page}
+        onPress={() => setSheetRow(row)}
+        onTransactions={() => openTransactions(row)}
+      />
+    ),
+    [page, openTransactions],
+  );
+
+  const txnKeyExtractor = useCallback(
+    (t: Txn, index: number) => `row-${index}-${String(t._id ?? '')}`,
+    [],
+  );
+
+  const renderTxnItem = useCallback(
+    ({ item: t, index }: ListRenderItemInfo<Txn>) => (
+      <CoinRemovalTxnCard
+        txn={t}
+        index={index}
+        txnPage={txnPage}
+        onPress={() => setSelectedTxn(t)}
+      />
+    ),
+    [txnPage],
+  );
+
   // ---- Transactions drill-down view ----
   if (detailUser) {
-    return (
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={txnLoading}
-            onRefresh={() => void loadTxns()}
-            tintColor={colors.primary}
-          />
-        }
-      >
+    const txnHeader = (
+      <>
         <TouchableOpacity
           onPress={() => {
             txnGenRef.current += 1;
@@ -204,47 +224,44 @@ export function CoinRemovalListScreen() {
             <Text style={styles.errorText}>{txnError}</Text>
           </View>
         ) : null}
+      </>
+    );
 
-        {txnLoading && txns.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-        {!txnLoading && txns.length === 0 ? (
-          <Text style={styles.hint}>No transactions found</Text>
-        ) : null}
+    const txnFooter = (
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, txnPage <= 1 && styles.pagerDisabled]}
+          onPress={() => txnPage > 1 && setTxnPage((p) => p - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {txnPage} / {txnTotalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, txnPage >= txnTotalPages && styles.pagerDisabled]}
+          onPress={() => txnPage < txnTotalPages && setTxnPage((p) => p + 1)}
+        >
+          Next ›
+        </Text>
+      </View>
+    );
 
-        <View style={styles.list}>
-          {txns.map((t, index) => (
-            <TouchableOpacity
-              key={`row-${index}-${String(t._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSelectedTxn(t)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(txnPage - 1) * PAGE_SIZE + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {String(t.paymentType || 'coins')}
-                </Text>
-                <Text style={styles.cardBadge} numberOfLines={1}>
-                  {display(t.tag)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Balance</Text>
-                <Text style={styles.cardValue}>
-                  {floorNum(t.balance ?? 0).toLocaleString('en-IN')}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Updated By</Text>
-                <Text style={styles.cardValue}>{display(t.updatedBy?.name)}</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Time</Text>
-                <Text style={styles.cardValue}>{formatTs(t.createdOn)}</Text>
-              </View>
-              <Text style={styles.cardHint}>Tap for full details</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+    return (
+      <>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={txns}
+          keyExtractor={txnKeyExtractor}
+          renderItem={renderTxnItem}
+          listHeader={txnHeader}
+          listFooter={txnFooter}
+          loading={txnLoading}
+          emptyMessage="No transactions found"
+          refreshing={txnLoading}
+          onRefresh={() => void loadTxns()}
+        />
 
         <RowDetailSheet
           visible={selectedTxn !== null}
@@ -252,42 +269,13 @@ export function CoinRemovalListScreen() {
           fields={selectedTxn ? txnSheetFields(selectedTxn) : []}
           onClose={() => setSelectedTxn(null)}
         />
-
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, txnPage <= 1 && styles.pagerDisabled]}
-            onPress={() => txnPage > 1 && setTxnPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {txnPage} / {txnTotalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, txnPage >= txnTotalPages && styles.pagerDisabled]}
-            onPress={() => txnPage < txnTotalPages && setTxnPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
-      </ScrollView>
+      </>
     );
   }
 
   // ---- Main list view ----
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const listHeader = (
+    <>
       <Text style={styles.title}>Coin Removal List</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate}
@@ -310,51 +298,44 @@ export function CoinRemovalListScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {display(row.name)}
-              </Text>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => openTransactions(row)}
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-              >
-                <Text style={styles.actionBtnText}>Transactions</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Coin Pulled</Text>
-              <Text style={styles.cardValue}>
-                {floorNum(row.totalBalance ?? 0).toLocaleString('en-IN')}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Transactions</Text>
-              <Text style={styles.cardValue}>{String(row.totalTransactions ?? 0)}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>City / State</Text>
-              <Text style={styles.cardValue}>
-                {display(row.city)} · {display(row.state)}
-              </Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for full details</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={userKeyExtractor}
+        renderItem={renderUserItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No data available"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -371,25 +352,98 @@ export function CoinRemovalListScreen() {
         ]}
         onClose={() => setSheetRow(null)}
       />
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </>
   );
 }
 
+type CoinRemovalUserCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  onPress: () => void;
+  onTransactions: () => void;
+};
+
+const CoinRemovalUserCard = memo(function CoinRemovalUserCard({
+  row,
+  index,
+  page,
+  onPress,
+  onTransactions,
+}: CoinRemovalUserCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={onTransactions}
+          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+        >
+          <Text style={styles.actionBtnText}>Transactions</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Coin Pulled</Text>
+        <Text style={styles.cardValue}>
+          {floorNum(row.totalBalance ?? 0).toLocaleString('en-IN')}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Transactions</Text>
+        <Text style={styles.cardValue}>{String(row.totalTransactions ?? 0)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>City / State</Text>
+        <Text style={styles.cardValue}>
+          {display(row.city)} · {display(row.state)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for full details</Text>
+    </TouchableOpacity>
+  );
+});
+
+type CoinRemovalTxnCardProps = {
+  txn: Txn;
+  index: number;
+  txnPage: number;
+  onPress: () => void;
+};
+
+const CoinRemovalTxnCard = memo(function CoinRemovalTxnCard({
+  txn: t,
+  index,
+  txnPage,
+  onPress,
+}: CoinRemovalTxnCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(txnPage - 1) * PAGE_SIZE + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {String(t.paymentType || 'coins')}
+        </Text>
+        <Text style={styles.cardBadge} numberOfLines={1}>
+          {display(t.tag)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Balance</Text>
+        <Text style={styles.cardValue}>{floorNum(t.balance ?? 0).toLocaleString('en-IN')}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Updated By</Text>
+        <Text style={styles.cardValue}>{display(t.updatedBy?.name)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Time</Text>
+        <Text style={styles.cardValue}>{formatTs(t.createdOn)}</Text>
+      </View>
+      <Text style={styles.cardHint}>Tap for full details</Text>
+    </TouchableOpacity>
+  );
+});

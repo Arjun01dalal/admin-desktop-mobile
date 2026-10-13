@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import type { GameImageUpdateTarget } from '@astro/shared/updateGameImage';
+import { CachedImage } from '../../../components/CachedImage';
 import { colors } from '../../../theme';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { styles } from './UpdateGameImageModal.styles';
@@ -86,7 +86,7 @@ export function UpdateGameImageModal({ visible, loading, target, onClose, onSubm
             <View style={styles.previewBlock}>
               <Text style={styles.previewLabel}>Current</Text>
               {target?.currentImageUrl ? (
-                <Image
+                <CachedImage
                   source={{ uri: replaceS3WithCloudfront(target.currentImageUrl) }}
                   style={styles.previewImage}
                   resizeMode="contain"
@@ -98,7 +98,7 @@ export function UpdateGameImageModal({ visible, loading, target, onClose, onSubm
             <View style={styles.previewBlock}>
               <Text style={styles.previewLabel}>New preview</Text>
               {trimmed ? (
-                <Image
+                <CachedImage
                   source={{ uri: replaceS3WithCloudfront(trimmed) }}
                   style={styles.previewImage}
                   resizeMode="contain"

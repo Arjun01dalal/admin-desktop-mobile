@@ -1,36 +1,11 @@
 /**
  * Panel detail routes — maps desktop href paths (carried on KPI / provider
  * card models) to mobile detail screens pushed on the root stack.
+ * Screen modules load lazily via getComponent on first navigation.
  */
 import React from 'react';
 import { canAccessNavItem, Permissions, type Permission } from '../auth/permissions';
 import type { AuthUser } from '../types/auth';
-import { LiveMatchTotalScreen } from '../screens/dashboards/details/LiveMatchTotalScreen';
-import { BothMasterAddScreen } from '../screens/dashboards/details/BothMasterAddScreen';
-import { FalconRateManagementScreen } from '../screens/dashboards/details/FalconRateManagementScreen';
-import { ExchangeRateManagementScreen } from '../screens/dashboards/details/ExchangeRateManagementScreen';
-import { MasterDashboardScreen } from '../screens/dashboards/details/MasterDashboardScreen';
-import { DashboardUsersListScreen } from '../screens/dashboards/details/DashboardUsersListScreen';
-import { TodaysActiveScreen } from '../screens/dashboards/details/TodaysActiveScreen';
-import { UsersScreen } from '../screens/UsersScreen';
-import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersScreen';
-import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
-import { PlayerActivityDetailsScreen } from '../screens/dashboards/details/PlayerActivityDetailsScreen';
-import { GameActivityDetailsScreen } from '../screens/dashboards/details/GameActivityDetailsScreen';
-import { GameUserStatsScreen } from '../screens/dashboards/details/GameUserStatsScreen';
-import { BetConstructGamesListScreen } from '../screens/dashboards/details/BetConstructGamesListScreen';
-import { NandiPlatformScreen } from '../screens/dashboards/details/NandiPlatformScreen';
-import { LudoUserGgrScreen } from '../screens/dashboards/details/LudoUserGgrScreen';
-import { LudoPlayerWiseRtpScreen } from '../screens/dashboards/details/LudoPlayerWiseRtpScreen';
-import { LeaderboardCustomerListScreen } from '../screens/dashboards/details/LeaderboardCustomerListScreen';
-import { UserReportScreen } from '../screens/UserReportScreen';
-import { UserExposureScreen } from '../screens/UserExposureScreen';
-import { BonusEarningScreen } from '../screens/BonusEarningScreen';
-import { CallerDepositListScreen } from '../screens/dashboards/details/CallerDepositListScreen';
-import { CallerDetailsScreen } from '../screens/dashboards/details/CallerDetailsScreen';
-import { ActiveBotUsersScreen } from '../screens/dashboards/details/ActiveBotUsersScreen';
-import { ActiveUserDataScreen } from '../screens/dashboards/details/ActiveUserDataScreen';
-import { MidGroupsScreen } from '../screens/dashboards/details/MidGroupsScreen';
 
 export type PanelDetailParams = Record<string, unknown>;
 
@@ -45,7 +20,8 @@ export type PanelDetailRoute = {
   /** Desktop route path — also used as the stack screen name. */
   path: string;
   title: string;
-  Component: React.ComponentType<Record<string, unknown>>;
+  /** Lazy factory — require() runs on first open. */
+  getComponent: () => React.ComponentType<Record<string, unknown>>;
 };
 
 const DETAIL_PERMISSION_BY_PATH: Readonly<Record<string, Permission>> = {
@@ -62,6 +38,7 @@ const DETAIL_PERMISSION_BY_PATH: Readonly<Record<string, Permission>> = {
   '/registered-users': Permissions.View_Dashboard,
   '/users': Permissions.View_Users,
   '/todays-active': Permissions.todays_active,
+  '/played-today-yesterday': Permissions.View_Dashboard,
   '/new-registers': Permissions.new_registrations,
   '/game-activity': Permissions.game_activity,
   '/player-activity/details': Permissions.player_activity,
@@ -81,156 +58,301 @@ const DETAIL_PERMISSION_BY_PATH: Readonly<Record<string, Permission>> = {
   '/funds/mid-groups': Permissions.Deposit_Config,
 };
 
+function named(
+  mod: Record<string, unknown>,
+  exportName: string,
+): React.ComponentType<Record<string, unknown>> {
+  const Comp = mod[exportName];
+  if (typeof Comp !== 'function') {
+    throw new Error(`panelDetail: missing export ${exportName}`);
+  }
+  return Comp as React.ComponentType<Record<string, unknown>>;
+}
+
+const detailCache = new Map<string, React.ComponentType<Record<string, unknown>>>();
+
+function lazyOnce(
+  key: string,
+  factory: () => React.ComponentType<Record<string, unknown>>,
+): () => React.ComponentType<Record<string, unknown>> {
+  return () => {
+    const hit = detailCache.get(key);
+    if (hit) return hit;
+    const Comp = factory();
+    detailCache.set(key, Comp);
+    return Comp;
+  };
+}
+
 export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
   {
     path: '/liveMatchTotal',
     title: 'Live Match Total',
-    Component: () => <LiveMatchTotalScreen variant="laxmi" />,
+    getComponent: lazyOnce('/liveMatchTotal', () => {
+      const { LiveMatchTotalScreen } = require('../screens/dashboards/details/LiveMatchTotalScreen');
+      return function LiveMatchLaxmi() {
+        return <LiveMatchTotalScreen variant="laxmi" />;
+      };
+    }),
   },
   {
     path: '/masterLiveMatchTotal',
     title: 'Live Match Total (Master)',
-    Component: () => <LiveMatchTotalScreen variant="master" />,
+    getComponent: lazyOnce('/masterLiveMatchTotal', () => {
+      const { LiveMatchTotalScreen } = require('../screens/dashboards/details/LiveMatchTotalScreen');
+      return function LiveMatchMaster() {
+        return <LiveMatchTotalScreen variant="master" />;
+      };
+    }),
   },
   {
     path: '/bothLiveMatchTotal',
     title: 'Live Match Total (Master & Laxmi)',
-    Component: () => <LiveMatchTotalScreen variant="both" />,
+    getComponent: lazyOnce('/bothLiveMatchTotal', () => {
+      const { LiveMatchTotalScreen } = require('../screens/dashboards/details/LiveMatchTotalScreen');
+      return function LiveMatchBoth() {
+        return <LiveMatchTotalScreen variant="both" />;
+      };
+    }),
   },
   {
     path: '/bothMasterAddPage',
     title: 'AAA & Master AAA Books',
-    Component: BothMasterAddScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/bothMasterAddPage', () =>
+      named(require('../screens/dashboards/details/BothMasterAddScreen'), 'BothMasterAddScreen'),
+    ),
   },
   {
     path: '/falconRateManagement',
     title: 'Falcon Rate Management',
-    Component: FalconRateManagementScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/falconRateManagement', () =>
+      named(
+        require('../screens/dashboards/details/FalconRateManagementScreen'),
+        'FalconRateManagementScreen',
+      ),
+    ),
   },
   {
     path: '/exchangeRateManagement',
     title: 'Exchange Rate Management',
-    Component: ExchangeRateManagementScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/exchangeRateManagement', () =>
+      named(
+        require('../screens/dashboards/details/ExchangeRateManagementScreen'),
+        'ExchangeRateManagementScreen',
+      ),
+    ),
   },
   {
     path: '/activeUserData',
     title: 'Active User Data',
-    Component: ActiveUserDataScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/activeUserData', () =>
+      named(require('../screens/dashboards/details/ActiveUserDataScreen'), 'ActiveUserDataScreen'),
+    ),
   },
   {
     path: '/masterDashboard',
     title: 'Master Dashboard',
-    Component: MasterDashboardScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/masterDashboard', () =>
+      named(
+        require('../screens/dashboards/details/MasterDashboardScreen'),
+        'MasterDashboardScreen',
+      ),
+    ),
   },
   {
     path: '/balance-f',
     title: 'Users Balance',
-    Component: () => <DashboardUsersListScreen kind="balance" />,
+    getComponent: lazyOnce('/balance-f', () => {
+      const {
+        DashboardUsersListScreen,
+      } = require('../screens/dashboards/details/DashboardUsersListScreen');
+      return function BalanceUsers() {
+        return <DashboardUsersListScreen kind="balance" />;
+      };
+    }),
   },
   {
     path: '/total-bonus-users-p',
     title: 'Users Bonus Balance',
-    Component: () => <DashboardUsersListScreen kind="bonus" />,
+    getComponent: lazyOnce('/total-bonus-users-p', () => {
+      const {
+        DashboardUsersListScreen,
+      } = require('../screens/dashboards/details/DashboardUsersListScreen');
+      return function BonusUsers() {
+        return <DashboardUsersListScreen kind="bonus" />;
+      };
+    }),
   },
   {
     path: '/registered-users',
     title: 'Registered Users (App, Today)',
-    Component: () => <DashboardUsersListScreen kind="registered" />,
+    getComponent: lazyOnce('/registered-users', () => {
+      const {
+        DashboardUsersListScreen,
+      } = require('../screens/dashboards/details/DashboardUsersListScreen');
+      return function RegisteredUsers() {
+        return <DashboardUsersListScreen kind="registered" />;
+      };
+    }),
   },
   {
     path: '/users',
     title: 'Users',
-    Component: UsersScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/users', () => named(require('../screens/UsersScreen'), 'UsersScreen')),
   },
   {
     path: '/todays-active',
     title: "Today's Active Users",
-    Component: TodaysActiveScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/todays-active', () =>
+      named(require('../screens/dashboards/details/TodaysActiveScreen'), 'TodaysActiveScreen'),
+    ),
+  },
+  {
+    path: '/played-today-yesterday',
+    title: 'Played Today / Yesterday',
+    getComponent: lazyOnce('/played-today-yesterday', () =>
+      named(
+        require('../screens/dashboards/details/PlayedTodayYesterdayScreen'),
+        'PlayedTodayYesterdayScreen',
+      ),
+    ),
   },
   {
     path: '/new-registers',
     title: 'New Registration',
-    Component: NewRegistersScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/new-registers', () =>
+      named(require('../screens/dashboards/details/NewRegistersScreen'), 'NewRegistersScreen'),
+    ),
   },
   {
     path: '/game-activity',
     title: 'Games Activity',
-    Component: GameActivityScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/game-activity', () =>
+      named(require('../screens/dashboards/details/GameActivityScreen'), 'GameActivityScreen'),
+    ),
   },
   {
     path: '/player-activity/details',
     title: 'Player Activity Details',
-    Component: PlayerActivityDetailsScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/player-activity/details', () =>
+      named(
+        require('../screens/dashboards/details/PlayerActivityDetailsScreen'),
+        'PlayerActivityDetailsScreen',
+      ),
+    ),
   },
   {
     path: '/game-activity/details',
     title: 'Game Activity Details',
-    Component: GameActivityDetailsScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/game-activity/details', () =>
+      named(
+        require('../screens/dashboards/details/GameActivityDetailsScreen'),
+        'GameActivityDetailsScreen',
+      ),
+    ),
   },
   {
     path: '/game-activity/user-stats',
     title: 'Game User Stats',
-    Component: GameUserStatsScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/game-activity/user-stats', () =>
+      named(require('../screens/dashboards/details/GameUserStatsScreen'), 'GameUserStatsScreen'),
+    ),
   },
   {
     path: '/betConstructGamesList',
     title: 'BetConstruct Details',
-    Component: BetConstructGamesListScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/betConstructGamesList', () =>
+      named(
+        require('../screens/dashboards/details/BetConstructGamesListScreen'),
+        'BetConstructGamesListScreen',
+      ),
+    ),
   },
   {
     path: '/nandi-platform',
     title: 'Shatabhisha Platform',
-    Component: NandiPlatformScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/nandi-platform', () =>
+      named(require('../screens/dashboards/details/NandiPlatformScreen'), 'NandiPlatformScreen'),
+    ),
   },
   {
     path: '/ludo-user-ggr-by-round',
     title: 'Ludo User GGR By Round',
-    Component: LudoUserGgrScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/ludo-user-ggr-by-round', () =>
+      named(require('../screens/dashboards/details/LudoUserGgrScreen'), 'LudoUserGgrScreen'),
+    ),
   },
   {
     path: '/ludo-player-wise-rtp',
     title: 'Player Wise RTP',
-    Component: LudoPlayerWiseRtpScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/ludo-player-wise-rtp', () =>
+      named(
+        require('../screens/dashboards/details/LudoPlayerWiseRtpScreen'),
+        'LudoPlayerWiseRtpScreen',
+      ),
+    ),
   },
   {
     path: '/leaderboardCustomerCount',
     title: 'Caller Customers',
-    Component: LeaderboardCustomerListScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/leaderboardCustomerCount', () =>
+      named(
+        require('../screens/dashboards/details/LeaderboardCustomerListScreen'),
+        'LeaderboardCustomerListScreen',
+      ),
+    ),
   },
   {
     path: '/user-report',
     title: 'User Report',
-    Component: UserReportScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/user-report', () =>
+      named(require('../screens/UserReportScreen'), 'UserReportScreen'),
+    ),
   },
   {
     path: '/user_exposure',
     title: 'User Exposure',
-    Component: UserExposureScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/user_exposure', () =>
+      named(require('../screens/UserExposureScreen'), 'UserExposureScreen'),
+    ),
   },
   {
     path: '/bonus-wallet-referral-earning',
     title: 'Bonus Earning',
-    Component: BonusEarningScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/bonus-wallet-referral-earning', () =>
+      named(require('../screens/BonusEarningScreen'), 'BonusEarningScreen'),
+    ),
   },
   {
     path: '/caller-responsibility/deposit-list',
     title: 'Caller Deposit List',
-    Component: CallerDepositListScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/caller-responsibility/deposit-list', () =>
+      named(
+        require('../screens/dashboards/details/CallerDepositListScreen'),
+        'CallerDepositListScreen',
+      ),
+    ),
   },
   {
     path: '/caller-responsibility/details',
     title: 'Caller Details',
-    Component: CallerDetailsScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/caller-responsibility/details', () =>
+      named(require('../screens/dashboards/details/CallerDetailsScreen'), 'CallerDetailsScreen'),
+    ),
   },
   {
     path: '/caller-responsibility/bot-users',
     title: 'Active Bot Users',
-    Component: ActiveBotUsersScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/caller-responsibility/bot-users', () =>
+      named(require('../screens/dashboards/details/ActiveBotUsersScreen'), 'ActiveBotUsersScreen'),
+    ),
   },
   {
     path: '/funds/mid-groups',
     title: 'MID Groups',
-    Component: MidGroupsScreen as PanelDetailRoute['Component'],
+    getComponent: lazyOnce('/funds/mid-groups', () =>
+      named(require('../screens/dashboards/details/MidGroupsScreen'), 'MidGroupsScreen'),
+    ),
   },
 ];
 
@@ -267,8 +389,6 @@ export function mergeTargetParams(target: PanelDetailTarget): PanelDetailParams 
 /**
  * Open the mobile detail screen matching a card target.
  * Returns false when the href has no mobile screen (card stays inert).
- * Walks up to a parent navigator when the current one cannot open the route
- * (drawer screens → root stack detail routes).
  */
 export function openPanelTarget(
   navigation: {

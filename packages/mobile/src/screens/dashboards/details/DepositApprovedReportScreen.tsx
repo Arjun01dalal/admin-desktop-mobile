@@ -9,20 +9,21 @@
  *
  * Skipped: desktop's "Download ExcelData" (browser file download) — not ported.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asList, asPaged, unpackPayload } from '@astro/shared';
 import { colors, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
@@ -30,6 +31,7 @@ import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
 import { shareCsvFile } from '../../../utils/shareCsv';
 import { styles } from './DepositApprovedReportScreen.styles';
+import { display } from '../../../utils/display';
 
 type RequestType = 'automaticDeposit' | 'scannerDeposit';
 
@@ -102,11 +104,6 @@ const TYPE_OPTIONS: { key: RequestType; label: string }[] = [
   { key: 'automaticDeposit', label: 'Automatic' },
   { key: 'scannerDeposit', label: 'Scanner data' },
 ];
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatIN(value: unknown): string {
   const n = Number(value ?? 0);
@@ -515,23 +512,14 @@ export function DepositApprovedReportScreen() {
       }));
   }, [scannerSheet, scannerColumns]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => {
-            if (isScanner) void loadScanner();
-            else void loadAutomatic();
-            void loadApprovedSum();
-          }}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const refresh = useCallback(() => {
+    if (isScanner) void loadScanner();
+    else void loadAutomatic();
+    void loadApprovedSum();
+  }, [isScanner, loadScanner, loadAutomatic, loadApprovedSum]);
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Deposit Approved Report</Text>
       <Text style={styles.sub}>
         {`${startDate} → ${endDate}`} · Total:{' '}
@@ -638,146 +626,96 @@ export function DepositApprovedReportScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
+  const listFooter = !isScanner ? (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  ) : null;
+
+  const scannerKeyExtractor = useCallback(
+    (row: ScannerRow, index: number) => `row-${index}-${String(row._id || row.userId || '')}`,
+    [],
+  );
+
+  const depositKeyExtractor = useCallback(
+    (row: DepositRow, index: number) => `row-${index}-${String(row._id || row.orderId || '')}`,
+    [],
+  );
+
+  const renderScannerItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<ScannerRow>) => (
+      <DepositApprovedScannerCard
+        row={row}
+        index={index}
+        onOpenSheet={() => setScannerSheet(row)}
+        onOpenReport={() => openUserReport(row.userId, row.userName)}
+      />
+    ),
+    [openUserReport],
+  );
+
+  const renderDepositItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<DepositRow>) => (
+      <DepositApprovedDepositCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onOpenSheet={() => setDepositSheet(row)}
+        onOpenReport={() => openUserReport(row.userId, row.userName)}
+      />
+    ),
+    [page, pageSize, openUserReport],
+  );
+
+  return (
+    <View style={styles.screen}>
       {isScanner ? (
-        <>
-          {loading && visibleScannerRows.length === 0 ? (
-            <Text style={styles.hint}>Loading…</Text>
-          ) : null}
-          {!loading && visibleScannerRows.length === 0 ? (
-            <Text style={styles.hint}>No scanner data found</Text>
-          ) : null}
-          <View style={styles.list}>
-            {visibleScannerRows.map((row, index) => (
-              <TouchableOpacity
-                key={`row-${index}-${String(row._id || row.userId || '')}`}
-                style={styles.card}
-                activeOpacity={0.75}
-                onPress={() => setScannerSheet(row)}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardIndex}>#{index + 1}</Text>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {display(row.userName)}
-                  </Text>
-                  {row.userId ? (
-                    <TouchableOpacity
-                      style={styles.reportBtn}
-                      onPress={() => openUserReport(row.userId, row.userName)}
-                    >
-                      <Text style={styles.reportBtnText}>User Report</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    App Code: {appCodeForName(row.clientName)}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    Balance: {formatIN(row.balance)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Reason</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {display(row.reason)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>DP ID</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {display(row.userId)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Date</Text>
-                  <Text style={styles.cardValue}>
-                    {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
-                      .filter(Boolean)
-                      .join(' ') || '—'}
-                  </Text>
-                </View>
-                <Text style={styles.cardHint}>Tap card for full details</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={visibleScannerRows}
+          keyExtractor={scannerKeyExtractor}
+          renderItem={renderScannerItem}
+          listHeader={listHeader}
+          loading={loading}
+          emptyMessage="No scanner data found"
+          refreshing={loading}
+          onRefresh={refresh}
+          refreshEnabled={!downloadOpen}
+        />
       ) : (
-        <>
-          {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-          {!loading && rows.length === 0 ? (
-            <Text style={styles.hint}>No approved deposits found</Text>
-          ) : null}
-          <View style={styles.list}>
-            {rows.map((row, index) => (
-              <TouchableOpacity
-                key={`row-${index}-${String(row._id || row.orderId || '')}`}
-                style={styles.card}
-                activeOpacity={0.75}
-                onPress={() => setDepositSheet(row)}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {display(row.userName)}
-                  </Text>
-                  {row.userId ? (
-                    <TouchableOpacity
-                      style={styles.reportBtn}
-                      onPress={() => openUserReport(row.userId, row.userName)}
-                    >
-                      <Text style={styles.reportBtnText}>User Report</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Amount</Text>
-                  <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    App Code: {appCodeForName(row.clientName)}
-                  </Text>
-                  <Text style={[styles.cardSplitRight, styles.approvedText]} numberOfLines={1}>
-                    Status: {display(row.status)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>DP ID</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {display(row.userId)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Date</Text>
-                  <Text style={styles.cardValue}>
-                    {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
-                      .filter(Boolean)
-                      .join(' ') || '—'}
-                  </Text>
-                </View>
-                <Text style={styles.cardHint}>Tap card for full details</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.pager}>
-            <Text
-              style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-              onPress={() => page > 1 && setPage((p) => p - 1)}
-            >
-              ‹ Prev
-            </Text>
-            <Text style={styles.pagerLabel}>
-              Page {page} / {totalPages}
-            </Text>
-            <Text
-              style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-              onPress={() => page < totalPages && setPage((p) => p + 1)}
-            >
-              Next ›
-            </Text>
-          </View>
-        </>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={rows}
+          keyExtractor={depositKeyExtractor}
+          renderItem={renderDepositItem}
+          listHeader={listHeader}
+          listFooter={listFooter}
+          loading={loading}
+          emptyMessage="No approved deposits found"
+          refreshing={loading}
+          onRefresh={refresh}
+          refreshEnabled={!downloadOpen}
+        />
       )}
 
       <RowDetailSheet
@@ -834,7 +772,127 @@ export function DepositApprovedReportScreen() {
         onClose={() => setDownloadOpen(false)}
         onVerified={() => downloadExcel()}
       />
-    </ScrollView>
+    </View>
   );
 }
+
+type DepositApprovedScannerCardProps = {
+  row: ScannerRow;
+  index: number;
+  onOpenSheet: () => void;
+  onOpenReport: () => void;
+};
+
+const DepositApprovedScannerCard = memo(function DepositApprovedScannerCard({
+  row,
+  index,
+  onOpenSheet,
+  onOpenReport,
+}: DepositApprovedScannerCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.userName)}
+        </Text>
+        {row.userId ? (
+          <TouchableOpacity style={styles.reportBtn} onPress={onOpenReport}>
+            <Text style={styles.reportBtnText}>User Report</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          App Code: {appCodeForName(row.clientName)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Balance: {formatIN(row.balance)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Reason</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.reason)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>DP ID</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.userId)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Date</Text>
+        <Text style={styles.cardValue}>
+          {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
+            .filter(Boolean)
+            .join(' ') || '—'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for full details</Text>
+    </TouchableOpacity>
+  );
+});
+
+type DepositApprovedDepositCardProps = {
+  row: DepositRow;
+  index: number;
+  page: number;
+  pageSize: number;
+  onOpenSheet: () => void;
+  onOpenReport: () => void;
+};
+
+const DepositApprovedDepositCard = memo(function DepositApprovedDepositCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onOpenSheet,
+  onOpenReport,
+}: DepositApprovedDepositCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.userName)}
+        </Text>
+        {row.userId ? (
+          <TouchableOpacity style={styles.reportBtn} onPress={onOpenReport}>
+            <Text style={styles.reportBtnText}>User Report</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Amount</Text>
+        <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          App Code: {appCodeForName(row.clientName)}
+        </Text>
+        <Text style={[styles.cardSplitRight, styles.approvedText]} numberOfLines={1}>
+          Status: {display(row.status)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>DP ID</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.userId)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Date</Text>
+        <Text style={styles.cardValue}>
+          {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
+            .filter(Boolean)
+            .join(' ') || '—'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for full details</Text>
+    </TouchableOpacity>
+  );
+});
 

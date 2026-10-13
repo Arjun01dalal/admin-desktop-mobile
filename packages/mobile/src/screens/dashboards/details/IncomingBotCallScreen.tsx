@@ -5,20 +5,22 @@
  * Comments require `doc_id` → `incomingBot.addComment` only.
  * Summary still hits helper.callingbot.live process-call.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
-  Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
+import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import {
   buildIncomingBotSyncPayload,
   extractIncomingBotCallUsers,
@@ -28,7 +30,6 @@ import {
   getIncomingBotCallMobile,
   INCOMING_BOT_DIALER,
   incomingBotDefaultDateInputValue,
-  incomingBotMinDateInputValue,
   mapIncomingBotUsersToCalls,
   mergeIncomingBotCallsPreservingComments,
   mergeIncomingBotCommentOntoCalls,
@@ -44,6 +45,7 @@ import { openPanelTarget } from '../../../navigation/panelDetail';
 import { addToDialerBatch } from '../../../utils/externalDialer';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { RecordingPlayerModal } from '../../../components/RecordingPlayerModal';
+import { SkyTalkEmbed } from '../../../components/SkyTalkEmbed';
 import { DateField } from '../../../components/DateField';
 import {
   processIncomingCall,
@@ -51,13 +53,9 @@ import {
   type CallSummaryData,
 } from '../../../api/incomingBot';
 import { styles } from './IncomingBotCallScreen.styles';
+import { display } from '../../../utils/display';
 
 type IncomingCall = IncomingBotCallRow;
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatDateTime(value?: string): string {
   if (!value) return '—';
@@ -116,22 +114,26 @@ function buildSummaryRows(summaryData: CallSummaryData | null) {
   ];
 }
 
-function clampIncomingBotDate(value: string, minDate: string, floor?: string): string {
-  let next = value || minDate;
-  if (next < minDate) next = minDate;
-  if (floor && next < floor) next = floor;
-  return next;
+/** Keep end ≥ start (admin-panel-domains Incoming Bot parity; no month-23 floor). */
+function clampEndToStart(value: string, start: string): string {
+  if (value && start && value < start) return start;
+  return value;
 }
 
 export function IncomingBotCallScreen() {
   const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
+  const isFocused = useIsFocused();
+  const { defer } = useDeferredTimeout();
   const canShowMobile = hasPermission('show_mobile');
+  const canShowSkyTalk = hasPermission('show_skyTalk');
   const admin = useMemo(() => getStoredUser<{ _id?: string; name?: string }>(), []);
-  const minDate = useMemo(() => incomingBotMinDateInputValue(), []);
   const [startDate, setStartDate] = useState(() => incomingBotDefaultDateInputValue());
   const [endDate, setEndDate] = useState(() => incomingBotDefaultDateInputValue());
   const [draftStart, setDraftStart] = useState(() => incomingBotDefaultDateInputValue());
   const [draftEnd, setDraftEnd] = useState(() => incomingBotDefaultDateInputValue());
+  const [showSkyTalk, setShowSkyTalk] = useState(false);
+  const [skyTalkRemountToken, setSkyTalkRemountToken] = useState(0);
+  const skyTalkMounted = showSkyTalk && canShowSkyTalk && isFocused;
 
   const [searchFrom, setSearchFrom] = useState('');
   const [searchTo, setSearchTo] = useState('');
@@ -165,10 +167,13 @@ export function IncomingBotCallScreen() {
   const summaryGenRef = useRef(0);
 
   /** Dismiss RowDetailSheet before presenting another Modal (iOS nested-modal bug). */
-  const openAfterSheetClose = useCallback((open: () => void) => {
-    setSheetRow(null);
-    setTimeout(open, Platform.OS === 'ios' ? 350 : 80);
-  }, []);
+  const openAfterSheetClose = useCallback(
+    (open: () => void) => {
+      setSheetRow(null);
+      defer(open);
+    },
+    [defer],
+  );
 
   const load = useCallback(
     async (override?: { startDate: string; endDate: string }) => {
@@ -232,8 +237,11 @@ export function IncomingBotCallScreen() {
   }, [syncing, startDate, endDate, load]);
 
   const applyFilters = useCallback(() => {
-    const nextStart = clampIncomingBotDate(draftStart.trim(), minDate);
-    const nextEnd = clampIncomingBotDate(draftEnd.trim(), minDate, nextStart);
+    const nextStart = draftStart.trim() || incomingBotDefaultDateInputValue();
+    const nextEnd = clampEndToStart(
+      draftEnd.trim() || nextStart,
+      nextStart,
+    );
     setDraftStart(nextStart);
     setDraftEnd(nextEnd);
     setStartDate(nextStart);
@@ -242,7 +250,7 @@ export function IncomingBotCallScreen() {
     setAppliedTo(searchTo.trim());
     setAppliedSid(searchSid.trim());
     void load({ startDate: nextStart, endDate: nextEnd });
-  }, [draftStart, draftEnd, minDate, searchFrom, searchTo, searchSid, load]);
+  }, [draftStart, draftEnd, searchFrom, searchTo, searchSid, load]);
 
   const filteredRows = useMemo(() => {
     const fromQ = appliedFrom.toLowerCase();
@@ -537,20 +545,67 @@ export function IncomingBotCallScreen() {
     openUserReport,
   ]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
+  if (showSkyTalk && canShowSkyTalk) {
+    return (
+      <View style={styles.skyTalkRoot}>
+        <View style={styles.skyTalkHeader}>
+          <Text style={styles.title}>Sky Talk</Text>
+          <TouchableOpacity
+            style={styles.skyTalkToggleBtn}
+            onPress={() => setShowSkyTalk(false)}
+          >
+            <Text style={styles.skyTalkToggleText}>Incoming Bot</Text>
+          </TouchableOpacity>
+        </View>
+        <SkyTalkEmbed
+          active={skyTalkMounted}
+          remountToken={skyTalkRemountToken}
+          style={styles.skyTalkFrame}
+          webViewStyle={styles.skyTalkWebview}
+          pausedContent={null}
         />
-      }
-    >
-      <Text style={styles.title}>Incoming Bot Call</Text>
+      </View>
+    );
+  }
+
+  const keyExtractor = useCallback(
+    (row: IncomingBotCallRow, index: number) =>
+      `row-${index}-${String(row.sid || row.doc_id || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<IncomingBotCallRow>) => (
+      <IncomingBotCallCard
+        row={row}
+        index={index}
+        canShowMobile={canShowMobile}
+        dialerBusy={dialerBusySid === String(row.sid || '')}
+        onPress={() => setSheetRow(row)}
+        onCall={() => void connectToDialer(row)}
+        onComment={() => openAddComment(row)}
+        onViewComments={() => openViewComments(row)}
+      />
+    ),
+    [canShowMobile, dialerBusySid, connectToDialer, openAddComment, openViewComments],
+  );
+
+  const listHeader = (
+    <>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Incoming Bot Call</Text>
+        {canShowSkyTalk ? (
+          <TouchableOpacity
+            style={styles.skyTalkToggleBtn}
+            onPress={() => {
+              setSkyTalkRemountToken(Date.now());
+              setShowSkyTalk(true);
+            }}
+          >
+            <Text style={styles.skyTalkToggleText}>Sky Talk</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       <View style={styles.filterWrap}>
         <View style={styles.dateRow}>
@@ -560,9 +615,9 @@ export function IncomingBotCallScreen() {
               style={styles.input}
               value={draftStart}
               onChange={(v) => {
-                const next = clampIncomingBotDate(v, minDate);
+                const next = v || draftStart;
                 setDraftStart(next);
-                if (draftEnd < next) setDraftEnd(next);
+                if (draftEnd && next && draftEnd < next) setDraftEnd(next);
               }}
             />
           </View>
@@ -571,7 +626,7 @@ export function IncomingBotCallScreen() {
             <DateField
               style={styles.input}
               value={draftEnd}
-              onChange={(v) => setDraftEnd(clampIncomingBotDate(v, minDate, draftStart))}
+              onChange={(v) => setDraftEnd(clampEndToStart(v, draftStart))}
             />
           </View>
         </View>
@@ -630,99 +685,25 @@ export function IncomingBotCallScreen() {
         {endDate !== startDate ? ` → ${endDate}` : ''} · {filteredRows.length.toLocaleString('en-IN')}{' '}
         calls · Tap card for recording & summary
       </Text>
+    </>
+  );
 
-      {loading && filteredRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && filteredRows.length === 0 ? (
-        <Text style={styles.hint}>No incoming calls found</Text>
-      ) : null}
-
-      <View style={styles.list}>
-        {filteredRows.map((row, index) => {
-          const badge = statusColor(row.status);
-          const mobile = getIncomingBotCallMobile(row);
-          const fromLabel =
-            row.dp_id && !canShowMobile ? '**********' : display(mobile || row.from);
-          const dialerBusy = dialerBusySid === String(row.sid || '');
-          const hasComment = (row.comments?.length || 0) > 0;
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row.sid || row.doc_id || '')}`}
-              style={[styles.card, hasComment ? styles.cardHasComment : styles.cardNoComment]}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name) !== '—' ? display(row.name) : fromLabel}
-                </Text>
-                <Text
-                  style={[styles.statusPill, { color: badge, backgroundColor: `${badge}22` }]}
-                  numberOfLines={1}
-                >
-                  {display(row.status)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  From: {fromLabel}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  App: {display(row.app_name)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  {display(row.state)} · {display(row.city)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  DP: {display(row.dp_id)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  {formatDateTime(row.start_time)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  {row.recording_url ? '🎙 Recording' : 'No recording'}
-                </Text>
-              </View>
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={[styles.callBtn, (!mobile || dialerBusy) && styles.btnDisabled]}
-                  disabled={!mobile || dialerBusy}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    void connectToDialer(row);
-                  }}
-                >
-                  <Text style={styles.callBtnText}>{dialerBusy ? 'Sending…' : 'Call'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.commentBtn}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    openAddComment(row);
-                  }}
-                >
-                  <Text style={styles.commentBtnText}>Comment</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.commentBtn}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    openViewComments(row);
-                  }}
-                >
-                  <Text style={styles.commentBtnText}>
-                    View All{(row.comments?.length || 0) > 0 ? ` (${row.comments?.length})` : ''}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={filteredRows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No incoming calls found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!summaryOpen && !commentOpen && !viewOpen}
+        extraData={dialerBusySid}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -864,7 +845,110 @@ export function IncomingBotCallScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
+
+type IncomingBotCallCardProps = {
+  row: IncomingBotCallRow;
+  index: number;
+  canShowMobile: boolean;
+  dialerBusy: boolean;
+  onPress: () => void;
+  onCall: () => void;
+  onComment: () => void;
+  onViewComments: () => void;
+};
+
+const IncomingBotCallCard = memo(function IncomingBotCallCard({
+  row,
+  index,
+  canShowMobile,
+  dialerBusy,
+  onPress,
+  onCall,
+  onComment,
+  onViewComments,
+}: IncomingBotCallCardProps) {
+  const badge = statusColor(row.status);
+  const mobile = getIncomingBotCallMobile(row);
+  const fromLabel = row.dp_id && !canShowMobile ? '**********' : display(mobile || row.from);
+  const hasComment = (row.comments?.length || 0) > 0;
+  return (
+    <TouchableOpacity
+      style={[styles.card, hasComment ? styles.cardHasComment : styles.cardNoComment]}
+      activeOpacity={0.75}
+      onPress={onPress}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name) !== '—' ? display(row.name) : fromLabel}
+        </Text>
+        <Text
+          style={[styles.statusPill, { color: badge, backgroundColor: `${badge}22` }]}
+          numberOfLines={1}
+        >
+          {display(row.status)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          From: {fromLabel}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          App: {display(row.app_name)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          {display(row.state)} · {display(row.city)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          DP: {display(row.dp_id)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          {formatDateTime(row.start_time)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {row.recording_url ? '🎙 Recording' : 'No recording'}
+        </Text>
+      </View>
+      <View style={styles.cardActions}>
+        <TouchableOpacity
+          style={[styles.callBtn, (!mobile || dialerBusy) && styles.btnDisabled]}
+          disabled={!mobile || dialerBusy}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onCall();
+          }}
+        >
+          <Text style={styles.callBtnText}>{dialerBusy ? 'Sending…' : 'Call'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.commentBtn}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onComment();
+          }}
+        >
+          <Text style={styles.commentBtnText}>Comment</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.commentBtn}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onViewComments();
+          }}
+        >
+          <Text style={styles.commentBtnText}>
+            View All{(row.comments?.length || 0) > 0 ? ` (${row.comments?.length})` : ''}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+});
 

@@ -5,16 +5,15 @@
  * desktop), paginated DataTable with main columns, bottom sheet with
  * every column, pull-to-refresh.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
@@ -28,6 +27,7 @@ import {
   todayIST,
 } from '../../../utils/dates';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { DetailFilterBar, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { pickPageSizes } from '@astro/shared';
@@ -61,7 +61,7 @@ type TxnRow = {
   updatedAt?: string;
 };
 
-const ITEMS_PER_PAGE_OPTIONS = pickPageSizes([50, 100, 200, 500]);
+const ITEMS_PER_PAGE_OPTIONS = pickPageSizes([25, 50]);
 
 /** Same shape as desktop INITIAL_FILTERS. */
 const INITIAL_FILTERS = {
@@ -501,324 +501,271 @@ export function HouseGamesScreen() {
     }
   }, [winItem, winStatus, winPoint, winAmount, load]);
 
+  const keyExtractor = useCallback(
+    (row: TxnRow, index: number) => `row-${index}-${String(row._id || row.txnId || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<TxnRow>) => (
+      <HouseGamesCard
+        row={row}
+        index={index}
+        rowOffset={rowOffset}
+        canUpdateBets={canUpdateBets}
+        canUpdateWinningPoint={canUpdateWinningPoint}
+        onPress={() => setSelected(row)}
+        onUpdateBet={() => openUpdateModal(row)}
+        onUpdateWinning={() => openWinningPointModal(row)}
+      />
+    ),
+    [rowOffset, canUpdateBets, canUpdateWinningPoint, openUpdateModal, openWinningPointModal],
+  );
+
+  const listHeader = (
+    <>
+      <Text style={styles.title}>{toDisplayText('House Games')}</Text>
+      <Text style={styles.sub}>
+        {startDate} → {endDate} · Tap a row to see all details
+      </Text>
+
+      <View style={styles.dateBarWrap}>
+        <DetailFilterBar
+          startDate={draftStart}
+          endDate={draftEnd}
+          loading={loading}
+          onStartDateChange={setDraftStart}
+          onEndDateChange={setDraftEnd}
+          onApply={applyAll}
+          searchFields={SEARCH_BAR_FIELDS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          searchText={searchDraft}
+          onSearchTextChange={setSearchDraft}
+          onSearchSubmit={submitSearch}
+        />
+      </View>
+
+      <View style={[styles.chipGroupRow, styles.rowsSelector]}>
+        <Text style={styles.chipGroupLabel}>Rows</Text>
+        {ITEMS_PER_PAGE_OPTIONS.map((opt) => {
+          const active = itemsPerPage === opt;
+          return (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => {
+                setItemsPerPage(opt);
+                setPageNo(1);
+              }}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <TouchableOpacity
+        style={styles.filterToggle}
+        onPress={() => setShowFilters((v) => !v)}
+        accessibilityRole="button"
+      >
+        <Text style={styles.filterToggleText}>
+          {showFilters
+            ? 'Hide Search ▲'
+            : `Search Filters ▼${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
+        </Text>
+      </TouchableOpacity>
+
+      {showFilters && (
+        <View style={styles.filterPanel}>
+          <View style={styles.filterGrid}>
+            {TEXT_FILTER_FIELDS.map((f) => (
+              <TextInput
+                key={f.key}
+                style={styles.filterInput}
+                placeholder={f.placeholder}
+                placeholderTextColor={colors.muted}
+                value={String(draftFilters[f.key] ?? '')}
+                keyboardType={f.numeric ? 'numeric' : 'default'}
+                autoCapitalize="none"
+                onChangeText={(t) => setDraft(f.key, t)}
+                returnKeyType="search"
+                onSubmitEditing={applyAll}
+              />
+            ))}
+          </View>
+
+          <View style={styles.chipGroupRow}>
+            <Text style={styles.chipGroupLabel}>Type</Text>
+            {TYPE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt || 'all'}
+                style={[styles.chip, draftFilters.type === opt && styles.chipActive]}
+                onPress={() => setDraft('type', opt)}
+              >
+                <Text
+                  style={[styles.chipText, draftFilters.type === opt && styles.chipTextActive]}
+                >
+                  {opt || 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.chipGroupRow}>
+            <Text style={styles.chipGroupLabel}>Status</Text>
+            {STATUS_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt || 'all'}
+                style={[styles.chip, draftFilters.status === opt && styles.chipActive]}
+                onPress={() => setDraft('status', opt)}
+              >
+                <Text
+                  style={[styles.chipText, draftFilters.status === opt && styles.chipTextActive]}
+                >
+                  {opt || 'All'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.chipGroupRow}>
+            {(['isBot', 'human'] as const).map((key) => {
+              const on = draftFilters[key] === true;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.chip, on && styles.chipActive]}
+                  onPress={() => setDraft(key, on ? null : true)}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                    {key === 'isBot' ? 'Is Bot' : 'Human'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.filterActions}>
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={clearFilters}
+              accessibilityRole="button"
+            >
+              <Text style={styles.clearBtnText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.applyBtn}
+              onPress={applyAll}
+              accessibilityRole="button"
+            >
+              <Text style={styles.applyBtnText}>Search</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {(totalCount !== null || totalAmount !== null) && (
+        <View style={styles.totalsLine}>
+          {totalCount !== null && (
+            <Text style={styles.totalsText}>
+              Total Count: {totalCount.toLocaleString('en-IN')}
+            </Text>
+          )}
+          {totalAmount !== null && (
+            <Text style={styles.totalsText}>
+              Total Amount: {Math.round(Number(totalAmount) || 0).toLocaleString('en-IN')}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+    </>
+  );
+
+  const listFooter = (
+    <View style={styles.pagerRow}>
+      <TouchableOpacity
+        style={[styles.pagerBtn, (pageNo <= 1 || loading) && styles.pagerBtnDisabled]}
+        disabled={pageNo <= 1 || loading}
+        onPress={() => setPageNo((p) => Math.max(1, p - 1))}
+        accessibilityRole="button"
+      >
+        <Text style={styles.pagerBtnText}>‹ Prev</Text>
+      </TouchableOpacity>
+      <Text style={styles.pagerLabel}>
+        Page {pageNo} of {totalPages}
+      </Text>
+      <TouchableOpacity
+        style={[styles.pagerBtn, (pageNo >= totalPages || loading) && styles.pagerBtnDisabled]}
+        disabled={pageNo >= totalPages || loading}
+        onPress={() => setPageNo((p) => Math.min(totalPages, p + 1))}
+        accessibilityRole="button"
+      >
+        <Text style={styles.pagerBtnText}>Next ›</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <>
-      <ScrollView
+      <ScreenFlatList
         style={styles.screen}
         contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={() => void load()}
-            tintColor={colors.primary}
-          />
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No Data Found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
+
+      <RowDetailSheet
+        visible={selected !== null}
+        title={selected ? String(selected.name || selected.txnId || 'Details') : ''}
+        fields={
+          selected
+            ? columns.map<SheetField>((c) => ({
+                label: c.label,
+                value: c.render(selected, 0),
+                color: c.color?.(selected),
+              }))
+            : []
         }
-      >
-        <Text style={styles.title}>{toDisplayText('House Games')}</Text>
-        <Text style={styles.sub}>
-          {startDate} → {endDate} · Tap a row to see all details
-        </Text>
-
-        <View style={styles.dateBarWrap}>
-          <DetailFilterBar
-            startDate={draftStart}
-            endDate={draftEnd}
-            loading={loading}
-            onStartDateChange={setDraftStart}
-            onEndDateChange={setDraftEnd}
-            onApply={applyAll}
-            searchFields={SEARCH_BAR_FIELDS}
-            searchField={searchField}
-            onSearchFieldChange={setSearchField}
-            searchText={searchDraft}
-            onSearchTextChange={setSearchDraft}
-            onSearchSubmit={submitSearch}
-          />
-        </View>
-
-        {/* Items per page (desktop: 50/100/200/500) */}
-        <View style={[styles.chipGroupRow, styles.rowsSelector]}>
-          <Text style={styles.chipGroupLabel}>Rows</Text>
-          {ITEMS_PER_PAGE_OPTIONS.map((opt) => {
-            const active = itemsPerPage === opt;
-            return (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.chip, active && styles.chipActive]}
-                onPress={() => {
-                  setItemsPerPage(opt);
-                  setPageNo(1);
-                }}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Collapsible search filters (same payload as desktop) */}
-        <TouchableOpacity
-          style={styles.filterToggle}
-          onPress={() => setShowFilters((v) => !v)}
-          accessibilityRole="button"
-        >
-          <Text style={styles.filterToggleText}>
-            {showFilters
-              ? 'Hide Search ▲'
-              : `Search Filters ▼${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
-          </Text>
-        </TouchableOpacity>
-
-        {showFilters && (
-          <View style={styles.filterPanel}>
-            <View style={styles.filterGrid}>
-              {TEXT_FILTER_FIELDS.map((f) => (
-                <TextInput
-                  key={f.key}
-                  style={styles.filterInput}
-                  placeholder={f.placeholder}
-                  placeholderTextColor={colors.muted}
-                  value={String(draftFilters[f.key] ?? '')}
-                  keyboardType={f.numeric ? 'numeric' : 'default'}
-                  autoCapitalize="none"
-                  onChangeText={(t) => setDraft(f.key, t)}
-                  returnKeyType="search"
-                  onSubmitEditing={applyAll}
-                />
-              ))}
-            </View>
-
-            <View style={styles.chipGroupRow}>
-              <Text style={styles.chipGroupLabel}>Type</Text>
-              {TYPE_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt || 'all'}
-                  style={[styles.chip, draftFilters.type === opt && styles.chipActive]}
-                  onPress={() => setDraft('type', opt)}
-                >
-                  <Text
-                    style={[styles.chipText, draftFilters.type === opt && styles.chipTextActive]}
-                  >
-                    {opt || 'All'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.chipGroupRow}>
-              <Text style={styles.chipGroupLabel}>Status</Text>
-              {STATUS_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt || 'all'}
-                  style={[styles.chip, draftFilters.status === opt && styles.chipActive]}
-                  onPress={() => setDraft('status', opt)}
-                >
-                  <Text
-                    style={[styles.chipText, draftFilters.status === opt && styles.chipTextActive]}
-                  >
-                    {opt || 'All'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.chipGroupRow}>
-              {(['isBot', 'human'] as const).map((key) => {
-                const on = draftFilters[key] === true;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.chip, on && styles.chipActive]}
-                    onPress={() => setDraft(key, on ? null : true)}
-                  >
-                    <Text style={[styles.chipText, on && styles.chipTextActive]}>
-                      {key === 'isBot' ? 'Is Bot' : 'Human'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.filterActions}>
-              <TouchableOpacity
-                style={styles.clearBtn}
-                onPress={clearFilters}
-                accessibilityRole="button"
-              >
-                <Text style={styles.clearBtnText}>Clear</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.applyBtn}
-                onPress={applyAll}
-                accessibilityRole="button"
-              >
-                <Text style={styles.applyBtnText}>Search</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Totals line (matches desktop "Total Count / Total Amount") */}
-        {(totalCount !== null || totalAmount !== null) && (
-          <View style={styles.totalsLine}>
-            {totalCount !== null && (
-              <Text style={styles.totalsText}>
-                Total Count: {totalCount.toLocaleString('en-IN')}
-              </Text>
-            )}
-            {totalAmount !== null && (
-              <Text style={styles.totalsText}>
-                Total Amount: {Math.round(Number(totalAmount) || 0).toLocaleString('en-IN')}
-              </Text>
-            )}
-          </View>
-        )}
-
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-
-        {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-        {!loading && rows.length === 0 ? <Text style={styles.hint}>No Data Found</Text> : null}
-        <View style={styles.list}>
-          {rows.map((row, index) => {
-            const st = String(row.status || '—');
-            const ok = /success|complete|win|approved/i.test(st);
-            const bad = /fail|reject|cancel|loss/i.test(st);
-            return (
-              <TouchableOpacity
-                key={`row-${index}-${String(row._id || row.txnId || '')}`}
-                style={styles.card}
-                activeOpacity={0.75}
-                onPress={() => setSelected(row)}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardIndex}>#{index + 1 + rowOffset}</Text>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {String(row.name || '-')}
-                  </Text>
-                  {canUpdateBets ? (
-                    <TouchableOpacity
-                      style={styles.editIconBtn}
-                      onPress={() => openUpdateModal(row)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityRole="button"
-                      accessibilityLabel="Update Bet Status"
-                    >
-                      <Text style={styles.editIconText}>✎</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {canUpdateWinningPoint ? (
-                    <TouchableOpacity
-                      style={styles.trophyIconBtn}
-                      onPress={() => openWinningPointModal(row)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityRole="button"
-                      accessibilityLabel="Update Winning Point"
-                    >
-                      <Text style={styles.trophyIconText}>🏆</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  <Text
-                    style={[
-                      styles.statusPill,
-                      ok
-                        ? styles.statusOn
-                        : bad
-                          ? styles.statusOff
-                          : { color: colors.muted, backgroundColor: 'rgba(148,163,184,0.18)' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {st}
-                  </Text>
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    Amount: {fmt2(row.amount)}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    {String(row.type || '-')}
-                  </Text>
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    Game: {String(row.gameId || '-')}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    {fmtDate(row)}
-                  </Text>
-                </View>
-                <Text style={styles.cardHint}>Tap card for details</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Pagination */}
-        <View style={styles.pagerRow}>
-          <TouchableOpacity
-            style={[styles.pagerBtn, (pageNo <= 1 || loading) && styles.pagerBtnDisabled]}
-            disabled={pageNo <= 1 || loading}
-            onPress={() => setPageNo((p) => Math.max(1, p - 1))}
-            accessibilityRole="button"
-          >
-            <Text style={styles.pagerBtnText}>‹ Prev</Text>
-          </TouchableOpacity>
-          <Text style={styles.pagerLabel}>
-            Page {pageNo} of {totalPages}
-          </Text>
-          <TouchableOpacity
-            style={[styles.pagerBtn, (pageNo >= totalPages || loading) && styles.pagerBtnDisabled]}
-            disabled={pageNo >= totalPages || loading}
-            onPress={() => setPageNo((p) => Math.min(totalPages, p + 1))}
-            accessibilityRole="button"
-          >
-            <Text style={styles.pagerBtnText}>Next ›</Text>
-          </TouchableOpacity>
-        </View>
-
-        <RowDetailSheet
-          visible={selected !== null}
-          title={selected ? String(selected.name || selected.txnId || 'Details') : ''}
-          fields={
-            selected
-              ? columns.map<SheetField>((c) => ({
-                  label: c.label,
-                  value: c.render(selected, 0),
-                  color: c.color?.(selected),
-                }))
-              : []
-          }
-          actions={
-            selected && (canUpdateBets || canUpdateWinningPoint)
-              ? [
-                  ...(canUpdateBets
-                    ? [
-                        {
-                          label: 'Update Bet Status',
-                          tone: 'warning' as const,
-                          onPress: () => openUpdateModal(selected),
-                        },
-                      ]
-                    : []),
-                  ...(canUpdateWinningPoint
-                    ? [
-                        {
-                          label: 'Update Winning Point',
-                          tone: 'primary' as const,
-                          onPress: () => openWinningPointModal(selected),
-                        },
-                      ]
-                    : []),
-                ]
-              : undefined
-          }
-          onClose={() => setSelected(null)}
-        />
-      </ScrollView>
+        actions={
+          selected && (canUpdateBets || canUpdateWinningPoint)
+            ? [
+                ...(canUpdateBets
+                  ? [
+                      {
+                        label: 'Update Bet Status',
+                        tone: 'warning' as const,
+                        onPress: () => openUpdateModal(selected),
+                      },
+                    ]
+                  : []),
+                ...(canUpdateWinningPoint
+                  ? [
+                      {
+                        label: 'Update Winning Point',
+                        tone: 'primary' as const,
+                        onPress: () => openWinningPointModal(selected),
+                      },
+                    ]
+                  : []),
+              ]
+            : undefined
+        }
+        onClose={() => setSelected(null)}
+      />
 
       <Modal
         visible={editItem !== null}
@@ -984,4 +931,92 @@ export function HouseGamesScreen() {
     </>
   );
 }
+
+type HouseGamesCardProps = {
+  row: TxnRow;
+  index: number;
+  rowOffset: number;
+  canUpdateBets: boolean;
+  canUpdateWinningPoint: boolean;
+  onPress: () => void;
+  onUpdateBet: () => void;
+  onUpdateWinning: () => void;
+};
+
+const HouseGamesCard = memo(function HouseGamesCard({
+  row,
+  index,
+  rowOffset,
+  canUpdateBets,
+  canUpdateWinningPoint,
+  onPress,
+  onUpdateBet,
+  onUpdateWinning,
+}: HouseGamesCardProps) {
+  const st = String(row.status || '—');
+  const ok = /success|complete|win|approved/i.test(st);
+  const bad = /fail|reject|cancel|loss/i.test(st);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1 + rowOffset}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {String(row.name || '-')}
+        </Text>
+        {canUpdateBets ? (
+          <TouchableOpacity
+            style={styles.editIconBtn}
+            onPress={onUpdateBet}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Update Bet Status"
+          >
+            <Text style={styles.editIconText}>✎</Text>
+          </TouchableOpacity>
+        ) : null}
+        {canUpdateWinningPoint ? (
+          <TouchableOpacity
+            style={styles.trophyIconBtn}
+            onPress={onUpdateWinning}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Update Winning Point"
+          >
+            <Text style={styles.trophyIconText}>🏆</Text>
+          </TouchableOpacity>
+        ) : null}
+        <Text
+          style={[
+            styles.statusPill,
+            ok
+              ? styles.statusOn
+              : bad
+                ? styles.statusOff
+                : { color: colors.muted, backgroundColor: 'rgba(148,163,184,0.18)' },
+          ]}
+          numberOfLines={1}
+        >
+          {st}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Amount: {fmt2(row.amount)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {String(row.type || '-')}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Game: {String(row.gameId || '-')}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {fmtDate(row)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});
 

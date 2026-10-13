@@ -6,23 +6,26 @@
  * Un-Dump action. Desktop's user-report navigation is desktop-only (no /users/report
  * route on mobile) and is skipped.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
-import { pickPageSizes, appCodeForName, asPaged } from '@astro/shared';
+import { pickPageSizes, appCodeForName } from '@astro/shared';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { usePagedSecureQuery } from '../../../hooks/usePagedSecureQuery';
 import { getRoleId, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate } from '../../../utils/dates';
+import { display, maskMobile } from '../../../utils/display';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './DumpUsersScreen.styles';
 
@@ -47,23 +50,13 @@ type Row = {
   [key: string]: unknown;
 };
 
-const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50]);
 
 const SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'name', label: 'Name' },
   { key: '_id', label: 'Dp Id' },
   { key: 'mobile', label: 'Mobile' },
 ];
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function formatAmount(value: unknown): string {
   const num = Number(value);
@@ -81,56 +74,37 @@ export function DumpUsersScreen() {
     field: 'name',
     text: '',
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [sheetRow, setSheetRow] = useState<Row | null>(null);
   const [undumpingId, setUndumpingId] = useState('');
-  const genRef = useRef(0);
 
   const canShowMobile = hasPermission('show_mobile');
   const isCaller = CALLER_ROLE_IDS.has(getRoleId() || '');
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const filter: Record<string, unknown> = { dump: true };
-      const text = applied.text.trim();
-      if (text) {
-        if (applied.field === '_id') filter._id = text;
-        else if (applied.field === 'mobile') filter.mobile = text;
-        else filter.name = text;
-      }
-      const res = await secureApi<unknown>('users.getAll', {
-        itemsPerPage: pageSize,
-        pageNo: page,
-        filter,
-      });
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load dump users');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        return;
-      }
-      const paged = asPaged<Row>(res.data);
-      setSheetRow(null);
-      setRows(paged.rows);
-      setTotal(paged.total);
-      setTotalPages(Math.max(1, paged.totalPages));
-    } finally {
-      if (gen === genRef.current) setLoading(false);
+  const buildPayload = useCallback(() => {
+    const filter: Record<string, unknown> = { dump: true };
+    const text = applied.text.trim();
+    if (text) {
+      if (applied.field === '_id') filter._id = text;
+      else if (applied.field === 'mobile') filter.mobile = text;
+      else filter.name = text;
     }
+    return {
+      itemsPerPage: pageSize,
+      pageNo: page,
+      filter,
+    };
   }, [page, pageSize, applied]);
 
+  const { rows, total, totalPages, loading, error, load, setError } = usePagedSecureQuery<Row>({
+    action: 'users.getAll',
+    buildPayload,
+    autoDeps: [page, pageSize, applied],
+    errorMessage: 'Failed to load dump users',
+  });
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    setSheetRow(null);
+  }, [rows]);
 
   const search = useCallback(() => {
     setApplied({ field: searchField, text: searchText });
@@ -236,19 +210,30 @@ export function DumpUsersScreen() {
       }));
   }, [sheetRow, columns]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <DumpUserCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        canShowMobile={canShowMobile}
+        isCaller={isCaller}
+        undumpingId={undumpingId}
+        onOpenSheet={() => setSheetRow(row)}
+        onUndump={() => handleUndump(row)}
+      />
+    ),
+    [page, pageSize, canShowMobile, isCaller, undumpingId, handleUndump],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Dump Users</Text>
       <Text style={styles.sub}>Total: {total.toLocaleString('en-IN')}</Text>
 
@@ -319,82 +304,45 @@ export function DumpUsersScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No dump users found</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {display(row.name)}
-              </Text>
-              <TouchableOpacity
-                style={styles.undumpBtn}
-                onPress={() => handleUndump(row)}
-                disabled={undumpingId === row._id}
-                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-              >
-                <Text style={styles.undumpBtnText}>
-                  {undumpingId === row._id ? '…' : 'Un-Dump'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                App Code: {appCodeForName(row.clientName)}
-              </Text>
-              <Text style={styles.cardSplitRight} numberOfLines={1}>
-                Balance: {formatAmount(row.balance)}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>DP ID</Text>
-              <Text style={styles.cardValue} numberOfLines={1}>
-                {display(row._id)}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Mobile</Text>
-              <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
-            </View>
-            {!isCaller ? (
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Reason</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.dumpReason?.reason)}
-                </Text>
-              </View>
-            ) : null}
-            <Text style={styles.cardHint}>Tap card for full details</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No dump users found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        extraData={undumpingId}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -414,7 +362,77 @@ export function DumpUsersScreen() {
         }
         onClose={() => setSheetRow(null)}
       />
-    </ScrollView>
+    </>
   );
 }
+
+type DumpUserCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  canShowMobile: boolean;
+  isCaller: boolean;
+  undumpingId: string;
+  onOpenSheet: () => void;
+  onUndump: () => void;
+};
+
+const DumpUserCard = memo(function DumpUserCard({
+  row,
+  index,
+  page,
+  pageSize,
+  canShowMobile,
+  isCaller,
+  undumpingId,
+  onOpenSheet,
+  onUndump,
+}: DumpUserCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <TouchableOpacity
+          style={styles.undumpBtn}
+          onPress={onUndump}
+          disabled={undumpingId === row._id}
+          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+        >
+          <Text style={styles.undumpBtnText}>{undumpingId === row._id ? '…' : 'Un-Dump'}</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          App Code: {appCodeForName(row.clientName)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Balance: {formatAmount(row.balance)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>DP ID</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row._id)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
+      </View>
+      {!isCaller ? (
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>Reason</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {display(row.dumpReason?.reason)}
+          </Text>
+        </View>
+      ) : null}
+      <Text style={styles.cardHint}>Tap card for full details</Text>
+    </TouchableOpacity>
+  );
+});
 

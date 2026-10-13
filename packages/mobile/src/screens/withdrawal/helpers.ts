@@ -12,12 +12,9 @@ import { colors } from '../../theme';
 import { formatDisplayDate, formatDisplayTime } from '../../utils/dates';
 import { TERMINAL_STATUSES } from './constants';
 
-export type Rec = Record<string, unknown>;
+export { display } from '../../utils/display';
 
-export function display(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—';
-  return String(v);
-}
+export type Rec = Record<string, unknown>;
 
 export function num(v: unknown): number {
   const n = Number(v);
@@ -28,16 +25,21 @@ export function fmtAmount(v: unknown): string {
   return Math.floor(num(v)).toLocaleString('en-IN');
 }
 
+/** Admin/desktop parity: first 6 of name + last 6 of dp_id. */
+export function sendToBankName(r: Rec): string {
+  const name = String(r.accountHolderName ?? r.userName ?? '').slice(0, 6);
+  const dp = String(r.dp_id ?? '').slice(-6);
+  if (!name && !dp) return '';
+  return `${name}${dp ? `-${dp}` : ''}`;
+}
+
 /** Desktop UPIQR parity: build the UPI payment query string. */
 export function buildUpiQuery(r: Rec): string {
   const params = new URLSearchParams();
   params.set('pa', String(r.upiId ?? ''));
   if (r.amount !== undefined && r.amount !== null) params.set('am', String(r.amount));
   params.set('cu', 'INR');
-  params.set(
-    'tn',
-    `Note:${String(r.accountHolderName ?? '').slice(0, 6)}-${String(r.dp_id ?? '').slice(-6)}`,
-  );
+  params.set('tn', `Note:${sendToBankName(r)}`);
   params.set('tr', `ORD-${Date.now()}`);
   return params.toString();
 }
@@ -197,8 +199,14 @@ export type Geo = { city: string; state: string; lat: string; long: string };
  * touches (the "cards stop responding" bug). Always close sheets first and
  * show alerts after a short delay.
  */
+let notifyTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function notify(title: string, message?: string): void {
-  setTimeout(() => Alert.alert(title, message), 450);
+  if (notifyTimer) clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(() => {
+    notifyTimer = null;
+    Alert.alert(title, message);
+  }, 450);
 }
 
 /** Desktop requireWithdrawalGeo parity: lat/long + city/state or abort (no alert here). */

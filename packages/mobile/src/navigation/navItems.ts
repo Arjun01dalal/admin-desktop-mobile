@@ -89,6 +89,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.call_logs,
   },
   {
+    id: 'gtelCalls',
+    label: 'Gtel Calls',
+    path: '/gtel-calls',
+    permission: Permissions.show_gtel_calls,
+  },
+  {
     id: 'dialerPushData',
     label: 'Dialer Push Data',
     path: '/dialer-push-data',
@@ -417,13 +423,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/incoming-bot-call',
     permission: Permissions.show_incoming_bot,
   },
-  // Gated by login Responsibilities → view_live_chat.
-  {
-    id: 'skyTalk',
-    label: 'Sky Talk',
-    path: '/sky-talk',
-    permission: Permissions.view_live_chat,
-  },
+  // Sky Talk lives as a toggle on Incoming Bot Call (show_skyTalk), matching admin-panel-domains.
   {
     id: 'rolesResponsibilities',
     label: 'Roles & Responsibilities',

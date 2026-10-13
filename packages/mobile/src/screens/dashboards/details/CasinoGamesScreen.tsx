@@ -5,15 +5,15 @@
  * Enable/Disable action (ops.casinoEditGame). Provider switching, Mirai and
  * Table ID management stay desktop-only.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import {
   buildUpdateGameImagePayload,
@@ -23,11 +23,13 @@ import { pickPageSizes } from '@astro/shared';
 import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { UpdateGameImageModal } from './UpdateGameImageModal';
 import { styles } from './CasinoGamesScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -49,7 +51,7 @@ type Row = {
 
 type Provider = 'QTECH' | 'WACS';
 
-const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
+const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50]);
 const GAME_CATEGORIES = [
   'Andar Bahar',
   'Roulette',
@@ -78,11 +80,6 @@ function parseGameCounts(raw: unknown): GameCounts {
     active: Math.max(0, Number(c.enabled ?? c.active) || 0),
     inactive: Math.max(0, Number(c.disabled ?? c.inactive) || 0),
   };
-}
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
 }
 
 function asProvider(value: unknown): Provider {
@@ -363,19 +360,27 @@ export function CasinoGamesScreen() {
     [page, pageSize, provider],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <CasinoGamesCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        provider={provider}
+        onPress={() => setSheetRow(row)}
+      />
+    ),
+    [page, pageSize, provider],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>{toDisplayText('Casino Games')}</Text>
       <Text style={styles.sub}>Active Provider: {provider}</Text>
 
@@ -565,46 +570,46 @@ export function CasinoGamesScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No games found</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const active = Boolean(row.status);
-          const gameIdLabel = provider === 'QTECH' ? 'Game ID' : 'Game Code';
-          const gameIdValue = display(
-            provider === 'QTECH' ? row.gameId : (row.Game_Code ?? row.gameId),
-          );
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.Name || row.name)}
-                </Text>
-                <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
-                  {active ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  {gameIdLabel}: {gameIdValue}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  {display(row.category ?? row.Category_ID)}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No games found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={imageTarget === null}
+      />
+
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.Name || sheetRow.name) : ''}
@@ -644,25 +649,51 @@ export function CasinoGamesScreen() {
         onClose={() => !imageSaving && setImageTarget(null)}
         onSubmit={(path) => void handleImageUpdate(path)}
       />
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
+
+type CasinoGamesCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  provider: Provider;
+  onPress: () => void;
+};
+
+const CasinoGamesCard = memo(function CasinoGamesCard({
+  row,
+  index,
+  page,
+  pageSize,
+  provider,
+  onPress,
+}: CasinoGamesCardProps) {
+  const active = Boolean(row.status);
+  const gameIdLabel = provider === 'QTECH' ? 'Game ID' : 'Game Code';
+  const gameIdValue = display(provider === 'QTECH' ? row.gameId : (row.Game_Code ?? row.gameId));
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.Name || row.name)}
+        </Text>
+        <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
+          {active ? 'Active' : 'Inactive'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          {gameIdLabel}: {gameIdValue}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {display(row.category ?? row.Category_ID)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

@@ -17,6 +17,13 @@ export const styles = makeStyles({
     gap: spacing(2),
     marginBottom: spacing(2),
   },
+  balanceFilterWrap: { marginBottom: spacing(2), gap: spacing(1) },
+  balanceFilterLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: spacing(1),
+  },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,

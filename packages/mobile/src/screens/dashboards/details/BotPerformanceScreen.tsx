@@ -4,19 +4,19 @@
  * desktop filter set: date range, type, bot IDs, app, and per-column filters.
  * Desktop-only "Add to Dialer" (external dialer batch) is not ported.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { appCodeForName, asPaged } from '@astro/shared';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
@@ -27,6 +27,7 @@ import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { CAMPAIGN_LIST } from '../../../utils/campaignList';
 import { addToDialerBatch } from '../../../utils/externalDialer';
 import { styles } from './BotPerformanceScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 type BotPerfRow = {
   _id: string;
@@ -57,15 +58,6 @@ const TYPE_OPTIONS = [
 function formatBalance(value: unknown): string {
   const n = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(n) ? n.toFixed(2) : '0.00';
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (value === undefined || value === null || value === '') return '—';
-  return canShow ? String(value) : '**********';
-}
-
-function display(value: unknown): string {
-  return value === undefined || value === null || value === '' ? '—' : String(value);
 }
 
 export function BotPerformanceScreen() {
@@ -328,19 +320,27 @@ export function BotPerformanceScreen() {
     { label: 'Max Balance', value: maxBal, set: setMaxBal, keyboard: 'numeric' },
   ];
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: BotPerfRow, index: number) => String(row._id || index),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<BotPerfRow>) => (
+      <BotPerformanceCard
+        row={row}
+        index={index}
+        rowOffset={rowOffset}
+        checked={selectedIds.has(String(row._id))}
+        onToggle={() => toggleSelect(row)}
+        onPress={() => setSelected({ row, index })}
+      />
+    ),
+    [rowOffset, selectedIds, toggleSelect],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Bot Performance</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Tap a row for all details
@@ -456,100 +456,59 @@ export function BotPerformanceScreen() {
         </View>
       )}
 
-      {loading && rows.length === 0 ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading data…</Text>
-        </View>
-      ) : (
-        <>
-          {!loading && rows.length === 0 ? <Text style={styles.hint}>No records found</Text> : null}
-          {rows.length > 0 ? (
-            <View style={styles.selectAllRow}>
-              <TouchableOpacity style={styles.selectAllBtn} onPress={toggleAll}>
-                <Text style={styles.selectAllText}>
-                  {allSelected ? '☑ Deselect all' : '☐ Select all'}
-                </Text>
-              </TouchableOpacity>
-              <Text style={styles.selectedCount}>{selectedIds.size} selected</Text>
-            </View>
-          ) : null}
-          <View style={styles.list}>
-            {rows.map((row, index) => {
-              const id = String(row._id);
-              const checked = selectedIds.has(id);
-              return (
-                <View key={id || String(index)} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <TouchableOpacity
-                      style={[styles.cardCheck, checked && styles.cardCheckOn]}
-                      onPress={() => toggleSelect(row)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={[styles.cardCheckText, checked && styles.cardCheckTextOn]}>
-                        {checked ? '☑' : '☐'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{ flex: 1, minWidth: 0 }}
-                      activeOpacity={0.75}
-                      onPress={() => setSelected({ row, index })}
-                    >
-                      <View style={styles.cardHeader}>
-                        <Text style={styles.cardIndex}>#{rowOffset + index + 1}</Text>
-                        <Text style={styles.cardTitle} numberOfLines={1}>
-                          {display(row.name || row.client_name)}
-                        </Text>
-                        <Text style={styles.cardSplitRight}>Bot {display(row.bot_id)}</Text>
-                      </View>
-                      <View style={styles.cardSplitRow}>
-                        <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                          Balance: {formatBalance(row.balance)}
-                        </Text>
-                        <Text style={styles.cardSplitRight} numberOfLines={1}>
-                          {appCodeForName(row.clientName)}
-                        </Text>
-                      </View>
-                      <View style={styles.cardSplitRow}>
-                        <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                          {display(row.city)} · {display(row.state)}
-                        </Text>
-                        <Text style={styles.cardSplitRight} numberOfLines={1}>
-                          {formatDisplayDate(row.activeUser) || '—'}
-                        </Text>
-                      </View>
-                      <Text style={styles.cardHint}>Tap card for details</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Pagination */}
-          <View style={styles.pagerRow}>
-            <TouchableOpacity
-              style={[styles.pagerBtn, page <= 1 && styles.pagerBtnDisabled]}
-              onPress={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-            >
-              <Text style={styles.pagerBtnText}>‹ Prev</Text>
-            </TouchableOpacity>
-            <Text style={styles.pagerInfo}>
-              {total > 0
-                ? `${total.toLocaleString()} users · page ${page} of ${totalPages}`
-                : `page ${page} of ${totalPages}`}
+      {rows.length > 0 ? (
+        <View style={styles.selectAllRow}>
+          <TouchableOpacity style={styles.selectAllBtn} onPress={toggleAll}>
+            <Text style={styles.selectAllText}>
+              {allSelected ? '☑ Deselect all' : '☐ Select all'}
             </Text>
-            <TouchableOpacity
-              style={[styles.pagerBtn, page >= totalPages && styles.pagerBtnDisabled]}
-              onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-            >
-              <Text style={styles.pagerBtnText}>Next ›</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
+          </TouchableOpacity>
+          <Text style={styles.selectedCount}>{selectedIds.size} selected</Text>
+        </View>
+      ) : null}
+    </>
+  );
+
+  const listFooter = (
+    <View style={styles.pagerRow}>
+      <TouchableOpacity
+        style={[styles.pagerBtn, page <= 1 && styles.pagerBtnDisabled]}
+        onPress={() => setPage((p) => Math.max(1, p - 1))}
+        disabled={page <= 1}
+      >
+        <Text style={styles.pagerBtnText}>‹ Prev</Text>
+      </TouchableOpacity>
+      <Text style={styles.pagerInfo}>
+        {total > 0
+          ? `${total.toLocaleString()} users · page ${page} of ${totalPages}`
+          : `page ${page} of ${totalPages}`}
+      </Text>
+      <TouchableOpacity
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerBtnDisabled]}
+        onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+        disabled={page >= totalPages}
+      >
+        <Text style={styles.pagerBtnText}>Next ›</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No records found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        extraData={selectedIds}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -566,7 +525,67 @@ export function BotPerformanceScreen() {
         }
         onClose={() => setSelected(null)}
       />
-    </ScrollView>
+    </View>
   );
 }
+
+type BotPerformanceCardProps = {
+  row: BotPerfRow;
+  index: number;
+  rowOffset: number;
+  checked: boolean;
+  onToggle: () => void;
+  onPress: () => void;
+};
+
+const BotPerformanceCard = memo(function BotPerformanceCard({
+  row,
+  index,
+  rowOffset,
+  checked,
+  onToggle,
+  onPress,
+}: BotPerformanceCardProps) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <TouchableOpacity
+          style={[styles.cardCheck, checked && styles.cardCheckOn]}
+          onPress={onToggle}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.cardCheckText, checked && styles.cardCheckTextOn]}>
+            {checked ? '☑' : '☐'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.75} onPress={onPress}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIndex}>#{rowOffset + index + 1}</Text>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {display(row.name || row.client_name)}
+            </Text>
+            <Text style={styles.cardSplitRight}>Bot {display(row.bot_id)}</Text>
+          </View>
+          <View style={styles.cardSplitRow}>
+            <Text style={styles.cardSplitLeft} numberOfLines={1}>
+              Balance: {formatBalance(row.balance)}
+            </Text>
+            <Text style={styles.cardSplitRight} numberOfLines={1}>
+              {appCodeForName(row.clientName)}
+            </Text>
+          </View>
+          <View style={styles.cardSplitRow}>
+            <Text style={styles.cardSplitLeft} numberOfLines={1}>
+              {display(row.city)} · {display(row.state)}
+            </Text>
+            <Text style={styles.cardSplitRight} numberOfLines={1}>
+              {formatDisplayDate(row.activeUser) || '—'}
+            </Text>
+          </View>
+          <Text style={styles.cardHint}>Tap card for details</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
 

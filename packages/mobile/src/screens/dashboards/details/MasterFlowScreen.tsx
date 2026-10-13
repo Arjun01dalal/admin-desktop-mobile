@@ -17,6 +17,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './MasterFlowScreen.styles';
+import { maskMobile } from '../../../utils/display';
 
 type ListType = 'Master' | 'Super Master' | 'Super Admin';
 
@@ -65,11 +66,6 @@ function asRows(raw: unknown): MasterFlowRow[] {
 function fmt2(value: unknown): string {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n.toFixed(2) : '0.00';
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
 }
 
 /** Columns shown in the list; the bottom sheet shows all of them. */

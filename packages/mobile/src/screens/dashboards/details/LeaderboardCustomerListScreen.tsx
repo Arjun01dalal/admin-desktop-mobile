@@ -14,6 +14,7 @@ import { hasPermission } from '../../../auth/permissions';
 import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './LeaderboardCustomerListScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 type CustomerRow = {
   _id?: string;
@@ -31,16 +32,6 @@ const PER_PAGE_OPTIONS = [50, 100, 250, 500] as const;
 
 /** Columns kept in the list; everything shows in the bottom sheet. */
 const MAIN_KEYS = new Set(['idx', 'name', 'clientName', 'kyc']);
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function unpackPlayers(raw: unknown): { items: CustomerRow[]; totalPages: number } {
   if (!raw || typeof raw !== 'object') return { items: [], totalPages: 1 };

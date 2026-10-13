@@ -41,6 +41,7 @@ import {
   normalizeDialerLeads,
   parseLlmSendResult,
   rowsFromLlmPayload,
+  trimLlmChatMessages,
   type LlmChatMessage,
 } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
@@ -51,7 +52,7 @@ function loadStoredMessages(): LlmChatMessage[] {
     const raw = sessionStorage.getItem(LLM_CHAT_HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return trimLlmChatMessages(Array.isArray(parsed) ? (parsed as LlmChatMessage[]) : []);
   } catch {
     return [];
   }
@@ -353,7 +354,12 @@ export function AdminLlmChatWidget() {
   }, [open]);
 
   useEffect(() => {
-    sessionStorage.setItem(LLM_CHAT_HISTORY_KEY, JSON.stringify(messages));
+    const capped = trimLlmChatMessages(messages);
+    if (capped.length !== messages.length) {
+      setMessages(capped);
+      return;
+    }
+    sessionStorage.setItem(LLM_CHAT_HISTORY_KEY, JSON.stringify(capped));
   }, [messages]);
 
   useEffect(() => {

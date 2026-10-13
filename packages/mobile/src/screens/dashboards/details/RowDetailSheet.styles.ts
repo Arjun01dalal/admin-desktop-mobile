@@ -5,16 +5,19 @@ import { colors, radius, spacing } from '../../../theme';
 
 export const styles = makeStyles({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  backdropTouch: { flex: 1 },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    maxHeight: '80%',
+    maxHeight: '88%',
     paddingHorizontal: spacing(4),
     paddingTop: spacing(2),
+    overflow: 'hidden',
   },
+  scroll: { marginTop: spacing(1), flexGrow: 0, flexShrink: 1 },
   handle: {
     alignSelf: 'center',
     width: 40,
@@ -33,7 +36,6 @@ export const styles = makeStyles({
   },
   title: { color: colors.foreground, fontSize: 16, fontWeight: '700', flex: 1 },
   close: { color: colors.muted, fontSize: 18, paddingHorizontal: spacing(2) },
-  scroll: { marginTop: spacing(1) },
   image: {
     width: '100%',
     height: 150,

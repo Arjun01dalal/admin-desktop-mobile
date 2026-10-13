@@ -36,17 +36,13 @@ import {
 } from '../theme';
 import { getAppVersion } from '../utils/appVersion';
 import { styles } from './ProfileScreen.styles';
+import { display } from '../utils/display';
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'dark', label: 'Dark' },
   { value: 'light', label: 'Light' },
   { value: 'system', label: 'System' },
 ];
-
-function display(value: unknown): string {
-  const s = value == null ? '' : String(value).trim();
-  return s || '—';
-}
 
 function ThemePicker() {
   const [mode, setMode] = useState<ThemeMode>(getThemeMode());

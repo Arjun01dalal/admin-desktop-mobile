@@ -1,21 +1,22 @@
 /**
  * AAA Fraud Bet Report — mobile port of desktop AAAFraudBetReportPage / Laxmi.
- * Date pickers (From / To), card list, images rendered with <Image>.
+ * Date pickers (From / To), card list, images via CachedImage (expo-image).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   Modal,
-  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
-import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { CachedImage } from '../../../components/CachedImage';
 import { DateField } from '../../../components/DateField';
+import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './AAAFraudBetReportScreen.styles';
 
@@ -189,6 +190,7 @@ export function AAAFraudBetReportScreen() {
   const [sheetRow, setSheetRow] = useState<Record<string, unknown> | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const genRef = useRef(0);
+  const { defer } = useDeferredTimeout();
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -232,20 +234,26 @@ export function AAAFraudBetReportScreen() {
 
   const sheetImage = sheetRow ? pickImageFromRow(sheetRow) : null;
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Record<string, unknown>, index: number) =>
+      `row-${index}-${String(row._id || row.id || row.userId || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Record<string, unknown>>) => (
+      <AAAFraudBetCard
+        row={row}
+        index={index}
+        onPress={() => setSheetRow(row)}
+        onPreviewImage={setPreviewImage}
+      />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>AAA Fraud Bet Report</Text>
       <Text style={styles.sub}>Total: {rows.length.toLocaleString('en-IN')}</Text>
 
@@ -306,60 +314,25 @@ export function AAAFraudBetReportScreen() {
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No fraud bets found for the selected filters.</Text>
-      ) : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const image = pickImageFromRow(row);
-          const fields = cardFields(row);
-          const title =
-            String(
-              row.userName ||
-                row.user_name ||
-                row.name ||
-                row.userId ||
-                row.user_id ||
-                `Bet #${index + 1}`,
-            ) || `Bet #${index + 1}`;
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id || row.id || row.userId || '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {title}
-                </Text>
-                {image ? (
-                  <TouchableOpacity
-                    style={styles.viewImageBtn}
-                    activeOpacity={0.8}
-                    onPress={() => setPreviewImage(image.uri)}
-                  >
-                    <Text style={styles.viewImageBtnText}>View Image</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-
-              {fields.map((f) => (
-                <View key={f.key} style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>{f.label}</Text>
-                  <Text style={styles.cardValue} numberOfLines={3}>
-                    {f.value}
-                  </Text>
-                </View>
-              ))}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No fraud bets found for the selected filters."
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!previewImage}
+        keyboardShouldPersistTaps="handled"
+      />
 
       <RowDetailSheet
         visible={Boolean(sheetRow)}
@@ -374,7 +347,7 @@ export function AAAFraudBetReportScreen() {
                   onPress: () => {
                     const uri = sheetImage.uri;
                     setSheetRow(null);
-                    setTimeout(() => setPreviewImage(uri), 250);
+                    defer(() => setPreviewImage(uri), 250);
                   },
                 },
               ]
@@ -402,16 +375,71 @@ export function AAAFraudBetReportScreen() {
               <Text style={styles.previewCloseText}>✕</Text>
             </TouchableOpacity>
             {previewImage ? (
-              <Image
+              <CachedImage
                 source={{ uri: previewImage }}
                 style={styles.previewImage}
                 resizeMode="contain"
+                recyclingKey={previewImage}
               />
             ) : null}
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
+
+type AAAFraudBetCardProps = {
+  row: Record<string, unknown>;
+  index: number;
+  onPress: () => void;
+  onPreviewImage: (uri: string) => void;
+};
+
+const AAAFraudBetCard = memo(function AAAFraudBetCard({
+  row,
+  index,
+  onPress,
+  onPreviewImage,
+}: AAAFraudBetCardProps) {
+  const image = pickImageFromRow(row);
+  const fields = cardFields(row);
+  const title =
+    String(
+      row.userName ||
+        row.user_name ||
+        row.name ||
+        row.userId ||
+        row.user_id ||
+        `Bet #${index + 1}`,
+    ) || `Bet #${index + 1}`;
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        {image ? (
+          <TouchableOpacity
+            style={styles.viewImageBtn}
+            activeOpacity={0.8}
+            onPress={() => onPreviewImage(image.uri)}
+          >
+            <Text style={styles.viewImageBtnText}>View Image</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {fields.map((f) => (
+        <View key={f.key} style={styles.cardRow}>
+          <Text style={styles.cardLabel}>{f.label}</Text>
+          <Text style={styles.cardValue} numberOfLines={3}>
+            {f.value}
+          </Text>
+        </View>
+      ))}
+    </TouchableOpacity>
+  );
+});
 

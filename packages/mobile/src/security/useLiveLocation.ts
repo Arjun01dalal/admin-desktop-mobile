@@ -224,12 +224,21 @@ export function useLiveLocation(enabled: boolean): {
   const inflightRef = useRef<Promise<LiveLocation | null> | null>(null);
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const watchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aliveRef = useRef(true);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     locationRef.current = location;
   }, [location]);
 
   const blockForLocationOff = useCallback((message: string) => {
+    if (!aliveRef.current) return;
     setLocation(null);
     locationRef.current = null;
     setError(message);
@@ -241,6 +250,7 @@ export function useLiveLocation(enabled: boolean): {
   }, []);
 
   const markSuccess = useCallback((next: LiveLocation) => {
+    if (!aliveRef.current) return;
     setLocation(next);
     locationRef.current = next;
     setError(null);
@@ -259,7 +269,7 @@ export function useLiveLocation(enabled: boolean): {
           },
         ),
       );
-      if (watcher.current) {
+      if (!aliveRef.current || watcher.current) {
         sub.remove();
         return;
       }
@@ -276,18 +286,21 @@ export function useLiveLocation(enabled: boolean): {
       if (inflightRef.current) return inflightRef.current;
 
       const run = (async () => {
-        if (!options?.silent) setLoading(true);
+        if (!options?.silent && aliveRef.current) setLoading(true);
         try {
           const next = await tryOsLocation();
+          if (!aliveRef.current) return next;
           markSuccess(next);
           // Let the one-shot native request release its result before watch starts.
           if (watchTimer.current) clearTimeout(watchTimer.current);
           watchTimer.current = setTimeout(() => {
             watchTimer.current = null;
+            if (!aliveRef.current) return;
             void startWatch();
           }, 800);
           return next;
         } catch (err) {
+          if (!aliveRef.current) return null;
           const failure = err as LocationFailure;
           if (isHardLocationOff(failure)) {
             blockForLocationOff(failure.message);
@@ -307,7 +320,7 @@ export function useLiveLocation(enabled: boolean): {
           setBlocked(true);
           return null;
         } finally {
-          if (!options?.silent) setLoading(false);
+          if (!options?.silent && aliveRef.current) setLoading(false);
           inflightRef.current = null;
         }
       })();

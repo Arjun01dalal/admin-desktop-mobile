@@ -334,7 +334,8 @@ export async function secureApi<T = unknown>(
     const hadToken = Boolean(token);
 
     // _clientName -> client-name header (mirrors desktop behaviour)
-    const { _clientName, ...rest } = payload ?? {};
+    const { _clientName, ...restIn } = payload ?? {};
+    const rest: Record<string, unknown> = { ...restIn };
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -352,11 +353,21 @@ export async function secureApi<T = unknown>(
       for (const [k, v] of Object.entries(staticHeaders)) headers[k] = String(v);
     }
 
+    // Registry paths may include `{param}` placeholders (e.g. /dialer/call/{callId}).
+    let resolvedPath = entry.path;
+    if (resolvedPath.includes('{')) {
+      resolvedPath = resolvedPath.replace(/\{(\w+)\}/g, (_match, key: string) => {
+        const value = rest[key];
+        delete rest[key];
+        return encodeURIComponent(String(value ?? ''));
+      });
+    }
+
     const body = entry.encryptRequest ? { token: encryptPayload(rest) } : rest;
 
     const isGet = entry.method === 'GET';
     // Registry paths may be absolute (other backends, e.g. Live Match book/odds).
-    let url = /^https?:\/\//i.test(entry.path) ? entry.path : `${getApiBaseUrl()}${entry.path}`;
+    let url = /^https?:\/\//i.test(resolvedPath) ? resolvedPath : `${getApiBaseUrl()}${resolvedPath}`;
     // Match desktop: GET payload goes in the query string (e.g. startDate/endDate).
     if (isGet) {
       const entries = Object.entries(rest || {}).filter(

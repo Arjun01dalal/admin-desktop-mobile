@@ -44,6 +44,8 @@ export function LiveStreamModal({ open, onClose, streamId }: Props) {
   const id = String(streamId || '').trim();
   const streamUrl = `https://aaa.aaryapaar.exchange/sports/exchange/live-stream/${id}`;
   const scoreUrl = `https://aaa.aaryapaar.exchange/sports/exchange/live-score/${id}`;
+  // Unmount WebViews when closed — keeps native media/DOM out of memory.
+  const showFrames = open && Boolean(id);
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
@@ -56,14 +58,16 @@ export function LiveStreamModal({ open, onClose, streamId }: Props) {
             </TouchableOpacity>
           </View>
           <View style={styles.scoreBox}>
-            {id ? <StreamFrame uri={scoreUrl} title="Live Score" /> : null}
+            {showFrames ? <StreamFrame uri={scoreUrl} title="Live Score" /> : null}
           </View>
           <View style={styles.streamBox}>
-            {id ? (
+            {showFrames ? (
               <StreamFrame uri={streamUrl} title="Live Stream" />
             ) : (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No stream available for this match.</Text>
+                <Text style={styles.emptyText}>
+                  {open ? 'No stream available for this match.' : ''}
+                </Text>
               </View>
             )}
           </View>

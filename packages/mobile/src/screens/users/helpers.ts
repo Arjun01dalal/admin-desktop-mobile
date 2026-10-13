@@ -75,15 +75,7 @@ export function resolveBlockOtpMobile(loginMobile?: string): string {
 
 /* --------------------------------- helpers -------------------------------- */
 
-export function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-export function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
+export { display, maskMobile } from '../../utils/display';
 
 export function isBlocked(r: Row): boolean {
   return Boolean(r.blockUser ?? r.block);

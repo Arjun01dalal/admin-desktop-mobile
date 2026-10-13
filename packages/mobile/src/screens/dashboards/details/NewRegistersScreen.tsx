@@ -4,23 +4,24 @@
  * Every desktop column is shown in a sideways-scrolling table; contact
  * columns are hidden for restricted roles like on desktop.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { appCodeForName, registrationCommentsOf, withRegistrationComment } from '@astro/shared';
 import { colors } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import {
   formatAadharAddress,
   flattenUserRow,
@@ -42,9 +43,11 @@ import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDia
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './NewRegistersScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 /** Search fields mirroring desktop NewRegistersPage per-column filters (filter keys match).
  *  Contact-identifier fields are withheld for restricted roles like the desktop column filters. */
@@ -147,15 +150,6 @@ type Response = {
 
 const PAGE_SIZE = 25;
 
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
 export function NewRegistersScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const initialStart = typeof params.startDate === 'string' ? params.startDate : todayIST();
@@ -163,6 +157,7 @@ export function NewRegistersScreen() {
   const canShowMobile = hasPermission('show_mobile');
   const isCaller = isNewRegistersCaller();
   const hideContact = hasPermission('contact_visibility_none') || isCaller;
+  const { defer } = useDeferredTimeout();
 
   const [draftStart, setDraftStart] = useState(initialStart);
   const [draftEnd, setDraftEnd] = useState(initialEnd);
@@ -433,11 +428,14 @@ export function NewRegistersScreen() {
   }, [admin, campaignId, campaignOptions, rows]);
 
   /** Close row sheet first so native modals do not stack (same as Call Logs). */
-  const afterSheetClose = useCallback((fn: () => void) => {
-    setSelected(null);
-    setCallMsg('');
-    setTimeout(fn, 250);
-  }, []);
+  const afterSheetClose = useCallback(
+    (fn: () => void) => {
+      setSelected(null);
+      setCallMsg('');
+      defer(fn, 250);
+    },
+    [defer],
+  );
 
   const openAddComment = useCallback(
     (row: Row) => {
@@ -710,19 +708,26 @@ export function NewRegistersScreen() {
     return cols;
   }, [page, pageSize, hideContact, canShowMobile, appVersions]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <NewRegistersCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onOpenSheet={() => setSelected(row)}
+      />
+    ),
+    [page, pageSize],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>New Registration</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
@@ -876,48 +881,45 @@ export function NewRegistersScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No users found</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const bal = pickBalance(row);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSelected(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name)}
-                </Text>
-                <Text style={styles.cardApp}>{appCodeForName(pickAppName(row))}</Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Balance: {bal == null ? '—' : floorNum(bal).toLocaleString('en-IN')}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  {formatDisplayDate(row.createdOn || row.createdAt) || '—'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  State: {display(row.state)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  {pickLastActivity(row)}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No users found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!commentOpen && !viewCommentsOpen && !viewLogsOpen}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -1089,25 +1091,53 @@ export function NewRegistersScreen() {
           </View>
         </View>
       </Modal>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
+
+type NewRegistersCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  onOpenSheet: () => void;
+};
+
+const NewRegistersCard = memo(function NewRegistersCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onOpenSheet,
+}: NewRegistersCardProps) {
+  const bal = pickBalance(row);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <Text style={styles.cardApp}>{appCodeForName(pickAppName(row))}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Balance: {bal == null ? '—' : floorNum(bal).toLocaleString('en-IN')}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {formatDisplayDate(row.createdOn || row.createdAt) || '—'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          State: {display(row.state)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {pickLastActivity(row)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

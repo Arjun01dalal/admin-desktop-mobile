@@ -111,7 +111,8 @@ export function CommentModal({
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>Add Comment</Text>
           <Text style={styles.modalSub}>
-            {String(row?.client_name || '')} · {String(row?.caller_user_id || '')}
+            {String(row?.client_name || '')} ·{' '}
+            {String(row?.customerId || row?.caller_user_id || '')}
           </Text>
           <ScrollView style={styles.modalChips} showsVerticalScrollIndicator={false}>
             <View style={styles.chipWrap}>

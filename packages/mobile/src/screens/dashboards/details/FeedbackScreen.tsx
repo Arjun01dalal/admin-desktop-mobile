@@ -3,27 +3,28 @@
  * ops.feedbackGetAll { pageNo, itemsPerPage, filter:{ feedBackStatus:'Pending' }, dates when
  * both applied }. Row tap opens a detail modal; Respond (Edit_Feedback) and Delete actions.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
-import { asPaged } from '@astro/shared';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { usePagedSecureQuery } from '../../../hooks/usePagedSecureQuery';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
+import { display } from '../../../utils/display';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './FeedbackScreen.styles';
@@ -38,26 +39,11 @@ type Row = {
   [key: string]: unknown;
 };
 
-type FeedbackResponse =
-  | Row[]
-  | {
-      items?: Row[];
-      feedback?: Row[];
-      users?: Row[];
-      totalPages?: number;
-      total?: number;
-    };
-
 type FeedbackUpdateResponse = {
   message?: string;
 };
 
 const PAGE_SIZE = 25;
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function FeedbackScreen() {
   const canShowMobile = hasPermission('show_mobile');
@@ -70,55 +56,36 @@ export function FeedbackScreen() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
   const [sheetRow, setSheetRow] = useState<Row | null>(null);
   // Respond modal.
   const [replyRow, setReplyRow] = useState<Row | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
   const [savingReply, setSavingReply] = useState(false);
   const [replyMsg, setReplyMsg] = useState('');
-  const genRef = useRef(0);
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const payload: Record<string, unknown> = {
-        pageNo: page,
-        itemsPerPage: PAGE_SIZE,
-        filter: { feedBackStatus: 'Pending' },
-      };
-      if (startDate && endDate) {
-        payload.startDate = startDate;
-        payload.endDate = endDate;
-      }
-      const res = await secureApi<FeedbackResponse>('ops.feedbackGetAll', payload);
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load feedback');
-        setRows([]);
-        setTotalPages(1);
-        setTotal(0);
-        return;
-      }
-      const parsed = asPaged<Row>(res.data);
-      setSheetRow(null);
-      setRows(parsed.rows);
-      setTotal(parsed.total ?? parsed.rows.length);
-      setTotalPages(Math.max(1, parsed.totalPages ?? 1));
-    } finally {
-      if (gen === genRef.current) setLoading(false);
+  const buildPayload = useCallback(() => {
+    const payload: Record<string, unknown> = {
+      pageNo: page,
+      itemsPerPage: PAGE_SIZE,
+      filter: { feedBackStatus: 'Pending' },
+    };
+    if (startDate && endDate) {
+      payload.startDate = startDate;
+      payload.endDate = endDate;
     }
+    return payload;
   }, [page, startDate, endDate]);
 
+  const { rows, total, totalPages, loading, error, load, setError } = usePagedSecureQuery<Row>({
+    action: 'ops.feedbackGetAll',
+    buildPayload,
+    autoDeps: [page, startDate, endDate],
+    errorMessage: 'Failed to load feedback',
+  });
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    setSheetRow(null);
+  }, [rows]);
 
   const submitReply = useCallback(async () => {
     const text = replyDraft.trim();
@@ -164,7 +131,7 @@ export function FeedbackScreen() {
         },
       ]);
     },
-    [load],
+    [load, setError],
   );
 
   const columns = useMemo<DataTableColumn<Row>[]>(
@@ -217,19 +184,20 @@ export function FeedbackScreen() {
     });
   }
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <FeedbackCard row={row} index={index} page={page} onPress={() => setSheetRow(row)} />
+    ),
+    [page],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Pending Feedback</Text>
       <Text style={styles.sub}>
         {startDate && endDate ? `${startDate} → ${endDate}` : 'All dates'} · Total:{' '}
@@ -253,40 +221,45 @@ export function FeedbackScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No pending feedback</Text> : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {display(row.name)}
-              </Text>
-            </View>
-            <Text style={styles.cardSplitLeft} numberOfLines={2}>
-              Message: {display(row.message)}
-            </Text>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                Reply: {display(row.feedbackResponse)}
-              </Text>
-              <Text style={styles.cardSplitRight} numberOfLines={1}>
-                {row.createdOn
-                  ? `${formatDisplayDate(row.createdOn)} ${formatDisplayTime(row.createdOn)}`
-                  : '—'}
-              </Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for details & actions</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No pending feedback"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={replyRow === null}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -354,25 +327,40 @@ export function FeedbackScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
+type FeedbackCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  onPress: () => void;
+};
+
+const FeedbackCard = memo(function FeedbackCard({ row, index, page, onPress }: FeedbackCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+      </View>
+      <Text style={styles.cardSplitLeft} numberOfLines={2}>
+        Message: {display(row.message)}
+      </Text>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Reply: {display(row.feedbackResponse)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {row.createdOn
+            ? `${formatDisplayDate(row.createdOn)} ${formatDisplayTime(row.createdOn)}`
+            : '—'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});

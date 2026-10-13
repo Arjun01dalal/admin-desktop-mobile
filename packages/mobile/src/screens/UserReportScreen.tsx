@@ -14,7 +14,6 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { floorNum } from '../dashboards/mergeMetrics';
 
-
 import { TabSelect } from './userReport/TabSelect';
 import { TopCasinoGamesSection } from './userReport/TopCasinoGamesSection';
 import { useWalletSummary } from './userReport/useWalletSummary';

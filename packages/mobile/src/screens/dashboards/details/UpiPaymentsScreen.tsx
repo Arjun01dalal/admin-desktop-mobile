@@ -28,6 +28,7 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/d
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './UpiPaymentsScreen.styles';
+import { display } from '../../../utils/display';
 
 type NotifRow = {
   _id?: string;
@@ -66,11 +67,6 @@ type Gateway = { _id?: string; name?: string; mid?: string };
 type Tab = 'notifications' | 'requests';
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100]);
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function statusBadge(status: unknown): string | undefined {
   const s = String(status || '').toLowerCase();

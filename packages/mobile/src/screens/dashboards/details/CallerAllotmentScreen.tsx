@@ -2,22 +2,24 @@
  * Caller Allotment — port of desktop CallerAllotmentPage.
  * Assign/remove caller heads + update Location / Extension / Bot / Server / Telegram.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { CALLER_HEAD_ROLE_IDS, CALLER_ROLE_IDS, OFFICE_LOCATIONS } from '../../../auth/callerRoles';
 import { canUpdateCallerAllotmentEmpCode } from '../../../auth/permissions';
 import { RowDetailSheet } from './RowDetailSheet';
 import { styles } from './CallerAllotmentScreen.styles';
+import { display } from '../../../utils/display';
 
 type SubAdmin = {
   _id: string;
@@ -59,12 +61,6 @@ type EditDraft = {
 };
 
 type EditMode = 'location' | 'ids' | 'head' | 'empCode' | null;
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  if (Array.isArray(value)) return value.filter(Boolean).join(', ') || '—';
-  return String(value);
-}
 
 function displayCallerHead(value: unknown): string {
   if (!value || value === 'not assigned') return '—';
@@ -327,93 +323,40 @@ export function CallerAllotmentScreen() {
     [selected, draft, load],
   );
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: CallerRow, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<CallerRow>) => (
+      <CallerAllotmentCard row={row} index={index} onPress={() => openRow(row, index)} />
+    ),
+    [openRow],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Caller Allotment</Text>
       <Text style={styles.hint}>Tap a caller, then choose what you want to update</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.emptyHint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.emptyHint}>No callers</Text> : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const blocked = Boolean(row.block);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={[styles.card, blocked && styles.cardBlocked]}
-              activeOpacity={blocked ? 1 : 0.75}
-              disabled={blocked}
-              onPress={() => openRow(row, index)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name)}
-                </Text>
-                <Text
-                  style={[styles.statusPill, blocked ? styles.statusBlocked : styles.statusActive]}
-                >
-                  {blocked ? 'Blocked' : 'Active'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Emp: {display(row.empCode)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  Head: {displayCallerHead(row.callerHead)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Location</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.officeLocation || row.location)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Real Name</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.realName)}
-                </Text>
-              </View>
-              <View style={styles.idBlock}>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    Ext: {formatIdList(row.extensionId) || '—'}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    Server: {display(row.serverId)}
-                  </Text>
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    Bot: {formatIdList(row.botIds) || '—'}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    Telegram: {display(row.telegram_username)}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.cardHint}>
-                {blocked ? 'Blocked — updates disabled' : 'Tap card to update'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No callers"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={!!selected}
@@ -642,7 +585,80 @@ export function CallerAllotmentScreen() {
           ) : null
         }
       />
-    </ScrollView>
+    </>
   );
 }
+
+type CallerAllotmentCardProps = {
+  row: CallerRow;
+  index: number;
+  onPress: () => void;
+};
+
+const CallerAllotmentCard = memo(function CallerAllotmentCard({
+  row,
+  index,
+  onPress,
+}: CallerAllotmentCardProps) {
+  const blocked = Boolean(row.block);
+  return (
+    <TouchableOpacity
+      style={[styles.card, blocked && styles.cardBlocked]}
+      activeOpacity={blocked ? 1 : 0.75}
+      disabled={blocked}
+      onPress={onPress}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <Text style={[styles.statusPill, blocked ? styles.statusBlocked : styles.statusActive]}>
+          {blocked ? 'Blocked' : 'Active'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Emp: {display(row.empCode)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Head: {displayCallerHead(row.callerHead)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Location</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.officeLocation || row.location)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Real Name</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.realName)}
+        </Text>
+      </View>
+      <View style={styles.idBlock}>
+        <View style={styles.cardSplitRow}>
+          <Text style={styles.cardSplitLeft} numberOfLines={1}>
+            Ext: {formatIdList(row.extensionId) || '—'}
+          </Text>
+          <Text style={styles.cardSplitRight} numberOfLines={1}>
+            Server: {display(row.serverId)}
+          </Text>
+        </View>
+        <View style={styles.cardSplitRow}>
+          <Text style={styles.cardSplitLeft} numberOfLines={1}>
+            Bot: {formatIdList(row.botIds) || '—'}
+          </Text>
+          <Text style={styles.cardSplitRight} numberOfLines={1}>
+            Telegram: {display(row.telegram_username)}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.cardHint}>
+        {blocked ? 'Blocked — updates disabled' : 'Tap card to update'}
+      </Text>
+    </TouchableOpacity>
+  );
+});
 

@@ -2,22 +2,21 @@
  * WhatsApp inbox — native mobile port of desktop WhatsappPage.
  * Chat list and the open thread load separately (admin-panel-domains WhatsappView).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
+  FlatList,
   KeyboardAvoidingView,
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
@@ -31,9 +30,13 @@ import {
   isIncoming,
   presentMessage,
   toApiMobile,
+  type ChatListItem,
+  type WhatsappMessage,
 } from '@astro/shared/whatsappInbox';
+import { CachedImage } from '../../../components/CachedImage';
 import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { useWhatsappInbox } from './whatsapp/useWhatsappInbox';
 import { styles } from './WhatsappScreen.styles';
 
@@ -45,12 +48,83 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
+const ChatCard = memo(function ChatCard({
+  chat,
+  onPress,
+}: {
+  chat: ChatListItem;
+  onPress: (phone: string) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.chatCard}
+      activeOpacity={0.75}
+      onPress={() => onPress(chat.phone)}
+    >
+      <Avatar name={chat.profileName} />
+      <View style={styles.chatBody}>
+        <View style={styles.chatTopRow}>
+          <Text style={styles.chatName} numberOfLines={1}>
+            {chat.profileName}
+          </Text>
+          <Text style={styles.chatTime}>{formatListTime(chat.timestamp)}</Text>
+        </View>
+        <Text style={styles.chatPhone} numberOfLines={1}>
+          {chat.phone}
+        </Text>
+        <Text style={styles.chatPreview} numberOfLines={1}>
+          {chat.preview || '—'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const MessageBubble = memo(function MessageBubble({ item }: { item: WhatsappMessage }) {
+  const incoming = isIncoming(item);
+  const view = presentMessage(item);
+  return (
+    <View
+      style={[
+        styles.messageRow,
+        incoming ? styles.messageRowIncoming : styles.messageRowOutgoing,
+      ]}
+    >
+      <View style={[styles.bubble, incoming ? styles.bubbleIncoming : styles.bubbleOutgoing]}>
+        {view.kind === 'text' ? <Text style={styles.messageText}>{view.text}</Text> : null}
+        {view.kind === 'image' && view.src ? (
+          <CachedImage
+            source={{ uri: view.src }}
+            style={styles.messageImage}
+            resizeMode="cover"
+            recyclingKey={view.src}
+          />
+        ) : null}
+        {view.kind === 'image' && view.caption ? (
+          <Text style={styles.messageText}>{view.caption}</Text>
+        ) : null}
+        {view.kind === 'audio' ? (
+          <TouchableOpacity
+            disabled={!view.src}
+            onPress={() => {
+              if (view.src) void Linking.openURL(view.src);
+            }}
+          >
+            <Text style={styles.messageText}>🎵 Audio</Text>
+          </TouchableOpacity>
+        ) : null}
+        <Text style={styles.messageTime}>{formatListTime(item.timestamp)}</Text>
+      </View>
+    </View>
+  );
+});
+
 export function WhatsappScreen() {
   const inbox = useWhatsappInbox();
   const [message, setMessage] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const messagesRef = useRef<ScrollView>(null);
+  const messagesRef = useRef<FlatList<WhatsappMessage>>(null);
   const { selectedUser: openChat, activeMessages, stickToBottomRef } = inbox;
 
   useEffect(() => {
@@ -115,12 +189,6 @@ export function WhatsappScreen() {
     }
   }, [image, inbox, message, sending]);
 
-  const onChatListScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 80;
-    if (nearBottom) inbox.loadMoreChats();
-  };
-
   const onMessagesScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
@@ -134,8 +202,8 @@ export function WhatsappScreen() {
     contentHeightRef.current = height;
     if (previous != null) {
       pendingPrependHeightRef.current = null;
-      messagesRef.current?.scrollTo({
-        y: Math.max(0, height - previous),
+      messagesRef.current?.scrollToOffset({
+        offset: Math.max(0, height - previous),
         animated: false,
       });
       return;
@@ -152,6 +220,18 @@ export function WhatsappScreen() {
       if (!grew) pendingPrependHeightRef.current = null;
     });
   };
+
+  const renderChat = useCallback(
+    ({ item }: ListRenderItemInfo<ChatListItem>) => (
+      <ChatCard chat={item} onPress={inbox.selectChat} />
+    ),
+    [inbox.selectChat],
+  );
+
+  const renderMessage = useCallback(
+    ({ item }: ListRenderItemInfo<WhatsappMessage>) => <MessageBubble item={item} />,
+    [],
+  );
 
   if (!inbox.selectedUser) {
     return (
@@ -190,51 +270,25 @@ export function WhatsappScreen() {
           </View>
         ) : null}
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
+        <ScreenFlatList
+          style={{ flex: 1 }}
+          data={inbox.filteredChats}
+          keyExtractor={(chat) => chat.phone}
+          renderItem={renderChat}
           contentContainerStyle={styles.chatList}
-          onScroll={onChatListScroll}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl
-              refreshing={inbox.loadingList}
-              onRefresh={() => void inbox.refreshChats()}
-              tintColor={colors.primary}
-            />
+          refreshing={inbox.loadingList}
+          onRefresh={() => void inbox.refreshChats()}
+          onEndReached={() => inbox.loadMoreChats()}
+          onEndReachedThreshold={0.4}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              {inbox.chatListLoaded ? 'No chats found' : 'Loading chats…'}
+            </Text>
           }
-        >
-          {inbox.chatListLoaded && inbox.filteredChats.length === 0 ? (
-            <Text style={styles.emptyText}>No chats found</Text>
-          ) : null}
-          {!inbox.chatListLoaded && inbox.filteredChats.length === 0 ? (
-            <Text style={styles.emptyText}>Loading chats…</Text>
-          ) : null}
-          {inbox.filteredChats.map((chat) => (
-            <TouchableOpacity
-              key={chat.phone}
-              style={styles.chatCard}
-              activeOpacity={0.75}
-              onPress={() => inbox.selectChat(chat.phone)}
-            >
-              <Avatar name={chat.profileName} />
-              <View style={styles.chatBody}>
-                <View style={styles.chatTopRow}>
-                  <Text style={styles.chatName} numberOfLines={1}>
-                    {chat.profileName}
-                  </Text>
-                  <Text style={styles.chatTime}>{formatListTime(chat.timestamp)}</Text>
-                </View>
-                <Text style={styles.chatPhone} numberOfLines={1}>
-                  {chat.phone}
-                </Text>
-                <Text style={styles.chatPreview} numberOfLines={1}>
-                  {chat.preview || '—'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-          {inbox.loadingMore ? <Text style={styles.emptyText}>Loading more...</Text> : null}
-        </ScrollView>
+          listFooter={
+            inbox.loadingMore ? <Text style={styles.emptyText}>Loading more...</Text> : null
+          }
+        />
       </View>
     );
   }
@@ -278,77 +332,49 @@ export function WhatsappScreen() {
       </View>
 
       <View style={styles.messagesWrap}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        ref={messagesRef}
-        style={styles.messages}
-        contentContainerStyle={styles.messagesContent}
-        keyboardShouldPersistTaps="handled"
-        onScroll={onMessagesScroll}
-        scrollEventThrottle={16}
-        onContentSizeChange={onMessagesContentSizeChange}
-      >
-        {inbox.messagesLoading && inbox.activeMessages.length === 0 ? (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing(8) }} />
-        ) : null}
-        {!inbox.messagesLoading && inbox.activeMessages.length === 0 ? (
-          <Text style={styles.emptyText}>No messages in this chat.</Text>
-        ) : null}
-        {inbox.activeMessages.map((item, index) => {
-          const incoming = isIncoming(item);
-          const view = presentMessage(item);
-          return (
-            <View
-              key={getWhatsappMessageId(item, index)}
-              style={[
-                styles.messageRow,
-                incoming ? styles.messageRowIncoming : styles.messageRowOutgoing,
-              ]}
+        <FlatList
+          ref={messagesRef}
+          data={inbox.activeMessages}
+          keyExtractor={(item, index) => getWhatsappMessageId(item, index)}
+          renderItem={renderMessage}
+          style={styles.messages}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onMessagesScroll}
+          scrollEventThrottle={16}
+          onContentSizeChange={onMessagesContentSizeChange}
+          windowSize={7}
+          maxToRenderPerBatch={8}
+          initialNumToRender={16}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListEmptyComponent={
+            inbox.messagesLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginTop: spacing(8) }} />
+            ) : (
+              <Text style={styles.emptyText}>No messages in this chat.</Text>
+            )
+          }
+        />
+        {showLoadPrevious ? (
+          <View style={styles.loadOlderWrap} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.loadOlderBtn}
+              disabled={inbox.loadingOlder}
+              onPress={handleLoadPrevious}
             >
-              <View
-                style={[styles.bubble, incoming ? styles.bubbleIncoming : styles.bubbleOutgoing]}
-              >
-                {view.kind === 'text' ? <Text style={styles.messageText}>{view.text}</Text> : null}
-                {view.kind === 'image' && view.src ? (
-                  <Image source={{ uri: view.src }} style={styles.messageImage} resizeMode="cover" />
-                ) : null}
-                {view.kind === 'image' && view.caption ? (
-                  <Text style={styles.messageText}>{view.caption}</Text>
-                ) : null}
-                {view.kind === 'audio' ? (
-                  <TouchableOpacity
-                    disabled={!view.src}
-                    onPress={() => {
-                      if (view.src) void Linking.openURL(view.src);
-                    }}
-                  >
-                    <Text style={styles.messageText}>🎵 Audio</Text>
-                  </TouchableOpacity>
-                ) : null}
-                <Text style={styles.messageTime}>{formatListTime(item.timestamp)}</Text>
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
-      {showLoadPrevious ? (
-        <View style={styles.loadOlderWrap} pointerEvents="box-none">
-          <TouchableOpacity
-            style={styles.loadOlderBtn}
-            disabled={inbox.loadingOlder}
-            onPress={handleLoadPrevious}
-          >
-            <Text style={styles.loadOlderText}>
-              {inbox.loadingOlder ? 'Loading...' : 'Load previous'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+              <Text style={styles.loadOlderText}>
+                {inbox.loadingOlder ? 'Loading...' : 'Load previous'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
 
       {image ? (
         <View style={styles.previewRow}>
-          <Image source={{ uri: image }} style={styles.previewImage} />
+          <CachedImage source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
           <TouchableOpacity onPress={() => setImage(null)}>
             <Text style={styles.removeImage}>Remove image</Text>
           </TouchableOpacity>
@@ -386,4 +412,3 @@ export function WhatsappScreen() {
     </KeyboardAvoidingView>
   );
 }
-

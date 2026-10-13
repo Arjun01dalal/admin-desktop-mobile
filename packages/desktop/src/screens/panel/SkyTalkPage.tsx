@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-
-const SKYTALK_URL = 'https://skytalk.site';
+import { SKYTALK_EMBED_URL } from '@astro/shared';
 
 /**
  * Embeds Sky Talk. Remounts (fresh iframe key) whenever this route mounts,
- * so each visit to the side-nav item reloads skytalk.site.
+ * so each visit to the side-nav item reloads the CRM embed.
  */
 export function SkyTalkPage() {
   const [frameKey, setFrameKey] = useState(() => Date.now());
@@ -49,7 +48,7 @@ export function SkyTalkPage() {
       >
         <iframe
           key={frameKey}
-          src={SKYTALK_URL}
+          src={SKYTALK_EMBED_URL}
           title="Sky Talk"
           width="100%"
           height="100%"

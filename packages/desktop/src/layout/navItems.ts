@@ -88,6 +88,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.call_logs,
   },
   {
+    id: 'gtelCalls',
+    label: 'Gtel Calls',
+    path: '/gtel-calls',
+    permission: Permissions.show_gtel_calls,
+  },
+  {
     id: 'dialerPushData',
     label: 'Dialer Push Data',
     path: '/dialer-push-data',

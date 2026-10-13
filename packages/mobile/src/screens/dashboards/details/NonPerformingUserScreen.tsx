@@ -3,23 +3,24 @@
  * ops.nonPerformingUser { pageNo, itemPerPage, startDate?, endDate?, filter } (filter always
  * present, dates only when both applied). Row tap opens a detail modal with all columns.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appCodeForName, asPaged, nonPerformingCommentsOf } from '@astro/shared';
 import { colors, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
@@ -27,6 +28,7 @@ import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './NonPerformingUserScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -73,16 +75,6 @@ const SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'state', label: 'State' },
   { key: 'city', label: 'City' },
 ];
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function formatTs(ts?: string): string {
   if (!ts) return '—';
@@ -260,19 +252,27 @@ export function NonPerformingUserScreen() {
     return acts;
   }, [sheetRow, openComments, openUserReport]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <NonPerformingUserCard
+        row={row}
+        index={index}
+        page={page}
+        canShowMobile={canShowMobile}
+        onPress={() => setSheetRow(row)}
+        onOpenComments={() => openComments(row)}
+      />
+    ),
+    [page, canShowMobile, openComments],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Non Performing User</Text>
       <Text style={styles.sub}>
         {startDate && endDate ? `${startDate} → ${endDate}` : 'All dates'} · Total:{' '}
@@ -310,65 +310,44 @@ export function NonPerformingUserScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const commentCount = commentsOf(row).length;
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name)}
-                </Text>
-                <TouchableOpacity
-                  style={styles.viewCommentBtn}
-                  onPress={() => openComments(row)}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                >
-                  <Text style={styles.viewCommentBtnText}>
-                    {commentCount > 0 ? `View Comment (${commentCount})` : 'View Comment'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Balance</Text>
-                <Text style={styles.cardValue}>
-                  {floorNum(row.balance ?? 0).toLocaleString('en-IN')}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Deposit</Text>
-                <Text style={styles.cardValue}>
-                  {floorNum(row.totalAmount ?? 0).toLocaleString('en-IN')}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>App</Text>
-                <Text style={styles.cardValue}>{appCodeForName(String(row.clientName || ''))}</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Mobile</Text>
-                <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Last Activity</Text>
-                <Text style={styles.cardValue}>{formatTs(row.updatedOn)}</Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for full details</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No data available"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -464,25 +443,70 @@ export function NonPerformingUserScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </>
   );
 }
+
+type NonPerformingUserCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  canShowMobile: boolean;
+  onPress: () => void;
+  onOpenComments: () => void;
+};
+
+const NonPerformingUserCard = memo(function NonPerformingUserCard({
+  row,
+  index,
+  page,
+  canShowMobile,
+  onPress,
+  onOpenComments,
+}: NonPerformingUserCardProps) {
+  const commentCount = commentsOf(row).length;
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <TouchableOpacity
+          style={styles.viewCommentBtn}
+          onPress={onOpenComments}
+          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+        >
+          <Text style={styles.viewCommentBtnText}>
+            {commentCount > 0 ? `View Comment (${commentCount})` : 'View Comment'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Balance</Text>
+        <Text style={styles.cardValue}>{floorNum(row.balance ?? 0).toLocaleString('en-IN')}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Deposit</Text>
+        <Text style={styles.cardValue}>
+          {floorNum(row.totalAmount ?? 0).toLocaleString('en-IN')}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>App</Text>
+        <Text style={styles.cardValue}>{appCodeForName(String(row.clientName || ''))}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Last Activity</Text>
+        <Text style={styles.cardValue}>{formatTs(row.updatedOn)}</Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for full details</Text>
+    </TouchableOpacity>
+  );
+});
 

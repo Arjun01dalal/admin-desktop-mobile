@@ -4,8 +4,15 @@
  * search bar (User ID / Name / Mobile), per-page chips, DataTable with
  * main columns and a bottom sheet showing every column, pagination.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { pickPageSizes } from '@astro/shared';
 import { secureApi } from '../../../api/client';
@@ -13,9 +20,11 @@ import { hasPermission } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './ProfitLossScreen.styles';
+import { maskMobile } from '../../../utils/display';
 
 type PLRow = {
   _id?: string;
@@ -41,11 +50,6 @@ const PAGE_SIZES = pickPageSizes([10, 25, 50, 75, 100]);
 function fmt(value: unknown): string {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—';
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (value === undefined || value === null || value === '') return '—';
-  return canShow ? String(value) : '**********';
 }
 
 function unwrap(raw: unknown): { rows: PLRow[]; count: number } {
@@ -206,25 +210,30 @@ export function ProfitLossScreen() {
     ];
   }, [selected, canOpenReport, openUserReport]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: PLRow, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<PLRow>) => (
+      <ProfitLossCard
+        row={row}
+        index={index}
+        rowOffset={rowOffset}
+        onPress={() => setSelected({ row, index })}
+      />
+    ),
+    [rowOffset],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Profit &amp; Loss</Text>
       <Text style={styles.sub}>
         Per-user balances, bets, deposits and withdrawals · Tap a row for all details
       </Text>
 
-      {/* Search bar (same pattern as other pages) */}
       <View style={styles.searchCard}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.chipRow}>
@@ -261,7 +270,6 @@ export function ProfitLossScreen() {
         </View>
       </View>
 
-      {/* Per-page chips */}
       <View style={styles.chipRowSpaced}>
         <Text style={styles.chipRowLabel}>Per page</Text>
         {PAGE_SIZES.map((n) => (
@@ -283,58 +291,48 @@ export function ProfitLossScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No records found</Text> : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSelected({ row, index })}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{index + 1 + rowOffset}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {String(row.name || '—')}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Deposit: {fmt(row.deposite)}</Text>
-              <Text style={styles.cardSplitRight}>Win: {fmt(row.totalProfit)}</Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Bet: {fmt(row.betAmount)}</Text>
-              <Text style={styles.cardSplitRight}>Refund: {fmt(row.withdrawl)}</Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for details</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  const listFooter = (
+    <View style={styles.pagerRow}>
+      <TouchableOpacity
+        style={[styles.pagerBtn, (page <= 1 || loading) && styles.pagerBtnDisabled]}
+        onPress={() => setPage((p) => Math.max(1, p - 1))}
+        disabled={page <= 1 || loading}
+      >
+        <Text style={styles.pagerBtnText}>‹ Prev</Text>
+      </TouchableOpacity>
+      <Text style={styles.pagerInfo}>
+        {count > 0
+          ? `${count.toLocaleString()} records · page ${page} of ${totalPages}`
+          : 'No records'}
+      </Text>
+      <TouchableOpacity
+        style={[styles.pagerBtn, (page >= totalPages || loading) && styles.pagerBtnDisabled]}
+        onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+        disabled={page >= totalPages || loading}
+      >
+        <Text style={styles.pagerBtnText}>Next ›</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-      {/* Pagination */}
-      <View style={styles.pagerRow}>
-        <TouchableOpacity
-          style={[styles.pagerBtn, (page <= 1 || loading) && styles.pagerBtnDisabled]}
-          onPress={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page <= 1 || loading}
-        >
-          <Text style={styles.pagerBtnText}>‹ Prev</Text>
-        </TouchableOpacity>
-        <Text style={styles.pagerInfo}>
-          {count > 0
-            ? `${count.toLocaleString()} records · page ${page} of ${totalPages}`
-            : 'No records'}
-        </Text>
-        <TouchableOpacity
-          style={[styles.pagerBtn, (page >= totalPages || loading) && styles.pagerBtnDisabled]}
-          onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page >= totalPages || loading}
-        >
-          <Text style={styles.pagerBtnText}>Next ›</Text>
-        </TouchableOpacity>
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No records found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -350,7 +348,40 @@ export function ProfitLossScreen() {
         onClose={() => setSelected(null)}
         actions={sheetActions}
       />
-    </ScrollView>
+    </>
   );
 }
 
+type ProfitLossCardProps = {
+  row: PLRow;
+  index: number;
+  rowOffset: number;
+  onPress: () => void;
+};
+
+const ProfitLossCard = memo(function ProfitLossCard({
+  row,
+  index,
+  rowOffset,
+  onPress,
+}: ProfitLossCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1 + rowOffset}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {String(row.name || '—')}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Deposit: {fmt(row.deposite)}</Text>
+        <Text style={styles.cardSplitRight}>Win: {fmt(row.totalProfit)}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Bet: {fmt(row.betAmount)}</Text>
+        <Text style={styles.cardSplitRight}>Refund: {fmt(row.withdrawl)}</Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});

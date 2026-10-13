@@ -28,6 +28,7 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/d
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './DepositProvidersScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -57,12 +58,6 @@ type Row = {
   amtUpdatedBy?: { userName?: string };
   [key: string]: unknown;
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
-  return String(value);
-}
 
 function asList<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];

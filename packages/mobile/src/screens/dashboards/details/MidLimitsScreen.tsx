@@ -3,14 +3,13 @@
  * Loads MIDs from deposits.mids + limits from midLimits.get; edit via midLimits.upsert;
  * alert recipients via midLimits.getRecipients / midLimits.setRecipients.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Switch,
   Text,
@@ -18,7 +17,9 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
   applyMidLimitUpsert,
@@ -52,11 +53,7 @@ import { canEditMidLimits, canViewMidLimits, getSessionUser } from '../../../aut
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './MidLimitsScreen.styles';
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
+import { display } from '../../../utils/display';
 
 function formatUpdatedOn(value: string | undefined): string {
   if (!value) return '—';
@@ -314,177 +311,154 @@ export function MidLimitsScreen() {
     );
   }
 
-  return (
-    <>
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={() => void load()}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        <Text style={styles.overline}>Payin</Text>
-        <Text style={styles.title}>MID Limits</Text>
-        <Text style={styles.subtitle}>View all MIDs and set or update deposit limits.</Text>
+  const keyExtractor = useCallback((row: MidLimitRow) => row.mid, []);
 
-        <View style={styles.toolbar}>
-          <View style={styles.searchWrap}>
-            <MaterialIcons name="search" size={18} color={colors.muted} />
-            <TextInput
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search MID or gateway"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {search ? (
-              <TouchableOpacity
-                onPress={() => setSearch('')}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <MaterialIcons name="close" size={18} color={colors.muted} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          {canEdit ? (
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<MidLimitRow>) => (
+      <MidLimitsCard
+        row={row}
+        index={index}
+        canEdit={canEdit}
+        onPress={() => setSheetRow(row)}
+        onEdit={() => openEdit(row)}
+      />
+    ),
+    [canEdit, openEdit],
+  );
+
+  const listHeader = (
+    <>
+      <Text style={styles.overline}>Payin</Text>
+      <Text style={styles.title}>MID Limits</Text>
+      <Text style={styles.subtitle}>View all MIDs and set or update deposit limits.</Text>
+
+      <View style={styles.toolbar}>
+        <View style={styles.searchWrap}>
+          <MaterialIcons name="search" size={18} color={colors.muted} />
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search MID or gateway"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {search ? (
             <TouchableOpacity
-              style={styles.alertBtn}
-              onPress={() => void openRecipientsDialog()}
-              disabled={loading || saving || recipientsLoading}
+              onPress={() => setSearch('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <MaterialIcons name="notifications-active" size={16} color="#1a1200" />
-              <Text style={styles.alertBtnText}>Alerts</Text>
+              <MaterialIcons name="close" size={18} color={colors.muted} />
             </TouchableOpacity>
           ) : null}
         </View>
+        {canEdit ? (
+          <TouchableOpacity
+            style={styles.alertBtn}
+            onPress={() => void openRecipientsDialog()}
+            disabled={loading || saving || recipientsLoading}
+          >
+            <MaterialIcons name="notifications-active" size={16} color="#1a1200" />
+            <Text style={styles.alertBtnText}>Alerts</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
-        <View style={styles.alertInfoBox}>
-          <View style={styles.alertInfoHeader}>
-            <MaterialIcons
-              name="notifications-active"
-              size={16}
-              color={alertRecipients?.enabled === false ? colors.muted : '#ff9f0a'}
-            />
-            <Text style={styles.alertInfoTitle}>Alert notifications</Text>
-            <View
+      <View style={styles.alertInfoBox}>
+        <View style={styles.alertInfoHeader}>
+          <MaterialIcons
+            name="notifications-active"
+            size={16}
+            color={alertRecipients?.enabled === false ? colors.muted : '#ff9f0a'}
+          />
+          <Text style={styles.alertInfoTitle}>Alert notifications</Text>
+          <View
+            style={[
+              styles.alertStatusChip,
+              alertRecipients?.enabled === false && styles.alertStatusChipOff,
+            ]}
+          >
+            <Text
               style={[
-                styles.alertStatusChip,
-                alertRecipients?.enabled === false && styles.alertStatusChipOff,
+                styles.alertStatusChipText,
+                alertRecipients?.enabled === false && styles.alertStatusChipTextOff,
               ]}
             >
-              <Text
-                style={[
-                  styles.alertStatusChipText,
-                  alertRecipients?.enabled === false && styles.alertStatusChipTextOff,
-                ]}
-              >
-                {alertRecipients?.enabled === false ? 'Disabled' : 'Enabled'}
-              </Text>
-            </View>
-          </View>
-          {alertRecipientDisplays.length ? (
-            <View style={styles.alertRecipientList}>
-              {alertRecipientDisplays.map((item) => (
-                <View key={item.key} style={styles.alertRecipientChip}>
-                  <Text style={styles.alertRecipientChipText} numberOfLines={2}>
-                    {item.detail ? `${item.label} · ${item.detail}` : item.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.alertInfoEmpty}>
-              {formatAlertRecipientsSummary(alertRecipients, alertRecipientDisplays)}
+              {alertRecipients?.enabled === false ? 'Disabled' : 'Enabled'}
             </Text>
-          )}
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statChip}>
-            <Text style={styles.statValue}>{filteredRows.length}</Text>
-            <Text style={styles.statLabel}>MIDs</Text>
-          </View>
-          <View style={styles.statChip}>
-            <Text style={styles.statValue}>
-              {filteredRows.filter((r) => r.limit != null).length}
-            </Text>
-            <Text style={styles.statLabel}>With limit</Text>
           </View>
         </View>
-
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-
-        {loading && !rows.length ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.loadingText}>Loading MID limits…</Text>
-          </View>
-        ) : filteredRows.length ? (
-          <View style={styles.list}>
-            {filteredRows.map((row, index) => (
-              <TouchableOpacity
-                key={row.mid}
-                style={styles.card}
-                activeOpacity={0.85}
-                onPress={() => setSheetRow(row)}
-              >
-                <View style={styles.cardTop}>
-                  <View style={styles.cardMain}>
-                    <Text style={styles.cardMid} numberOfLines={1}>
-                      {row.mid}
-                    </Text>
-                    <Text style={styles.cardGateway} numberOfLines={1}>
-                      {display(midLimitGatewayLabel(row))}
-                    </Text>
-                  </View>
-                  <View style={styles.indexBadge}>
-                    <Text style={styles.indexBadgeText}>{index + 1}</Text>
-                  </View>
-                </View>
-                <View style={styles.cardBottom}>
-                  <View style={styles.limitBlock}>
-                    <Text style={styles.limitLabel}>Limit</Text>
-                    <Text style={[styles.limitValue, row.limit == null && styles.limitUnset]}>
-                      {formatMidLimitAmount(row.limit)}
-                    </Text>
-                  </View>
-                  {canEdit ? (
-                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(row)}>
-                      <MaterialIcons name="edit" size={16} color={colors.primary} />
-                      <Text style={styles.editBtnText}>Edit</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-                {row.updatedBy?.userName ? (
-                  <Text style={styles.cardMeta} numberOfLines={1}>
-                    Updated by {row.updatedBy.userName}
-                  </Text>
-                ) : null}
-              </TouchableOpacity>
+        {alertRecipientDisplays.length ? (
+          <View style={styles.alertRecipientList}>
+            {alertRecipientDisplays.map((item) => (
+              <View key={item.key} style={styles.alertRecipientChip}>
+                <Text style={styles.alertRecipientChipText} numberOfLines={2}>
+                  {item.detail ? `${item.label} · ${item.detail}` : item.label}
+                </Text>
+              </View>
             ))}
           </View>
         ) : (
-          <View style={styles.emptyWrap}>
-            <MaterialIcons name="account-balance-wallet" size={36} color={colors.muted} />
-            <Text style={styles.emptyTitle}>No MIDs found</Text>
-            <Text style={styles.emptyText}>
-              {search.trim() ? 'Try a different search term.' : 'Pull down to refresh.'}
-            </Text>
-          </View>
+          <Text style={styles.alertInfoEmpty}>
+            {formatAlertRecipientsSummary(alertRecipients, alertRecipientDisplays)}
+          </Text>
         )}
-      </ScrollView>
+      </View>
+
+      <View style={styles.statsRow}>
+        <View style={styles.statChip}>
+          <Text style={styles.statValue}>{filteredRows.length}</Text>
+          <Text style={styles.statLabel}>MIDs</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={styles.statValue}>
+            {filteredRows.filter((r) => r.limit != null).length}
+          </Text>
+          <Text style={styles.statLabel}>With limit</Text>
+        </View>
+      </View>
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+    </>
+  );
+
+  const emptyComponent =
+    loading && !rows.length ? (
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator color={colors.primary} />
+        <Text style={styles.loadingText}>Loading MID limits…</Text>
+      </View>
+    ) : (
+      <View style={styles.emptyWrap}>
+        <MaterialIcons name="account-balance-wallet" size={36} color={colors.muted} />
+        <Text style={styles.emptyTitle}>No MIDs found</Text>
+        <Text style={styles.emptyText}>
+          {search.trim() ? 'Try a different search term.' : 'Pull down to refresh.'}
+        </Text>
+      </View>
+    );
+
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={filteredRows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!editOpen}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={emptyComponent}
+      />
 
       <RowDetailSheet
         visible={!!sheetRow}
@@ -667,4 +641,57 @@ export function MidLimitsScreen() {
     </>
   );
 }
+
+type MidLimitsCardProps = {
+  row: MidLimitRow;
+  index: number;
+  canEdit: boolean;
+  onPress: () => void;
+  onEdit: () => void;
+};
+
+const MidLimitsCard = memo(function MidLimitsCard({
+  row,
+  index,
+  canEdit,
+  onPress,
+  onEdit,
+}: MidLimitsCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
+      <View style={styles.cardTop}>
+        <View style={styles.cardMain}>
+          <Text style={styles.cardMid} numberOfLines={1}>
+            {row.mid}
+          </Text>
+          <Text style={styles.cardGateway} numberOfLines={1}>
+            {display(midLimitGatewayLabel(row))}
+          </Text>
+        </View>
+        <View style={styles.indexBadge}>
+          <Text style={styles.indexBadgeText}>{index + 1}</Text>
+        </View>
+      </View>
+      <View style={styles.cardBottom}>
+        <View style={styles.limitBlock}>
+          <Text style={styles.limitLabel}>Limit</Text>
+          <Text style={[styles.limitValue, row.limit == null && styles.limitUnset]}>
+            {formatMidLimitAmount(row.limit)}
+          </Text>
+        </View>
+        {canEdit ? (
+          <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+            <MaterialIcons name="edit" size={16} color={colors.primary} />
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {row.updatedBy?.userName ? (
+        <Text style={styles.cardMeta} numberOfLines={1}>
+          Updated by {row.updatedBy.userName}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+});
 

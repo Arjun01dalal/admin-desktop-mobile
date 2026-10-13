@@ -1,4 +1,4 @@
-/** Styles for CheckersReportScreen — shared presets from styles/common plus screen-specific keys. */
+/** Shared list styles for AllUserLoginReportScreen and CheckersReportScreen. */
 import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 

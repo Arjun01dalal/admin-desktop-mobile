@@ -89,6 +89,7 @@ import {
   BetConstructGamesPage,
   NonPerformingUserPage,
   TodaysActivePage,
+  PlayedTodayYesterdayPage,
   NewDepositsPage,
   PlayerRtpPage,
   PlayerRtpDetailsPage,
@@ -198,6 +199,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/customer-allotted" element={<AllottedCustomersPage />} />
             <Route path="/non_performing_user" element={<NonPerformingUserPage />} />
             <Route path="/todays-active" element={<TodaysActivePage />} />
+            <Route path="/played-today-yesterday" element={<PlayedTodayYesterdayPage />} />
             <Route path="/feedback" element={<FeedbackPage />} />
             <Route path="/betConstruct-lists" element={<BetConstructGamesPage />} />
             <Route path="/casino-lists" element={<CasinoGamesPage />} />

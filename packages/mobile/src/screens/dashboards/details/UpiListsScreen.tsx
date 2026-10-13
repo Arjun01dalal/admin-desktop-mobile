@@ -3,26 +3,28 @@
  * ops.upiGetAll {} → list. Row tap opens a detail sheet; toggle status (gated) and
  * delete actions. Header "Add UPI" opens a create modal.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './UpiListsScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -31,11 +33,6 @@ type Row = {
   status?: boolean;
   [key: string]: unknown;
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 /** Tolerant list unpack — res.data may be array or under .payload/.items/.data. */
 function asList<T>(data: unknown): T[] {
@@ -214,19 +211,20 @@ export function UpiListsScreen() {
     });
   }
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <UpiListsCard row={row} index={index} onPress={() => setSheetRow(row)} />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>AB UPIs</Text>
@@ -244,39 +242,24 @@ export function UpiListsScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No UPI records found</Text> : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const active = Boolean(row.status);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name)}
-                </Text>
-                <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
-                  {active ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  UPI Id: {display(row.upiId)}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No UPI records found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!addOpen}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -371,7 +354,36 @@ export function UpiListsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
+
+type UpiListsCardProps = {
+  row: Row;
+  index: number;
+  onPress: () => void;
+};
+
+const UpiListsCard = memo(function UpiListsCard({ row, index, onPress }: UpiListsCardProps) {
+  const active = Boolean(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
+          {active ? 'Active' : 'Inactive'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          UPI Id: {display(row.upiId)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

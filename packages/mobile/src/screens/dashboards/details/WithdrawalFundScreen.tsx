@@ -20,11 +20,10 @@
  * from the admin's serverId, same as desktop), and "Add Comment" edits the
  * local-only comment field on the row (desktop does not persist it either).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -32,11 +31,13 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { appCodeForName, parseAgentSummaries, pickDocList, sumGroupedTotal, unpackPayload } from '@astro/shared';
 import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import {
   getRoleName,
@@ -50,6 +51,7 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { EmpCodePieChartModal, type ChartCountRow } from './EmpCodePieChartModal';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './WithdrawalFundScreen.styles';
+import { display } from '../../../utils/display';
 
 /** Current Month Chart — 9608010101 + full_access / dev_full_access. */
 const WITHDRAWAL_FUND_CHART_MOBILES = new Set(['9608010101']);
@@ -168,11 +170,6 @@ type MidSummaryState = {
   dbNotSheet: number;
   sheetNotDb: number;
 } | null;
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatAmount(value: unknown): string {
   const n = Number(value ?? 0);
@@ -762,12 +759,8 @@ export function WithdrawalFundScreen() {
 
   // ---------- Withdrawal-doc list view ----------
   if (view === 'withdrawals' && bucket) {
-    return (
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+    const bucketHeader = (
+      <>
         <TouchableOpacity
           onPress={() => {
             setBucket(null);
@@ -831,59 +824,29 @@ export function WithdrawalFundScreen() {
             </TouchableOpacity>
           </View>
         ) : null}
+      </>
+    );
 
-        {bucket.rows.length === 0 ? <Text style={styles.hint}>No withdrawals found</Text> : null}
-
-        <View style={styles.list}>
-          {bucket.rows.map((r, index) => {
-            const holder = display(r.accountHolderName || r.userName || r.name);
-            const mobile = canShowMobile
-              ? display(r.mobile ?? r.userMobile)
-              : r.mobile || r.userMobile
-                ? '**********'
-                : '—';
-            return (
-              <TouchableOpacity
-                key={`row-${index}-${String(r._id || r.transactionId || r.orderId || '')}`}
-                style={styles.card}
-                activeOpacity={0.75}
-                onPress={() => setRow(r)}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardIndex}>#{index + 1}</Text>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {holder}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Amount</Text>
-                  <Text style={styles.cardValue}>{formatAmount(r.amount ?? 0)}</Text>
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    Emp Code: {display(r.empCode)}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    Status: {display(r.status)}
-                  </Text>
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    App Code: {appCodeForName(r.clientName)}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    Mobile: {mobile}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Date</Text>
-                  <Text style={styles.cardValue}>{dt(r.updatedOn ?? r.createdOn)}</Text>
-                </View>
-                <Text style={styles.cardHint}>Tap card for details & actions</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+    return (
+      <View style={styles.screen}>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={bucket.rows}
+          keyExtractor={(r, index) =>
+            `row-${index}-${String(r._id || r.transactionId || r.orderId || '')}`
+          }
+          renderItem={({ item: r, index }: ListRenderItemInfo<WithdrawalDoc>) => (
+            <WithdrawalFundDocCard
+              row={r}
+              index={index}
+              canShowMobile={canShowMobile}
+              onPress={() => setRow(r)}
+            />
+          )}
+          listHeader={bucketHeader}
+          emptyMessage="No withdrawals found"
+        />
 
         <RowDetailSheet
           visible={row !== null && !commentOpen}
@@ -935,24 +898,13 @@ export function WithdrawalFundScreen() {
             </View>
           </View>
         </Modal>
-      </ScrollView>
+      </View>
     );
   }
 
   // ---------- Main report view ----------
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const mainHeader = (
+    <>
       <Text style={styles.title}>{toDisplayText('Refund Fund')}</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Amount: {formatAmount(totalAmount)}
@@ -1019,37 +971,33 @@ export function WithdrawalFundScreen() {
           </View>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && types.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && types.length === 0 ? (
-        <Text style={styles.hint}>No withdrawal fund data for this date range</Text>
-      ) : null}
-
-      <View style={styles.list}>
-        {types.map((t, index) => (
-          <TouchableOpacity
-            key={`${t.type}-${index}`}
-            style={styles.card}
-            activeOpacity={0.75}
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={types}
+        keyExtractor={(t, index) => `${t.type}-${index}`}
+        renderItem={({ item: t, index }: ListRenderItemInfo<TypeGroup>) => (
+          <WithdrawalFundTypeCard
+            typeItem={t}
+            index={index}
             onPress={() => {
               setBucketBackView('mids');
               openType(t);
             }}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {String(t.type).toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Amount: {formatAmount(typeTotal(t))}</Text>
-              <Text style={styles.cardSplitRight}>Providers: {t.providers.length}</Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for providers → MIDs</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          />
+        )}
+        listHeader={mainHeader}
+        loading={loading}
+        emptyMessage="No withdrawal fund data for this date range"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!chartOpen}
+      />
 
       <EmpCodePieChartModal
         visible={chartOpen}
@@ -1063,7 +1011,7 @@ export function WithdrawalFundScreen() {
         onEndDateChange={setChartEnd}
         onApply={() => void loadChartReport(chartStart, chartEnd)}
       />
-    </ScrollView>
+    </View>
   );
 
   // (Helpers below use closures; declared as function statements so they hoist.)
@@ -1085,4 +1033,88 @@ export function WithdrawalFundScreen() {
     setView('withdrawals');
   }
 }
+
+type WithdrawalFundTypeCardProps = {
+  typeItem: TypeGroup;
+  index: number;
+  onPress: () => void;
+};
+
+const WithdrawalFundTypeCard = memo(function WithdrawalFundTypeCard({
+  typeItem: t,
+  index,
+  onPress,
+}: WithdrawalFundTypeCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {String(t.type).toUpperCase()}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Amount: {formatAmount(typeTotal(t))}</Text>
+        <Text style={styles.cardSplitRight}>Providers: {t.providers.length}</Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for providers → MIDs</Text>
+    </TouchableOpacity>
+  );
+});
+
+type WithdrawalFundDocCardProps = {
+  row: WithdrawalDoc;
+  index: number;
+  canShowMobile: boolean;
+  onPress: () => void;
+};
+
+const WithdrawalFundDocCard = memo(function WithdrawalFundDocCard({
+  row: r,
+  index,
+  canShowMobile,
+  onPress,
+}: WithdrawalFundDocCardProps) {
+  const holder = display(r.accountHolderName || r.userName || r.name);
+  const mobile = canShowMobile
+    ? display(r.mobile ?? r.userMobile)
+    : r.mobile || r.userMobile
+      ? '**********'
+      : '—';
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {holder}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Amount</Text>
+        <Text style={styles.cardValue}>{formatAmount(r.amount ?? 0)}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Emp Code: {display(r.empCode)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Status: {display(r.status)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          App Code: {appCodeForName(r.clientName)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Mobile: {mobile}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Date</Text>
+        <Text style={styles.cardValue}>{dt(r.updatedOn ?? r.createdOn)}</Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

@@ -1,18 +1,18 @@
 /**
  * MID Groups — mobile port of desktop MidGroupsPage / admin-panel Funds/MidGroups.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { styles } from './MidGroupsScreen.styles';
 
@@ -196,20 +196,57 @@ export function MidGroupsScreen() {
     ]);
   };
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading || busy}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-      keyboardShouldPersistTaps="handled"
-    >
+  const keyExtractor = useCallback((groupName: string) => groupName, []);
+
+  const renderItem = useCallback(
+    ({ item: groupName }: ListRenderItemInfo<string>) => (
+      <MidGroupsCard
+        groupName={groupName}
+        mids={groups[groupName] || []}
+        draftMid={draftMids[groupName] || ''}
+        busy={busy}
+        onDraftChange={(v) => setDraftMids((prev) => ({ ...prev, [groupName]: v }))}
+        onAddMid={() => {
+          const mid = (draftMids[groupName] || '').trim();
+          if (!mid) {
+            Alert.alert('Validation', 'Enter MID');
+            return;
+          }
+          setDraftMids((prev) => ({ ...prev, [groupName]: '' }));
+          void runMutation(
+            'funds.midGroupsAddMid',
+            { group: groupName, mids: [mid] },
+            `MID added to ${groupName}`,
+          );
+        }}
+        onRemoveGroup={() =>
+          confirm(
+            'Remove group?',
+            `Remove group "${groupName}" and all its MIDs?`,
+            () =>
+              void runMutation(
+                'funds.midGroupsRemoveGroup',
+                { group: groupName },
+                `Group "${groupName}" removed`,
+              ),
+          )
+        }
+        onRemoveMid={(mid) =>
+          confirm('Remove MID?', `Remove MID "${mid}" from ${groupName}?`, () =>
+            void runMutation(
+              'funds.midGroupsRemoveMid',
+              { group: groupName, mids: [mid] },
+              `MID removed from ${groupName}`,
+            ),
+          )
+        }
+      />
+    ),
+    [groups, draftMids, busy, runMutation, confirm],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>MID Groups</Text>
       <Text style={styles.sub}>
         Organize payin groups, assign MIDs, and manage WhatsApp global list.
@@ -309,97 +346,26 @@ export function MidGroupsScreen() {
       <Text style={styles.section}>
         Payin Groups ({filteredNames.length}/{Object.keys(groups).length})
       </Text>
-      {filteredNames.length === 0 ? (
-        <Text style={styles.hint}>No groups found</Text>
-      ) : (
-        filteredNames.map((groupName) => {
-          const mids = groups[groupName] || [];
-          return (
-            <View key={groupName} style={styles.card}>
-              <View style={styles.cardHead}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initials(groupName)}</Text>
-                </View>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{groupName}</Text>
-                  <Text style={styles.cardMeta}>
-                    {mids.length} MID{mids.length === 1 ? '' : 's'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() =>
-                    confirm(
-                      'Remove group?',
-                      `Remove group "${groupName}" and all its MIDs?`,
-                      () =>
-                        void runMutation(
-                          'funds.midGroupsRemoveGroup',
-                          { group: groupName },
-                          `Group "${groupName}" removed`,
-                        ),
-                    )
-                  }
-                >
-                  <Text style={styles.danger}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.row}>
-                <TextInput
-                  style={[styles.input, styles.flex]}
-                  placeholder="Add MID"
-                  placeholderTextColor={colors.muted}
-                  value={draftMids[groupName] || ''}
-                  onChangeText={(v) => setDraftMids((prev) => ({ ...prev, [groupName]: v }))}
-                />
-                <TouchableOpacity
-                  style={styles.btn}
-                  disabled={busy}
-                  onPress={() => {
-                    const mid = (draftMids[groupName] || '').trim();
-                    if (!mid) {
-                      Alert.alert('Validation', 'Enter MID');
-                      return;
-                    }
-                    setDraftMids((prev) => ({ ...prev, [groupName]: '' }));
-                    void runMutation(
-                      'funds.midGroupsAddMid',
-                      { group: groupName, mids: [mid] },
-                      `MID added to ${groupName}`,
-                    );
-                  }}
-                >
-                  <Text style={styles.btnText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-              {mids.length === 0 ? (
-                <Text style={styles.hint}>No MIDs in this group</Text>
-              ) : (
-                mids.map((mid) => (
-                  <View key={`${groupName}-${mid}`} style={styles.midRow}>
-                    <Text style={styles.midText}>{mid}</Text>
-                    <TouchableOpacity
-                      onPress={() =>
-                        confirm(
-                          'Remove MID?',
-                          `Remove MID "${mid}" from ${groupName}?`,
-                          () =>
-                            void runMutation(
-                              'funds.midGroupsRemoveMid',
-                              { group: groupName, mids: [mid] },
-                              `MID removed from ${groupName}`,
-                            ),
-                        )
-                      }
-                    >
-                      <Text style={styles.danger}>Remove</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </View>
-          );
-        })
-      )}
+    </>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={filteredNames}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No groups found"
+        refreshing={loading || busy}
+        onRefresh={() => void load()}
+        refreshEnabled={!addOpen}
+        keyboardShouldPersistTaps="handled"
+        extraData={draftMids}
+      />
 
       <Modal visible={addOpen} transparent animationType="slide">
         <View style={styles.backdrop}>
@@ -445,7 +411,72 @@ export function MidGroupsScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
+
+type MidGroupsCardProps = {
+  groupName: string;
+  mids: string[];
+  draftMid: string;
+  busy: boolean;
+  onDraftChange: (v: string) => void;
+  onAddMid: () => void;
+  onRemoveGroup: () => void;
+  onRemoveMid: (mid: string) => void;
+};
+
+const MidGroupsCard = memo(function MidGroupsCard({
+  groupName,
+  mids,
+  draftMid,
+  busy,
+  onDraftChange,
+  onAddMid,
+  onRemoveGroup,
+  onRemoveMid,
+}: MidGroupsCardProps) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHead}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initials(groupName)}</Text>
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.cardTitle}>{groupName}</Text>
+          <Text style={styles.cardMeta}>
+            {mids.length} MID{mids.length === 1 ? '' : 's'}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onRemoveGroup}>
+          <Text style={styles.danger}>Remove</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.row}>
+        <TextInput
+          style={[styles.input, styles.flex]}
+          placeholder="Add MID"
+          placeholderTextColor={colors.muted}
+          value={draftMid}
+          onChangeText={onDraftChange}
+        />
+        <TouchableOpacity style={styles.btn} disabled={busy} onPress={onAddMid}>
+          <Text style={styles.btnText}>Add</Text>
+        </TouchableOpacity>
+      </View>
+      {mids.length === 0 ? (
+        <Text style={styles.hint}>No MIDs in this group</Text>
+      ) : (
+        mids.map((mid) => (
+          <View key={`${groupName}-${mid}`} style={styles.midRow}>
+            <Text style={styles.midText}>{mid}</Text>
+            <TouchableOpacity onPress={() => onRemoveMid(mid)}>
+              <Text style={styles.danger}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
+    </View>
+  );
+});
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { CachedImage } from '../../../../components/CachedImage';
 import { colors } from '../../../../theme';
 import { replaceS3WithCloudfront } from '../../../../utils/cdnUrl';
 import { styles } from '../BannersScreen.styles';
@@ -47,10 +48,11 @@ export function BannerUpdateImageModal({
         autoCorrect={false}
       />
       {normalizedPath && !isVideo ? (
-        <Image
+        <CachedImage
           source={{ uri: replaceS3WithCloudfront(normalizedPath) }}
           style={styles.previewImage}
           resizeMode="contain"
+          recyclingKey={normalizedPath}
         />
       ) : null}
       {normalizedPath && isVideo ? (

@@ -1,19 +1,13 @@
 /** Laxmi-compatible Ludo user GGR-by-round report. */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { secureApi } from '../../../api/client';
 import { parseLudoGameOptions } from '../../../dashboards/gameMetrics';
 import { toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { colors } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
@@ -200,19 +194,20 @@ export function LudoUserGgrScreen() {
 
   const selectedLabel = gameOptions.find((option) => option.value === gameId)?.label || gameId;
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: ReportRow, index: number) => String(row._id ?? row.userId ?? row.roundId ?? index),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row }: ListRenderItemInfo<ReportRow>) => (
+      <LudoUserGgrCard row={row} columns={compactColumns} onPress={() => setSelected(row)} />
+    ),
+    [compactColumns],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>{toDisplayText('Ludo User GGR By Round')}</Text>
       <Text style={styles.sub}>
         {date} · {selectedLabel || 'Select game'} ·{' '}
@@ -300,22 +295,24 @@ export function LudoUserGgrScreen() {
       ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {rows.length > 0 ? <Text style={styles.hint}>Tap a row to see all details</Text> : null}
+    </>
+  );
 
-      {loading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loaderText}>Loading…</Text>
-        </View>
-      ) : (
-        <DataTable
-          columns={compactColumns}
-          rows={rows}
-          keyFor={(row, index) => String(row._id ?? row.userId ?? row.roundId ?? index)}
-          emptyMessage="No Ludo GGR users found"
-          onRowPress={setSelected}
-          hint="Tap a row to see all details"
-        />
-      )}
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No Ludo GGR users found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -323,7 +320,35 @@ export function LudoUserGgrScreen() {
         fields={sheetFields}
         onClose={() => setSelected(null)}
       />
-    </ScrollView>
+    </View>
   );
 }
+
+type LudoUserGgrCardProps = {
+  row: ReportRow;
+  columns: DataTableColumn<ReportRow>[];
+  onPress: () => void;
+};
+
+const LudoUserGgrCard = memo(function LudoUserGgrCard({
+  row,
+  columns,
+  onPress,
+}: LudoUserGgrCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      {columns.map((column) => (
+        <View key={column.key} style={styles.cardRow}>
+          <Text style={styles.cardLabel}>{column.label}</Text>
+          <Text
+            style={[styles.cardValue, column.color ? { color: column.color(row) } : null]}
+            numberOfLines={1}
+          >
+            {column.render(row, 0)}
+          </Text>
+        </View>
+      ))}
+    </TouchableOpacity>
+  );
+});
 

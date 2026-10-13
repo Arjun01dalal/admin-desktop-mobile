@@ -9,22 +9,23 @@
  *  - Manual KYC: customer OTP → ops.kycManualUpdate with bank details.
  *  - Verify UPI: ops.kycVerifyUpi.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { appCodeForName, kycApprovedRowPatch, kycManualRowPatch, kycRejectedRowPatch } from '@astro/shared';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -32,6 +33,7 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { sendKycCallToDialer } from '../../../utils/externalDialer';
 import { styles } from './UsersKycScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 type CheckStamp = { name?: string; date?: string } | undefined;
 
@@ -79,16 +81,6 @@ function isKycNightHours(now = new Date()): boolean {
 }
 
 const NIGHT_UNLOCK_MS = 60_000;
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function formatDateTime(value?: string | number): string {
   if (value == null || value === '') return '—';
@@ -720,6 +712,26 @@ export function UsersKycScreen() {
 
   const sheetImage = sheetRow ? aadhaarImageUri(sheetRow.aadhaarImageBase64) : null;
 
+  const keyExtractor = useCallback(
+    (row: KycRow, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: r }: ListRenderItemInfo<KycRow>) => (
+      <UsersKycCard
+        row={r}
+        called={calledId !== '' && calledId === r._id}
+        canShowMobile={canShowMobile}
+        busy={busy}
+        nightLocked={nightLocked}
+        onPress={() => setSheetRow(r)}
+        onCall={() => connectToDialer(r)}
+      />
+    ),
+    [calledId, canShowMobile, busy, nightLocked, connectToDialer],
+  );
+
   if (!canView) {
     return (
       <View style={[styles.screen, styles.centered]}>
@@ -728,19 +740,8 @@ export function UsersKycScreen() {
     );
   }
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const listHeader = (
+    <>
       <Text style={styles.title}>KYC</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
@@ -782,103 +783,45 @@ export function UsersKycScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {!loading && !rows.length ? <Text style={styles.empty}>No KYC records found</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      {rows.map((r, i) => {
-        const called = calledId !== '' && calledId === r._id;
-        return (
-          <View
-            key={`row-${i}-${String(r._id ?? '')}`}
-            style={[styles.card, called && styles.cardCalled]}
-          >
-            <View style={styles.cardTop}>
-              <TouchableOpacity
-                style={styles.cardTopMain}
-                activeOpacity={0.75}
-                onPress={() => setSheetRow(r)}
-              >
-                <Text style={styles.cardName} numberOfLines={1}>
-                  {display(r.name)}
-                </Text>
-                <View
-                  style={[styles.statusPill, { backgroundColor: r.kyc ? '#16a34a' : '#d97706' }]}
-                >
-                  <Text style={styles.statusPillText}>{r.kyc ? 'Verified' : 'Pending'}</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.callIconBtn,
-                  called && styles.callIconBtnActive,
-                  (busy || nightLocked) && styles.callIconBtnDisabled,
-                ]}
-                disabled={busy || nightLocked}
-                onPress={() => connectToDialer(r)}
-                accessibilityLabel="Call Customer"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <MaterialIcons
-                  name="phone-in-talk"
-                  size={12}
-                  color={called ? colors.primaryForeground : colors.primary}
-                />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity activeOpacity={0.75} onPress={() => setSheetRow(r)}>
-              <View style={styles.cardGrid}>
-                <View style={styles.cardCell}>
-                  <Text style={styles.cardLabel}>Mobile</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {maskMobile(r.mobile, canShowMobile)}
-                  </Text>
-                </View>
-                <View style={styles.cardCell}>
-                  <Text style={styles.cardLabel}>App</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {display(appCodeForName(r.clientName) || r.clientName)}
-                  </Text>
-                </View>
-                <View style={styles.cardCell}>
-                  <Text style={styles.cardLabel}>Account</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {display(r.accountNumber)}
-                  </Text>
-                </View>
-                <View style={styles.cardCell}>
-                  <Text style={styles.cardLabel}>Aadhaar</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {display(r.aadhaarNumber)}
-                  </Text>
-                </View>
-              </View>
-              {r.manualKycUpdatedBy?.name ? (
-                <Text style={styles.cardDoneBy} numberOfLines={1}>
-                  Manual by {r.manualKycUpdatedBy.name}
-                </Text>
-              ) : null}
-            </TouchableOpacity>
-          </View>
-        );
-      })}
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No KYC records found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        extraData={calledId}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -1142,9 +1085,94 @@ export function UsersKycScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </>
   );
 }
+
+type UsersKycCardProps = {
+  row: KycRow;
+  called: boolean;
+  canShowMobile: boolean;
+  busy: boolean;
+  nightLocked: boolean;
+  onPress: () => void;
+  onCall: () => void;
+};
+
+const UsersKycCard = memo(function UsersKycCard({
+  row: r,
+  called,
+  canShowMobile,
+  busy,
+  nightLocked,
+  onPress,
+  onCall,
+}: UsersKycCardProps) {
+  return (
+    <View style={[styles.card, called && styles.cardCalled]}>
+      <View style={styles.cardTop}>
+        <TouchableOpacity style={styles.cardTopMain} activeOpacity={0.75} onPress={onPress}>
+          <Text style={styles.cardName} numberOfLines={1}>
+            {display(r.name)}
+          </Text>
+          <View style={[styles.statusPill, { backgroundColor: r.kyc ? '#16a34a' : '#d97706' }]}>
+            <Text style={styles.statusPillText}>{r.kyc ? 'Verified' : 'Pending'}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.callIconBtn,
+            called && styles.callIconBtnActive,
+            (busy || nightLocked) && styles.callIconBtnDisabled,
+          ]}
+          disabled={busy || nightLocked}
+          onPress={onCall}
+          accessibilityLabel="Call Customer"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <MaterialIcons
+            name="phone-in-talk"
+            size={12}
+            color={called ? colors.primaryForeground : colors.primary}
+          />
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity activeOpacity={0.75} onPress={onPress}>
+        <View style={styles.cardGrid}>
+          <View style={styles.cardCell}>
+            <Text style={styles.cardLabel}>Mobile</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {maskMobile(r.mobile, canShowMobile)}
+            </Text>
+          </View>
+          <View style={styles.cardCell}>
+            <Text style={styles.cardLabel}>App</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {display(appCodeForName(r.clientName) || r.clientName)}
+            </Text>
+          </View>
+          <View style={styles.cardCell}>
+            <Text style={styles.cardLabel}>Account</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {display(r.accountNumber)}
+            </Text>
+          </View>
+          <View style={styles.cardCell}>
+            <Text style={styles.cardLabel}>Aadhaar</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {display(r.aadhaarNumber)}
+            </Text>
+          </View>
+        </View>
+        {r.manualKycUpdatedBy?.name ? (
+          <Text style={styles.cardDoneBy} numberOfLines={1}>
+            Manual by {r.manualKycUpdatedBy.name}
+          </Text>
+        ) : null}
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 function Field({
   label,

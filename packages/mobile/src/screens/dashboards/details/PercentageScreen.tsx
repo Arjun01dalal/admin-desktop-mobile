@@ -22,6 +22,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './PercentageScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -51,11 +52,6 @@ const EMPTY_FORM: PercentForm = {
 };
 
 const MAIN_KEYS = new Set(['idx', 'name', 'percent', 'status']);
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatAmount(value: unknown): string {
   const n = Number(value ?? 0);

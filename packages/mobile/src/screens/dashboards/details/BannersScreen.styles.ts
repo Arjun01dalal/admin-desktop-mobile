@@ -66,6 +66,13 @@ export const styles = makeStyles({
     borderRadius: radius.md,
     backgroundColor: colors.surfaceAlt,
   },
+  listThumb: {
+    width: '100%',
+    height: 96,
+    marginTop: spacing(1.5),
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
   videoHint: {
     color: colors.muted,
     fontSize: 12,

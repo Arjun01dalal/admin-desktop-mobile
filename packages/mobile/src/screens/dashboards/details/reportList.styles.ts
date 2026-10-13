@@ -1,16 +1,19 @@
-/** Styles for AllUserLoginReportScreen — shared presets from styles/common plus screen-specific keys. */
+/** Shared list styles for LoginReportScreen and SheetDownloadReportScreen. */
 import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 
 export const styles = makeStyles({
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
+  quickRow: { marginTop: spacing(3), flexGrow: 0 },
+  chip: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.destructive,
-    borderRadius: 8,
-    padding: spacing(3),
-    marginTop: spacing(3),
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(3),
+    marginRight: spacing(2),
   },
+  chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   statusPill: {
     fontSize: 10,
     fontWeight: '700',

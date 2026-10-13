@@ -4,15 +4,15 @@
  * client-side search; row tap opens detail modal with status toggle
  * (topGames.updateStatus) and delete (topGames.removeAtPosition).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import {
   buildUpdateGameImagePayload,
@@ -20,12 +20,14 @@ import {
 } from '@astro/shared/updateGameImage';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { replaceS3WithCloudfront } from '../../../utils/cdnUrl';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { UpdateGameImageModal } from './UpdateGameImageModal';
 import { styles } from './TopGamesScreen.styles';
+import { display } from '../../../utils/display';
 
 type Item = {
   _id?: string;
@@ -45,11 +47,6 @@ type Item = {
 };
 
 type GameRow = Item & { _categoryKey: string; _position: number };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function gameName(item: Item): string {
   return String(item.Name || item.gameName || '—');
@@ -287,19 +284,21 @@ export function TopGamesScreen() {
     [],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: GameRow, index: number) =>
+      `row-${index}-${row._categoryKey}-${String(row._id ?? row.gameId ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<GameRow>) => (
+      <TopGamesCard row={row} index={index} onPress={() => setSheetRow(row)} />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Top Games</Text>
       <Text style={styles.sub}>
         {rows.length} games · {rows.filter((r) => r.status).length} showing
@@ -347,50 +346,23 @@ export function TopGamesScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No games found</Text> : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const showing = Boolean(row.status);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${row._categoryKey}-${String(row._id ?? row.gameId ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {gameName(row)}
-                </Text>
-                <Text style={[styles.statusPill, showing ? styles.statusOn : styles.statusOff]}>
-                  {showing ? 'Showing' : 'Hidden'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Category: {display(row.category)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  Pos: {String(row._position)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Provider: {providerName(row)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  ID: {display(row.gameId)}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No games found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -430,7 +402,46 @@ export function TopGamesScreen() {
         onClose={() => !imageSaving && setImageTarget(null)}
         onSubmit={(path) => void handleImageUpdate(path)}
       />
-    </ScrollView>
+    </>
   );
 }
 
+type TopGamesCardProps = {
+  row: GameRow;
+  index: number;
+  onPress: () => void;
+};
+
+const TopGamesCard = memo(function TopGamesCard({ row, index, onPress }: TopGamesCardProps) {
+  const showing = Boolean(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {gameName(row)}
+        </Text>
+        <Text style={[styles.statusPill, showing ? styles.statusOn : styles.statusOff]}>
+          {showing ? 'Showing' : 'Hidden'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Category: {display(row.category)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Pos: {String(row._position)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Provider: {providerName(row)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          ID: {display(row.gameId)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});

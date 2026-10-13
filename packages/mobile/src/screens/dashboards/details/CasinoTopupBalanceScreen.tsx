@@ -39,6 +39,7 @@ import {
   remainingRowConsumed,
 } from '@astro/shared/casinoTopup';
 import { styles } from './CasinoTopupBalanceScreen.styles';
+import { display } from '../../../utils/display';
 
 type ProviderKey = 'qtech' | 'betconstruct';
 
@@ -66,11 +67,6 @@ const PROVIDER_CONFIG: Record<ProviderKey, { title: string; defaultNote: string 
 };
 
 const CURRENCY_OPTIONS = ['USD', 'INR', 'EUR'] as const;
-
-function display(value: unknown): string {
-  if (value == null || value === '') return '—';
-  return String(value);
-}
 
 function toNumber(value: unknown): number | null {
   if (value == null || value === '') return null;

@@ -14,12 +14,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
@@ -30,9 +28,11 @@ import { getStoredUser } from '../../../lib/webShim';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { formatDdMmYyyy, todayIST } from '../../../utils/dates';
 import { CAMPAIGN_LIST, campaignsForLoginUser } from '../../../utils/campaignList';
 import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
+import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { RecordingPlayerModal } from '../../../components/RecordingPlayerModal';
@@ -44,11 +44,12 @@ import {
   SearchFilters,
   type CallLogTextFilter,
 } from './callLogs/CallLogsControls';
-import { CallLogsList } from './callLogs/CallLogsList';
+import { CallLogCard, CallLogsListHeader } from './callLogs/CallLogsList';
 import { CallLogsPagination } from './callLogs/CallLogsPagination';
 import {
   REINIT_CHIPS,
   buildBotSummaryRows,
+  callLogCustomerId,
   callLogRowId,
   filterCallsClientSide,
   formatStatusLabel,
@@ -86,6 +87,7 @@ export function CallLogsScreen() {
     () => campaignsForLoginUser(admin, { assignedOnly: isCaller }),
     [admin, isCaller],
   );
+  const { defer } = useDeferredTimeout();
 
   const today = todayIST();
   const [draftStart, setDraftStart] = useState(today);
@@ -169,10 +171,10 @@ export function CallLogsScreen() {
         secureApi<{ calls?: CallLogRow[]; pagination?: { totalCount?: number } }>(
           'callLogs.getDialerData',
           {
-            userId: '',
+            subAdminId: '',
             filter: {
               mobileNo: f.mobNo || undefined,
-              caller_user_id: f.dpId || undefined,
+              customerId: f.dpId || undefined,
               sid: f.sid || undefined,
               state: f.stateFilter || undefined,
               status: apiStatus,
@@ -351,7 +353,7 @@ export function CallLogsScreen() {
         for (let i = 0; i < settings.length; i += chunkSize) {
           const chunk = settings.slice(i, i + chunkSize);
           const res = await secureApi('callLogs.addToBotDialer', {
-            userId: String((admin as { _id?: string } | null)?._id || ''),
+            subAdminId: String((admin as { _id?: string } | null)?._id || ''),
             created_by: String((admin as { name?: string } | null)?.name || ''),
             dialout_settings: chunk,
           });
@@ -399,7 +401,7 @@ export function CallLogsScreen() {
               };
             }
             const res = await secureApi<{ calls?: CallLogRow[] }>('callLogs.getDialerData', {
-              userId: '',
+              subAdminId: '',
               filter: {
                 status,
                 startDate: formatDdMmYyyy(startDate),
@@ -476,15 +478,18 @@ export function CallLogsScreen() {
     [admin, load],
   );
 
-  const openRecording = useCallback((row: CallLogRow) => {
-    const rawUrl = String(row.recording_url || '').trim();
-    if (!rawUrl) {
-      Alert.alert('Recording', 'Recording URL is not available.');
-      return;
-    }
-    setSelected(null);
-    setTimeout(() => setRecordingUrl(rawUrl), Platform.OS === 'ios' ? 350 : 80);
-  }, []);
+  const openRecording = useCallback(
+    (row: CallLogRow) => {
+      const rawUrl = String(row.recording_url || '').trim();
+      if (!rawUrl) {
+        Alert.alert('Recording', 'Recording URL is not available.');
+        return;
+      }
+      setSelected(null);
+      defer(() => setRecordingUrl(rawUrl));
+    },
+    [defer],
+  );
 
   const viewSummary = useCallback(async (row: CallLogRow) => {
     const id = callLogRowId(row);
@@ -494,7 +499,9 @@ export function CallLogsScreen() {
     setActionLoading(true);
     setActionMsg('');
     // Let the row-detail native modal finish dismissing before opening another.
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise<void>((resolve) => {
+      defer(() => resolve(), 250);
+    });
     setSummaryOpen(true);
     try {
       const res = await processCallSummary(String(row.call_sid || ''));
@@ -509,11 +516,11 @@ export function CallLogsScreen() {
       setSummaryBusyId(null);
       setActionLoading(false);
     }
-  }, []);
+  }, [defer]);
 
   const openUserReport = useCallback(
     (row: CallLogRow) => {
-      const userId = String(row.caller_user_id || '').trim();
+      const userId = callLogCustomerId(row);
       if (!userId) {
         Alert.alert('User Report', 'User ID is not available for this call.');
         return;
@@ -639,10 +646,10 @@ export function CallLogsScreen() {
         label: 'Name',
         width: 110,
         render: (r) => String(r.client_name || '—'),
-        color: (r) => (String(r.caller_user_id || '').trim() ? colors.primary : colors.foreground),
+        color: (r) => (callLogCustomerId(r) ? colors.primary : colors.foreground),
         onCellPress: (r) => openUserReport(r),
       },
-      { key: 'dpId', label: 'DP ID', width: 180, render: (r) => String(r.caller_user_id || '—') },
+      { key: 'dpId', label: 'DP ID', width: 180, render: (r) => callLogCustomerId(r) || '—' },
     ];
     if (!isCaller) {
       cols.push({
@@ -760,19 +767,28 @@ export function CallLogsScreen() {
       : []),
   ];
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<CallLogRow>) => {
+      const id = callLogRowId(item);
+      return (
+        <CallLogCard
+          row={item}
+          index={index}
+          rowOffset={rowOffset}
+          checked={selectedIds.has(id)}
+          summaryBusy={summaryBusyId === id}
+          onToggleSelect={toggleSelect}
+          onSelectRow={(row, rowIndex) => setSelected({ row, index: rowIndex })}
+          onComment={openComment}
+          onViewSummary={(row) => void viewSummary(row)}
         />
-      }
-    >
+      );
+    },
+    [openComment, rowOffset, selectedIds, summaryBusyId, toggleSelect, viewSummary],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Call Logs</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Tap a row for all details
@@ -866,29 +882,46 @@ export function CallLogsScreen() {
               onReinit={(targets) => void reinitiateStatuses(targets)}
             />
           ) : null}
-
-          <CallLogsList
-            rows={rows}
-            rowOffset={rowOffset}
-            selectedIds={selectedIds}
+          <CallLogsListHeader
+            showSelectAll={rows.length > 0}
             allSelected={allSelected}
-            summaryBusyId={summaryBusyId}
+            selectedCount={selectedIds.size}
             onToggleAll={toggleAll}
-            onToggleSelect={toggleSelect}
-            onSelectRow={(row, index) => setSelected({ row, index })}
-            onComment={openComment}
-            onViewSummary={(row) => void viewSummary(row)}
-          />
-
-          <CallLogsPagination
-            page={page}
-            total={total}
-            totalPages={totalPages}
-            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-            onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
           />
         </>
       )}
+    </>
+  );
+
+  const listFooter = !loading ? (
+    <CallLogsPagination
+      page={page}
+      total={total}
+      totalPages={totalPages}
+      onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+      onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
+    />
+  ) : null;
+
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={loading ? [] : rows}
+        keyExtractor={(row, index) =>
+          `row-${index}-${String(row.call_sid || row._id || '')}`
+        }
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No call logs"
+        ListEmptyComponent={loading ? <View /> : undefined}
+        refreshing={loading}
+        onRefresh={() => void load()}
+        extraData={{ selectedIds, summaryBusyId, allSelected }}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -941,6 +974,6 @@ export function CallLogsScreen() {
         url={recordingUrl}
         onClose={() => setRecordingUrl(null)}
       />
-    </ScrollView>
+    </>
   );
 }

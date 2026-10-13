@@ -20,13 +20,20 @@ import { WithdrawalModals } from './withdrawal/WithdrawalModals';
 import { WithdrawalCardFooter } from './withdrawal/WithdrawalCardFooter';
 import { WithdrawalToolbar } from './withdrawal/WithdrawalToolbar';
 import { TotalBeneListModal } from './withdrawal/TotalBeneListModal';
-import { display, fmtAmount, statusBadgeBg, type Rec } from './withdrawal/helpers';
+import {
+  display,
+  fmtAmount,
+  sendToBankName,
+  statusBadgeBg,
+  type Rec,
+} from './withdrawal/helpers';
 import { styles } from './WithdrawalScreen.styles';
 import { useWithdrawalScreen } from './withdrawal/useWithdrawalScreen';
 
-const COPYABLE_COLUMN_KEYS = new Set(['bank', 'accountNo', 'ifsc']);
+const COPYABLE_COLUMN_KEYS = new Set(['sendToBank', 'bank', 'accountNo', 'ifsc']);
 
 function rawCopyValue(row: Rec, key: string): string {
+  if (key === 'sendToBank') return sendToBankName(row);
   if (key === 'bank') return String(row.userBankName ?? row.bankName ?? '').trim();
   if (key === 'accountNo') return String(row.accountNo ?? row.accountNumber ?? '').trim();
   if (key === 'ifsc') return String(row.ifscCode ?? row.ifsc ?? '').trim();
@@ -165,6 +172,9 @@ export function WithdrawalScreen() {
     setDraftEnd,
     setStartDate,
     setEndDate,
+    applyAllData,
+    clearDates,
+    clearAllFilters,
     setPage,
     pageSize,
     setPageSize,
@@ -212,15 +222,8 @@ export function WithdrawalScreen() {
     [openMidReport],
   );
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />
-      }
-    >
+  const listHeader = (
+    <>
       <Text style={styles.title}>Refund</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryRow}>
         <View style={styles.summaryChip}>
@@ -273,6 +276,9 @@ export function WithdrawalScreen() {
         setDraftEnd={setDraftEnd}
         setStartDate={setStartDate}
         setEndDate={setEndDate}
+        applyAllData={applyAllData}
+        clearDates={clearDates}
+        clearAllFilters={clearAllFilters}
         setPage={setPage}
         pageSize={pageSize}
         setPageSize={setPageSize}
@@ -294,10 +300,44 @@ export function WithdrawalScreen() {
         setModalErr={setModalErr}
         setBulkManualOpen={setBulkManualOpen}
       />
+    </>
+  );
 
+  const listFooter = (
+    <View style={styles.pagerRow}>
+      <TouchableOpacity
+        style={[styles.pagerBtn, (page <= 1 || loading) && styles.pagerBtnDisabled]}
+        disabled={page <= 1 || loading}
+        onPress={() => setPage((value) => Math.max(1, value - 1))}
+      >
+        <Text style={styles.pagerBtnText}>‹ Prev</Text>
+      </TouchableOpacity>
+      <Text style={styles.pagerText}>
+        Page {page} / {totalPages}
+      </Text>
+      <TouchableOpacity
+        style={[styles.pagerBtn, (page >= totalPages || loading) && styles.pagerBtnDisabled]}
+        disabled={page >= totalPages || loading}
+        onPress={() => setPage((value) => Math.min(totalPages, value + 1))}
+      >
+        <Text style={styles.pagerBtnText}>Next ›</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <>
       <ResponsiveTable
+        virtualized
         forceCards
         previewFieldCount={3}
+        style={styles.root}
+        contentContainerStyle={styles.content}
+        listHeaderComponent={listHeader}
+        listFooterComponent={listFooter}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />
+        }
         columns={columns}
         rows={rows}
         renderCardTitleSuffix={renderWithdrawalMidIcon}
@@ -419,32 +459,12 @@ export function WithdrawalScreen() {
         onClose={() => setTotalBeneListOpen(false)}
       />
 
-      <View style={styles.pagerRow}>
-        <TouchableOpacity
-          style={[styles.pagerBtn, (page <= 1 || loading) && styles.pagerBtnDisabled]}
-          disabled={page <= 1 || loading}
-          onPress={() => setPage((value) => Math.max(1, value - 1))}
-        >
-          <Text style={styles.pagerBtnText}>‹ Prev</Text>
-        </TouchableOpacity>
-        <Text style={styles.pagerText}>
-          Page {page} / {totalPages}
-        </Text>
-        <TouchableOpacity
-          style={[styles.pagerBtn, (page >= totalPages || loading) && styles.pagerBtnDisabled]}
-          disabled={page >= totalPages || loading}
-          onPress={() => setPage((value) => Math.min(totalPages, value + 1))}
-        >
-          <Text style={styles.pagerBtnText}>Next ›</Text>
-        </TouchableOpacity>
-      </View>
-
       <SheetDownloadOtpModal
         visible={sheetOtp.open}
         filter={sheetOtp.filter}
         onClose={() => setSheetOtp((value) => ({ ...value, open: false }))}
         onVerified={() => sheetAfterOtp.current?.()}
       />
-    </ScrollView>
+    </>
   );
 }

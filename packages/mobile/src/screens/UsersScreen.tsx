@@ -5,27 +5,42 @@
  * LAXMI_999_Users) with the desktop action + payload mapping, server search,
  * pagination, row detail sheet, OTP-gated block/unblock and Create User.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  FlatList,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { appCodeForName, resolveCallerDialerIds } from '@astro/shared';
-import { USER_TYPES, type UserType } from '@astro/shared/userTypes';
+import {
+  BALANCE_RANGE_OPTIONS,
+  balanceRangeToFilter,
+  USER_TYPES,
+  type UserType,
+} from '@astro/shared/userTypes';
 import { colors } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../dashboards/ui/DataTable';
-import { pickLastActivity } from '../dashboards/userRowUtils';
+import {
+  nestedDpId,
+  nestedName,
+  pickAccountNumber,
+  pickAadharNumber,
+  pickLastActivity,
+  pickUserBankName,
+} from '../dashboards/userRowUtils';
 import { secureApi } from '../api/client';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getSessionUser, hasPermission, isCallerRole } from '../auth/permissions';
-import { formatDisplayDate, todayIST } from '../utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './dashboards/details/DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
 import { CreateUserScreen } from './CreateUserScreen';
@@ -104,6 +119,7 @@ export function UsersScreen() {
   );
   const [appClientName, setAppClientName] = useState('');
   const [blockFilter, setBlockFilter] = useState<'' | 'block' | 'unblock'>('');
+  const [balanceRange, setBalanceRange] = useState('');
   const [searchField, setSearchField] = useState<SearchFieldKey>('name');
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState<{ field: SearchFieldKey; text: string }>({
@@ -121,6 +137,33 @@ export function UsersScreen() {
   const [blockRow, setBlockRow] = useState<Row | null>(null);
   const [dumpRow, setDumpRow] = useState<Row | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [appVersions, setAppVersions] = useState<Record<string, string>>({});
+  const loadGenRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      loadGenRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await secureApi<{ clientName?: string; version?: string }[]>(
+        'users.appVersions',
+        {},
+      );
+      if (cancelled || !res.ok) return;
+      const map: Record<string, string> = {};
+      for (const item of Array.isArray(res.data) ? res.data : []) {
+        if (item?.clientName) map[item.clientName] = String(item.version ?? '');
+      }
+      setAppVersions(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Dashboard Today's Active → Users with selectActiveCustomers
   useEffect(() => {
@@ -211,7 +254,7 @@ export function UsersScreen() {
     try {
       const adminRec = (admin ?? {}) as Record<string, unknown>;
       const res = await secureApi('callLogs.addToBotDialer', {
-        userId: adminRec._id,
+        subAdminId: adminRec._id,
         created_by: adminRec.name,
         dialout_settings: mapUsersToBotSettings(rows, botId.trim(), reasonForUserType(userType)),
       });
@@ -265,6 +308,7 @@ export function UsersScreen() {
   }, [admin, campaignId, rows]);
 
   const load = useCallback(async () => {
+    const gen = ++loadGenRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -272,6 +316,7 @@ export function UsersScreen() {
       const loginEmpCode = String(adminRec.empCode || '').trim();
       const callerEmpScoped = isCaller && userType !== 'Sub_Admin';
       if (callerEmpScoped && !loginEmpCode) {
+        if (gen !== loadGenRef.current) return;
         setError('No empCode on this login. Ask admin to assign empCode.');
         setRows([]);
         setTotal(0);
@@ -311,6 +356,15 @@ export function UsersScreen() {
       }
       if (blockFilter && userType === 'User' && !searchingDpId) {
         filter.blockUser = blockFilter === 'block';
+      }
+      if (
+        balanceRange &&
+        !searchingDpId &&
+        userType !== 'Sub_Admin' &&
+        userType !== 'Non_Performing_Active_User' &&
+        userType !== 'LAXMI_999_Users'
+      ) {
+        Object.assign(filter, balanceRangeToFilter(balanceRange));
       }
       // Caller default list = own emp; when searching DP ID / name / etc. omit empCode
       // so 001 (unassigned) users can be returned, then scoped client-side.
@@ -418,6 +472,7 @@ export function UsersScreen() {
           };
       }
       const res = await secureApi<UsersListResponse | Row[]>(TYPE_ACTION[userType], payload);
+      if (gen !== loadGenRef.current) return;
       if (!res.ok) {
         setError(res.message || 'Failed to load users');
         setRows([]);
@@ -447,9 +502,20 @@ export function UsersScreen() {
       setTotalPages(Math.max(1, Number(nested.totalPages ?? raw.totalPages ?? 1) || 1));
       setTotal(Number(nested.total ?? nested.count ?? raw.total ?? raw.count ?? list.length) || 0);
     } finally {
-      setLoading(false);
+      if (gen === loadGenRef.current) setLoading(false);
     }
-  }, [admin, appClientName, appliedSearch, blockFilter, dates, isCaller, page, pageSize, userType]);
+  }, [
+    admin,
+    appClientName,
+    appliedSearch,
+    balanceRange,
+    blockFilter,
+    dates,
+    isCaller,
+    page,
+    pageSize,
+    userType,
+  ]);
 
   useEffect(() => {
     void load();
@@ -491,6 +557,25 @@ export function UsersScreen() {
       return cols;
     }
     cols.push({ key: 'dpId', label: 'Dp Id', width: 150, render: (r) => display(r._id) });
+    if (!isCaller) {
+      cols.push({
+        key: 'bank',
+        label: 'User Bank Name',
+        width: 140,
+        render: (r) => pickUserBankName(r),
+      });
+    }
+    cols.push(
+      { key: 'appName', label: 'App', width: 48, render: (r) => appCodeForName(r.clientName) },
+      { key: 'empCode', label: 'Emp Code', width: 70, render: (r) => display(r.empCode) },
+      { key: 'playIn', label: 'In', width: 60, render: (r) => display(r.played) },
+      {
+        key: 'encryptedDpId',
+        label: 'User Encrypted Dp Id',
+        width: 160,
+        render: (r) => display(r.encryptedUserName),
+      },
+    );
     if (!hideContact) {
       cols.push({
         key: 'mobile',
@@ -499,12 +584,23 @@ export function UsersScreen() {
         render: (r) => maskMobile(r.mobile, canShowMobile),
       });
     }
-    cols.push(
-      { key: 'appName', label: 'App', width: 48, render: (r) => appCodeForName(r.clientName) },
-      { key: 'empCode', label: 'Emp Code', width: 70, render: (r) => display(r.empCode) },
-      { key: 'playIn', label: 'In', width: 60, render: (r) => display(r.played) },
-      { key: 'kyc', label: 'Kyc', width: 60, render: (r) => (r.kyc ? 'Yes' : 'No') },
-    );
+    if (!isCaller) {
+      cols.push(
+        { key: 'kyc', label: 'Kyc', width: 60, render: (r) => (r.kyc ? 'Yes' : 'No') },
+        {
+          key: 'account',
+          label: 'Account Number',
+          width: 140,
+          render: (r) => pickAccountNumber(r),
+        },
+        {
+          key: 'aadhaar',
+          label: 'Aadhar Number',
+          width: 140,
+          render: (r) => pickAadharNumber(r),
+        },
+      );
+    }
     if (!hideContact) {
       cols.push({
         key: 'email',
@@ -516,6 +612,42 @@ export function UsersScreen() {
     cols.push(
       { key: 'city', label: 'City', width: 100, render: (r) => display(r.city) },
       { key: 'state', label: 'State', width: 110, render: (r) => display(r.state) },
+    );
+    if (!isCaller) {
+      cols.push(
+        {
+          key: 'prevCaller',
+          label: 'Previous Caller Name',
+          width: 130,
+          render: (r) => nestedName(r.previousCaller),
+        },
+        {
+          key: 'prevCallerDp',
+          label: 'Previous Caller Dp_ID',
+          width: 150,
+          render: (r) => nestedDpId(r.previousCaller),
+        },
+      );
+    }
+    cols.push(
+      {
+        key: 'currCaller',
+        label: 'Current Caller',
+        width: 130,
+        render: (r) => nestedName(r.currentCaller),
+      },
+      {
+        key: 'referredCode',
+        label: 'Referred Referral Code',
+        width: 140,
+        render: (r) => display(r.referredCode),
+      },
+      {
+        key: 'referralCode',
+        label: 'Referral Code',
+        width: 120,
+        render: (r) => display(r.referralCodeUser),
+      },
       {
         key: 'deviceType',
         label: 'Device Type',
@@ -529,17 +661,56 @@ export function UsersScreen() {
         render: (r) => display(r.currentAppVersion),
       },
       {
+        key: 'appVersion',
+        label: 'App Version',
+        width: 100,
+        render: (r) => {
+          const key = String(r.clientName || '');
+          return key && appVersions[key] ? appVersions[key] : '—';
+        },
+      },
+      {
         key: 'balance',
         label: 'Balance',
         width: 90,
         render: (r) => floorNum(r.balance ?? 0).toLocaleString('en-IN'),
       },
-      {
+    );
+    if (!isCaller) {
+      cols.push({
         key: 'totalDeposit',
         label: 'Total Deposit',
         width: 100,
         align: 'right',
         render: (r) => floorNum(r.totalDeposit ?? 0).toLocaleString('en-IN'),
+      });
+    }
+    cols.push(
+      {
+        key: 'created',
+        label: 'Created',
+        width: 90,
+        render: (r) => (r.createdOn ? formatDisplayDate(r.createdOn) : '—'),
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        width: 80,
+        render: (r) => (r.createdOn ? formatDisplayTime(r.createdOn) || '—' : '—'),
+      },
+      {
+        key: 'lastActivity',
+        label: 'Last Activity',
+        width: 150,
+        render: (r) => pickLastActivity(r),
+      },
+      {
+        key: 'bonusBalance',
+        label: 'Bonus Balance',
+        width: 110,
+        align: 'right',
+        render: (r) =>
+          floorNum(r.bonusWalletBalance ?? r.bonusBalance ?? r.bonus ?? 0).toLocaleString('en-IN'),
       },
       {
         key: 'blocked',
@@ -548,15 +719,9 @@ export function UsersScreen() {
         render: (r) => (isBlocked(r) ? 'Blocked' : 'Active'),
         color: (r) => (isBlocked(r) ? colors.destructive : undefined),
       },
-      {
-        key: 'created',
-        label: 'Created',
-        width: 90,
-        render: (r) => (r.createdOn ? formatDisplayDate(r.createdOn) : '—'),
-      },
     );
     return cols;
-  }, [page, pageSize, userType, hideContact, canShowMobile]);
+  }, [page, pageSize, userType, hideContact, canShowMobile, isCaller, appVersions]);
 
   const showBlockAction = userType !== 'Sub_Admin' && !isCaller;
   // Callers may dump users from the same user types (Laxmi parity).
@@ -564,19 +729,51 @@ export function UsersScreen() {
     userType,
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const renderUserCard = useCallback(
+    ({ item: r, index: i }: ListRenderItemInfo<Row>) => (
+      <UserCard
+        row={r}
+        index={i}
+        page={page}
+        pageSize={pageSize}
+        userType={userType}
+        hideContact={hideContact}
+        canShowMobile={canShowMobile}
+        canOpenReport={canOpenReport}
+        showCalling={showCalling}
+        showBlockAction={showBlockAction}
+        callBusy={callBusy}
+        onOpenSheet={() => setSelected(r)}
+        onOpenReport={() =>
+          navigation.navigate('/user-report', {
+            userId: String(r._id),
+            userName: display(r.name),
+          })
+        }
+        onCall={() => {
+          setSelected(null);
+          void placeManualCall(r);
+        }}
+        onBlock={() => setBlockRow(r)}
+      />
+    ),
+    [
+      page,
+      pageSize,
+      userType,
+      hideContact,
+      canShowMobile,
+      canOpenReport,
+      showCalling,
+      showBlockAction,
+      callBusy,
+      navigation,
+      placeManualCall,
+    ],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Users</Text>
@@ -604,6 +801,7 @@ export function UsersScreen() {
               setSearchField('name');
               setSearchDraft('');
               setAppliedSearch({ field: 'name', text: '' });
+              setBalanceRange('');
             }}
           >
             <Text style={[styles.chipText, userType === t && styles.chipTextActive]}>{t}</Text>
@@ -633,6 +831,36 @@ export function UsersScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+      ) : null}
+
+      {userType !== 'Sub_Admin' &&
+      userType !== 'Non_Performing_Active_User' &&
+      userType !== 'LAXMI_999_Users' ? (
+        <View style={styles.balanceFilterWrap}>
+          <Text style={styles.balanceFilterLabel}>Select Balance Range</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRowPlain}
+          >
+            {BALANCE_RANGE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.value || 'all'}
+                style={[styles.chip, balanceRange === opt.value && styles.chipActive]}
+                onPress={() => {
+                  setBalanceRange(opt.value);
+                  setPage(1);
+                }}
+              >
+                <Text
+                  style={[styles.chipText, balanceRange === opt.value && styles.chipTextActive]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       ) : null}
 
@@ -749,137 +977,58 @@ export function UsersScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      <View style={styles.cardList}>
-        {loading && !rows.length ? (
-          <Text style={styles.cardEmpty}>Loading…</Text>
-        ) : !rows.length ? (
-          <Text style={styles.cardEmpty}>No users found</Text>
-        ) : (
-          rows.map((r, i) => {
-            const blocked = isBlocked(r);
-            const name = display(r.name);
-            const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
-            const app = appCodeForName(r.clientName);
-            const mobileVal = !hideContact || canShowMobile ? display(r.mobile) : '';
-            const sub =
-              userType === 'Sub_Admin'
-                ? display(r.Role_Name)
-                : [
-                    mobileVal !== '—' ? mobileVal : '',
-                    display(r.city) !== '—' ? display(r.city) : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || '—';
-            return (
-              <TouchableOpacity
-                key={`user-${i}-${String(r._id || '')}`}
-                style={styles.userCard}
-                onPress={() => setSelected(r)}
-                activeOpacity={0.7}
+  return (
+    <>
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={(r, i) => `user-${i}-${String(r._id || '')}`}
+        renderItem={renderUserCard}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <Text style={styles.cardEmpty}>{loading ? 'Loading…' : 'No users found'}</Text>
+        }
+        ListFooterComponent={
+          <>
+            {rows.length ? <Text style={styles.cardHint}>Tap a card to see all details</Text> : null}
+            <View style={styles.pager}>
+              <Text
+                style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+                onPress={() => page > 1 && setPage((p) => p - 1)}
               >
-                <View style={[styles.avatar, blocked && styles.avatarBlocked]}>
-                  <Text style={[styles.avatarText, blocked && styles.avatarTextBlocked]}>
-                    {initial}
-                  </Text>
-                </View>
-                <View style={styles.userCardMid}>
-                  <Text
-                    style={[
-                      styles.userCardName,
-                      canOpenReport && r._id ? styles.userCardNameLink : null,
-                    ]}
-                    numberOfLines={1}
-                    onPress={
-                      canOpenReport && r._id
-                        ? () =>
-                            navigation.navigate('/user-report', {
-                              userId: String(r._id),
-                              userName: name,
-                            })
-                        : undefined
-                    }
-                  >
-                    {name}
-                  </Text>
-                  <Text style={styles.userCardSub} numberOfLines={1}>
-                    {sub}
-                  </Text>
-                  <View style={styles.userCardTags}>
-                    {app ? (
-                      <View style={styles.tagApp}>
-                        <Text style={styles.tagAppText} numberOfLines={1}>
-                          {app}
-                        </Text>
-                      </View>
-                    ) : null}
-                    {display(r.empCode) !== '—' ? (
-                      <View style={styles.tagApp}>
-                        <Text style={styles.tagAppText} numberOfLines={1}>
-                          Emp {display(r.empCode)}
-                        </Text>
-                      </View>
-                    ) : null}
-                    {display(r.state) !== '—' ? (
-                      <View style={[styles.tagApp, styles.tagState]}>
-                        <Text style={styles.tagAppText} numberOfLines={1}>
-                          {display(r.state)}
-                        </Text>
-                      </View>
-                    ) : null}
-                    <View
-                      style={[styles.tagStatus, blocked ? styles.tagBlocked : styles.tagActive]}
-                    >
-                      <Text
-                        style={[
-                          styles.tagStatusText,
-                          blocked ? styles.tagBlockedText : styles.tagActiveText,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {blocked ? 'Blocked' : 'Active'}
-                      </Text>
-                    </View>
-                  </View>
-                  {showCalling && userType !== 'Sub_Admin' && String(r.mobile || '').trim() ? (
-                    <View style={styles.callBtnRow}>
-                      <TouchableOpacity
-                        style={[styles.callBtn, callBusy && styles.dialerBtnDisabled]}
-                        disabled={callBusy}
-                        onPress={() => {
-                          setSelected(null);
-                          void placeManualCall(r);
-                        }}
-                      >
-                        <Text style={styles.callBtnText}>Call</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-                </View>
-                <View style={styles.userCardRight}>
-                  <Text style={styles.userCardBalance}>
-                    ₹{floorNum(r.balance ?? 0).toLocaleString('en-IN')}
-                  </Text>
-                  <Text style={styles.userCardIdx}>#{(page - 1) * pageSize + i + 1}</Text>
-                  {showBlockAction ? (
-                    <TouchableOpacity
-                      style={[styles.blockBtn, blocked ? styles.blockBtnUnblock : null]}
-                      onPress={() => setBlockRow(r)}
-                    >
-                      <Text
-                        style={[styles.blockBtnText, blocked ? styles.blockBtnUnblockText : null]}
-                      >
-                        {blocked ? 'Unblock' : 'Block'}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              </TouchableOpacity>
-            );
-          })
-        )}
-        {rows.length ? <Text style={styles.cardHint}>Tap a card to see all details</Text> : null}
-      </View>
+                ‹ Prev
+              </Text>
+              <Text style={styles.pagerLabel}>
+                Page {page} / {totalPages}
+              </Text>
+              <Text
+                style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+                onPress={() => page < totalPages && setPage((p) => p + 1)}
+              >
+                Next ›
+              </Text>
+            </View>
+          </>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => void load()}
+            tintColor={colors.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        windowSize={7}
+        maxToRenderPerBatch={8}
+        initialNumToRender={10}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -983,24 +1132,135 @@ export function UsersScreen() {
           <CreateUserScreen />
         </View>
       </Modal>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </>
   );
 }
+
+type UserCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  userType: UserType;
+  hideContact: boolean;
+  canShowMobile: boolean;
+  canOpenReport: boolean;
+  showCalling: boolean;
+  showBlockAction: boolean;
+  callBusy: boolean;
+  onOpenSheet: () => void;
+  onOpenReport: () => void;
+  onCall: () => void;
+  onBlock: () => void;
+};
+
+const UserCard = memo(function UserCard({
+  row: r,
+  index: i,
+  page,
+  pageSize,
+  userType,
+  hideContact,
+  canShowMobile,
+  canOpenReport,
+  showCalling,
+  showBlockAction,
+  callBusy,
+  onOpenSheet,
+  onOpenReport,
+  onCall,
+  onBlock,
+}: UserCardProps) {
+  const blocked = isBlocked(r);
+  const name = display(r.name);
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  const app = appCodeForName(r.clientName);
+  const mobileVal = !hideContact || canShowMobile ? display(r.mobile) : '';
+  const sub =
+    userType === 'Sub_Admin'
+      ? display(r.Role_Name)
+      : [mobileVal !== '—' ? mobileVal : '', display(r.city) !== '—' ? display(r.city) : '']
+          .filter(Boolean)
+          .join(' · ') || '—';
+
+  return (
+    <TouchableOpacity style={styles.userCard} onPress={onOpenSheet} activeOpacity={0.7}>
+      <View style={[styles.avatar, blocked && styles.avatarBlocked]}>
+        <Text style={[styles.avatarText, blocked && styles.avatarTextBlocked]}>{initial}</Text>
+      </View>
+      <View style={styles.userCardMid}>
+        <Text
+          style={[styles.userCardName, canOpenReport && r._id ? styles.userCardNameLink : null]}
+          numberOfLines={1}
+          onPress={canOpenReport && r._id ? onOpenReport : undefined}
+        >
+          {name}
+        </Text>
+        <Text style={styles.userCardSub} numberOfLines={1}>
+          {sub}
+        </Text>
+        <View style={styles.userCardTags}>
+          {app ? (
+            <View style={styles.tagApp}>
+              <Text style={styles.tagAppText} numberOfLines={1}>
+                {app}
+              </Text>
+            </View>
+          ) : null}
+          {display(r.empCode) !== '—' ? (
+            <View style={styles.tagApp}>
+              <Text style={styles.tagAppText} numberOfLines={1}>
+                Emp {display(r.empCode)}
+              </Text>
+            </View>
+          ) : null}
+          {display(r.state) !== '—' ? (
+            <View style={[styles.tagApp, styles.tagState]}>
+              <Text style={styles.tagAppText} numberOfLines={1}>
+                {display(r.state)}
+              </Text>
+            </View>
+          ) : null}
+          <View style={[styles.tagStatus, blocked ? styles.tagBlocked : styles.tagActive]}>
+            <Text
+              style={[
+                styles.tagStatusText,
+                blocked ? styles.tagBlockedText : styles.tagActiveText,
+              ]}
+              numberOfLines={1}
+            >
+              {blocked ? 'Blocked' : 'Active'}
+            </Text>
+          </View>
+        </View>
+        {showCalling && userType !== 'Sub_Admin' && String(r.mobile || '').trim() ? (
+          <View style={styles.callBtnRow}>
+            <TouchableOpacity
+              style={[styles.callBtn, callBusy && styles.dialerBtnDisabled]}
+              disabled={callBusy}
+              onPress={onCall}
+            >
+              <Text style={styles.callBtnText}>Call</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.userCardRight}>
+        <Text style={styles.userCardBalance}>
+          ₹{floorNum(r.balance ?? 0).toLocaleString('en-IN')}
+        </Text>
+        <Text style={styles.userCardIdx}>#{(page - 1) * pageSize + i + 1}</Text>
+        {showBlockAction ? (
+          <TouchableOpacity
+            style={[styles.blockBtn, blocked ? styles.blockBtnUnblock : null]}
+            onPress={onBlock}
+          >
+            <Text style={[styles.blockBtnText, blocked ? styles.blockBtnUnblockText : null]}>
+              {blocked ? 'Unblock' : 'Block'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+});

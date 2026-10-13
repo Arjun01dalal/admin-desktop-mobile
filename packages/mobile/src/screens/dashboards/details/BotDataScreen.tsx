@@ -153,7 +153,7 @@ export function BotDataScreen() {
                 mapUsersToBotSettings(users, botId, userType),
               );
               const res = await secureApi<unknown>('callLogs.addToBotDialer', {
-                userId: user?._id,
+                subAdminId: user?._id,
                 created_by: user?.name,
                 dialout_settings,
               });

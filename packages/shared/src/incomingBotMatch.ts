@@ -105,19 +105,17 @@ export function todayIncomingBotDateInputValue(): string {
   return new Date().toISOString().split('T')[0]!;
 }
 
-/** Earliest selectable day is the 23rd of the current month (Laxmi parity). */
+/**
+ * @deprecated Removed in admin-panel-domains (list 400 fix). Default is today; no month-23 floor.
+ * Kept as an alias so older imports keep compiling.
+ */
 export function incomingBotMinDateInputValue(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}-23`;
+  return todayIncomingBotDateInputValue();
 }
 
-/** Default selected date: today, but never before the 23rd min. */
+/** Default selected date: today (admin-panel-domains Incoming Bot parity). */
 export function incomingBotDefaultDateInputValue(): string {
-  const today = todayIncomingBotDateInputValue();
-  const min = incomingBotMinDateInputValue();
-  return today < min ? min : today;
+  return todayIncomingBotDateInputValue();
 }
 
 /** @deprecated Prefer getAll-exotel date range; kept for callers still using since/until. */
@@ -367,6 +365,10 @@ export const INCOMING_BOT_DIALER = {
   /** Maps to api2 via dialer server map */
   serverId: '1',
 } as const;
+
+/** Sky Talk CRM embed used on Incoming Bot (admin-panel-domains parity). */
+export const SKYTALK_EMBED_URL =
+  'https://skytalk.site/crm-embed#access=skytalk_embed_GMfSye66vouZJ_AC-kxI6gZbgWuOe4epzJnyvqatOfM';
 
 export function formatIncomingBotCommentAuthor(c: IncomingBotCallerComment): string {
   return String(c.who?.userName || c.who?.name || c.userName || c.commented_by || '—');

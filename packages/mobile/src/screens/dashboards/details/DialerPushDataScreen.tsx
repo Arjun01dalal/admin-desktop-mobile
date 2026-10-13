@@ -25,16 +25,12 @@ import { DateField } from '../../../components/DateField';
 import { colors } from '../../../theme';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { styles } from './DialerPushDataScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = Record<string, unknown>;
 
-const PAGE_SIZES = pickPageSizes([25, 50, 100, 200, 500]);
+const PAGE_SIZES = pickPageSizes([25, 50]);
 const CAMPAIGN_PAGE_SIZE = 50;
-
-function display(v: unknown): string {
-  if (v == null || v === '') return '—';
-  return String(v);
-}
 
 function formatDateTime(value: unknown): string {
   if (value == null || value === '') return '—';

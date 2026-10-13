@@ -1418,6 +1418,48 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'dashboard.playedTodayYesterday': {
+    method: 'POST',
+    path: '/User/played-today-yesterday',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'gtel.calls': {
+    method: 'GET',
+    path: '/dialer/calls',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'gtel.dispositions': {
+    method: 'GET',
+    path: '/dialer/dispositions',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'gtel.callDetails': {
+    method: 'GET',
+    path: '/dialer/call/{callId}',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'gtel.clickToCall': {
+    method: 'POST',
+    path: '/dialer/click-to-call',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'gtel.hangup': {
+    method: 'POST',
+    path: '/dialer/hangup',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'gtel.updateDisposition': {
+    method: 'POST',
+    path: '/dialer/call/{callId}/disposition',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   'dashboard.wco': {
     method: 'POST',
     path: '/User/wco',

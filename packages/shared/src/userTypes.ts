@@ -40,6 +40,37 @@ export const BLOCK_STATUS_OPTIONS = [
   { value: 'unblock', label: 'Unblocked' },
 ] as const;
 
+/**
+ * Users balance filter — admin-panel-domains "Select Balance Range".
+ * Value is `min-max`; API filter gets numeric `min` / `max`.
+ */
+export const BALANCE_RANGE_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: '0-1000', label: '0 - 1000' },
+  { value: '1000-10000', label: '1,000 - 10,000' },
+  { value: '10000-50000', label: '10,000 - 50,000' },
+  { value: '50000-100000', label: '50,000 - 100,000' },
+  { value: '100000-1000000', label: '100,000 - 100,0000' },
+] as const;
+
+export type BalanceRangeValue = (typeof BALANCE_RANGE_OPTIONS)[number]['value'];
+
+/** Parse `min-max` range into API filter fields. */
+export function balanceRangeToFilter(range: string | null | undefined): {
+  min?: number;
+  max?: number;
+} {
+  const raw = String(range || '').trim();
+  if (!raw || !raw.includes('-')) return {};
+  const [minRaw, maxRaw] = raw.split('-');
+  const min = Number(minRaw);
+  const max = Number(maxRaw);
+  const out: { min?: number; max?: number } = {};
+  if (Number.isFinite(min)) out.min = min;
+  if (Number.isFinite(max)) out.max = max;
+  return out;
+}
+
 export const DEFAULT_EMP_CODE = '001';
 
 /** Mobiles allowed to edit user empCode. */

@@ -24,14 +24,10 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
-import { CreateUserScreen } from '../screens/CreateUserScreen';
-import { UsersScreen } from '../screens/UsersScreen';
-import { WithdrawalScreen } from '../screens/WithdrawalScreen';
-import { ActiveUserWithdrawalScreen } from '../screens/dashboards/details/ActiveUserWithdrawalScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAV_ITEMS, type NavItem } from './navItems';
 import { canAccessPanelDetail, PANEL_DETAIL_ROUTES } from './panelDetail';
+import { resolveLazyScreen } from './lazyScreens';
 import { canAccessNavItem } from '../auth/permissions';
 import { SosProvider } from '../auth/useSosGuard';
 import { SosAlertOverlay } from '../components/SosAlertOverlay';
@@ -39,87 +35,27 @@ import { AdminLlmChatHeaderButton } from '../components/AdminLlmChatWidget';
 import { useAuth } from '../auth/AuthContext';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
 import { useRevealCodes } from '../context/useRevealCodes';
-import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
-import { OpsDashboardScreen } from '../screens/dashboards/OpsDashboardScreen';
-import { RiskAnalysisScreen } from '../screens/dashboards/RiskAnalysisScreen';
-import { AnalysisScreen } from '../screens/dashboards/AnalysisScreen';
-import { MasterFlowScreen } from '../screens/dashboards/details/MasterFlowScreen';
-import { HouseGamesScreen } from '../screens/dashboards/details/HouseGamesScreen';
-import { LeaderboardScreen } from '../screens/dashboards/details/LeaderboardScreen';
-import { ProfitLossScreen } from '../screens/dashboards/details/ProfitLossScreen';
-import { CallerResponsibilityScreen } from '../screens/dashboards/details/CallerResponsibilityScreen';
-import { PlayerActivityScreen } from '../screens/dashboards/details/PlayerActivityScreen';
-import { GameActivityScreen } from '../screens/dashboards/details/GameActivityScreen';
-import { CallLogsScreen } from '../screens/dashboards/details/CallLogsScreen';
-import { DialerPushDataScreen } from '../screens/dashboards/details/DialerPushDataScreen';
-import { NewRegistersScreen } from '../screens/dashboards/details/NewRegistersScreen';
-import { StateWiseRegistrationScreen } from '../screens/dashboards/details/StateWiseRegistrationScreen';
-import { LoginReportScreen } from '../screens/dashboards/details/LoginReportScreen';
-import { AllUserLoginReportScreen } from '../screens/dashboards/details/AllUserLoginReportScreen';
-import { SosBlockedUsersScreen } from '../screens/dashboards/details/SosBlockedUsersScreen';
-import { CheckersReportScreen } from '../screens/dashboards/details/CheckersReportScreen';
-import { SheetDownloadReportScreen } from '../screens/dashboards/details/SheetDownloadReportScreen';
-import { PointsReportScreen } from '../screens/dashboards/details/PointsReportScreen';
-import { CoinRemovalListScreen } from '../screens/dashboards/details/CoinRemovalListScreen';
-import { ShowMyCoinHistoryScreen } from '../screens/dashboards/details/ShowMyCoinHistoryScreen';
-import { CustomerAllotmentScreen } from '../screens/dashboards/details/CustomerAllotmentScreen';
-import { CallerAllotmentScreen } from '../screens/dashboards/details/CallerAllotmentScreen';
-import { NonPerformingUserScreen } from '../screens/dashboards/details/NonPerformingUserScreen';
-import { TodaysActiveScreen } from '../screens/dashboards/details/TodaysActiveScreen';
-import { FeedbackScreen } from '../screens/dashboards/details/FeedbackScreen';
-import { BetConstructGamesScreen } from '../screens/dashboards/details/BetConstructGamesScreen';
-import { CasinoGamesScreen } from '../screens/dashboards/details/CasinoGamesScreen';
-import { CasinoSwitchScreen } from '../screens/dashboards/details/CasinoSwitchScreen';
-import { TopGamesScreen } from '../screens/dashboards/details/TopGamesScreen';
-import { CasinoTopupBalanceScreen } from '../screens/dashboards/details/CasinoTopupBalanceScreen';
-import { BannersScreen } from '../screens/dashboards/details/BannersScreen';
-import { PushNotificationsScreen } from '../screens/dashboards/details/PushNotificationsScreen';
-import { BlockWithdrawalScreen } from '../screens/dashboards/details/BlockWithdrawalScreen';
-import { GgrAlertScreen } from '../screens/dashboards/details/GgrAlertScreen';
-import { UpiPaymentsScreen } from '../screens/dashboards/details/UpiPaymentsScreen';
-import { UpiListsScreen } from '../screens/dashboards/details/UpiListsScreen';
-import { UtrProviderScreen } from '../screens/dashboards/details/UtrProviderScreen';
-import { InstantDepositProvidersScreen } from '../screens/dashboards/details/InstantDepositProvidersScreen';
-import { DepositProvidersScreen } from '../screens/dashboards/details/DepositProvidersScreen';
-import { DepositConfigScreen } from '../screens/dashboards/details/DepositConfigScreen';
-import { MidLimitsScreen } from '../screens/dashboards/details/MidLimitsScreen';
-import { DepositScreen } from '../screens/dashboards/details/DepositScreen';
-import { UsersKycScreen } from '../screens/dashboards/details/UsersKycScreen';
-import { FundRequestScreen } from '../screens/dashboards/details/FundRequestScreen';
-import { FundsScreen } from '../screens/dashboards/details/FundsScreen';
-import { WithdrawalProvidersScreen } from '../screens/dashboards/details/WithdrawalProvidersScreen';
-import { BotDataScreen } from '../screens/dashboards/details/BotDataScreen';
-import { PlayerRtpScreen } from '../screens/dashboards/details/PlayerRtpScreen';
-import { DumpUsersScreen } from '../screens/dashboards/details/DumpUsersScreen';
-import { PercentageScreen } from '../screens/dashboards/details/PercentageScreen';
-import { NewDepositsScreen } from '../screens/dashboards/details/NewDepositsScreen';
-import { BotPerformanceScreen } from '../screens/dashboards/details/BotPerformanceScreen';
-import { DepositListScreen } from '../screens/dashboards/details/DepositListScreen';
-import { WithdrawalFundScreen } from '../screens/dashboards/details/WithdrawalFundScreen';
-import { SocialMediaScreen } from '../screens/dashboards/details/SocialMediaScreen';
-import { WhatsappScreen } from '../screens/dashboards/details/WhatsappScreen';
-import { WhatsappMidScreen } from '../screens/dashboards/details/WhatsappMidScreen';
-import { AAAFraudBetReportScreen } from '../screens/dashboards/details/AAAFraudBetReportScreen';
-import { AAABlacklistedUsersScreen } from '../screens/dashboards/details/AAABlacklistedUsersScreen';
-import { MobileAppScreen } from '../screens/dashboards/details/MobileAppScreen';
-import { IncomingBotCallScreen } from '../screens/dashboards/details/IncomingBotCallScreen';
-import { SkyTalkScreen } from '../screens/dashboards/details/SkyTalkScreen';
-import { RolesResponsibilitiesScreen } from '../screens/dashboards/details/RolesResponsibilitiesScreen';
-import { BonusWalletFundRequestScreen } from '../screens/dashboards/details/BonusWalletFundRequestScreen';
-import { BonusWalletRequestsScreen } from '../screens/dashboards/details/BonusWalletRequestsScreen';
-import { DepositApprovedReportScreen } from '../screens/dashboards/details/DepositApprovedReportScreen';
-import { UniqueDepositPendingScreen } from '../screens/dashboards/details/UniqueDepositPendingScreen';
 import { colors, isDarkTheme } from '../theme';
 import { getAppVersion } from '../utils/appVersion';
 import { styles } from './AppNavigator.styles';
 
 const Drawer = createDrawerNavigator();
 
+/** Stack routes that keep WebViews / live polling — unmount when left. */
+const HEAVY_STACK_UNMOUNT = new Set([
+  '/liveMatchTotal',
+  '/masterLiveMatchTotal',
+  '/bothLiveMatchTotal',
+  '/incoming-bot-call',
+  '/sky-talk',
+]);
+
 type RootStackParamList = {
   panel: undefined;
   profile: undefined;
   '/active-user-withdrawal': undefined;
+  '/incoming-bot-call': undefined;
   [route: string]: undefined;
 };
 
@@ -127,89 +63,20 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 type AnyScreen = React.ComponentType<Record<string, unknown>>;
 
-/** Map desktop route paths to implemented mobile screens. Unlisted paths get a placeholder. */
-const IMPLEMENTED: Record<string, AnyScreen> = {
-  '/welcome': WelcomeScreen as AnyScreen,
-  '/dashboard': (() => <OpsDashboardScreen mode="main" />) as AnyScreen,
-  '/vip-dashboard': (() => <OpsDashboardScreen mode="vip" />) as AnyScreen,
-  '/combined-dashboard': (() => <OpsDashboardScreen mode="combined" />) as AnyScreen,
-  '/risk-dashboard': RiskAnalysisScreen as AnyScreen,
-  '/analytics': AnalysisScreen as AnyScreen,
-  '/master-flow': MasterFlowScreen as AnyScreen,
-  '/house-games': HouseGamesScreen as AnyScreen,
-  '/leaderboard': LeaderboardScreen as AnyScreen,
-  '/profit-loss': ProfitLossScreen as AnyScreen,
-  '/caller-responsibility': CallerResponsibilityScreen as AnyScreen,
-  '/player-activity': PlayerActivityScreen as AnyScreen,
-  '/game-activity': GameActivityScreen as AnyScreen,
-  '/call-logs': CallLogsScreen as AnyScreen,
-  '/dialer-push-data': DialerPushDataScreen as AnyScreen,
-  '/new-registers': NewRegistersScreen as AnyScreen,
-  '/register-user-report': StateWiseRegistrationScreen as AnyScreen,
-  '/login-report': LoginReportScreen as AnyScreen,
-  '/all-user-login-report': AllUserLoginReportScreen as AnyScreen,
-  '/sos-blocked-users': SosBlockedUsersScreen as AnyScreen,
-  '/checkers-report': CheckersReportScreen as AnyScreen,
-  '/download-report': SheetDownloadReportScreen as AnyScreen,
-  '/downlaodReport': SheetDownloadReportScreen as AnyScreen,
-  '/coins-report': PointsReportScreen as AnyScreen,
-  '/coins-removal': CoinRemovalListScreen as AnyScreen,
-  '/show_my_coin_history': ShowMyCoinHistoryScreen as AnyScreen,
-  '/customer-allotment': CustomerAllotmentScreen as AnyScreen,
-  '/callerAllotment': CallerAllotmentScreen as AnyScreen,
-  '/non_performing_user': NonPerformingUserScreen as AnyScreen,
-  '/todays-active': TodaysActiveScreen as AnyScreen,
-  '/feedback': FeedbackScreen as AnyScreen,
-  '/betConstruct-lists': BetConstructGamesScreen as AnyScreen,
-  '/casino-lists': CasinoGamesScreen as AnyScreen,
-  '/dynamic-casino-switching': CasinoSwitchScreen as AnyScreen,
-  '/top-games': TopGamesScreen as AnyScreen,
-  '/casino-topup-balance': CasinoTopupBalanceScreen as AnyScreen,
-  '/banners': BannersScreen as AnyScreen,
-  '/push-notifications': PushNotificationsScreen as AnyScreen,
-  '/block-withdrawal': BlockWithdrawalScreen as AnyScreen,
-  '/ggr-alert': GgrAlertScreen as AnyScreen,
-  '/all-upi-payments': UpiPaymentsScreen as AnyScreen,
-  '/upi-lists': UpiListsScreen as AnyScreen,
-  '/utr-provider': UtrProviderScreen as AnyScreen,
-  '/instant-provider': InstantDepositProvidersScreen as AnyScreen,
-  '/pay-g-mid': DepositProvidersScreen as AnyScreen,
-  '/deposit-config': DepositConfigScreen as AnyScreen,
-  '/mid-limits': MidLimitsScreen as AnyScreen,
-  '/deposit': DepositScreen as AnyScreen,
-  '/users-kyc': UsersKycScreen as AnyScreen,
-  '/fund-request': FundRequestScreen as AnyScreen,
-  '/funds': FundsScreen as AnyScreen,
-  '/payout-accounts': WithdrawalProvidersScreen as AnyScreen,
-  '/botData': BotDataScreen as AnyScreen,
-  '/playerRtp': PlayerRtpScreen as AnyScreen,
-  '/dumpUsers': DumpUsersScreen as AnyScreen,
-  '/percentage': PercentageScreen as AnyScreen,
-  '/newdeposits': NewDepositsScreen as AnyScreen,
-  '/botPerformance': BotPerformanceScreen as AnyScreen,
-  '/depositList': DepositListScreen as AnyScreen,
-  '/withdrawal-fund': WithdrawalFundScreen as AnyScreen,
-  '/social-media': SocialMediaScreen as AnyScreen,
-  '/whatsappView': WhatsappScreen as AnyScreen,
-  '/whatsapp-mid': WhatsappMidScreen as AnyScreen,
-  '/aaa-fraud-bet-report': AAAFraudBetReportScreen as AnyScreen,
-  '/aaa-blacklisted-users': AAABlacklistedUsersScreen as AnyScreen,
-  '/mobile-app': MobileAppScreen as AnyScreen,
-  '/incoming-bot-call': IncomingBotCallScreen as AnyScreen,
-  '/sky-talk': SkyTalkScreen as AnyScreen,
-  '/roles-responsibilities': RolesResponsibilitiesScreen as AnyScreen,
-  '/fund-request-bonus-wallet': BonusWalletFundRequestScreen as AnyScreen,
-  '/bonus-wallet': BonusWalletRequestsScreen as AnyScreen,
-  '/DepositApprovedReport': DepositApprovedReportScreen as AnyScreen,
-  '/unique_deposit_pending': UniqueDepositPendingScreen as AnyScreen,
-  '/create-user': CreateUserScreen as AnyScreen,
-  '/users': UsersScreen as AnyScreen,
-  '/withdrawal': WithdrawalScreen as AnyScreen,
-  '/active-user-withdrawal': ActiveUserWithdrawalScreen as AnyScreen,
-};
-
 function screenNameFor(item: NavItem): string {
   return item.id;
+}
+
+/** Load screen module on first visit; wrap with safe-area chrome (no per-screen background). */
+function LazyScreened({
+  path,
+  title,
+}: {
+  path: string;
+  title: string;
+}) {
+  const Impl = resolveLazyScreen(path);
+  return <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>;
 }
 
 function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] }) {
@@ -257,7 +124,6 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
         {...rest}
         style={styles.drawerScroll}
         contentContainerStyle={styles.drawerScrollContent}
-        // SafeAreaView already handles notch / home-indicator insets.
       >
         {visibleItems.length === 0 ? <Text style={styles.drawerNoMatch}>No menu found</Text> : null}
         {visibleItems.map((item) => (
@@ -269,12 +135,16 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
             inactiveTintColor={colors.muted}
             onPress={() => {
               const nav = rest.navigation;
-              if (item.id === 'activeUserWithdrawal') {
-                // This list's layout was sliding the drawer open. Show it on
-                // the root stack, above the drawer, so the menu cannot cover it.
+              if (item.id === 'activeUserWithdrawal' || item.id === 'incomingBotCall') {
                 nav.closeDrawer();
                 const parent = nav.getParent<NativeStackNavigationProp<RootStackParamList>>();
-                if (parent) parent.navigate('/active-user-withdrawal');
+                if (parent) {
+                  parent.navigate(
+                    item.id === 'incomingBotCall'
+                      ? '/incoming-bot-call'
+                      : '/active-user-withdrawal',
+                  );
+                }
                 return;
               }
               nav.navigate(screenNameFor(item));
@@ -293,24 +163,20 @@ function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] })
 }
 
 /**
- * Per-screen wrapper: opaque cosmic background behind every screen so
- * navigation transitions never show screens overlapping through
- * transparent roots.
+ * Per-screen chrome only — cosmic background lives once under AppNavigator
+ * so we do not remount 70 SVG circles on every route / reveal toggle.
  */
 function Screened({ children }: { children: React.ReactNode }) {
   const reveal = useRevealCodes();
-  // Top inset is handled by the navigation header; bottom edge keeps content
-  // clear of the home-indicator / gesture bar (and notch edges in landscape).
   return (
-    <View
-      key={reveal.active ? `revealed-${reveal.expiresAt}` : 'hidden'}
-      style={{ flex: 1, backgroundColor: colors.background }}
-    >
-      <AppBackground />
-      <SafeAreaView edges={['bottom', 'left', 'right']} style={{ flex: 1 }}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={{ flex: 1 }}>
+      <View
+        key={reveal.active ? `revealed-${reveal.expiresAt}` : 'hidden'}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
+      >
         {children}
-      </SafeAreaView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -319,10 +185,10 @@ function GuardedPanelDetail({ route }: { route: (typeof PANEL_DETAIL_ROUTES)[num
   if (!canAccessPanelDetail(route.path, user)) {
     return <PlaceholderScreen title="You do not have permission to view this page." />;
   }
-  return <route.Component />;
+  const Comp = route.getComponent();
+  return <Comp />;
 }
 
-/** Header actions — Admin LLM + profile. */
 function PanelHeaderRight() {
   return (
     <View style={styles.headerRightRow}>
@@ -332,14 +198,12 @@ function PanelHeaderRight() {
   );
 }
 
-/** Header profile button — opens account page (SOS / theme / reveal / logout). */
 function ProfileHeaderButton() {
   const navigation = useNavigation();
   return (
     <TouchableOpacity
       style={styles.headerIconBtn}
       onPress={() => {
-        // Profile lives on the root stack above the drawer.
         const parent = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
         if (parent) parent.navigate('profile');
         else (navigation as NativeStackNavigationProp<RootStackParamList>).navigate('profile');
@@ -353,7 +217,6 @@ function ProfileHeaderButton() {
 
 function PanelDrawer({ items }: { items: NavItem[] }) {
   const { width: screenWidth } = useWindowDimensions();
-  // Default RN drawer is ~280 / 80% — keep it a bit narrower on phones.
   const drawerWidth = Math.min(230, Math.round(screenWidth * 0.7));
 
   return (
@@ -371,18 +234,29 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
           backgroundColor: colors.surface,
           width: drawerWidth,
         },
-        sceneStyle: { backgroundColor: colors.background },
+        sceneStyle: { backgroundColor: 'transparent' },
+        lazy: true,
+        freezeOnBlur: true,
       }}
     >
       {items
-        .filter((item) => item.id !== 'activeUserWithdrawal')
+        .filter(
+          (item) => item.id !== 'activeUserWithdrawal' && item.id !== 'incomingBotCall',
+        )
         .map((item) => {
-          const Impl = IMPLEMENTED[item.path];
           const title = toDisplayText(item.label);
           return (
-            <Drawer.Screen key={item.id} name={screenNameFor(item)} options={{ title }}>
-              {() => <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>}
-            </Drawer.Screen>
+            <Drawer.Screen
+              key={item.id}
+              name={screenNameFor(item)}
+              options={{ title, freezeOnBlur: true }}
+              getComponent={() => {
+                function Route() {
+                  return <LazyScreened path={item.path} title={title} />;
+                }
+                return Route;
+              }}
+            />
           );
         })}
     </Drawer.Navigator>
@@ -391,19 +265,20 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
 
 export function AppNavigator() {
   const { user } = useAuth();
-  useRevealCodes(); // refresh screen titles and navigation chrome
+  useRevealCodes();
 
   const items = useMemo(() => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)), [user]);
 
   return (
     <SosProvider enabled={!!user}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <AppBackground />
         <NavigationContainer
           theme={{
             ...(isDarkTheme() ? DarkTheme : DefaultTheme),
             colors: {
               ...(isDarkTheme() ? DarkTheme.colors : DefaultTheme.colors),
-              background: colors.background,
+              background: 'transparent',
               card: colors.surface,
               text: colors.foreground,
               primary: colors.primary,
@@ -416,42 +291,83 @@ export function AppNavigator() {
               headerStyle: { backgroundColor: colors.surface },
               headerTintColor: colors.foreground,
               headerTitleStyle: { fontWeight: '600' },
-              contentStyle: { backgroundColor: colors.background },
+              contentStyle: { backgroundColor: 'transparent' },
               animation: 'slide_from_right',
+              freezeOnBlur: true,
             }}
           >
             <RootStack.Screen name="panel" options={{ headerShown: false }}>
               {() => <PanelDrawer items={items} />}
             </RootStack.Screen>
-            <RootStack.Screen name="profile" options={{ title: 'Profile' }}>
-              {() => (
-                <Screened>
-                  <ProfileScreen />
-                </Screened>
-              )}
-            </RootStack.Screen>
+            <RootStack.Screen
+              name="profile"
+              options={{ title: 'Profile' }}
+              getComponent={() => {
+                function ProfileRoute() {
+                  const { ProfileScreen } = require('../screens/ProfileScreen');
+                  return (
+                    <Screened>
+                      <ProfileScreen />
+                    </Screened>
+                  );
+                }
+                return ProfileRoute;
+              }}
+            />
             <RootStack.Screen
               name="/active-user-withdrawal"
               options={{ title: toDisplayText('Active User Withdrawal') }}
-            >
-              {() => (
-                <Screened>
-                  <ActiveUserWithdrawalScreen />
-                </Screened>
-              )}
-            </RootStack.Screen>
+              getComponent={() => {
+                function Route() {
+                  return (
+                    <LazyScreened
+                      path="/active-user-withdrawal"
+                      title={toDisplayText('Active User Withdrawal')}
+                    />
+                  );
+                }
+                return Route;
+              }}
+            />
+            <RootStack.Screen
+              name="/incoming-bot-call"
+              options={{
+                title: toDisplayText('Incoming Bot Call'),
+                freezeOnBlur: true,
+                unmountOnBlur: true,
+              }}
+              getComponent={() => {
+                function Route() {
+                  return (
+                    <LazyScreened
+                      path="/incoming-bot-call"
+                      title={toDisplayText('Incoming Bot Call')}
+                    />
+                  );
+                }
+                return Route;
+              }}
+            />
             {PANEL_DETAIL_ROUTES.map((route) => (
               <RootStack.Screen
                 key={route.path}
                 name={route.path}
-                options={{ title: toDisplayText(route.title) }}
-              >
-                {() => (
-                  <Screened>
-                    <GuardedPanelDetail route={route} />
-                  </Screened>
-                )}
-              </RootStack.Screen>
+                options={{
+                  title: toDisplayText(route.title),
+                  freezeOnBlur: true,
+                  ...(HEAVY_STACK_UNMOUNT.has(route.path) ? { unmountOnBlur: true } : null),
+                }}
+                getComponent={() => {
+                  function Route() {
+                    return (
+                      <Screened>
+                        <GuardedPanelDetail route={route} />
+                      </Screened>
+                    );
+                  }
+                  return Route;
+                }}
+              />
             ))}
           </RootStack.Navigator>
         </NavigationContainer>
@@ -461,3 +377,5 @@ export function AppNavigator() {
   );
 }
 
+// Satisfy unused type lint if any
+export type { AnyScreen };

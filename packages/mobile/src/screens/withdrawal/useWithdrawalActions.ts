@@ -3,7 +3,7 @@
  * Shared by WithdrawalScreen (via useWithdrawalScreen) and ActiveUserWithdrawalScreen.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -12,8 +12,10 @@ import {
   normalizeBeneAccountCountSummary,
   type BenePendingOption,
 } from '@astro/shared/beneficiaryAccountCounts';
+import { parseDistinctMidOptions } from '@astro/shared';
 import { secureApi } from '../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../auth/permissions';
+import { useDeferredTimeout } from '../../hooks/useDeferredTimeout';
 import { BOT_CHECK_HIDDEN_STATUSES, GATEWAY_OPTIONS } from './constants';
 import {
   bothChecksOk,
@@ -52,6 +54,7 @@ export type UseWithdrawalActionsOptions = {
 
 export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions) {
   const admin = useMemo(() => getSessionUser() as Admin | null, []);
+  const { defer } = useDeferredTimeout();
 
   const [selected, setSelected] = useState<Rec | null>(null);
   const [midReportRow, setMidReportRow] = useState<Rec | null>(null);
@@ -114,19 +117,12 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
         secureApi('withdrawals.payoutAccounts', {}),
       ]);
       if (midRes.ok) {
-        const list = listOf(midRes.data) as {
-          mid?: string | number;
-          name?: string;
-          paymentGatewayName?: string;
-        }[];
         setMids(
-          list
-            .filter((m) => m.mid !== undefined && m.mid !== null)
-            .map((m) => ({
-              label: `${m.paymentGatewayName || m.name || '—'} - ${m.mid}`,
-              mid: String(m.mid),
-              gateway: String(m.paymentGatewayName || m.name || ''),
-            })),
+          parseDistinctMidOptions(midRes.data).map((mid) => ({
+            label: mid,
+            mid,
+            gateway: '',
+          })),
         );
       }
       if (gwRes.ok) {
@@ -356,14 +352,14 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
       setAddBeneSelected([]);
       setAddBeneExisting(extractBeneficiaryAccounts(r));
       setAddBeneBusy(true);
-      setTimeout(() => setAddBeneRow(r), 350);
+      defer(() => setAddBeneRow(r));
       try {
         await loadAvailableBanks();
       } finally {
         setAddBeneBusy(false);
       }
     },
-    [loadAvailableBanks],
+    [defer, loadAvailableBanks],
   );
 
   const submitAddBene = useCallback(async () => {
@@ -581,7 +577,7 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
   const confirmLock = useCallback(
     (r: Rec, lock: boolean) => {
       setSelected(null);
-      setTimeout(
+      defer(
         () =>
           Alert.alert(
             lock ? 'Lock refund?' : 'Unlock refund?',
@@ -594,22 +590,28 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
         450,
       );
     },
-    [doLock],
+    [defer, doLock],
   );
 
-  const openStatusModal = useCallback((r: Rec, statusName: string) => {
-    setRemark('');
-    setGateway('');
-    setMid('');
-    setModalErr('');
-    setSelected(null);
-    setTimeout(() => setStatusModal({ row: r, status: statusName }), 350);
-  }, []);
+  const openStatusModal = useCallback(
+    (r: Rec, statusName: string) => {
+      setRemark('');
+      setGateway('');
+      setMid('');
+      setModalErr('');
+      setSelected(null);
+      defer(() => setStatusModal({ row: r, status: statusName }));
+    },
+    [defer],
+  );
 
-  const openBotReport = useCallback((r: Rec) => {
-    setSelected(null);
-    setTimeout(() => setValidationRow(r), Platform.OS === 'ios' ? 350 : 80);
-  }, []);
+  const openBotReport = useCallback(
+    (r: Rec) => {
+      setSelected(null);
+      defer(() => setValidationRow(r));
+    },
+    [defer],
+  );
 
   const navigation = useNavigation<{ navigate: (name: string, params?: object) => void }>();
   const sheetActions = useCallback(
@@ -671,7 +673,7 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
             setProvider(defaultGateway);
             setModalErr('');
             setSelected(null);
-            setTimeout(() => setApproveTarget({ row: r, bulk: false }), 350);
+            defer(() => setApproveTarget({ row: r, bulk: false }));
           },
         });
         acts.push({
@@ -687,7 +689,7 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
             setMid('');
             setModalErr('');
             setSelected(null);
-            setTimeout(() => setQrRow(r), 350);
+            defer(() => setQrRow(r));
           },
         });
         acts.push({
@@ -717,6 +719,7 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
     [
       confirmLock,
       defaultGateway,
+      defer,
       doCheck,
       navigation,
       openAddBene,

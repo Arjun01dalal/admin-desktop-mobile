@@ -48,6 +48,15 @@ export function SosAlertOverlay() {
         // ignore
       }
     }
+    return () => {
+      if (!playingRef.current) return;
+      playingRef.current = false;
+      try {
+        player.pause();
+      } catch {
+        // ignore
+      }
+    };
   }, [show, player]);
 
   if (!show) return null;

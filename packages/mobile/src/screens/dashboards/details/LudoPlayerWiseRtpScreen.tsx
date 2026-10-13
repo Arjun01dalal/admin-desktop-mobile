@@ -24,6 +24,7 @@ import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import { colors, spacing } from '../../../theme';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './LudoPlayerWiseRtpScreen.styles';
+import { display } from '../../../utils/display';
 
 type GameOption = { value: string; label: string };
 
@@ -60,11 +61,6 @@ function extractList(payload: unknown): RtpUserRow[] {
     if (Array.isArray(obj[key])) return obj[key] as RtpUserRow[];
   }
   return [];
-}
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
 }
 
 function formatUpdatedOn(value?: number | string) {

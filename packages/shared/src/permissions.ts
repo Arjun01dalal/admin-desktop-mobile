@@ -86,6 +86,8 @@ export const Permissions = {
   bot_data_upload: 'bot_data_upload',
   bot_performance: 'bot_performance',
   show_incoming_bot: 'show_incoming_bot',
+  /** Sky Talk toggle on Incoming Bot Call (admin-panel-domains Responsibilities.show_skyTalk). */
+  show_skyTalk: 'show_skyTalk',
   view_live_chat: 'view_live_chat',
   /** Admin LLM Chatbot floating assistant (admin-panel-domains AdminLlmChat). */
   Admin_LLM_Chatbot: 'Admin_LLM_Chatbot',
@@ -124,6 +126,10 @@ export const Permissions = {
   Disable_Withdrawals_Check: 'Disable_Withdrawals_Check',
   change_status: 'change_status',
   show_mobile: 'show_mobile',
+  /** Gtel Calls page (admin-panel-domains GtelCalls). */
+  show_gtel_calls: 'show_gtel_calls',
+  /** Click-to-call button on Gtel Calls. */
+  show_c2cBtn: 'show_c2cBtn',
   contact_visibility_none: 'contact_visibility_none',
   show_download_botton: 'show_download_botton',
   whatsapp_icon: 'whatsapp_icon',
@@ -400,6 +406,14 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'Dialer Push Data',
     'dialerPushData',
   ],
+  show_gtel_calls: [
+    'show_gtel_calls',
+    'Show_Gtel_Calls',
+    'Gtel Calls',
+    'gtel_calls',
+    'gtelCalls',
+  ],
+  show_c2cBtn: ['show_c2cBtn', 'show_c2c_btn', 'Show_C2C_Btn', 'c2cBtn'],
   update_ludo_bets: ['update_ludo_bets', 'Update_Ludo_Bets', 'update_ludo_bet', 'Update Ludo Bets'],
   show_wining_btn: [
     'show_wining_btn',

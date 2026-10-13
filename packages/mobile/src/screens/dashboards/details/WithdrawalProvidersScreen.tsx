@@ -29,6 +29,7 @@ import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './WithdrawalProvidersScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -43,12 +44,6 @@ type Row = {
   cookies?: string;
   [key: string]: unknown;
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
-  return String(value);
-}
 
 /** Tolerant unpack: array directly, or under .payload/.items/.data (nested .items). */
 function asList<T>(data: unknown): T[] {

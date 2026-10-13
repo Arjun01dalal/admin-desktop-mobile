@@ -20,6 +20,7 @@ import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { colors } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
+import { display, maskMobile } from '../../../utils/display';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { pickPlayIn } from '../../../dashboards/userRowUtils';
 import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
@@ -85,16 +86,6 @@ function formatDaysAgoLocal(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
   return d.toISOString().split('T')[0];
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
 }
 
 function rowName(row: DetailRow): string {

@@ -10,28 +10,30 @@
  *  - Block / Un Block (remark)  → ops.blockCaller { _id, Role_ID, status, blockReason }
  *  - Add/Remove App (allowlisted Role_IDs only) → subadmin.updateAppHeads { userId, app, type }
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { pickPageSizes, asPaged, CLIENT_NAMES } from '@astro/shared';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
+import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import { formatDisplayDate } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './CoinPermissionScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id: string;
@@ -52,11 +54,6 @@ type Row = {
 const PAGE_SIZE_OPTIONS = pickPageSizes([20, 25, 50, 75, 100]);
 // Same Role_ID allowlist the web panel uses for the Edit Apps "Add" button.
 const EDIT_APPS_ADD_ROLE_IDS = new Set(['6a33c137a6558491e0d20464', '64f710d9a2ab78980020c5fb']);
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   const user = useMemo(() => getSessionUser(), []);
@@ -95,6 +92,7 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   const [appMode, setAppMode] = useState<'add' | 'remove'>('add');
   const [appTarget, setAppTarget] = useState<Row | null>(null);
   const [appSelected, setAppSelected] = useState('');
+  const { defer } = useDeferredTimeout();
 
   const load = useCallback(async () => {
     const gen = ++genRef.current;
@@ -163,10 +161,13 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
    * Modal while RowDetailSheet is still visible. Dismiss the sheet first and
    * open the requested editor after its slide-out animation has completed.
    */
-  const openAfterSheetClose = useCallback((open: () => void) => {
-    setSheetRow(null);
-    setTimeout(open, Platform.OS === 'ios' ? 350 : 80);
-  }, []);
+  const openAfterSheetClose = useCallback(
+    (open: () => void) => {
+      setSheetRow(null);
+      defer(open);
+    },
+    [defer],
+  );
 
   const closeCoinModal = useCallback(() => {
     if (busy) return;
@@ -426,6 +427,24 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   const appOptions: readonly string[] =
     appMode === 'add' ? (CLIENT_NAMES as readonly string[]) : appTarget?.allotedApps || [];
 
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <CoinPermissionCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onPress={() => setSheetRow(row)}
+      />
+    ),
+    [page, pageSize],
+  );
+
   if (!canView) {
     return (
       <View style={[styles.screen, styles.content]}>
@@ -437,19 +456,8 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
     );
   }
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const listHeader = (
+    <>
       <TouchableOpacity onPress={onBack}>
         <Text style={styles.backLink}>‹ Back to Roles</Text>
       </TouchableOpacity>
@@ -503,84 +511,44 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No sub-admins found</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const blocked = Boolean(row.block);
-          const statusColor = blocked ? '#dc2626' : '#16a34a';
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id || '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name)}
-                </Text>
-                <Text
-                  style={[
-                    styles.statusPill,
-                    { color: statusColor, backgroundColor: `${statusColor}22` },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {blocked ? 'Blocked' : 'Active'}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Mobile</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.mobile)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Coins: {display(row.coinLimit)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  Role: {row.showCoins === true ? 'Added' : '—'}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Permission</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {row.showRemoveCoin === true ? 'Yes' : 'No'}
-                </Text>
-              </View>
-              {row.allotedApps && row.allotedApps.length > 0 ? (
-                <Text style={styles.cardApps} numberOfLines={2}>
-                  Apps: {row.allotedApps.join(', ')}
-                </Text>
-              ) : null}
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No sub-admins found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={!!sheetRow}
@@ -731,7 +699,68 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </>
   );
 }
+
+type CoinPermissionCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  onPress: () => void;
+};
+
+const CoinPermissionCard = memo(function CoinPermissionCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onPress,
+}: CoinPermissionCardProps) {
+  const blocked = Boolean(row.block);
+  const statusColor = blocked ? '#dc2626' : '#16a34a';
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <Text
+          style={[styles.statusPill, { color: statusColor, backgroundColor: `${statusColor}22` }]}
+          numberOfLines={1}
+        >
+          {blocked ? 'Blocked' : 'Active'}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.mobile)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Coins: {display(row.coinLimit)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Role: {row.showCoins === true ? 'Added' : '—'}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Permission</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {row.showRemoveCoin === true ? 'Yes' : 'No'}
+        </Text>
+      </View>
+      {row.allotedApps && row.allotedApps.length > 0 ? (
+        <Text style={styles.cardApps} numberOfLines={2}>
+          Apps: {row.allotedApps.join(', ')}
+        </Text>
+      ) : null}
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

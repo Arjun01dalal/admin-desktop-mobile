@@ -22,8 +22,9 @@ export const PINNED_HOST = 'laxminarayan.live';
  * Keep these even when the remote API returns additional/rotated pins.
  */
 const BOOTSTRAP_SPKI_SHA256 = [
-  'gF86/4V6toOdUboSdnEP/CwGTeeMs/egiSRZvTb6ZZs=', // leaf: CN=*.laxminarayan.live
-  'a9khLOZJxlnJyrxstg/P+seiDCm+Yf3OsrXyFocBaI0=', // intermediate: Sectigo DV R36
+  // Rotated 2026-04 (Sectigo wildcard → Amazon RSA 2048 M01) — keep in sync with desktop certPin.cjs
+  'Zn+v3cQ9Fle86m++pLYkqzmNEhcEGoSZWzBUlXxavys=', // leaf: CN=laxminarayan.live
+  'DxH4tt40L+eduF6szpY6TONlxhZhBd+pJ9wbHlQ2fuw=', // intermediate: Amazon RSA 2048 M01
 ] as const;
 
 /** OkHttp / TrustKit pin: base64 of 32-byte SHA-256 → 44 chars ending in `=`. */

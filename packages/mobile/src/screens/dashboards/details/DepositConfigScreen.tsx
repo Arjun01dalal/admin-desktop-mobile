@@ -3,26 +3,27 @@
  * depositConfig.getAll {}. Row tap opens a detail sheet with a permission-gated Edit
  * action; header "Add config" (gated) opens the same form empty. Deposit_Config permission.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './DepositConfigScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -46,11 +47,6 @@ const EMPTY_FORM: FormState = {
   maxDeposit: '',
   allowedAmounts: '',
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 /** Tolerant unpack: array directly, or under .payload/.items/.data. */
 function asList<T>(data: unknown): T[] {
@@ -190,19 +186,26 @@ export function DepositConfigScreen() {
     [],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <DepositConfigCard
+        row={row}
+        index={index}
+        canEdit={canEdit}
+        onOpenSheet={() => setSheetRow(row)}
+        onEdit={() => openEdit(row)}
+      />
+    ),
+    [canEdit, openEdit],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Deposit Config</Text>
         {canEdit ? (
@@ -217,47 +220,24 @@ export function DepositConfigScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No deposit config</Text> : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {appCodeForName(row.clientName) || display(row.clientName)}
-              </Text>
-              {canEdit ? (
-                <TouchableOpacity
-                  style={styles.editBtn}
-                  onPress={() => openEdit(row)}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                >
-                  <Text style={styles.editBtnText}>Edit</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Min: {display(row.minDeposit)}</Text>
-              <Text style={styles.cardSplitRight}>Max: {display(row.maxDeposit)}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Allowed</Text>
-              <Text style={styles.cardValue} numberOfLines={1}>
-                {Array.isArray(row.allowedAmounts) ? row.allowedAmounts.join(', ') : '—'}
-              </Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for details</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No deposit config"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!formOpen}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -352,7 +332,53 @@ export function DepositConfigScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
+type DepositConfigCardProps = {
+  row: Row;
+  index: number;
+  canEdit: boolean;
+  onOpenSheet: () => void;
+  onEdit: () => void;
+};
+
+const DepositConfigCard = memo(function DepositConfigCard({
+  row,
+  index,
+  canEdit,
+  onOpenSheet,
+  onEdit,
+}: DepositConfigCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {appCodeForName(row.clientName) || display(row.clientName)}
+        </Text>
+        {canEdit ? (
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={onEdit}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Min: {display(row.minDeposit)}</Text>
+        <Text style={styles.cardSplitRight}>Max: {display(row.maxDeposit)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Allowed</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {Array.isArray(row.allowedAmounts) ? row.allowedAmounts.join(', ') : '—'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});

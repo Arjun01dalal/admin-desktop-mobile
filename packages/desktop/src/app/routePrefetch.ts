@@ -60,6 +60,7 @@ const LOADERS: Record<string, Loader> = {
   '/customer-allotted': () => import('@/screens/panel/customerAllotment/AllottedCustomersPage'),
   '/non_performing_user': () => import('@/screens/panel/NonPerformingUserPage'),
   '/todays-active': () => import('@/screens/panel/TodaysActivePage'),
+  '/played-today-yesterday': () => import('@/screens/panel/PlayedTodayYesterdayPage'),
   '/feedback': () => import('@/screens/panel/FeedbackPage'),
   '/betConstruct-lists': () => import('@/screens/panel/BetConstructGamesPage'),
   '/casino-lists': () => import('@/screens/panel/CasinoGamesPage'),

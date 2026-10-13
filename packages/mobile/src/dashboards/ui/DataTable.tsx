@@ -2,8 +2,11 @@
  * Horizontally scrollable data table showing every desktop column.
  * Columns use fixed widths; the whole table (header + rows) scrolls sideways
  * together. Intended for page-sized data (≤ ~50 rows per page).
+ *
+ * Rows are memoized. Prefer wrapping the screen in ScreenFlatList /
+ * ResponsiveTable `virtualized` when the table is the main vertical list.
  */
-import React from 'react';
+import React, { memo } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -66,6 +69,87 @@ function FilterCell({
     </View>
   );
 }
+
+type DataTableRowProps<Row> = {
+  row: Row;
+  index: number;
+  columns: DataTableColumn<Row>[];
+  onRowPress?: (row: Row, index: number) => void;
+  rowBg?: (row: Row) => string | undefined;
+  rowKey: string;
+};
+
+function DataTableRowInner<Row>({
+  row,
+  index,
+  columns,
+  onRowPress,
+  rowBg,
+}: DataTableRowProps<Row>) {
+  const cells = columns.map((col) => {
+    const value = toDisplayText(col.render(row, index));
+    const color = col.color?.(row);
+    const badgeBg = col.badge?.(row);
+    const sub = col.subtext?.(row);
+    const subMapped = sub ? toDisplayText(sub) : undefined;
+    const textStyle = [
+      styles.cell,
+      { width: col.width },
+      col.align === 'right' && styles.right,
+      col.align === 'center' && styles.center,
+      color ? { color, fontWeight: '700' as const } : null,
+    ];
+    if (badgeBg) {
+      return (
+        <View key={col.key} style={[styles.badgeCell, { width: col.width }]}>
+          <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+            <Text style={styles.badgeText} numberOfLines={1}>
+              {value}
+            </Text>
+            {subMapped ? (
+              <Text style={styles.badgeSub} numberOfLines={1}>
+                {subMapped}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      );
+    }
+    if (col.onCellPress) {
+      return (
+        <TouchableOpacity
+          key={col.key}
+          onPress={() => col.onCellPress?.(row)}
+          style={{ width: col.width }}
+        >
+          <Text
+            style={[textStyle, styles.link, { width: undefined }, color ? { color } : null]}
+            numberOfLines={2}
+          >
+            {value}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    return (
+      <Text key={col.key} style={textStyle} numberOfLines={1}>
+        {value}
+      </Text>
+    );
+  });
+  const bg = rowBg?.(row);
+  const rowStyle = [styles.row, bg ? { backgroundColor: bg } : null];
+  if (onRowPress) {
+    return (
+      <Pressable style={rowStyle} onPress={() => onRowPress(row, index)}>
+        {cells}
+      </Pressable>
+    );
+  }
+  return <View style={rowStyle}>{cells}</View>;
+}
+
+const DataTableRow = memo(DataTableRowInner) as typeof DataTableRowInner;
 
 export function DataTable<Row>({
   columns,
@@ -137,77 +221,17 @@ export function DataTable<Row>({
       ) : rows.length === 0 ? (
         <Text style={styles.empty}>{toDisplayText(emptyMessage)}</Text>
       ) : (
-        rows.map((row, index) => {
-          const cells = columns.map((col) => {
-            const value = toDisplayText(col.render(row, index));
-            const color = col.color?.(row);
-            const badgeBg = col.badge?.(row);
-            const sub = col.subtext?.(row);
-            const subMapped = sub ? toDisplayText(sub) : undefined;
-            const textStyle = [
-              styles.cell,
-              { width: col.width },
-              col.align === 'right' && styles.right,
-              col.align === 'center' && styles.center,
-              color ? { color, fontWeight: '700' as const } : null,
-            ];
-            if (badgeBg) {
-              return (
-                <View key={col.key} style={[styles.badgeCell, { width: col.width }]}>
-                  <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-                    <Text style={styles.badgeText} numberOfLines={1}>
-                      {value}
-                    </Text>
-                    {subMapped ? (
-                      <Text style={styles.badgeSub} numberOfLines={1}>
-                        {subMapped}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            }
-            if (col.onCellPress) {
-              return (
-                <TouchableOpacity
-                  key={col.key}
-                  onPress={() => col.onCellPress?.(row)}
-                  style={{ width: col.width }}
-                >
-                  <Text
-                    style={[textStyle, styles.link, { width: undefined }, color ? { color } : null]}
-                    numberOfLines={2}
-                  >
-                    {value}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }
-            return (
-              <Text key={col.key} style={textStyle} numberOfLines={1}>
-                {value}
-              </Text>
-            );
-          });
-          const bg = rowBg?.(row);
-          const rowStyle = [styles.row, bg ? { backgroundColor: bg } : null];
-          if (onRowPress) {
-            return (
-              <Pressable
-                key={keyFor(row, index)}
-                style={rowStyle}
-                onPress={() => onRowPress(row, index)}
-              >
-                {cells}
-              </Pressable>
-            );
-          }
-          return (
-            <View key={keyFor(row, index)} style={rowStyle}>
-              {cells}
-            </View>
-          );
-        })
+        rows.map((row, index) => (
+          <DataTableRow
+            key={keyFor(row, index)}
+            rowKey={keyFor(row, index)}
+            row={row}
+            index={index}
+            columns={columns}
+            onRowPress={onRowPress}
+            rowBg={rowBg}
+          />
+        ))
       )}
 
       {footer && rows.length > 0 ? (
@@ -246,4 +270,3 @@ export function DataTable<Row>({
     </View>
   );
 }
-

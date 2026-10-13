@@ -18,7 +18,7 @@ import { todayIST } from '../../../utils/dates';
 import { resolveGameId, resolveGameName } from '@astro/shared/gameUserStats';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { styles } from './GameActivityDetailsScreen.styles';
+import { styles } from './activityDetails.styles';
 
 type GameRow = Record<string, unknown>;
 

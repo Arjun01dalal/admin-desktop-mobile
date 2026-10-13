@@ -10,24 +10,24 @@
  * users.verifyBlockOtp + reports.sheetDownloadAuditCreate) gated by
  * show_download_botton; the actual CSV is exported via the share sheet.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { appCodeForName, asPaged, unpackPayload } from '@astro/shared';
+import { appCodeForName, asPaged, buildDepositWhatsAppMessage, unpackPayload } from '@astro/shared';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import {
   canShowUniqueDepositEmpCode,
@@ -35,6 +35,7 @@ import {
   hasPermission,
 } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { display, maskMobile } from '../../../utils/display';
 import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '../../../utils/empCodeNameCache';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
@@ -63,16 +64,6 @@ type UniquePendingRow = {
   transactionId?: string;
   uniquePendingReason?: { reason?: string; name?: string; _id?: string };
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function rowMobile(row: UniquePendingRow): string {
   return String(row.userMobile || row.mobile || '').trim();
@@ -110,21 +101,6 @@ function toCsv(rows: Record<string, unknown>[]): string {
   const lines = [headers.join(',')];
   for (const row of rows) lines.push(headers.map((h) => csvEscape(row[h])).join(','));
   return lines.join('\r\n');
-}
-
-/** State-aware WhatsApp greeting (desktop parity). */
-function whatsAppMessage(row: UniquePendingRow): string {
-  const state = row.userState || row.state || '';
-  const client = row.clientName || '';
-  const template =
-    state === 'Karnataka'
-      ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nನೀವು ಠೇವಣಿ ಮಾಡಲು ಪ್ರಯತ್ನಿಸುತ್ತಿರುವಿರಿ ಎಂದು ಕಾಣುತ್ತದೆ. ನಾನು ಇಂದು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?`
-      : ['Telangana', 'Andhra Pradesh'].includes(state)
-        ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nమీరు డిపాజిట్ చేయడానికి ప్రయత్నిస్తున్నారని నేను చూస్తున్నాను. నేను ఈ రోజు మీకు ఎలా సహాయం చేయగలను?`
-        : ['Tamil Nadu', 'Tiruchirappalli'].includes(state)
-          ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nநீங்கள் டெப்பாசிட் செய்ய முயற்சிக்கிறீர்கள் என்று பார்க்கிறேன். இன்று நான் உங்களுக்கு எப்படி உதவலாம்?`
-          : `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nI see you're trying to make a deposit. How can I assist you today?`;
-  return template.replace('{USER_NAME}', (row.userName || '').split(' ')[0] || '');
 }
 
 export function UniqueDepositPendingScreen() {
@@ -350,7 +326,7 @@ export function UniqueDepositPendingScreen() {
     }
     let formatted = String(rawMobile).replace(/\D/g, '');
     if (formatted.length === 10) formatted = `91${formatted}`;
-    const encoded = encodeURIComponent(whatsAppMessage(row));
+    const encoded = encodeURIComponent(buildDepositWhatsAppMessage(row));
     const appUrl = `whatsapp://send?phone=${formatted}&text=${encoded}`;
     const webUrl = `https://wa.me/${formatted}?text=${encoded}`;
     void Linking.openURL(appUrl).catch(() => {
@@ -463,22 +439,31 @@ export function UniqueDepositPendingScreen() {
     openUserReport,
   ]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => {
-            void load();
-            void loadSummary();
-          }}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: UniquePendingRow, index: number) =>
+      `row-${index}-${String(row._id || row.orderId || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<UniquePendingRow>) => (
+      <UniquePendingCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        canShowMobile={canShowMobile}
+        canShowEmpCode={canShowEmpCode}
+        empCodeLabel={canShowEmpCode ? formatEmpCode(row) : ''}
+        onOpenSheet={() => setSheetRow(row)}
+        onOpenReport={() => openUserReport(row)}
+      />
+    ),
+    [page, pageSize, canShowMobile, canShowEmpCode, formatEmpCode, openUserReport],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Unique Deposit Pending User</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
@@ -527,104 +512,47 @@ export function UniqueDepositPendingScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No unique pending deposits found</Text>
-      ) : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const badge = statusBadge(row.status);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id || row.orderId || '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.userName)}
-                </Text>
-                {row.userId ? (
-                  <TouchableOpacity
-                    style={styles.reportBtn}
-                    onPress={() => openUserReport(row)}
-                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                  >
-                    <Text style={styles.reportBtnText}>User Report</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Mobile</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {maskMobile(rowMobile(row), canShowMobile)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Amount</Text>
-                <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  App Code: {appCodeForName(row.clientName)}
-                </Text>
-                <Text
-                  style={[styles.cardSplitRight, badge ? { color: badge } : null]}
-                  numberOfLines={1}
-                >
-                  Status: {display(row.status)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>DP ID</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.userId)}
-                </Text>
-              </View>
-              {canShowEmpCode ? (
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Emp Code</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {formatEmpCode(row)}
-                  </Text>
-                </View>
-              ) : null}
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Date</Text>
-                <Text style={styles.cardValue}>
-                  {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
-                    .filter(Boolean)
-                    .join(' ') || '—'}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No unique pending deposits found"
+        refreshing={loading}
+        onRefresh={() => {
+          void load();
+          void loadSummary();
+        }}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -686,7 +614,94 @@ export function UniqueDepositPendingScreen() {
         onClose={() => setDownloadOpen(false)}
         onVerified={() => downloadCsv()}
       />
-    </ScrollView>
+    </>
   );
 }
+
+type UniquePendingCardProps = {
+  row: UniquePendingRow;
+  index: number;
+  page: number;
+  pageSize: number;
+  canShowMobile: boolean;
+  canShowEmpCode: boolean;
+  empCodeLabel: string;
+  onOpenSheet: () => void;
+  onOpenReport: () => void;
+};
+
+const UniquePendingCard = memo(function UniquePendingCard({
+  row,
+  index,
+  page,
+  pageSize,
+  canShowMobile,
+  canShowEmpCode,
+  empCodeLabel,
+  onOpenSheet,
+  onOpenReport,
+}: UniquePendingCardProps) {
+  const badge = statusBadge(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.userName)}
+        </Text>
+        {row.userId ? (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={onOpenReport}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Text style={styles.reportBtnText}>User Report</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {maskMobile(rowMobile(row), canShowMobile)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Amount</Text>
+        <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          App Code: {appCodeForName(row.clientName)}
+        </Text>
+        <Text style={[styles.cardSplitRight, badge ? { color: badge } : null]} numberOfLines={1}>
+          Status: {display(row.status)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>DP ID</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.userId)}
+        </Text>
+      </View>
+      {canShowEmpCode ? (
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>Emp Code</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {empCodeLabel}
+          </Text>
+        </View>
+      ) : null}
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Date</Text>
+        <Text style={styles.cardValue}>
+          {[formatDisplayDate(row.createdOn), formatDisplayTime(row.createdOn)]
+            .filter(Boolean)
+            .join(' ') || '—'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

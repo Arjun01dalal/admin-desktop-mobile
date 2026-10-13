@@ -39,8 +39,8 @@ export function BotStatusPanel({
   const botCardStats = useCallback((row: BotSummaryRow) => {
     return [
       { label: 'Completed', value: row.completed, color: colors.success },
-      { label: 'No-Answer', value: row.noAnswer, color: colors.destructive },
-      { label: 'In-Progress', value: row.inProgress, color: colors.primary },
+      { label: 'No-Answer', value: row['no-answer'], color: colors.destructive },
+      { label: 'In-Progress', value: row['in-progress'], color: colors.primary },
       { label: 'Failed', value: row.failed },
       { label: 'Busy', value: row.busy },
       { label: 'Queued', value: row.queued },

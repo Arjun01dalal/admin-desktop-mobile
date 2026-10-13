@@ -3,17 +3,15 @@
  * desktop ActiveUserDataPage.
  * Phone UI: compact cards (not a horizontal table).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
   Text,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { providerWiseActive, toNum } from '../../../dashboards/mergeMetrics';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
@@ -21,6 +19,7 @@ import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './ActiveUserDataScreen.styles';
+import { display } from '../../../utils/display';
 
 type UserRow = {
   _id?: string;
@@ -32,11 +31,6 @@ type UserRow = {
   kyc?: boolean;
   [key: string]: unknown;
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function ActiveUserDataScreen() {
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
@@ -92,7 +86,8 @@ export function ActiveUserDataScreen() {
       const entry =
         (providerWise[customerKey] as Record<string, unknown> | undefined) ||
         (Object.entries(providerWise).find(([k]) => k.toLowerCase() === keyLower)?.[1] as
-          Record<string, unknown> | undefined) ||
+          | Record<string, unknown>
+          | undefined) ||
         {};
 
       setRows(Array.isArray(entry.list) ? (entry.list as UserRow[]) : []);
@@ -122,19 +117,20 @@ export function ActiveUserDataScreen() {
     ];
   }, [selected]);
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: UserRow, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<UserRow>) => (
+      <ActiveUserDataCard row={row} index={index} page={page} onPress={() => setSelected(row)} />
+    ),
+    [page],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>{toDisplayText('Active User Data')}</Text>
       <Text style={styles.description}>
         {toDisplayText(customerKey || 'provider')} · {startDate} → {endDate}
@@ -164,64 +160,47 @@ export function ActiveUserDataScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="small" color={colors.primary} />
-        </View>
-      ) : null}
-
-      {!loading && rows.length === 0 && customerKey ? (
-        <Text style={styles.emptyTextCenter}>No Data Found</Text>
-      ) : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSelected(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{(page - 1) * 50 + index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {display(row.name)}
-              </Text>
-              <Text style={[styles.kycPill, row.kyc ? styles.kycYes : styles.kycNo]}>
-                {row.kyc ? 'KYC' : 'No KYC'}
-              </Text>
-            </View>
-            <View style={styles.cardGrid}>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>Mobile</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.mobile)}
-                </Text>
-              </View>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>Balance</Text>
-                <Text style={[styles.cardValue, styles.cardAmount]} numberOfLines={1}>
-                  ₹{toNum(row.balance).toLocaleString('en-IN')}
-                </Text>
-              </View>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>State</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.state)}
-                </Text>
-              </View>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>City</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.city)}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.cardHint}>Tap for all details</Text>
-          </TouchableOpacity>
-        ))}
+  const listFooter =
+    totalPages > 1 ? (
+      <View style={styles.pager}>
+        <TouchableOpacity
+          disabled={page <= 1 || loading}
+          onPress={() => setPage((p) => Math.max(1, p - 1))}
+          style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+        >
+          <Text style={styles.pageBtnText}>Prev</Text>
+        </TouchableOpacity>
+        <Text style={styles.pageLabel}>
+          Page {page} / {totalPages}
+        </Text>
+        <TouchableOpacity
+          disabled={page >= totalPages || loading}
+          onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+          style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+        >
+          <Text style={styles.pageBtnText}>Next</Text>
+        </TouchableOpacity>
       </View>
+    ) : null;
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage={customerKey ? 'No Data Found' : 'No data'}
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -229,29 +208,61 @@ export function ActiveUserDataScreen() {
         fields={sheetFields}
         onClose={() => setSelected(null)}
       />
-
-      {totalPages > 1 ? (
-        <View style={styles.pager}>
-          <TouchableOpacity
-            disabled={page <= 1 || loading}
-            onPress={() => setPage((p) => Math.max(1, p - 1))}
-            style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-          >
-            <Text style={styles.pageBtnText}>Prev</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageLabel}>
-            Page {page} / {totalPages}
-          </Text>
-          <TouchableOpacity
-            disabled={page >= totalPages || loading}
-            onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-            style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-          >
-            <Text style={styles.pageBtnText}>Next</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-    </ScrollView>
+    </View>
   );
 }
 
+type ActiveUserDataCardProps = {
+  row: UserRow;
+  index: number;
+  page: number;
+  onPress: () => void;
+};
+
+const ActiveUserDataCard = memo(function ActiveUserDataCard({
+  row,
+  index,
+  page,
+  onPress,
+}: ActiveUserDataCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * 50 + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <Text style={[styles.kycPill, row.kyc ? styles.kycYes : styles.kycNo]}>
+          {row.kyc ? 'KYC' : 'No KYC'}
+        </Text>
+      </View>
+      <View style={styles.cardGrid}>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Mobile</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {display(row.mobile)}
+          </Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Balance</Text>
+          <Text style={[styles.cardValue, styles.cardAmount]} numberOfLines={1}>
+            ₹{toNum(row.balance).toLocaleString('en-IN')}
+          </Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>State</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {display(row.state)}
+          </Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>City</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {display(row.city)}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.cardHint}>Tap for all details</Text>
+    </TouchableOpacity>
+  );
+});

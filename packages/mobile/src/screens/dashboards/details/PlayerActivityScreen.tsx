@@ -25,7 +25,7 @@ import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { styles } from './PlayerActivityScreen.styles';
+import { styles } from './activityList.styles';
 
 function fmt(n: number): string {
   return floorNum(n).toLocaleString('en-IN');

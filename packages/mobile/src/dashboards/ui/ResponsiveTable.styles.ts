@@ -4,6 +4,13 @@ import { colors, radius, spacing } from '../../theme';
 
 export const styles = makeStyles({
   list: { marginTop: spacing(2), gap: spacing(2) },
+  listHint: {
+    color: colors.muted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: spacing(1),
+    marginBottom: spacing(1),
+  },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,

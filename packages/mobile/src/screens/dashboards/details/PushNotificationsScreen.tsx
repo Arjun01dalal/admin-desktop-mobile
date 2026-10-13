@@ -4,24 +4,23 @@
  *
  * List + filter + create/edit + pause/resume/cancel/send-now/restart.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { CachedImage } from '../../../components/CachedImage';
 import {
-  asPaged,
   buildPushImageUploadFileName,
   emptyPushCampaignForm,
   formatPushCampaignIst,
@@ -34,7 +33,10 @@ import {
   type PushCampaignStatus,
 } from '@astro/shared';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { usePagedSecureQuery } from '../../../hooks/usePagedSecureQuery';
+import { display } from '../../../utils/display';
 import { PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './PushNotificationsScreen.styles';
@@ -58,11 +60,6 @@ const ACTION_SUCCESS: Record<ConfirmAction, string> = {
   'send-now': 'Notification sent to all subscribed users',
   restart: 'Push notification started again',
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function statusColors(status: PushCampaignStatus): { color: string; backgroundColor: string } {
   if (status === 'active') return { color: '#0f5132', backgroundColor: '#d1e7dd' };
@@ -94,11 +91,6 @@ export function PushNotificationsScreen() {
   const [appliedStatus, setAppliedStatus] = useState('All');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0] ?? 10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<PushCampaign[]>([]);
   const [sheetRow, setSheetRow] = useState<PushCampaign | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -111,46 +103,32 @@ export function PushNotificationsScreen() {
   const [formMsg, setFormMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const genRef = useRef(0);
-
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const payload: Record<string, unknown> = {
-        pageNo: page,
-        itemsPerPage: pageSize,
-      };
-      if (appliedTitle.trim()) payload.title = appliedTitle.trim();
-      if (appliedStatus && appliedStatus !== 'All') {
-        payload.status = appliedStatus.toLowerCase();
-      }
-      const res = await secureApi<unknown>('ops.pushCampaignList', payload);
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load push notifications');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        return;
-      }
-      const paged = asPaged<PushCampaign>(res.data);
-      setSheetRow(null);
-      setRows(paged.rows);
-      setTotal(paged.total);
-      setTotalPages(Math.max(1, paged.totalPages));
-      if (page > paged.totalPages && paged.totalPages > 0) {
-        setPage(paged.totalPages);
-      }
-    } finally {
-      if (gen === genRef.current) setLoading(false);
+  const buildPayload = useCallback(() => {
+    const payload: Record<string, unknown> = {
+      pageNo: page,
+      itemsPerPage: pageSize,
+    };
+    if (appliedTitle.trim()) payload.title = appliedTitle.trim();
+    if (appliedStatus && appliedStatus !== 'All') {
+      payload.status = appliedStatus.toLowerCase();
     }
+    return payload;
   }, [page, pageSize, appliedTitle, appliedStatus]);
 
+  const { rows, total, totalPages, loading, error, load, setError } = usePagedSecureQuery<PushCampaign>({
+    action: 'ops.pushCampaignList',
+    buildPayload,
+    autoDeps: [page, pageSize, appliedTitle, appliedStatus],
+    errorMessage: 'Failed to load push notifications',
+  });
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    setSheetRow(null);
+  }, [rows]);
+
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [page, totalPages]);
 
   const applyFilters = useCallback(() => {
     setAppliedTitle(titleDraft);
@@ -426,20 +404,26 @@ export function PushNotificationsScreen() {
     return actions;
   }, [sheetRow, openEdit, runAction]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: PushCampaign, index: number) => `row-${index}-${row._id}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<PushCampaign>) => (
+      <PushNotificationCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onPress={() => setSheetRow(row)}
+      />
+    ),
+    [page, pageSize],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Push Notifications</Text>
@@ -513,43 +497,46 @@ export function PushNotificationsScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No push notifications yet</Text>
-      ) : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const pill = statusColors(row.status);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${row._id}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.title)}
-                </Text>
-                <Text style={[styles.statusPill, pill]}>{row.status}</Text>
-              </View>
-              {row.imageUrl ? (
-                <Image source={{ uri: row.imageUrl }} style={styles.thumb} />
-              ) : null}
-              <Text style={styles.cardBody} numberOfLines={2}>
-                {display(row.body)}
-              </Text>
-              <Text style={styles.cardMeta} numberOfLines={1}>
-                {pushCampaignIntervalLabel(row)} · Sent {row.sendCount || 0}x
-              </Text>
-              <Text style={styles.cardHint}>Tap for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
+  const listFooter =
+    rows.length > 0 ? (
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+          onPress={() => page > 1 && setPage((p) => p - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {page} / {totalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+          onPress={() => page < totalPages && setPage((p) => p + 1)}
+        >
+          Next ›
+        </Text>
       </View>
+    ) : null;
+
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No push notifications yet"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        keyboardShouldPersistTaps="handled"
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -610,7 +597,7 @@ export function PushNotificationsScreen() {
               ) : null}
             </View>
             {imagePreview ? (
-              <Image source={{ uri: imagePreview }} style={styles.preview} />
+              <CachedImage source={{ uri: imagePreview }} style={styles.preview} resizeMode="cover" />
             ) : null}
 
             <TouchableOpacity
@@ -726,27 +713,51 @@ export function PushNotificationsScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
-
-      {rows.length > 0 ? (
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-            onPress={() => page > 1 && setPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {page} / {totalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-            onPress={() => page < totalPages && setPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
-      ) : null}
-    </ScrollView>
+    </>
   );
 }
+
+type PushNotificationCardProps = {
+  row: PushCampaign;
+  index: number;
+  page: number;
+  pageSize: number;
+  onPress: () => void;
+};
+
+const PushNotificationCard = memo(function PushNotificationCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onPress,
+}: PushNotificationCardProps) {
+  const pill = statusColors(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.title)}
+        </Text>
+        <Text style={[styles.statusPill, pill]}>{row.status}</Text>
+      </View>
+      {row.imageUrl ? (
+        <CachedImage
+          source={{ uri: row.imageUrl }}
+          style={styles.thumb}
+          resizeMode="cover"
+          recyclingKey={row.imageUrl}
+        />
+      ) : null}
+      <Text style={styles.cardBody} numberOfLines={2}>
+        {display(row.body)}
+      </Text>
+      <Text style={styles.cardMeta} numberOfLines={1}>
+        {pushCampaignIntervalLabel(row)} · Sent {row.sendCount || 0}x
+      </Text>
+      <Text style={styles.cardHint}>Tap for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

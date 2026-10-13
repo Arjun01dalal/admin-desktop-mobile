@@ -4,13 +4,22 @@
  * from ops.customerSupportDeposit { itemPerPage, pageNo }. Row tap opens a detail modal.
  * Block/Unblock and Caller Report dialogs stay desktop-only.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
 import { colors } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
-import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTable';
+import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
+import { display, maskMobile } from '../../../utils/display';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CustomerAllotmentScreen.styles';
 
@@ -37,23 +46,12 @@ type Row = {
 };
 
 const PAGE_SIZE = 25;
-const MAIN_KEYS = new Set(['idx', 'name', 'empCode', 'autoDeposit']);
 const SEARCH_FIELDS = [
   { key: 'name', label: 'Name' },
   { key: 'mobile', label: 'Mobile' },
   { key: 'empCode', label: 'Emp Code' },
 ] as const;
 type SearchKey = (typeof SEARCH_FIELDS)[number]['key'];
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function statLabel(stats: Stat[] | undefined): string {
   const s = Array.isArray(stats) ? stats[0] : undefined;
@@ -215,19 +213,23 @@ export function CustomerAllotmentScreen() {
     [page, canShowMobile, depositMap],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback((row: Row, index: number) => String(row._id || index), []);
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <CustomerAllotmentCard
+        row={row}
+        index={index}
+        page={page}
+        depositLabel={statLabel(depositMap.get(String(row._id || ''))?.depositData)}
+        onPress={() => setSheetRow(row)}
+      />
+    ),
+    [page, depositMap],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Customer Allotment</Text>
       <Text style={styles.sub}>Total: {total.toLocaleString('en-IN')}</Text>
 
@@ -286,14 +288,44 @@ export function CustomerAllotmentScreen() {
         </View>
       ) : null}
 
-      <DataTable
-        columns={columns.filter((c) => MAIN_KEYS.has(c.key))}
-        rows={rows}
-        keyFor={(r, i) => String(r._id || i)}
+      {rows.length > 0 ? <Text style={styles.hint}>Tap a row to see all details</Text> : null}
+    </>
+  );
+
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
         loading={loading}
         emptyMessage="No callers found"
-        onRowPress={(row) => setSheetRow(row)}
-        hint="Tap a row to see all details"
+        refreshing={loading}
+        onRefresh={() => void load()}
       />
 
       <RowDetailSheet
@@ -309,25 +341,42 @@ export function CustomerAllotmentScreen() {
         note="Block/Unblock and Caller Report are available on the desktop panel."
         onClose={() => setSheetRow(null)}
       />
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
+
+type CustomerAllotmentCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  depositLabel: string;
+  onPress: () => void;
+};
+
+const CustomerAllotmentCard = memo(function CustomerAllotmentCard({
+  row,
+  index,
+  page,
+  depositLabel,
+  onPress,
+}: CustomerAllotmentCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Emp: {display(row.empCode)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Auto Dep: {depositLabel}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
 

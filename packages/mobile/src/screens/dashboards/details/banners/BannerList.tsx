@@ -1,5 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
+import { CachedImage } from '../../../../components/CachedImage';
+import { replaceS3WithCloudfront } from '../../../../utils/cdnUrl';
 import { styles } from '../BannersScreen.styles';
 import { display, type Row } from './helpers';
 
@@ -13,6 +15,7 @@ export function BannerList({ rows, onSelect }: Props) {
     <View style={styles.list}>
       {rows.map((row, index) => {
         const active = Boolean(row.status);
+        const thumbUri = row.imagePath ? replaceS3WithCloudfront(row.imagePath) : '';
         return (
           <TouchableOpacity
             key={`row-${index}-${String(row._id ?? '')}`}
@@ -29,6 +32,14 @@ export function BannerList({ rows, onSelect }: Props) {
                 {active ? 'Active' : 'Inactive'}
               </Text>
             </View>
+            {thumbUri ? (
+              <CachedImage
+                source={{ uri: thumbUri }}
+                style={styles.listThumb}
+                resizeMode="cover"
+                recyclingKey={thumbUri}
+              />
+            ) : null}
             <View style={styles.cardSplitRow}>
               <Text style={styles.cardSplitLeft} numberOfLines={1}>
                 Type: {display(row.type)}

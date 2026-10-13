@@ -1,9 +1,9 @@
 /**
- * Screenshot / screen-recording block.
+ * Screenshot / screen-recording helpers.
  *
- * On Android this sets FLAG_SECURE (screenshots produce a black frame and
- * recording is blocked); on iOS it detects capture and can blur. We keep it
- * enabled for the entire authenticated session. No-ops on web preview.
+ * Block is currently off — useSecurity only calls allowScreenCapture so
+ * recording and screenshots work. enableScreenshotBlock remains for a
+ * future toggle. No-ops on web preview.
  */
 import { Platform } from 'react-native';
 import * as ScreenCapture from 'expo-screen-capture';

@@ -3,12 +3,12 @@
  * Calls users.registeredUsersReport with { pageNo, itemPerPage, startDate, endDate, filter }.
  * Shows a clickable "Players State Wise" summary; tapping a state filters the table.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
 import { appCodeForName, asPaged } from '@astro/shared';
-import { colors } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -285,19 +285,26 @@ export function StateWiseRegistrationScreen() {
     return cols;
   }, [page, pageSize, hideContact, canShowMobile]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <StateWiseRegistrationCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onPress={() => setSelected(row)}
+      />
+    ),
+    [page, pageSize],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>State wise Registration</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Users: {total.toLocaleString('en-IN')}
@@ -395,48 +402,44 @@ export function StateWiseRegistrationScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No registered users for selected filters</Text>
-      ) : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSelected(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {String(row.name || '—')}
-              </Text>
-              <Text style={[styles.statusPill, row.blockUser ? styles.statusOff : styles.statusOn]}>
-                {row.blockUser ? 'Blocked' : 'Active'}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                State: {String(row.state || '—')}
-              </Text>
-              <Text style={styles.cardSplitRight}>
-                App: {appCodeForName(String(row.clientName || ''))}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>
-                Balance: {floorNum(row.balance ?? 0).toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.cardSplitRight}>
-                KYC: {row.kyc === true ? 'Done' : 'Not Done'}
-              </Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for details</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No registered users for selected filters"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -453,25 +456,54 @@ export function StateWiseRegistrationScreen() {
         }
         onClose={() => setSelected(null)}
       />
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
+
+type StateWiseRegistrationCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  onPress: () => void;
+};
+
+const StateWiseRegistrationCard = memo(function StateWiseRegistrationCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onPress,
+}: StateWiseRegistrationCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {String(row.name || '—')}
+        </Text>
+        <Text style={[styles.statusPill, row.blockUser ? styles.statusOff : styles.statusOn]}>
+          {row.blockUser ? 'Blocked' : 'Active'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          State: {String(row.state || '—')}
+        </Text>
+        <Text style={styles.cardSplitRight}>
+          App: {appCodeForName(String(row.clientName || ''))}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>
+          Balance: {floorNum(row.balance ?? 0).toLocaleString('en-IN')}
+        </Text>
+        <Text style={styles.cardSplitRight}>
+          KYC: {row.kyc === true ? 'Done' : 'Not Done'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});
 

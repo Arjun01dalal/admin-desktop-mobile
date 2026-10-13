@@ -45,6 +45,12 @@ function LocalPlayer({ localUri, onClose }: { localUri: string; onClose: () => v
       } catch {
         // ignore
       }
+      try {
+        // Free native decoder / buffers when the modal closes or remounts.
+        player.remove();
+      } catch {
+        // ignore
+      }
     };
   }, [player]);
 

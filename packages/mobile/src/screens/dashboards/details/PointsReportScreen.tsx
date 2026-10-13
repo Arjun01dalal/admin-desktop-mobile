@@ -3,12 +3,13 @@
  * reports.subadminCoinReport { startDate, endDate }; tap a row to see its coin documents
  * (desktop's /coin-reports/report drill-down) and update the coin limit (reports.addCoin).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Text, TextInput, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
 import { appCodeForName } from '@astro/shared';
 import { colors } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
@@ -16,6 +17,7 @@ import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/d
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './PointsReportScreen.styles';
+import { display } from '../../../utils/display';
 
 type Doc = {
   _id?: string;
@@ -46,11 +48,6 @@ type Row = {
   documents?: Doc[];
   [key: string]: unknown;
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function PointsReportScreen() {
   const canShowMobile = hasPermission('show_mobile');
@@ -228,15 +225,36 @@ export function PointsReportScreen() {
     [canShowMobile],
   );
 
+  const docs = detailRow?.documents || [];
+
+  const docKeyExtractor = useCallback(
+    (doc: Doc, index: number) => `row-${index}-${String(doc._id ?? '')}`,
+    [],
+  );
+
+  const renderDocItem = useCallback(
+    ({ item: doc, index }: ListRenderItemInfo<Doc>) => (
+      <PointsReportDocCard doc={doc} index={index} onPress={() => setSelectedDoc(doc)} />
+    ),
+    [],
+  );
+
+  const rowKeyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderRowItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <PointsReportCard row={row} index={index} onPress={() => setSheetRow(row)} />
+    ),
+    [],
+  );
+
   // ---- Details (drill-down) view ----
   if (detailRow) {
-    const docs = detailRow.documents || [];
-    return (
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+    const detailHeader = (
+      <>
         <TouchableOpacity
           onPress={() => {
             setDetailRow(null);
@@ -273,39 +291,20 @@ export function PointsReportScreen() {
           </View>
           {coinMsg ? <Text style={styles.coinMsg}>{coinMsg}</Text> : null}
         </View>
+      </>
+    );
 
-        {docs.length === 0 ? <Text style={styles.hint}>No documents found</Text> : null}
-        <View style={styles.list}>
-          {docs.map((doc, index) => (
-            <TouchableOpacity
-              key={`row-${index}-${String(doc._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSelectedDoc(doc)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(doc.userName)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>
-                  Balance: {floorNum(doc.balance ?? 0).toLocaleString('en-IN')}
-                </Text>
-                <Text style={styles.cardSplitRight}>
-                  App: {appCodeForName(String(doc.clientName || ''))}
-                </Text>
-              </View>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                {doc.createdOn
-                  ? `${formatDisplayDate(doc.createdOn)} ${formatDisplayTime(doc.createdOn)}`
-                  : '—'}
-              </Text>
-              <Text style={styles.cardHint}>Tap card for details</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+    return (
+      <View style={styles.screen}>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={docs}
+          keyExtractor={docKeyExtractor}
+          renderItem={renderDocItem}
+          listHeader={detailHeader}
+          emptyMessage="No documents found"
+        />
 
         <RowDetailSheet
           visible={selectedDoc !== null}
@@ -319,24 +318,13 @@ export function PointsReportScreen() {
           }
           onClose={() => setSelectedDoc(null)}
         />
-      </ScrollView>
+      </View>
     );
   }
 
   // ---- Main report view ----
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const listHeader = (
+    <>
       <Text style={styles.title}>Points Report</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Balance Give: {floorNum(totalGiven).toLocaleString('en-IN')}
@@ -358,39 +346,23 @@ export function PointsReportScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {display(row.subadminName)}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Credit: {String(row.creditCount ?? 0)}</Text>
-              <Text style={styles.cardSplitRight}>
-                Given: {floorNum(row.totalBalanceGiven ?? 0).toLocaleString('en-IN')}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Debit: {String(row.debitCount ?? 0)}</Text>
-              <Text style={styles.cardSplitRight}>
-                Removed: {floorNum(row.totalBalanceRemove ?? 0).toLocaleString('en-IN')}
-              </Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for details & documents</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={rowKeyExtractor}
+        renderItem={renderRowItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No data available"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -411,7 +383,80 @@ export function PointsReportScreen() {
         ]}
         onClose={() => setSheetRow(null)}
       />
-    </ScrollView>
+    </View>
   );
 }
+
+type PointsReportCardProps = {
+  row: Row;
+  index: number;
+  onPress: () => void;
+};
+
+const PointsReportCard = memo(function PointsReportCard({
+  row,
+  index,
+  onPress,
+}: PointsReportCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.subadminName)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Credit: {String(row.creditCount ?? 0)}</Text>
+        <Text style={styles.cardSplitRight}>
+          Given: {floorNum(row.totalBalanceGiven ?? 0).toLocaleString('en-IN')}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Debit: {String(row.debitCount ?? 0)}</Text>
+        <Text style={styles.cardSplitRight}>
+          Removed: {floorNum(row.totalBalanceRemove ?? 0).toLocaleString('en-IN')}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & documents</Text>
+    </TouchableOpacity>
+  );
+});
+
+type PointsReportDocCardProps = {
+  doc: Doc;
+  index: number;
+  onPress: () => void;
+};
+
+const PointsReportDocCard = memo(function PointsReportDocCard({
+  doc,
+  index,
+  onPress,
+}: PointsReportDocCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(doc.userName)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>
+          Balance: {floorNum(doc.balance ?? 0).toLocaleString('en-IN')}
+        </Text>
+        <Text style={styles.cardSplitRight}>
+          App: {appCodeForName(String(doc.clientName || ''))}
+        </Text>
+      </View>
+      <Text style={styles.cardSplitLeft} numberOfLines={1}>
+        {doc.createdOn
+          ? `${formatDisplayDate(doc.createdOn)} ${formatDisplayTime(doc.createdOn)}`
+          : '—'}
+      </Text>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});
 

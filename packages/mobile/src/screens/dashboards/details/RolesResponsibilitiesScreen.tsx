@@ -30,14 +30,10 @@ import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { CoinPermissionScreen } from './CoinPermissionScreen';
 import { styles } from './RolesResponsibilitiesScreen.styles';
+import { display } from '../../../utils/display';
 
 type Responsibility = { _id: string; Enum?: string; Name?: string; Group?: string };
 type Role = { _id: string; Name?: string; Responsibilities?: string[] };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function RolesResponsibilitiesScreen() {
   const user = useMemo(() => getSessionUser(), []);

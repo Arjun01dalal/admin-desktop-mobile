@@ -2,15 +2,15 @@
  * Checkers Report — port of desktop CheckersReportPage.
  * Calls reports.checkersData with { startDate, endDate }.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../../theme';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { styles } from './CheckersReportScreen.styles';
+import { styles } from './loginStatusReport.styles';
 
 type CheckerMaps = {
   checkBy?: Record<string, number>;
@@ -91,19 +91,20 @@ export function CheckersReportScreen() {
     [],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row.name ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <CheckersReportCard row={row} index={index} onPress={() => setSelected(row)} />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Checkers Report</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · {rows.length} checkers
@@ -125,31 +126,23 @@ export function CheckersReportScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data available</Text> : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row.name ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSelected(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {row.name}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>Check By: {row.checkBy}</Text>
-              <Text style={styles.cardSplitRight}>Cross Check: {row.crossCheckBy}</Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for details</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No data available"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -161,7 +154,34 @@ export function CheckersReportScreen() {
         }
         onClose={() => setSelected(null)}
       />
-    </ScrollView>
+    </View>
   );
 }
 
+type CheckersReportCardProps = {
+  row: Row;
+  index: number;
+  onPress: () => void;
+};
+
+const CheckersReportCard = memo(function CheckersReportCard({
+  row,
+  index,
+  onPress,
+}: CheckersReportCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {row.name}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Check By: {row.checkBy}</Text>
+        <Text style={styles.cardSplitRight}>Cross Check: {row.crossCheckBy}</Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});

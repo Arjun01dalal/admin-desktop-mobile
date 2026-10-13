@@ -16,6 +16,7 @@ import { secureApi } from '../../api/client';
 import { Button } from '../../components/UI';
 import { colors } from '../../theme';
 import { styles } from './DepositWithdrawalMidModal.styles';
+import { display } from '../../utils/display';
 
 type Rec = Record<string, unknown>;
 
@@ -25,11 +26,6 @@ type Props = {
   catalogMids: string[];
   onClose: () => void;
 };
-
-function display(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—';
-  return String(v);
-}
 
 function fmtAmount(v: unknown): string {
   const n = Number(v);

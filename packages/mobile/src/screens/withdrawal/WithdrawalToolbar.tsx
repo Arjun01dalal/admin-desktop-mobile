@@ -44,6 +44,9 @@ type WithdrawalToolbarProps = {
   setDraftEnd: (value: string) => void;
   setStartDate: (value: string) => void;
   setEndDate: (value: string) => void;
+  applyAllData: () => void;
+  clearDates: () => void;
+  clearAllFilters: () => void;
   setPage: React.Dispatch<React.SetStateAction<number>>;
   pageSize: number;
   setPageSize: (value: number) => void;
@@ -102,6 +105,9 @@ export function WithdrawalToolbar({
   setDraftEnd,
   setStartDate,
   setEndDate,
+  applyAllData,
+  clearDates,
+  clearAllFilters,
   setPage,
   pageSize,
   setPageSize,
@@ -339,6 +345,9 @@ export function WithdrawalToolbar({
           setEndDate(draftEnd);
           setPage(1);
         }}
+        onAllData={applyAllData}
+        onClearDates={clearDates}
+        onClearAllFilters={clearAllFilters}
         pageSize={pageSize}
         onPageSizeChange={(v) => {
           setPageSize(v);

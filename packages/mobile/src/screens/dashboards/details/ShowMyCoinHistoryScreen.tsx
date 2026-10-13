@@ -2,16 +2,9 @@
  * Show My Coin History — Laxmi ShowCoinHistory port.
  * Visible only when User.data.showCoins is truthy (coin-role flag).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { colors } from '../../../theme';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { canShowMyCoinHistory, getSessionUser, hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
@@ -115,6 +108,18 @@ export function ShowMyCoinHistoryScreen() {
     void loadLimit();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const keyExtractor = useCallback(
+    (item: HistoryRow, index: number) => String(item._id || index),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<HistoryRow>) => (
+      <ShowMyCoinHistoryCard item={item} index={index} canShowMobile={canShowMobile} />
+    ),
+    [canShowMobile],
+  );
+
   if (!allowed) {
     return (
       <View style={styles.screen}>
@@ -123,21 +128,8 @@ export function ShowMyCoinHistoryScreen() {
     );
   }
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => {
-            void load();
-            void loadLimit();
-          }}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const listHeader = (
+    <>
       <Text style={styles.title}>Show My Coin History</Text>
 
       <DetailFilterBar
@@ -173,35 +165,60 @@ export function ShowMyCoinHistoryScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <ActivityIndicator color={colors.primary} /> : null}
-
-      {rows.map((item, index) => (
-        <View key={item._id || String(index)} style={styles.card}>
-          <Text style={styles.cardTitle}>
-            #{index + 1} {item.userName || '—'}
-          </Text>
-          <Text style={styles.body}>
-            Mobile: {canShowMobile ? item.userMobile || '—' : '**********'}
-          </Text>
-          <Text style={styles.body}>App: {item.clientName || '—'}</Text>
-          <Text style={styles.body}>
-            {item.state || '—'} / {item.city || '—'}
-          </Text>
-          <Text style={styles.body}>Opening: {String(item.openingSubadminBalance ?? '—')}</Text>
-          <Text style={styles.body}>Amount: {String(item.balance ?? '—')}</Text>
-          <Text style={styles.body}>Closing: {String(item.closingSubadminBalance ?? '—')}</Text>
-          <Text style={styles.body}>Reason: {item.reason || '—'}</Text>
-          <Text style={styles.body}>Remark: {item.remark || '—'}</Text>
-          <Text style={styles.body}>Tag: {item.tag || '—'}</Text>
-          <Text style={styles.hint}>{item.createdOn || '—'}</Text>
-        </View>
-      ))}
-
-      {!loading && rows.length === 0 && !error ? (
-        <Text style={styles.hint}>No coin history for this date range</Text>
-      ) : null}
-    </ScrollView>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No coin history for this date range"
+        refreshing={loading}
+        onRefresh={() => {
+          void load();
+          void loadLimit();
+        }}
+      />
+    </View>
   );
 }
 
+type ShowMyCoinHistoryCardProps = {
+  item: HistoryRow;
+  index: number;
+  canShowMobile: boolean;
+};
+
+const ShowMyCoinHistoryCard = memo(function ShowMyCoinHistoryCard({
+  item,
+  index,
+  canShowMobile,
+}: ShowMyCoinHistoryCardProps) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>
+        #{index + 1} {item.userName || '—'}
+      </Text>
+      <Text style={styles.body}>
+        Mobile: {canShowMobile ? item.userMobile || '—' : '**********'}
+      </Text>
+      <Text style={styles.body}>App: {item.clientName || '—'}</Text>
+      <Text style={styles.body}>
+        {item.state || '—'} / {item.city || '—'}
+      </Text>
+      <Text style={styles.body}>Opening: {String(item.openingSubadminBalance ?? '—')}</Text>
+      <Text style={styles.body}>Amount: {String(item.balance ?? '—')}</Text>
+      <Text style={styles.body}>Closing: {String(item.closingSubadminBalance ?? '—')}</Text>
+      <Text style={styles.body}>Reason: {item.reason || '—'}</Text>
+      <Text style={styles.body}>Remark: {item.remark || '—'}</Text>
+      <Text style={styles.body}>Tag: {item.tag || '—'}</Text>
+      <Text style={styles.hint}>{item.createdOn || '—'}</Text>
+    </View>
+  );
+});

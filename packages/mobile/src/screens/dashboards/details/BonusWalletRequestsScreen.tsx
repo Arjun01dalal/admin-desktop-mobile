@@ -6,24 +6,28 @@
  * the request is pending, Approve / Reject / Remove actions
  * (bonusWallet.updateTransferRequest) are available in the sheet.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { asPaged, unpackPayload } from '@astro/shared';
+import { unpackPayload } from '@astro/shared';
 import { colors, spacing } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { usePagedSecureQuery } from '../../../hooks/usePagedSecureQuery';
+import { useRequestGeneration } from '../../../hooks/useRequestGeneration';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { display, maskMobile } from '../../../utils/display';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './BonusWalletRequestsScreen.styles';
@@ -55,16 +59,6 @@ const SEARCH_FIELDS = [
   { key: 'mobile', label: 'Mobile' },
 ] as const;
 
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
-
 function formatIN(value: unknown): string {
   const n = Number(value ?? 0);
   if (!Number.isFinite(n)) return '0';
@@ -92,11 +86,6 @@ export function BonusWalletRequestsScreen() {
     text: '',
   });
 
-  const [rows, setRows] = useState<BonusRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary>({
     approvedCount: 0,
     walletBalance: 0,
@@ -104,52 +93,48 @@ export function BonusWalletRequestsScreen() {
   });
   const [sheetRow, setSheetRow] = useState<BonusRow | null>(null);
   const [actingId, setActingId] = useState('');
-  const genRef = useRef(0);
-  const summaryGenRef = useRef(0);
+  const {
+    next: nextSummary,
+    isCurrent: isSummaryCurrent,
+    begin: beginSummary,
+    end: endSummary,
+  } = useRequestGeneration();
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const filter: Record<string, unknown> = {};
-      if (status) filter.status = status;
-      const text = applied.text.trim();
-      if (text) {
-        if (applied.field === 'mobile') filter.mobile = text;
-        else if (applied.field === 'transactionId') filter._id = text;
-        else filter.name = text;
-      }
-      const payload: Record<string, unknown> = {
-        itemsPerPage: pageSize,
-        pageNo: page,
-        filter,
-      };
-      if (!allData) {
-        payload.startDate = startDate || todayIST();
-        payload.endDate = endDate || todayIST();
-      }
-      const res = await secureApi<unknown>('bonusWallet.transferRequests', payload);
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load bonus wallet requests');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        return;
-      }
-      const paged = asPaged<BonusRow>(res.data);
-      setSheetRow(null);
-      setRows(paged.rows);
-      setTotal(paged.total);
-      setTotalPages(Math.max(1, paged.totalPages));
-    } finally {
-      if (gen === genRef.current) setLoading(false);
+  const buildPayload = useCallback(() => {
+    const filter: Record<string, unknown> = {};
+    if (status) filter.status = status;
+    const text = applied.text.trim();
+    if (text) {
+      if (applied.field === 'mobile') filter.mobile = text;
+      else if (applied.field === 'transactionId') filter._id = text;
+      else filter.name = text;
     }
+    const payload: Record<string, unknown> = {
+      itemsPerPage: pageSize,
+      pageNo: page,
+      filter,
+    };
+    if (!allData) {
+      payload.startDate = startDate || todayIST();
+      payload.endDate = endDate || todayIST();
+    }
+    return payload;
   }, [status, applied, pageSize, page, allData, startDate, endDate]);
 
+  const { rows, total, totalPages, loading, error, load, setError } = usePagedSecureQuery<BonusRow>({
+    action: 'bonusWallet.transferRequests',
+    buildPayload,
+    autoDeps: [status, applied, pageSize, page, allData, startDate, endDate],
+    errorMessage: 'Failed to load bonus wallet requests',
+  });
+
+  useEffect(() => {
+    setSheetRow(null);
+  }, [rows]);
+
   const loadSummary = useCallback(async () => {
-    const gen = ++summaryGenRef.current;
+    const gen = nextSummary();
+    beginSummary();
     try {
       let payload: Record<string, unknown>;
       if (allData) {
@@ -161,7 +146,7 @@ export function BonusWalletRequestsScreen() {
         payload = { startDate: d, endDate: d, allData: false };
       }
       const res = await secureApi<unknown>('bonusWallet.fundRequestSummary', payload);
-      if (gen !== summaryGenRef.current) return;
+      if (!isSummaryCurrent(gen)) return;
       if (!res.ok) return;
       const body = unpackPayload(res.data);
       setSummary({
@@ -171,12 +156,10 @@ export function BonusWalletRequestsScreen() {
       });
     } catch {
       /* ignore */
+    } finally {
+      endSummary();
     }
-  }, [allData, startDate, endDate]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  }, [allData, startDate, endDate, nextSummary, isSummaryCurrent, beginSummary, endSummary]);
 
   useEffect(() => {
     void loadSummary();
@@ -362,22 +345,39 @@ export function BonusWalletRequestsScreen() {
     return acts;
   }, [sheetRow, actingId, handleAction, navigation]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => {
-            void load();
-            void loadSummary();
-          }}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const openUserReport = useCallback(
+    (userId?: string, userName?: string) => {
+      if (!userId) return;
+      navigation.navigate('/user-report', {
+        userId: String(userId),
+        userName: String(userName || ''),
+      });
+    },
+    [navigation],
+  );
+
+  const keyExtractor = useCallback(
+    (row: BonusRow, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<BonusRow>) => (
+      <BonusWalletRequestCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        canShowMobile={canShowMobile}
+        onPress={() => setSheetRow(row)}
+        onUserReport={() => openUserReport(row.userId, row.name)}
+      />
+    ),
+    [page, pageSize, canShowMobile, openUserReport],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>{toDisplayText('Bonus Wallet Requests')}</Text>
       <Text style={styles.sub}>Total: {total.toLocaleString('en-IN')}</Text>
 
@@ -454,93 +454,47 @@ export function BonusWalletRequestsScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No bonus wallet requests found</Text>
-      ) : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const statusColor =
-            row.status === 'approve'
-              ? '#16a34a'
-              : row.status === 'reject' || row.status === 'remove'
-                ? colors.destructive
-                : '#d97706';
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name)}
-                </Text>
-                {row.userId ? (
-                  <TouchableOpacity
-                    style={styles.reportBtn}
-                    onPress={() => {
-                      navigation.navigate('/user-report', {
-                        userId: String(row.userId),
-                        userName: String(row.name || ''),
-                      });
-                    }}
-                  >
-                    <Text style={styles.reportBtnText}>User Report</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>Amount: {formatIN(row.amount)}</Text>
-                <Text style={[styles.cardSplitRight, { color: statusColor }]} numberOfLines={1}>
-                  Status: {display(row.status)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Transaction ID</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row._id)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Mobile</Text>
-                <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Date</Text>
-                <Text style={styles.cardValue}>
-                  {[formatDisplayDate(row.updatedOn), formatDisplayTime(row.updatedOn)]
-                    .filter(Boolean)
-                    .join(' ') || '—'}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No bonus wallet requests found"
+        refreshing={loading}
+        onRefresh={() => {
+          void load();
+          void loadSummary();
+        }}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -549,7 +503,74 @@ export function BonusWalletRequestsScreen() {
         actions={sheetActions}
         onClose={() => setSheetRow(null)}
       />
-    </ScrollView>
+    </>
   );
 }
+
+type BonusWalletRequestCardProps = {
+  row: BonusRow;
+  index: number;
+  page: number;
+  pageSize: number;
+  canShowMobile: boolean;
+  onPress: () => void;
+  onUserReport: () => void;
+};
+
+const BonusWalletRequestCard = memo(function BonusWalletRequestCard({
+  row,
+  index,
+  page,
+  pageSize,
+  canShowMobile,
+  onPress,
+  onUserReport,
+}: BonusWalletRequestCardProps) {
+  const statusColor =
+    row.status === 'approve'
+      ? '#16a34a'
+      : row.status === 'reject' || row.status === 'remove'
+        ? colors.destructive
+        : '#d97706';
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        {row.userId ? (
+          <TouchableOpacity style={styles.reportBtn} onPress={onUserReport}>
+            <Text style={styles.reportBtnText}>User Report</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Amount: {formatIN(row.amount)}</Text>
+        <Text style={[styles.cardSplitRight, { color: statusColor }]} numberOfLines={1}>
+          Status: {display(row.status)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Transaction ID</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row._id)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Date</Text>
+        <Text style={styles.cardValue}>
+          {[formatDisplayDate(row.updatedOn), formatDisplayTime(row.updatedOn)]
+            .filter(Boolean)
+            .join(' ') || '—'}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

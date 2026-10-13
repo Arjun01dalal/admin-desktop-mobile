@@ -1,4 +1,5 @@
 /** Row/form shapes and pure helpers for the Banners screen. */
+export { display } from '../../../../utils/display';
 
 export type Row = {
   _id?: string;
@@ -41,11 +42,6 @@ export const EMPTY_ADD: AddForm = {
 };
 
 export const POSITION_OPTIONS = Array.from({ length: 25 }, (_, i) => i + 1);
-
-export function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function isGameBanner(row: Row): boolean {
   if (row.type === 'game') return true;

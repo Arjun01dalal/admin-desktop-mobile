@@ -2,16 +2,16 @@
  * All User Login Report — port of desktop AllUserLoginReportPage.
  * Calls reports.allUserLoginLogout with { page, limit, filter:{ startDate, endDate, ... } }.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../../theme';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, type SearchFieldKey, type SearchFieldOption } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { styles } from './AllUserLoginReportScreen.styles';
+import { styles } from './loginStatusReport.styles';
 
 type ActionItem = { action?: string; timestamp?: string; [key: string]: unknown };
 type Row = {
@@ -146,19 +146,20 @@ export function AllUserLoginReportScreen() {
     [page, canShowMobile],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <AllUserLoginCard row={row} index={index} page={page} onPress={() => setSelected(row)} />
+    ),
+    [page],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>All User Login Report</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Count:- {total.toLocaleString('en-IN')}
@@ -190,40 +191,44 @@ export function AllUserLoginReportScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No login records found</Text>
-      ) : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const login = getActionStats(row.actionHistory, 'login');
-          const logout = getActionStats(row.actionHistory, 'logout');
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSelected(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {String(row.name || '—')}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>Logins: {login.count}</Text>
-                <Text style={styles.cardSplitRight}>Logouts: {logout.count}</Text>
-              </View>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                Last login: {formatTs(login.last?.timestamp)}
-              </Text>
-              <Text style={styles.cardHint}>Tap card for details</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No login records found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -237,25 +242,41 @@ export function AllUserLoginReportScreen() {
         }
         onClose={() => setSelected(null)}
       />
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
+type AllUserLoginCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  onPress: () => void;
+};
+
+const AllUserLoginCard = memo(function AllUserLoginCard({
+  row,
+  index,
+  page,
+  onPress,
+}: AllUserLoginCardProps) {
+  const login = getActionStats(row.actionHistory, 'login');
+  const logout = getActionStats(row.actionHistory, 'logout');
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * PAGE_SIZE + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {String(row.name || '—')}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Logins: {login.count}</Text>
+        <Text style={styles.cardSplitRight}>Logouts: {logout.count}</Text>
+      </View>
+      <Text style={styles.cardSplitLeft} numberOfLines={1}>
+        Last login: {formatTs(login.last?.timestamp)}
+      </Text>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});

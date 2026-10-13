@@ -18,6 +18,7 @@ import {
   num,
   pagesOf,
   parseSummary,
+  sendToBankName,
   statusColor,
   totalUsersOf,
   type Rec,
@@ -37,6 +38,7 @@ export function useWithdrawalScreen() {
   const [draftEnd, setDraftEnd] = useState(incoming?.endDate || todayIST());
   const [startDate, setStartDate] = useState(incoming?.startDate || todayIST());
   const [endDate, setEndDate] = useState(incoming?.endDate || todayIST());
+  const [allData, setAllData] = useState(false);
   const [status, setStatus] = useState(incoming?.status || '');
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
@@ -125,9 +127,17 @@ export function useWithdrawalScreen() {
         itemsPerPage: pageSize,
         pageNo: page,
         filter,
-        startDate,
-        endDate,
       };
+      if (!allData) {
+        if (startDate && endDate) {
+          payload.startDate = startDate;
+          payload.endDate = endDate;
+        } else {
+          const today = todayIST();
+          payload.startDate = today;
+          payload.endDate = today;
+        }
+      }
       const app = admin?.clientName || admin?.allotedApps;
       if (app) payload.app = app;
       const res = await secureApi('withdrawals.transactions', payload);
@@ -152,6 +162,7 @@ export function useWithdrawalScreen() {
     page,
     startDate,
     endDate,
+    allData,
     perms.showAll,
     sortChecked,
     bankAmt,
@@ -160,9 +171,20 @@ export function useWithdrawalScreen() {
   ]);
 
   const loadSummary = useCallback(async () => {
-    const res = await secureApi('withdrawals.fundRequest', { startDate, endDate });
+    const payload: Rec = {};
+    if (!allData) {
+      if (startDate && endDate) {
+        payload.startDate = startDate;
+        payload.endDate = endDate;
+      } else {
+        const today = todayIST();
+        payload.startDate = today;
+        payload.endDate = today;
+      }
+    }
+    const res = await secureApi('withdrawals.fundRequest', payload);
     if (res.ok) setSummary(parseSummary(res.data));
-  }, [startDate, endDate]);
+  }, [allData, startDate, endDate]);
 
   loadRef.current = () => {
     void load();
@@ -289,6 +311,12 @@ export function useWithdrawalScreen() {
         label: 'User Name',
         width: 130,
         render: (r) => display(r.accountHolderName ?? r.userName ?? r.name),
+      },
+      {
+        key: 'sendToBank',
+        label: 'Name (Send to Bank)',
+        width: 140,
+        render: (r) => display(sendToBankName(r)),
       },
       { key: 'amount', label: 'Amount', width: 90, render: (r) => fmtAmount(r.amount ?? r.Amount) },
       { key: 'empCode', label: 'Emp Code', width: 90, render: formatEmpCode },
@@ -428,6 +456,56 @@ export function useWithdrawalScreen() {
     setStatus(value);
     setPage(1);
   }, []);
+
+  const applyAllData = useCallback(() => {
+    setDraftStart('');
+    setDraftEnd('');
+    setStartDate('');
+    setEndDate('');
+    setAllData(true);
+    setPage(1);
+  }, []);
+
+  const clearDates = useCallback(() => {
+    setDraftStart('');
+    setDraftEnd('');
+    setAllData(false);
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    const today = todayIST();
+    setDraftStart(today);
+    setDraftEnd(today);
+    setStartDate(today);
+    setEndDate(today);
+    setAllData(false);
+    setStatus('');
+    setSearchField('userName');
+    setSearchDraft('');
+    setApplied({ field: 'userName', text: '' });
+    setSortChecked(false);
+    setBankAmtDraft('');
+    setBankAmt('');
+    setMidFilter('');
+    setMidFilterOpen(false);
+    setSelectedBeneficiaryAccounts([]);
+    setDraftBeneficiaryAccounts([]);
+    setBenePendingOpen(false);
+    setPageSize(25);
+    setPage(1);
+    actions.clearBulk();
+  }, [actions.clearBulk]);
+
+  const setStartDateAndExitAllData = useCallback((value: string) => {
+    setAllData(false);
+    setStartDate(value);
+  }, []);
+
+  const setEndDateAndExitAllData = useCallback((value: string) => {
+    setAllData(false);
+    setEndDate(value);
+  }, []);
+
   const refresh = useCallback(() => {
     void load();
     void loadSummary();
@@ -491,8 +569,11 @@ export function useWithdrawalScreen() {
     draftEnd,
     setDraftStart,
     setDraftEnd,
-    setStartDate,
-    setEndDate,
+    setStartDate: setStartDateAndExitAllData,
+    setEndDate: setEndDateAndExitAllData,
+    applyAllData,
+    clearDates,
+    clearAllFilters,
     setPage,
     pageSize,
     setPageSize,

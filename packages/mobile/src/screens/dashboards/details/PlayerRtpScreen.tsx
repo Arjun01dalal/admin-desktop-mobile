@@ -16,6 +16,7 @@ import { todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './PlayerRtpScreen.styles';
+import { display } from '../../../utils/display';
 
 type RtpType = 'Qtech' | 'WCO' | 'Satta Matka' | 'Falcon' | 'Exchange' | 'AAA Exchange';
 
@@ -65,11 +66,6 @@ const TYPE_OPTIONS: RtpType[] = [
 
 /** Only these have RTP APIs wired (same as desktop TYPE_CONFIG). */
 const SUPPORTED_RTP_TYPES = new Set<RtpType>(['Qtech', 'AAA Exchange']);
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function formatAmount(value: unknown): string {
   const n = Number(value ?? 0);

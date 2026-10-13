@@ -14,6 +14,7 @@ import { DataTable, type DataTableColumn } from '../../../dashboards/ui/DataTabl
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './ActiveBotUsersScreen.styles';
+import { maskMobile } from '../../../utils/display';
 
 type ListParams = {
   activeBotUsers?: CallerRow[];
@@ -32,11 +33,6 @@ function firstBotId(row: CallerRow): string {
   if (Array.isArray(ids) && ids.length > 0) return String(ids[0] ?? '-');
   if (ids != null && ids !== '') return String(ids);
   return '-';
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
 }
 
 export function ActiveBotUsersScreen() {

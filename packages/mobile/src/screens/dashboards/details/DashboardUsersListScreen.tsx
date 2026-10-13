@@ -28,6 +28,7 @@ import {
 } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './DashboardUsersListScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 type Kind = 'balance' | 'bonus' | 'registered';
 type UserTypeFilter = '' | 'Active' | 'InActive';
@@ -80,15 +81,6 @@ const BALANCE_SEARCH_FIELDS: readonly SearchFieldOption[] = [
   { key: 'balance', label: 'Balance' },
   { key: 'city', label: 'City' },
 ];
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   const meta = META[kind];

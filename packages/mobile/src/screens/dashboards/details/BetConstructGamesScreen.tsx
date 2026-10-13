@@ -3,28 +3,29 @@
  * ops.betConstructGetAll { pageNo, itemPerPage, status:true, Name? }; parses
  * data.games + data.count. Row tap opens a detail modal. Image upload stays desktop-only.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { pickPageSizes } from '@astro/shared';
 import { styles } from './BetConstructGamesScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -46,11 +47,6 @@ type Row = {
 };
 
 const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100]);
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function BetConstructGamesScreen() {
   const [page, setPage] = useState(1);
@@ -241,19 +237,26 @@ export function BetConstructGamesScreen() {
     [page, pageSize],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <BetConstructGamesCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onPress={() => setSheetRow(row)}
+      />
+    ),
+    [page, pageSize],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>{toDisplayText('BetConstruct Games')}</Text>
       <Text style={styles.sub}>Total: {total.toLocaleString('en-IN')}</Text>
 
@@ -329,49 +332,45 @@ export function BetConstructGamesScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No games found</Text> : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const active = Boolean(row.status);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.Name || row.name)}
-                </Text>
-                <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
-                  {active ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Category: {display(row.category)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  ID: {display(row.gameId)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Provider: {display(row.providerName || row.provider?.name)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  Rating: {display(row.rating)}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No games found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={imageRow === null}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -458,25 +457,55 @@ export function BetConstructGamesScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
+
+type BetConstructGamesCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  onPress: () => void;
+};
+
+const BetConstructGamesCard = memo(function BetConstructGamesCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onPress,
+}: BetConstructGamesCardProps) {
+  const active = Boolean(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.Name || row.name)}
+        </Text>
+        <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
+          {active ? 'Active' : 'Inactive'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Category: {display(row.category)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          ID: {display(row.gameId)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Provider: {display(row.providerName || row.provider?.name)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Rating: {display(row.rating)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

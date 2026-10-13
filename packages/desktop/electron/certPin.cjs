@@ -7,11 +7,11 @@
  * proxies (which present their own certificate) are rejected — failing closed.
  *
  * We pin the SubjectPublicKeyInfo (SPKI) SHA-256 hash, NOT the leaf certificate
- * itself. The API (laxminarayan.live) uses a Sectigo-issued wildcard cert; when
- * it renews, the leaf changes but the public key usually stays the same. We also
- * include the intermediate CA's SPKI as a backup pin so a key rotation at renewal
- * does not brick installed apps. If the leaf is re-keyed, the chain still validates
- * against the pinned intermediate.
+ * itself. The API (laxminarayan.live) currently presents an Amazon-issued leaf;
+ * when it renews, the leaf changes but the public key usually stays the same. We
+ * also include the intermediate CA's SPKI as a backup pin so a key rotation at
+ * renewal does not brick installed apps. If the leaf is re-keyed, the chain still
+ * validates against the pinned intermediate.
  *
  * SPKI hashes below were captured from laxminarayan.live:443 and can be
  * re-generated with:
@@ -19,6 +19,7 @@
  *     | openssl x509 -noout -pubkey \
  *     | openssl pkey -pubin -outform der \
  *     | openssl dgst -sha256 -binary | openssl enc -base64
+ *   # or: node scripts/check-cert-pins.cjs
  */
 const https = require('node:https');
 const tls = require('node:tls');
@@ -29,9 +30,10 @@ const PINNED_HOST = 'laxminarayan.live';
 
 // Accepted SPKI SHA-256 hashes (base64). Any one matching in the presented
 // chain is sufficient. Keep the intermediate as a backup for leaf renewals.
+// Rotated 2026-04 (Sectigo wildcard → Amazon RSA 2048 M01).
 const PINNED_SPKI_SHA256 = new Set([
-  'gF86/4V6toOdUboSdnEP/CwGTeeMs/egiSRZvTb6ZZs=', // leaf: CN=*.laxminarayan.live
-  'a9khLOZJxlnJyrxstg/P+seiDCm+Yf3OsrXyFocBaI0=', // intermediate: Sectigo ... CA DV R36 (backup)
+  'Zn+v3cQ9Fle86m++pLYkqzmNEhcEGoSZWzBUlXxavys=', // leaf: CN=laxminarayan.live
+  'DxH4tt40L+eduF6szpY6TONlxhZhBd+pJ9wbHlQ2fuw=', // intermediate: Amazon RSA 2048 M01 (backup)
 ]);
 
 function spkiHash(cert) {

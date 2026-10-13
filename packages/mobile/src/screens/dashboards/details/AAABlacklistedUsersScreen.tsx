@@ -1,9 +1,9 @@
 /**
  * AAA Black Listed Users — mobile port of desktop AAABlacklistedUsersPage.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../../theme';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './AAABlacklistedUsersScreen.styles';
@@ -154,19 +154,21 @@ export function AAABlacklistedUsersScreen() {
       }))
     : [];
 
-  return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Record<string, unknown>, index: number) =>
+      `row-${index}-${String(row._id || row.id || row.userId || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Record<string, unknown>>) => (
+      <AAABlacklistedUserCard row={row} index={index} onPress={() => setSheetRow(row)} />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.toolbar}>
         <View style={styles.heading}>
           <Text style={styles.title}>AAA Black Listed Users</Text>
@@ -192,52 +194,41 @@ export function AAABlacklistedUsersScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+    </>
+  );
 
-      {!error && !loading && rows.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <View style={styles.emptyIcon}>
-            <Text style={styles.emptyIconText}>✓</Text>
-          </View>
-          <Text style={styles.emptyTitle}>No blacklisted users</Text>
-          <Text style={styles.emptyText}>
-            The API returned no records. Pull down or tap Refresh to check again.
-          </Text>
+  const emptyComponent =
+    !error && !loading ? (
+      <View style={styles.emptyCard}>
+        <View style={styles.emptyIcon}>
+          <Text style={styles.emptyIconText}>✓</Text>
         </View>
-      ) : null}
-
-      {!error && loading && rows.length === 0 ? (
-        <View style={styles.loadingCard}>
-          <Text style={styles.loadingTitle}>Loading blacklisted users…</Text>
-          <Text style={styles.loadingText}>Please wait while records are fetched.</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row._id || row.id || row.userId || '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {rowTitle(row)}
-              </Text>
-              <Text style={styles.detailsText}>Details ›</Text>
-            </View>
-            {cardFields(row).map((key) => (
-              <View style={styles.cardRow} key={key}>
-                <Text style={styles.cardLabel}>{formatColumnLabel(key)}</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {cellText(row[key])}
-                </Text>
-              </View>
-            ))}
-          </TouchableOpacity>
-        ))}
+        <Text style={styles.emptyTitle}>No blacklisted users</Text>
+        <Text style={styles.emptyText}>
+          The API returned no records. Pull down or tap Refresh to check again.
+        </Text>
       </View>
+    ) : !error && loading ? (
+      <View style={styles.loadingCard}>
+        <Text style={styles.loadingTitle}>Loading blacklisted users…</Text>
+        <Text style={styles.loadingText}>Please wait while records are fetched.</Text>
+      </View>
+    ) : null;
+
+  return (
+    <View style={styles.root}>
+      <ScreenFlatList
+        style={styles.root}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        refreshing={loading}
+        onRefresh={() => void load()}
+        ListEmptyComponent={emptyComponent}
+      />
 
       <RowDetailSheet
         visible={Boolean(sheetRow)}
@@ -245,7 +236,38 @@ export function AAABlacklistedUsersScreen() {
         fields={sheetFields}
         onClose={() => setSheetRow(null)}
       />
-    </ScrollView>
+    </View>
   );
 }
 
+type AAABlacklistedUserCardProps = {
+  row: Record<string, unknown>;
+  index: number;
+  onPress: () => void;
+};
+
+const AAABlacklistedUserCard = memo(function AAABlacklistedUserCard({
+  row,
+  index,
+  onPress,
+}: AAABlacklistedUserCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {rowTitle(row)}
+        </Text>
+        <Text style={styles.detailsText}>Details ›</Text>
+      </View>
+      {cardFields(row).map((key) => (
+        <View style={styles.cardRow} key={key}>
+          <Text style={styles.cardLabel}>{formatColumnLabel(key)}</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {cellText(row[key])}
+          </Text>
+        </View>
+      ))}
+    </TouchableOpacity>
+  );
+});

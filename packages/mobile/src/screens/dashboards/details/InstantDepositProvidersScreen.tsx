@@ -3,27 +3,29 @@
  * instantDeposit.list { pageNo:1, itemsPerPage:100, filter:{ name?, mid? } }. Row tap
  * opens a detail sheet with Enable/Disable, Edit name/MID/link, Delete; header adds a provider.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime } from '../../../utils/dates';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './InstantDepositProvidersScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -39,11 +41,6 @@ type Row = {
 };
 
 type UpdateKind = 'name' | 'mid' | 'link';
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 /** Tolerant paged unpack: items under .items or .payload.items (or a bare array). */
 function asPagedItems<T>(data: unknown): T[] {
@@ -302,19 +299,20 @@ export function InstantDepositProvidersScreen() {
 
   const editLabel = editKind === 'name' ? 'name' : editKind === 'mid' ? 'MID' : 'link';
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <InstantDepositProviderCard row={row} index={index} onOpenSheet={() => setSheetRow(row)} />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Instant Deposit Providers</Text>
         <TouchableOpacity
@@ -366,50 +364,24 @@ export function InstantDepositProvidersScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No instant deposit providers</Text>
-      ) : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const enabled = Boolean(row.status);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.name)}
-                </Text>
-                <Text style={[styles.statusPill, enabled ? styles.statusOn : styles.statusOff]}>
-                  {enabled ? 'Enabled' : 'Disabled'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  MID: {display(row.mid)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  Type: {display(row.type)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Link</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(row.link)}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No instant deposit providers"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!addOpen && editRow === null}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -585,7 +557,49 @@ export function InstantDepositProvidersScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
+
+type InstantDepositProviderCardProps = {
+  row: Row;
+  index: number;
+  onOpenSheet: () => void;
+};
+
+const InstantDepositProviderCard = memo(function InstantDepositProviderCard({
+  row,
+  index,
+  onOpenSheet,
+}: InstantDepositProviderCardProps) {
+  const enabled = Boolean(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <Text style={[styles.statusPill, enabled ? styles.statusOn : styles.statusOff]}>
+          {enabled ? 'Enabled' : 'Disabled'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          MID: {display(row.mid)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Type: {display(row.type)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Link</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {display(row.link)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

@@ -14,26 +14,30 @@
  * The desktop page has no mutations. The deposit/ helpers (SettleDialog etc.)
  * belong to a different transaction page and are not used here.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
+  Modal,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { appCodeForName, pickPageSizes } from '@astro/shared';
+import { appCodeForName, pickPageSizes, unpackPayload } from '@astro/shared';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { useRequestGeneration } from '../../../hooks/useRequestGeneration';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { display, maskMobile } from '../../../utils/display';
 import { openPanelTarget } from '../../../navigation/panelDetail';
+import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
-import { DateField } from '../../../components/DateField';
 import { styles } from './DepositListScreen.styles';
 
 type MidTotal = { mid?: string; amount?: number | string; count?: number | string };
@@ -54,7 +58,7 @@ type DepositListRow = {
   approvedWithdrawalAmountByMid?: MidTotal[];
 };
 
-const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50]);
 
 const SEARCH_FIELDS: { key: keyof SearchState; label: string; placeholder: string }[] = [
   { key: 'name', label: 'Name', placeholder: 'Search by Name' },
@@ -83,11 +87,6 @@ const EMPTY_SEARCH: SearchState = {
   clientName: '',
 };
 
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
 function num(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -95,11 +94,6 @@ function num(value: unknown): number {
 
 function formatAmt(value: unknown): string {
   return num(value).toLocaleString('en-IN');
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
 }
 
 function withdrawalPct(deposit?: number, withdrawal?: number): string {
@@ -110,16 +104,6 @@ function withdrawalPct(deposit?: number, withdrawal?: number): string {
 function lastActivity(value?: string): string {
   if (!value) return '—';
   return `${formatDisplayDate(value)} · ${formatDisplayTime(value)}`;
-}
-
-/** Mirror desktop unpackPayload: unwrap a single `.payload` object. */
-function unpackPayload(data: unknown): Record<string, unknown> {
-  if (!data || typeof data !== 'object') return {};
-  const obj = data as Record<string, unknown>;
-  if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
-    return obj.payload as Record<string, unknown>;
-  }
-  return obj;
 }
 
 function normalizeMids(raw: unknown): MidTotal[] {
@@ -151,6 +135,9 @@ export function DepositListScreen() {
   const [appliedEnd, setAppliedEnd] = useState(today);
   const [mid, setMid] = useState('');
   const [midOptions, setMidOptions] = useState<string[]>([]);
+  const [midPickerOpen, setMidPickerOpen] = useState(false);
+  const [midPickerQuery, setMidPickerQuery] = useState('');
+  const [allData, setAllData] = useState(false);
 
   // Draft (unapplied) search inputs vs applied filter.
   const [searchField, setSearchField] = useState<keyof SearchState>('name');
@@ -163,8 +150,8 @@ export function DepositListScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [totals, setTotals] = useState<Record<string, unknown> | null>(null);
   const [sheetRow, setSheetRow] = useState<DepositListRow | null>(null);
-  const genRef = useRef(0);
   const midsLoadedRef = useRef(false);
+  const { next, isCurrent, begin, end } = useRequestGeneration();
 
   // Drill-down: main list → MID breakdown (desktop /depositList/user-wise).
   const [view, setView] = useState<'main' | 'midBreakdown'>('main');
@@ -172,7 +159,8 @@ export function DepositListScreen() {
   const [drillMids, setDrillMids] = useState<MidTotal[]>([]);
 
   const load = useCallback(async () => {
-    const gen = ++genRef.current;
+    const gen = next();
+    begin();
     setLoading(true);
     setError(null);
     try {
@@ -189,12 +177,12 @@ export function DepositListScreen() {
           mid,
         },
       };
-      if (appliedStart && appliedEnd) {
+      if (!allData && appliedStart && appliedEnd) {
         body.startDate = appliedStart;
         body.endDate = appliedEnd;
       }
       const res = await secureApi<unknown>('depositList.report', body);
-      if (gen !== genRef.current) return;
+      if (!isCurrent(gen)) return;
       if (!res.ok) {
         setError(res.message || 'Failed to load deposit list');
         setRows([]);
@@ -225,9 +213,10 @@ export function DepositListScreen() {
         }
       }
     } finally {
-      if (gen === genRef.current) setLoading(false);
+      end();
+      if (isCurrent(gen)) setLoading(false);
     }
-  }, [page, pageSize, appliedStart, appliedEnd, mid, applied]);
+  }, [page, pageSize, appliedStart, appliedEnd, mid, applied, allData, next, isCurrent, begin, end]);
 
   useEffect(() => {
     void load();
@@ -239,16 +228,27 @@ export function DepositListScreen() {
   }, [searchField, draftText]);
 
   const applyDates = useCallback(() => {
+    setAllData(false);
     setAppliedStart(startDate);
     setAppliedEnd(endDate);
     setPage(1);
   }, [startDate, endDate]);
+
+  const applyAllData = useCallback(() => {
+    setStartDate('');
+    setEndDate('');
+    setAppliedStart('');
+    setAppliedEnd('');
+    setAllData(true);
+    setPage(1);
+  }, []);
 
   const clearDateFilter = useCallback(() => {
     setStartDate('');
     setEndDate('');
     setAppliedStart('');
     setAppliedEnd('');
+    setAllData(false);
     setPage(1);
   }, []);
 
@@ -258,11 +258,18 @@ export function DepositListScreen() {
     setEndDate(today);
     setAppliedStart(today);
     setAppliedEnd(today);
+    setAllData(false);
     setMid('');
     setDraftText('');
     setApplied(EMPTY_SEARCH);
     setPage(1);
   }, []);
+
+  const filteredMidOptions = useMemo(() => {
+    const q = midPickerQuery.trim().toLowerCase();
+    if (!q) return midOptions;
+    return midOptions.filter((m) => m.toLowerCase().includes(q));
+  }, [midOptions, midPickerQuery]);
 
   const openMidBreakdown = useCallback((title: string, data?: MidTotal[]) => {
     const mids = normalizeMids(data);
@@ -451,21 +458,28 @@ export function DepositListScreen() {
   }
 
   // ---------- Main list view ----------
-  const currentField = SEARCH_FIELDS.find((f) => f.key === searchField);
+  const keyExtractor = useCallback(
+    (row: DepositListRow, index: number) => `row-${index}-${String(row.userId ?? '')}`,
+    [],
+  );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<DepositListRow>) => (
+      <DepositListCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        canShowMobile={!!canShowMobile}
+        onOpenSheet={() => setSheetRow(row)}
+        onOpenReport={() => openUserDetails(row)}
+      />
+    ),
+    [page, pageSize, canShowMobile, openUserDetails],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Deposit List</Text>
 
       <View style={styles.totalsRow}>
@@ -477,154 +491,60 @@ export function DepositListScreen() {
         </Text>
       </View>
 
-      {/* Date range */}
-      <View style={styles.filterWrap}>
-        <View style={styles.datesRow}>
-          <View style={styles.dateField}>
-            <Text style={styles.dateLabel}>From</Text>
-            <DateField style={styles.dateInput} value={startDate} onChange={setStartDate} />
-          </View>
-          <View style={styles.dateField}>
-            <Text style={styles.dateLabel}>To</Text>
-            <DateField style={styles.dateInput} value={endDate} onChange={setEndDate} />
-          </View>
-        </View>
-        <View style={styles.actionBtnsRow}>
-          <TouchableOpacity
-            style={[styles.applyBtn, styles.actionBtnFlex]}
-            onPress={applyDates}
-            disabled={loading}
-          >
-            <Text style={styles.applyText}>Apply</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.clearBtn, styles.actionBtnFlex]}
-            onPress={clearDateFilter}
-            disabled={loading}
-          >
-            <Text style={styles.clearBtnText}>Clear Date</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.clearBtn, styles.actionBtnFlex]}
-            onPress={clearFilters}
-            disabled={loading}
-          >
-            <Text style={styles.clearBtnText}>Clear</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.applyBtn, styles.actionBtnFlex]}
-            onPress={() => void load()}
-            disabled={loading}
-          >
-            <Text style={styles.applyText}>Refresh</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Search field chips + input */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
-        >
-          <Text style={styles.chipsLabel}>Search by</Text>
-          {SEARCH_FIELDS.map((f) => (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.chip, searchField === f.key && styles.chipActive]}
-              onPress={() => setSearchField(f.key)}
-            >
-              <Text style={[styles.chipText, searchField === f.key && styles.chipTextActive]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <View style={styles.searchRow}>
-          <View style={styles.searchInputWrap}>
-            <TextInput
-              style={styles.searchInput}
-              value={draftText}
-              onChangeText={setDraftText}
-              onSubmitEditing={search}
-              returnKeyType="search"
-              placeholder={currentField?.placeholder ?? 'Search'}
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType={searchField === 'mobile' ? 'phone-pad' : 'default'}
-            />
-            {draftText.trim() ? (
-              <TouchableOpacity
-                style={styles.clearSearchBtn}
-                onPress={() => setDraftText('')}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-              >
-                <Text style={styles.clearSearchText}>✕</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          <TouchableOpacity
-            style={[styles.searchBtn, loading && styles.btnDisabled]}
-            disabled={loading}
-            onPress={search}
-          >
-            <Text style={styles.searchBtnText}>Search</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* MID selector */}
+      <DetailFilterBar
+        startDate={startDate}
+        endDate={endDate}
+        loading={loading}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onApply={applyDates}
+        onAllData={applyAllData}
+        onClearDates={clearDateFilter}
+        onClearAllFilters={clearFilters}
+        searchFields={SEARCH_FIELDS}
+        searchField={searchField}
+        onSearchFieldChange={(k) => setSearchField(k as keyof SearchState)}
+        searchText={draftText}
+        onSearchTextChange={setDraftText}
+        onSearchSubmit={search}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        onPageSizeChange={(n) => {
+          if (pageSize !== n) {
+            setPageSize(n);
+            setPage(1);
+          }
+        }}
+      >
         {midOptions.length ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-          >
-            <Text style={styles.chipsLabel}>Mid</Text>
+          <View style={styles.midSelectWrap}>
+            <Text style={styles.chipsLabel}>MID</Text>
             <TouchableOpacity
-              style={[styles.chip, mid === '' && styles.chipActive]}
+              style={styles.midSelectBtn}
               onPress={() => {
-                setMid('');
-                setPage(1);
+                setMidPickerQuery('');
+                setMidPickerOpen(true);
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Select MID"
             >
-              <Text style={[styles.chipText, mid === '' && styles.chipTextActive]}>All</Text>
+              <Text style={styles.midSelectBtnText} numberOfLines={1}>
+                {mid || 'All'}
+              </Text>
+              <Text style={styles.midSelectChevron}>▾</Text>
             </TouchableOpacity>
-            {midOptions.map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.chip, mid === m && styles.chipActive]}
-                onPress={() => {
-                  setMid(m);
-                  setPage(1);
-                }}
-              >
-                <Text style={[styles.chipText, mid === m && styles.chipTextActive]}>{m}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          </View>
         ) : null}
-      </View>
-
-      {/* Per page */}
-      <View style={styles.perPageRow}>
-        <Text style={styles.chipsLabel}>Per page:</Text>
-        {PAGE_SIZE_OPTIONS.map((n) => (
-          <TouchableOpacity
-            key={n}
-            style={[styles.chip, pageSize === n && styles.chipActive]}
-            onPress={() => {
-              if (pageSize !== n) {
-                setPageSize(n);
-                setPage(1);
-              }
-            }}
-          >
-            <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>{n}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        <TouchableOpacity
+          style={[styles.applyBtn, loading && styles.btnDisabled]}
+          onPress={() => void load()}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Refresh"
+        >
+          <Text style={styles.applyText}>Refresh</Text>
+        </TouchableOpacity>
+      </DetailFilterBar>
 
       {error ? (
         <View style={styles.errorBox}>
@@ -633,81 +553,45 @@ export function DepositListScreen() {
       ) : null}
 
       <Text style={styles.sectionLabel}>Details List</Text>
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => (
-          <TouchableOpacity
-            key={`row-${index}-${String(row.userId ?? '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(row)}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {display(row.name)}
-              </Text>
-              {row.userId ? (
-                <TouchableOpacity
-                  style={styles.reportBtn}
-                  onPress={() => openUserDetails(row)}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                >
-                  <Text style={styles.reportBtnText}>User Report</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                App Code: {appCodeForName(row.clientName)}
-              </Text>
-              <Text style={styles.cardSplitRight} numberOfLines={1}>
-                DP: {display(row.userId)}
-              </Text>
-            </View>
-            <View style={styles.cardSplitRow}>
-              <Text style={styles.cardSplitLeft}>
-                Deposit: {formatAmt(row.approvedDepositAmount)}
-              </Text>
-              <Text style={styles.cardSplitRight}>
-                Refund: {formatAmt(row.approvedWithdrawalAmount)}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Mobile</Text>
-              <Text style={styles.cardValue}>{maskMobile(row.mobile, !!canShowMobile)}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardLabel}>Last Activity</Text>
-              <Text style={styles.cardValue} numberOfLines={1}>
-                {lastActivity(row.activeUser)}
-              </Text>
-            </View>
-            <Text style={styles.cardHint}>Tap card for details & MID breakdown</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No data"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!midPickerOpen}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -716,7 +600,129 @@ export function DepositListScreen() {
         actions={sheetActions}
         onClose={() => setSheetRow(null)}
       />
-    </ScrollView>
+
+      <Modal
+        visible={midPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMidPickerOpen(false)}
+      >
+        <View style={styles.pickerBackdrop}>
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>Select MID</Text>
+            <TextInput
+              style={styles.pickerSearch}
+              value={midPickerQuery}
+              onChangeText={setMidPickerQuery}
+              placeholder="Search MID…"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              blurOnSubmit={false}
+            />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={styles.pickerList}
+              keyboardShouldPersistTaps="handled"
+            >
+              <TouchableOpacity
+                style={[styles.pickerRow, !mid && styles.pickerRowActive]}
+                onPress={() => {
+                  setMid('');
+                  setPage(1);
+                  setMidPickerOpen(false);
+                }}
+              >
+                <Text style={[styles.pickerRowText, !mid && styles.pickerRowTextActive]}>All</Text>
+              </TouchableOpacity>
+              {filteredMidOptions.map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.pickerRow, mid === m && styles.pickerRowActive]}
+                  onPress={() => {
+                    setMid(m);
+                    setPage(1);
+                    setMidPickerOpen(false);
+                  }}
+                >
+                  <Text style={[styles.pickerRowText, mid === m && styles.pickerRowTextActive]}>
+                    {m}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.pickerClose} onPress={() => setMidPickerOpen(false)}>
+              <Text style={styles.pickerCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
+
+type DepositListCardProps = {
+  row: DepositListRow;
+  index: number;
+  page: number;
+  pageSize: number;
+  canShowMobile: boolean;
+  onOpenSheet: () => void;
+  onOpenReport: () => void;
+};
+
+const DepositListCard = memo(function DepositListCard({
+  row,
+  index,
+  page,
+  pageSize,
+  canShowMobile,
+  onOpenSheet,
+  onOpenReport,
+}: DepositListCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        {row.userId ? (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={onOpenReport}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Text style={styles.reportBtnText}>User Report</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          App Code: {appCodeForName(row.clientName)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          DP: {display(row.userId)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Deposit: {formatAmt(row.approvedDepositAmount)}</Text>
+        <Text style={styles.cardSplitRight}>
+          Refund: {formatAmt(row.approvedWithdrawalAmount)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue}>{maskMobile(row.mobile, canShowMobile)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Last Activity</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {lastActivity(row.activeUser)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & MID breakdown</Text>
+    </TouchableOpacity>
+  );
+});
 

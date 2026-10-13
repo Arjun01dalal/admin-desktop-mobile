@@ -5,11 +5,12 @@
  * funds.allPayment { mid, startDate, endDate, paymentGateway? }) with KPIs and the
  * Automatic / Scanner Add / Scanner Remove selector.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, ScrollView, Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { whatsappPaymentGatewayName } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
@@ -19,6 +20,7 @@ import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSh
 import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
 import { rowsToCsv, shareCsvFile } from '../../../utils/shareCsv';
 import { styles } from './FundsScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   name: string;
@@ -56,11 +58,6 @@ const REQUEST_TYPES: { key: RequestType; label: string }[] = [
   { key: 'scanner add', label: 'Scanner Add' },
   { key: 'scanner remove', label: 'Scanner Remove' },
 ];
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 function roundAmt(value: unknown): number {
   const num = Number(value);
@@ -549,12 +546,8 @@ export function FundsScreen() {
 
   // ---------- MID list view ----------
   if (view === 'mids') {
-    return (
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+    const midsHeader = (
+      <>
         <TouchableOpacity onPress={() => setView('main')}>
           <Text style={styles.backLink}>‹ Back to Funds</Text>
         </TouchableOpacity>
@@ -584,58 +577,38 @@ export function FundsScreen() {
           {startDate} → {endDate} · {drillMids.length} MIDs
           {gatewayOnly ? ' · Gateway-only access — MID details are locked' : ''}
         </Text>
-        {drillMids.length === 0 ? <Text style={styles.hint}>No MIDs</Text> : null}
-        <View style={styles.list}>
-          {drillMids.map((row, index) => (
-            <TouchableOpacity
-              key={`${row.mid}-${index}`}
-              style={[styles.card, gatewayOnly && styles.cardDisabled]}
-              activeOpacity={gatewayOnly ? 1 : 0.75}
-              disabled={gatewayOnly}
+      </>
+    );
+
+    return (
+      <View style={styles.screen}>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={drillMids}
+          keyExtractor={(row, index) => `${row.mid}-${index}`}
+          renderItem={({ item: row, index }: ListRenderItemInfo<MidRow>) => (
+            <FundsMidCard
+              row={row}
+              index={index}
+              gatewayOnly={gatewayOnly}
               onPress={() => {
                 const midId = String(row.mid || '').trim();
                 if (midId) openPayin(midId);
               }}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.mid)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>Final: {formatAmt(row.finalAmount)}</Text>
-                <Text style={styles.cardSplitRight}>Txn: {formatAmt(row.transactionAmount)}</Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>Scan+: {formatAmt(row.coinAdd)}</Text>
-                <Text style={styles.cardSplitRight}>Scan−: {formatAmt(row.coinRemove)}</Text>
-              </View>
-              <Text style={styles.cardHint}>
-                {gatewayOnly ? 'MID details locked' : 'Tap card for transactions'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+            />
+          )}
+          listHeader={midsHeader}
+          emptyMessage="No MIDs"
+        />
+      </View>
     );
   }
 
   // ---------- Payin (transaction list) view ----------
   if (view === 'payin') {
-    return (
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={payinLoading}
-            onRefresh={() => void loadPayin(selectedMid)}
-            tintColor={colors.primary}
-          />
-        }
-      >
+    const payinHeader = (
+      <>
         <TouchableOpacity onPress={() => setView('mids')}>
           <Text style={styles.backLink}>‹ Back to MIDs</Text>
         </TouchableOpacity>
@@ -704,69 +677,32 @@ export function FundsScreen() {
             <Text style={styles.errorText}>{payinError}</Text>
           </View>
         ) : null}
+      </>
+    );
 
-        {payinLoading && payinRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-        {!payinLoading && payinRows.length === 0 ? (
-          <Text style={styles.hint}>No transactions</Text>
-        ) : null}
-
-        <View style={styles.list}>
-          {payinRows.map((row, index) => {
-            const isAuto = requestType === 'automaticDeposit';
-            const title = isAuto ? display(row.userName) : display(row.userId);
-            return (
-              <TouchableOpacity
-                key={`row-${index}-${String(row._id || row.orderId || '')}`}
-                style={styles.card}
-                activeOpacity={0.75}
-                onPress={() => setTxnSheet(row)}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardIndex}>#{index + 1}</Text>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {title}
-                  </Text>
-                </View>
-                {isAuto ? (
-                  <>
-                    <View style={styles.cardSplitRow}>
-                      <Text style={styles.cardSplitLeft}>Amount: {display(row.amount)}</Text>
-                      <Text style={styles.cardSplitRight} numberOfLines={1}>
-                        {canShowMobile
-                          ? display(row.userMobile)
-                          : row.userMobile
-                            ? '**********'
-                            : '—'}
-                      </Text>
-                    </View>
-                    <View style={styles.cardRow}>
-                      <Text style={styles.cardLabel}>Created</Text>
-                      <Text style={styles.cardValue} numberOfLines={1}>
-                        {dt(row.createdOn ?? row.createdAt)}
-                      </Text>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.cardSplitRow}>
-                      <Text style={styles.cardSplitLeft}>Balance: {display(row.balance)}</Text>
-                      <Text style={styles.cardSplitRight} numberOfLines={1}>
-                        {display(row.reason)}
-                      </Text>
-                    </View>
-                    <View style={styles.cardRow}>
-                      <Text style={styles.cardLabel}>Created</Text>
-                      <Text style={styles.cardValue} numberOfLines={1}>
-                        {dt(row.createdOn ?? row.createdAt)}
-                      </Text>
-                    </View>
-                  </>
-                )}
-                <Text style={styles.cardHint}>Tap card for full details</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+    return (
+      <View style={styles.screen}>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={payinRows}
+          keyExtractor={(row, index) => `row-${index}-${String(row._id || row.orderId || '')}`}
+          renderItem={({ item: row, index }: ListRenderItemInfo<TxnRow>) => (
+            <FundsPayinCard
+              row={row}
+              index={index}
+              isAuto={requestType === 'automaticDeposit'}
+              canShowMobile={canShowMobile}
+              onPress={() => setTxnSheet(row)}
+            />
+          )}
+          listHeader={payinHeader}
+          loading={payinLoading}
+          emptyMessage="No transactions"
+          refreshing={payinLoading}
+          onRefresh={() => void loadPayin(selectedMid)}
+          refreshEnabled={!downloadOpen}
+        />
 
         <RowDetailSheet
           visible={txnSheet !== null}
@@ -809,24 +745,13 @@ export function FundsScreen() {
           onClose={() => setDownloadOpen(false)}
           onVerified={() => downloadSheet()}
         />
-      </ScrollView>
+      </View>
     );
   }
 
   // ---------- Main view ----------
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const mainHeader = (
+    <>
       <Text style={styles.title}>Funds</Text>
 
       {canShowTotal ? (
@@ -873,41 +798,25 @@ export function FundsScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No data</Text> : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const label = row.name === 'coinRemove' ? 'Other Removal' : display(row.name);
-          return (
-            <TouchableOpacity
-              key={`${row.name}-${index}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => openMids(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {label}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>Total: {formatAmt(row.totalFinalAmount)}</Text>
-                <Text style={styles.cardSplitRight}>
-                  Auto: {formatAmt(row.totalTransactionAmount)}
-                </Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Points Remove</Text>
-                <Text style={styles.cardValue}>{formatAmt(row.totalCoinRemove)}</Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card to open MID list</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={(row, index) => `${row.name}-${index}`}
+        renderItem={({ item: row, index }: ListRenderItemInfo<Row>) => (
+          <FundsMainCard row={row} index={index} onPress={() => openMids(row)} />
+        )}
+        listHeader={mainHeader}
+        loading={loading}
+        emptyMessage="No data"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -922,7 +831,137 @@ export function FundsScreen() {
         actions={sheetActions}
         onClose={() => setSheetRow(null)}
       />
-    </ScrollView>
+    </View>
   );
 }
+
+type FundsMainCardProps = {
+  row: Row;
+  index: number;
+  onPress: () => void;
+};
+
+const FundsMainCard = memo(function FundsMainCard({ row, index, onPress }: FundsMainCardProps) {
+  const label = row.name === 'coinRemove' ? 'Other Removal' : display(row.name);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Total: {formatAmt(row.totalFinalAmount)}</Text>
+        <Text style={styles.cardSplitRight}>Auto: {formatAmt(row.totalTransactionAmount)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Points Remove</Text>
+        <Text style={styles.cardValue}>{formatAmt(row.totalCoinRemove)}</Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card to open MID list</Text>
+    </TouchableOpacity>
+  );
+});
+
+type FundsMidCardProps = {
+  row: MidRow;
+  index: number;
+  gatewayOnly: boolean;
+  onPress: () => void;
+};
+
+const FundsMidCard = memo(function FundsMidCard({
+  row,
+  index,
+  gatewayOnly,
+  onPress,
+}: FundsMidCardProps) {
+  return (
+    <TouchableOpacity
+      style={[styles.card, gatewayOnly && styles.cardDisabled]}
+      activeOpacity={gatewayOnly ? 1 : 0.75}
+      disabled={gatewayOnly}
+      onPress={onPress}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.mid)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Final: {formatAmt(row.finalAmount)}</Text>
+        <Text style={styles.cardSplitRight}>Txn: {formatAmt(row.transactionAmount)}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Scan+: {formatAmt(row.coinAdd)}</Text>
+        <Text style={styles.cardSplitRight}>Scan−: {formatAmt(row.coinRemove)}</Text>
+      </View>
+      <Text style={styles.cardHint}>
+        {gatewayOnly ? 'MID details locked' : 'Tap card for transactions'}
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
+type FundsPayinCardProps = {
+  row: TxnRow;
+  index: number;
+  isAuto: boolean;
+  canShowMobile: boolean;
+  onPress: () => void;
+};
+
+const FundsPayinCard = memo(function FundsPayinCard({
+  row,
+  index,
+  isAuto,
+  canShowMobile,
+  onPress,
+}: FundsPayinCardProps) {
+  const title = isAuto ? display(row.userName) : display(row.userId);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {title}
+        </Text>
+      </View>
+      {isAuto ? (
+        <>
+          <View style={styles.cardSplitRow}>
+            <Text style={styles.cardSplitLeft}>Amount: {display(row.amount)}</Text>
+            <Text style={styles.cardSplitRight} numberOfLines={1}>
+              {canShowMobile ? display(row.userMobile) : row.userMobile ? '**********' : '—'}
+            </Text>
+          </View>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardLabel}>Created</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {dt(row.createdOn ?? row.createdAt)}
+            </Text>
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={styles.cardSplitRow}>
+            <Text style={styles.cardSplitLeft}>Balance: {display(row.balance)}</Text>
+            <Text style={styles.cardSplitRight} numberOfLines={1}>
+              {display(row.reason)}
+            </Text>
+          </View>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardLabel}>Created</Text>
+            <Text style={styles.cardValue} numberOfLines={1}>
+              {dt(row.createdOn ?? row.createdAt)}
+            </Text>
+          </View>
+        </>
+      )}
+      <Text style={styles.cardHint}>Tap card for full details</Text>
+    </TouchableOpacity>
+  );
+});
 

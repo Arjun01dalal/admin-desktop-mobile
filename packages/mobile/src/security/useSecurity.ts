@@ -1,10 +1,10 @@
 /**
  * useSecurity — aggregates runtime protections.
  * Preview builds: no freeRASP.
+ * Screen capture / recording is allowed (screenshot block disabled).
  */
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
-import { enableScreenshotBlock, disableScreenshotBlock } from './screenshot';
+import { disableScreenshotBlock } from './screenshot';
 import { useRaspThreats } from './raspGuard';
 import type { ThreatKind } from './rasp';
 
@@ -18,14 +18,7 @@ const BLOCKING: ThreatKind[] = ['privilegedAccess', 'hooks', 'appIntegrity', 'si
 
 export function useSecurity(): SecurityStatus {
   useEffect(() => {
-    void enableScreenshotBlock().catch(() => undefined);
-    const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void enableScreenshotBlock().catch(() => undefined);
-    });
-    return () => {
-      sub.remove();
-      void disableScreenshotBlock().catch(() => undefined);
-    };
+    void disableScreenshotBlock().catch(() => undefined);
   }, []);
 
   const { threats: raspThreats } = useRaspThreats();

@@ -3,23 +3,24 @@
  * casinoSwitch.list {}; add provider (casinoSwitch.create), toggle status
  * (casinoSwitch.changeStatus), delete (casinoSwitch.delete, casino_delete_button).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './CasinoSwitchScreen.styles';
+import { display } from '../../../utils/display';
 
 type Row = {
   _id?: string;
@@ -30,11 +31,6 @@ type Row = {
   status?: boolean;
   [key: string]: unknown;
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 /** Tolerant list unpack matching desktop normalizeCasinoList. */
 function unpackList(raw: unknown): Row[] {
@@ -195,19 +191,20 @@ export function CasinoSwitchScreen() {
     }
   }
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <CasinoSwitchCard row={row} index={index} onPress={() => setSheetRow(row)} />
+    ),
+    [],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>{toDisplayText('Casino Switch')}</Text>
       <Text style={styles.sub}>{rows.length} providers</Text>
 
@@ -235,42 +232,23 @@ export function CasinoSwitchScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No providers found</Text> : null}
-
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const active = Boolean(row.status);
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSheetRow(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.casinoActiveProvider)}
-                </Text>
-                <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
-                  {active ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  Percent: {display(row.percent)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  {display(row.startAmount)} – {display(row.endAmount)}
-                </Text>
-              </View>
-              <Text style={styles.cardHint}>Tap card for details & actions</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        loading={loading}
+        emptyMessage="No providers found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -285,7 +263,42 @@ export function CasinoSwitchScreen() {
         actions={sheetActions}
         onClose={() => setSheetRow(null)}
       />
-    </ScrollView>
+    </>
   );
 }
 
+type CasinoSwitchCardProps = {
+  row: Row;
+  index: number;
+  onPress: () => void;
+};
+
+const CasinoSwitchCard = memo(function CasinoSwitchCard({
+  row,
+  index,
+  onPress,
+}: CasinoSwitchCardProps) {
+  const active = Boolean(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.casinoActiveProvider)}
+        </Text>
+        <Text style={[styles.statusPill, active ? styles.statusOn : styles.statusOff]}>
+          {active ? 'Active' : 'Inactive'}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Percent: {display(row.percent)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          {display(row.startAmount)} – {display(row.endAmount)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});

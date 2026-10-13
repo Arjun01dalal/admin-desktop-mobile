@@ -21,7 +21,8 @@ import { styles } from './DetailFilterBar.styles';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Mobile page-size chips — shared pagination, compact subset for small screens. */
-export const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50, 100, 200]);
+/** Mobile lists are card/table-mapped — keep page sizes small for JS/thread health. */
+export const PAGE_SIZE_OPTIONS = pickPageSizes([10, 25, 50]);
 
 /** One search field option; `key` is sent as the server-side filter key (mirrors desktop). */
 export type SearchFieldOption = { key: string; label: string };
@@ -41,12 +42,20 @@ type Props = {
   onStartDateChange: (v: string) => void;
   onEndDateChange: (v: string) => void;
   onApply: () => void;
+  /** When provided, shows All Data (fetch without date range). */
+  onAllData?: () => void;
+  /** When provided, shows Clear Dates (clear date inputs only). */
+  onClearDates?: () => void;
+  /** When provided, shows Clear All Filters (reset dates + search/status filters). */
+  onClearAllFilters?: () => void;
   /** When provided, renders the app filter chips (All Apps + client apps). */
   appClientName?: string;
   onAppChange?: (v: string) => void;
   /** When provided, renders per-page chips. */
   pageSize?: number;
   onPageSizeChange?: (v: number) => void;
+  /** Override default PAGE_SIZE_OPTIONS when provided. */
+  pageSizeOptions?: number[];
   /** Per-screen search field set (defaults to SEARCH_FIELDS). */
   searchFields?: readonly SearchFieldOption[];
   /** When provided, renders the search row (field chips + text input + Search). */
@@ -55,6 +64,15 @@ type Props = {
   searchText?: string;
   onSearchTextChange?: (v: string) => void;
   onSearchSubmit?: () => void;
+  /** Collapsible filter box (Gtel / Played pattern). */
+  collapsible?: boolean;
+  /** Controlled expanded state when collapsible. */
+  filtersExpanded?: boolean;
+  onToggleFilters?: () => void;
+  /** Header label when collapsible (default 'Filters'). */
+  filtersTitle?: string;
+  /** Extra controls inside the expanded body (after dates/search). */
+  children?: React.ReactNode;
 };
 
 function Chip({
@@ -85,22 +103,38 @@ export function DetailFilterBar(props: Props) {
     onStartDateChange,
     onEndDateChange,
     onApply,
+    onAllData,
+    onClearDates,
+    onClearAllFilters,
     appClientName,
     onAppChange,
     pageSize,
     onPageSizeChange,
+    pageSizeOptions,
     searchFields = SEARCH_FIELDS,
     searchField,
     onSearchFieldChange,
     searchText,
     onSearchTextChange,
     onSearchSubmit,
+    collapsible,
+    filtersExpanded,
+    onToggleFilters,
+    filtersTitle = 'Filters',
+    children,
   } = props;
 
-  const datesValid = DATE_RE.test(startDate) && DATE_RE.test(endDate);
+  const bothEmpty = !startDate.trim() && !endDate.trim();
+  const allowEmptyDates = Boolean(onAllData || onClearDates || onClearAllFilters);
+  const datesValid =
+    (allowEmptyDates && bothEmpty) ||
+    (DATE_RE.test(startDate) && DATE_RE.test(endDate));
+  const showDateActions = Boolean(onAllData || onClearDates || onClearAllFilters);
+  const sizeOptions = pageSizeOptions?.length ? pageSizeOptions : PAGE_SIZE_OPTIONS;
+  const expanded = !collapsible || Boolean(filtersExpanded);
 
-  return (
-    <View style={styles.wrap}>
+  const body = (
+    <>
       <View style={styles.datesRow}>
         <View style={styles.dateField}>
           <Text style={styles.dateLabel}>From</Text>
@@ -122,6 +156,44 @@ export function DetailFilterBar(props: Props) {
           )}
         </TouchableOpacity>
       </View>
+
+      {showDateActions ? (
+        <View style={styles.actionBtnsRow}>
+          {onAllData ? (
+            <TouchableOpacity
+              style={[styles.secondaryBtn, styles.actionBtnFlex, loading && styles.btnDisabled]}
+              onPress={onAllData}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="All Data"
+            >
+              <Text style={styles.secondaryBtnText}>All Data</Text>
+            </TouchableOpacity>
+          ) : null}
+          {onClearDates ? (
+            <TouchableOpacity
+              style={[styles.secondaryBtn, styles.actionBtnFlex, loading && styles.btnDisabled]}
+              onPress={onClearDates}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Clear Dates"
+            >
+              <Text style={styles.secondaryBtnText}>Clear Dates</Text>
+            </TouchableOpacity>
+          ) : null}
+          {onClearAllFilters ? (
+            <TouchableOpacity
+              style={[styles.secondaryBtn, styles.actionBtnFlex, loading && styles.btnDisabled]}
+              onPress={onClearAllFilters}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Clear All Filters"
+            >
+              <Text style={styles.secondaryBtnText}>Clear All Filters</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       {onSearchTextChange && onSearchSubmit ? (
         <View style={styles.searchWrap}>
@@ -203,6 +275,8 @@ export function DetailFilterBar(props: Props) {
         </ScrollView>
       ) : null}
 
+      {children}
+
       {onPageSizeChange ? (
         <ScrollView
           horizontal
@@ -210,7 +284,7 @@ export function DetailFilterBar(props: Props) {
           contentContainerStyle={styles.row}
         >
           <Text style={styles.rowLabel}>Per page</Text>
-          {PAGE_SIZE_OPTIONS.map((n) => (
+          {sizeOptions.map((n) => (
             <Chip
               key={n}
               label={String(n)}
@@ -220,7 +294,26 @@ export function DetailFilterBar(props: Props) {
           ))}
         </ScrollView>
       ) : null}
+    </>
+  );
+
+  if (!collapsible) {
+    return <View style={styles.wrap}>{body}</View>;
+  }
+
+  return (
+    <View style={styles.filterBox}>
+      <TouchableOpacity
+        style={styles.filterHeader}
+        activeOpacity={0.8}
+        onPress={onToggleFilters}
+        accessibilityRole="button"
+        accessibilityLabel={filtersTitle}
+      >
+        <Text style={styles.filterHeaderTitle}>{filtersTitle}</Text>
+        <Text style={styles.filterHeaderChevron}>{expanded ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {expanded ? <View style={styles.filterBody}>{body}</View> : null}
     </View>
   );
 }
-

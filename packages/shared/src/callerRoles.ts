@@ -14,6 +14,9 @@ export const CALLER_ROLE_IDS = new Set([
   '694c2f99a8b2fd753572f671',
 ]);
 
+/** Only this role's lists are auto-filtered by login empCode (admin-panel-domains). */
+export const EMPCODE_LIST_FILTER_ROLE_ID = '6864ced73cc84c862f86c17f';
+
 export const FULL_ALLOTMENT_ROLE_IDS = new Set(['68c29196001c4b3d02b1aa32']);
 
 export const OFFICE_LOCATIONS = ['Dubai', 'Nagpur', 'Nagpur/Dubai'] as const;

@@ -7,7 +7,7 @@
  * Pending deposit rows can have their status changed (deposits.updateStatus)
  * when the admin has the Deposit_Pensil permission.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,15 +20,18 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { CLIENT_NAMES, appCodeForName, asPaged, unpackPayload } from '@astro/shared';
 import { colors, spacing } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar, PAGE_SIZE_OPTIONS } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './FundRequestScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 // ---- summary payload shapes (desktop transactions/shared.ts parity) ----
 
@@ -160,17 +163,6 @@ const TONE_COLOR: Record<KpiTone, string> = {
 
 function apiFailed(res: { ok: boolean; success?: boolean }): boolean {
   return !res.ok || res.success === false;
-}
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(mobile: unknown, show: boolean): string {
-  const m = mobile == null ? '' : String(mobile);
-  if (!m) return '—';
-  return show ? m : `${'*'.repeat(Math.max(0, m.length - 4))}${m.slice(-4)}`;
 }
 
 function num(v: unknown): number {
@@ -780,6 +772,29 @@ export function FundRequestScreen() {
     return base;
   }, [sheetRow, drillType, canShowMobile]);
 
+  const keyExtractor = useCallback(
+    (r: TxnRow, i: number) => `row-${i}-${String(r._id || r.orderId || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: r }: ListRenderItemInfo<TxnRow>) => (
+      <FundRequestTxnCard
+        row={r}
+        drillType={drillType}
+        canShowMobile={!!canShowMobile}
+        canPencil={!!canPencil}
+        onOpenSheet={() => setSheetRow(r)}
+        onEdit={() => {
+          setEditRow(r);
+          setEditStatus('');
+          setEditRemark('');
+        }}
+      />
+    ),
+    [drillType, canShowMobile, canPencil],
+  );
+
   if (!canViewDeposit && !canViewWithdrawal) {
     return (
       <View style={[styles.screen, styles.centered]}>
@@ -788,299 +803,138 @@ export function FundRequestScreen() {
     );
   }
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.screen}
-      contentContainerStyle={{ padding: spacing(3), paddingBottom: spacing(10) }}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl
-          refreshing={summaryLoading}
-          onRefresh={() => {
-            void loadSummary({ allData });
-            reloadDrill();
-          }}
-        />
-      }
-    >
-      {!drillOpen ? (
-        <>
-          <DetailFilterBar
-            startDate={startDate}
-            endDate={endDate}
-            loading={summaryLoading}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            onApply={() => {
-              void loadSummary({ allData: false });
-              reloadDrill();
-            }}
-          />
+  const drillListHeader = (
+    <View>
+      <TouchableOpacity onPress={() => setDrillOpen(false)}>
+        <Text style={styles.backLink}>‹ Back to Fund Requests</Text>
+      </TouchableOpacity>
+      <Text style={styles.sectionTitle}>
+        {drillLabel || (drillType === 'deposit' ? 'Deposit' : 'Refund')} ({total})
+      </Text>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: spacing(2) }}
+      >
+        {statusOptions.map((s) => (
           <TouchableOpacity
-            style={styles.allDataBtn}
-            disabled={summaryLoading}
-            onPress={() => void loadSummary({ allData: true })}
+            key={s || 'all'}
+            style={[
+              styles.chip,
+              statusFilter === s && approvedDateScope === null && styles.chipActive,
+            ]}
+            onPress={() => applyStatusChip(s)}
           >
-            <Text style={styles.allDataText}>{allData ? '✓ All Data (active)' : 'All Data'}</Text>
-          </TouchableOpacity>
-
-          {summaryLoading ? (
-            <View style={styles.loaderWrap}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.hint}>Loading…</Text>
-            </View>
-          ) : (
-            <View style={styles.kpiGrid}>
-              {kpiItems
-                .filter((c) => c.show !== false)
-                .map((c) => {
-                  const color = TONE_COLOR[c.tone];
-                  return (
-                    <TouchableOpacity
-                      key={c.key}
-                      style={[styles.kpiCard, { borderColor: c.active ? color : colors.border }]}
-                      activeOpacity={c.onPress ? 0.7 : 1}
-                      onPress={c.onPress}
-                      disabled={!c.onPress || summaryLoading}
-                    >
-                      <Text style={[styles.kpiLabel, { color }]} numberOfLines={2}>
-                        {c.label}
-                      </Text>
-                      <Text style={styles.kpiValue}>
-                        ({c.bucket.count ?? 0}) : {c.bucket.totalAmount ?? 0}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-            </View>
-          )}
-        </>
-      ) : null}
-
-      {drillOpen && drillType ? (
-        <View>
-          <TouchableOpacity onPress={() => setDrillOpen(false)}>
-            <Text style={styles.backLink}>‹ Back to Fund Requests</Text>
-          </TouchableOpacity>
-          <Text style={styles.sectionTitle}>
-            {drillLabel || (drillType === 'deposit' ? 'Deposit' : 'Refund')} ({total})
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ marginBottom: spacing(2) }}
-          >
-            {statusOptions.map((s) => (
-              <TouchableOpacity
-                key={s || 'all'}
-                style={[
-                  styles.chip,
-                  statusFilter === s && approvedDateScope === null && styles.chipActive,
-                ]}
-                onPress={() => applyStatusChip(s)}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    statusFilter === s && approvedDateScope === null && styles.chipTextActive,
-                  ]}
-                >
-                  {s || 'All'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <View style={styles.filterRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="User Name"
-              placeholderTextColor={colors.muted}
-              value={userNameFilter}
-              onChangeText={setUserNameFilter}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Amount"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-              value={amountFilter}
-              onChangeText={setAmountFilter}
-            />
-          </View>
-          {drillType === 'deposit' ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: spacing(2) }}
+            <Text
+              style={[
+                styles.chipText,
+                statusFilter === s && approvedDateScope === null && styles.chipTextActive,
+              ]}
             >
-              <TouchableOpacity
-                style={[styles.chip, appFilter === '' && styles.chipActive]}
-                onPress={() => setAppFilter('')}
-              >
-                <Text style={[styles.chipText, appFilter === '' && styles.chipTextActive]}>
-                  All Apps
-                </Text>
-              </TouchableOpacity>
-              {CLIENT_NAMES.map((name) => (
-                <TouchableOpacity
-                  key={name}
-                  style={[styles.chip, appFilter === name && styles.chipActive]}
-                  onPress={() => setAppFilter(name)}
-                >
-                  <Text style={[styles.chipText, appFilter === name && styles.chipTextActive]}>
-                    {appCodeForName(name)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : null}
-          <View style={styles.filterRow}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-              {PAGE_SIZE_OPTIONS.map((n) => (
-                <TouchableOpacity
-                  key={n}
-                  style={[styles.chip, pageSize === n && styles.chipActive]}
-                  onPress={() => {
-                    setPageSize(n);
-                    setPage(1);
-                    reloadDrill({ itemsPerPage: n, pageNo: 1 });
-                  }}
-                >
-                  <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>
-                    {n}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              {s || 'All'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <View style={styles.filterRow}>
+        <TextInput
+          style={styles.input}
+          placeholder="User Name"
+          placeholderTextColor={colors.muted}
+          value={userNameFilter}
+          onChangeText={setUserNameFilter}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Amount"
+          placeholderTextColor={colors.muted}
+          keyboardType="numeric"
+          value={amountFilter}
+          onChangeText={setAmountFilter}
+        />
+      </View>
+      {drillType === 'deposit' ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: spacing(2) }}
+        >
+          <TouchableOpacity
+            style={[styles.chip, appFilter === '' && styles.chipActive]}
+            onPress={() => setAppFilter('')}
+          >
+            <Text style={[styles.chipText, appFilter === '' && styles.chipTextActive]}>
+              All Apps
+            </Text>
+          </TouchableOpacity>
+          {CLIENT_NAMES.map((name) => (
             <TouchableOpacity
-              style={styles.applyBtn}
-              disabled={tableLoading}
+              key={name}
+              style={[styles.chip, appFilter === name && styles.chipActive]}
+              onPress={() => setAppFilter(name)}
+            >
+              <Text style={[styles.chipText, appFilter === name && styles.chipTextActive]}>
+                {appCodeForName(name)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : null}
+      <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <TouchableOpacity
+              key={n}
+              style={[styles.chip, pageSize === n && styles.chipActive]}
               onPress={() => {
+                setPageSize(n);
                 setPage(1);
-                reloadDrill({ pageNo: 1 });
+                reloadDrill({ itemsPerPage: n, pageNo: 1 });
               }}
             >
-              <Text style={styles.applyBtnText}>Apply</Text>
+              <Text style={[styles.chipText, pageSize === n && styles.chipTextActive]}>{n}</Text>
             </TouchableOpacity>
-          </View>
+          ))}
+        </ScrollView>
+        <TouchableOpacity
+          style={styles.applyBtn}
+          disabled={tableLoading}
+          onPress={() => {
+            setPage(1);
+            reloadDrill({ pageNo: 1 });
+          }}
+        >
+          <Text style={styles.applyBtnText}>Apply</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
-          {tableLoading ? <Text style={styles.empty}>Loading…</Text> : null}
-          {!tableLoading && rows.length === 0 ? (
-            <Text style={styles.empty}>No transactions found</Text>
-          ) : null}
+  const drillListFooter =
+    rows.length > 0 ? (
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, (page <= 1 || tableLoading) && styles.pagerDisabled]}
+          onPress={() => page > 1 && !tableLoading && goPage(page - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {page} / {totalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, (page >= totalPages || tableLoading) && styles.pagerDisabled]}
+          onPress={() => page < totalPages && !tableLoading && goPage(page + 1)}
+        >
+          Next ›
+        </Text>
+      </View>
+    ) : null;
 
-          {rows.map((r, i) => {
-            const st = String(r.status || '').toLowerCase();
-            const stColor =
-              st === 'approved'
-                ? '#16a34a'
-                : st === 'pending'
-                  ? '#d97706'
-                  : st === 'rejected' || st === 'failed' || st === 'cancel'
-                    ? '#dc2626'
-                    : st === 'reverse'
-                      ? '#a855f7'
-                      : '#2563eb';
-            return (
-              <TouchableOpacity
-                key={`row-${i}-${String(r._id || r.orderId || '')}`}
-                style={styles.card}
-                activeOpacity={0.7}
-                onPress={() => setSheetRow(r)}
-              >
-                <View style={styles.cardTop}>
-                  <Text style={styles.cardName} numberOfLines={1}>
-                    {display(r.userName)}
-                  </Text>
-                  <View style={[styles.pill, { backgroundColor: `${stColor}22` }]}>
-                    <Text style={[styles.pillText, { color: stColor }]}>{display(r.status)}</Text>
-                  </View>
-                </View>
-                <View style={styles.cardGrid}>
-                  <View style={styles.cardCell}>
-                    <Text style={styles.cardLabel}>Amount</Text>
-                    <Text style={styles.cardValue}>{display(r.amount)}</Text>
-                  </View>
-                  <View style={styles.cardCell}>
-                    <Text style={styles.cardLabel}>App</Text>
-                    <Text style={styles.cardValue}>
-                      {display(appCodeForName(r.clientName) || r.clientName)}
-                    </Text>
-                  </View>
-                  <View style={styles.cardCell}>
-                    <Text style={styles.cardLabel}>Mobile</Text>
-                    <Text style={styles.cardValue}>
-                      {maskMobile(r.userMobile || r.mobile, canShowMobile)}
-                    </Text>
-                  </View>
-                  <View style={styles.cardCell}>
-                    <Text style={styles.cardLabel}>Date</Text>
-                    <Text style={styles.cardValue}>{formatDisplayDate(r.createdOn) || '—'}</Text>
-                  </View>
-                  {drillType === 'withdrawal' ? (
-                    <>
-                      <View style={styles.cardCell}>
-                        <Text style={styles.cardLabel}>Bank</Text>
-                        <Text style={styles.cardValue} numberOfLines={1}>
-                          {display(r.userBankName || r.bankName)}
-                        </Text>
-                      </View>
-                      <View style={styles.cardCell}>
-                        <Text style={styles.cardLabel}>Account</Text>
-                        <Text style={styles.cardValue} numberOfLines={1}>
-                          {display(r.accountNumber || r.accountNo)}
-                        </Text>
-                      </View>
-                    </>
-                  ) : null}
-                </View>
-                {drillType === 'deposit' && st === 'pending' && canPencil ? (
-                  <TouchableOpacity
-                    style={styles.editBtn}
-                    onPress={() => {
-                      setEditRow(r);
-                      setEditStatus('');
-                      setEditRemark('');
-                    }}
-                  >
-                    <Text style={styles.editBtnText}>✏️ Change Status</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })}
-
-          {rows.length > 0 ? (
-            <View style={styles.pager}>
-              <Text
-                style={[styles.pagerBtn, (page <= 1 || tableLoading) && styles.pagerDisabled]}
-                onPress={() => page > 1 && !tableLoading && goPage(page - 1)}
-              >
-                ‹ Prev
-              </Text>
-              <Text style={styles.pagerLabel}>
-                Page {page} / {totalPages}
-              </Text>
-              <Text
-                style={[
-                  styles.pagerBtn,
-                  (page >= totalPages || tableLoading) && styles.pagerDisabled,
-                ]}
-                onPress={() => page < totalPages && !tableLoading && goPage(page + 1)}
-              >
-                Next ›
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-      {!drillOpen ? (
-        <Text style={styles.hint}>Kisi bhi card par tap karke uski transactions dekhein.</Text>
-      ) : null}
-
+  const sheetsAndModals = (
+    <>
       <RowDetailSheet
         visible={sheetRow !== null}
         title={sheetRow ? display(sheetRow.userName) : ''}
@@ -1088,7 +942,6 @@ export function FundRequestScreen() {
         onClose={() => setSheetRow(null)}
       />
 
-      {/* Change Deposit Status modal */}
       <Modal
         visible={editRow !== null}
         transparent
@@ -1145,7 +998,188 @@ export function FundRequestScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </>
+  );
+
+  if (drillOpen && drillType) {
+    return (
+      <View style={styles.screen}>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={{ padding: spacing(3), paddingBottom: spacing(10) }}
+          data={rows}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          listHeader={drillListHeader}
+          listFooter={drillListFooter}
+          loading={tableLoading}
+          emptyMessage="No transactions found"
+          refreshing={tableLoading}
+          onRefresh={() => reloadDrill()}
+          refreshEnabled={editRow === null}
+          keyboardShouldPersistTaps="handled"
+        />
+        {sheetsAndModals}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.screen}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={styles.screen}
+        contentContainerStyle={{ padding: spacing(3), paddingBottom: spacing(10) }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={summaryLoading}
+            onRefresh={() => {
+              void loadSummary({ allData });
+              reloadDrill();
+            }}
+          />
+        }
+      >
+        <DetailFilterBar
+          startDate={startDate}
+          endDate={endDate}
+          loading={summaryLoading}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onApply={() => {
+            void loadSummary({ allData: false });
+            reloadDrill();
+          }}
+        />
+        <TouchableOpacity
+          style={styles.allDataBtn}
+          disabled={summaryLoading}
+          onPress={() => void loadSummary({ allData: true })}
+        >
+          <Text style={styles.allDataText}>{allData ? '✓ All Data (active)' : 'All Data'}</Text>
+        </TouchableOpacity>
+
+        {summaryLoading ? (
+          <View style={styles.loaderWrap}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.hint}>Loading…</Text>
+          </View>
+        ) : (
+          <View style={styles.kpiGrid}>
+            {kpiItems
+              .filter((c) => c.show !== false)
+              .map((c) => {
+                const color = TONE_COLOR[c.tone];
+                return (
+                  <TouchableOpacity
+                    key={c.key}
+                    style={[styles.kpiCard, { borderColor: c.active ? color : colors.border }]}
+                    activeOpacity={c.onPress ? 0.7 : 1}
+                    onPress={c.onPress}
+                    disabled={!c.onPress || summaryLoading}
+                  >
+                    <Text style={[styles.kpiLabel, { color }]} numberOfLines={2}>
+                      {c.label}
+                    </Text>
+                    <Text style={styles.kpiValue}>
+                      ({c.bucket.count ?? 0}) : {c.bucket.totalAmount ?? 0}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+          </View>
+        )}
+
+        <Text style={styles.hint}>Kisi bhi card par tap karke uski transactions dekhein.</Text>
+      </ScrollView>
+      {sheetsAndModals}
+    </View>
   );
 }
+
+type FundRequestTxnCardProps = {
+  row: TxnRow;
+  drillType: DrillType | null;
+  canShowMobile: boolean;
+  canPencil: boolean;
+  onOpenSheet: () => void;
+  onEdit: () => void;
+};
+
+const FundRequestTxnCard = memo(function FundRequestTxnCard({
+  row: r,
+  drillType,
+  canShowMobile,
+  canPencil,
+  onOpenSheet,
+  onEdit,
+}: FundRequestTxnCardProps) {
+  const st = String(r.status || '').toLowerCase();
+  const stColor =
+    st === 'approved'
+      ? '#16a34a'
+      : st === 'pending'
+        ? '#d97706'
+        : st === 'rejected' || st === 'failed' || st === 'cancel'
+          ? '#dc2626'
+          : st === 'reverse'
+            ? '#a855f7'
+            : '#2563eb';
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={onOpenSheet}>
+      <View style={styles.cardTop}>
+        <Text style={styles.cardName} numberOfLines={1}>
+          {display(r.userName)}
+        </Text>
+        <View style={[styles.pill, { backgroundColor: `${stColor}22` }]}>
+          <Text style={[styles.pillText, { color: stColor }]}>{display(r.status)}</Text>
+        </View>
+      </View>
+      <View style={styles.cardGrid}>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Amount</Text>
+          <Text style={styles.cardValue}>{display(r.amount)}</Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>App</Text>
+          <Text style={styles.cardValue}>
+            {display(appCodeForName(r.clientName) || r.clientName)}
+          </Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Mobile</Text>
+          <Text style={styles.cardValue}>
+            {maskMobile(r.userMobile || r.mobile, canShowMobile)}
+          </Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Date</Text>
+          <Text style={styles.cardValue}>{formatDisplayDate(r.createdOn) || '—'}</Text>
+        </View>
+        {drillType === 'withdrawal' ? (
+          <>
+            <View style={styles.cardCell}>
+              <Text style={styles.cardLabel}>Bank</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>
+                {display(r.userBankName || r.bankName)}
+              </Text>
+            </View>
+            <View style={styles.cardCell}>
+              <Text style={styles.cardLabel}>Account</Text>
+              <Text style={styles.cardValue} numberOfLines={1}>
+                {display(r.accountNumber || r.accountNo)}
+              </Text>
+            </View>
+          </>
+        ) : null}
+      </View>
+      {drillType === 'deposit' && st === 'pending' && canPencil ? (
+        <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+          <Text style={styles.editBtnText}>✏️ Change Status</Text>
+        </TouchableOpacity>
+      ) : null}
+    </TouchableOpacity>
+  );
+});
 

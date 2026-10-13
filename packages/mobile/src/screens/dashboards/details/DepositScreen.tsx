@@ -8,37 +8,39 @@
  * whatsapp_icon show WhatsApp / Telegram buttons inside the detail sheet
  * (Laxmi parity). Tapping a card opens the full detail sheet with every field.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import {
   appCodeForName,
-  asList,
   asPaged,
+  buildDepositWhatsAppMessage,
   canEditDeposit,
   canShowCheckAction,
   defaultSettleReason,
   isUpiGateway,
   settleReasonOptions,
-  unpackPayload,
+  parseDistinctMidOptions,
 } from '@astro/shared';
 import { colors } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { display, maskMobile } from '../../../utils/display';
 import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '../../../utils/empCodeNameCache';
 import * as ImagePicker from 'expo-image-picker';
 import { openPanelTarget } from '../../../navigation/panelDetail';
@@ -92,20 +94,10 @@ function formatCheckPerson(p?: CheckPerson): string {
 
 const STATUS_OPTIONS = ['', 'Pending', 'Approved', 'Rejected'] as const;
 
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
 function formatIN(value: unknown): string {
   const n = Number(value ?? 0);
   if (!Number.isFinite(n)) return '0';
   return n.toLocaleString('en-IN');
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
 }
 
 function statusBadge(status: unknown): string | undefined {
@@ -130,21 +122,6 @@ function formatPhone(raw?: string): string {
   return n;
 }
 
-/** State-aware WhatsApp greeting (Laxmi / desktop DepositCells parity). */
-function whatsAppMessage(row: DepositRow): string {
-  const state = row.userState || row.state || '';
-  const client = row.clientName || '';
-  const template =
-    state === 'Karnataka'
-      ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nನೀವು ಠೇವಣಿ ಮಾಡಲು ಪ್ರಯತ್ನಿಸುತ್ತಿರುವಿರಿ ಎಂದು ಕಾಣುತ್ತದೆ. ನಾನು ಇಂದು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?`
-      : ['Telangana', 'Andhra Pradesh'].includes(state)
-        ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nమీరు డిపాజిట్ చేయడానికి ప్రయత్నిస్తున్నారని నేను చూస్తున్నాను. నేను ఈ రోజు మీకు ఎలా సహాయం చేయగలను?`
-        : ['Tamil Nadu', 'Tiruchirappalli'].includes(state)
-          ? `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nநீங்கள் டெப்பாசிட் செய்ய முயற்சிக்கிறீர்கள் என்று பார்க்கிறேன். இன்று நான் உங்களுக்கு எப்படி உதவலாம்?`
-          : `Hello {USER_NAME} Sir,\nWelcome to ${client} Games.\nI see you're trying to make a deposit. How can I assist you today?`;
-  return template.replace('{USER_NAME}', (row.userName || '').split(' ')[0] || '');
-}
-
 async function openWhatsApp(row: DepositRow): Promise<void> {
   const raw = row.userMobile || row.mobile;
   if (!raw) {
@@ -152,7 +129,7 @@ async function openWhatsApp(row: DepositRow): Promise<void> {
     return;
   }
   const formatted = formatPhone(raw);
-  const encoded = encodeURIComponent(whatsAppMessage(row));
+  const encoded = encodeURIComponent(buildDepositWhatsAppMessage(row));
   const appUrl = `whatsapp://send?phone=${formatted}&text=${encoded}`;
   const webUrl = `https://wa.me/${formatted}?text=${encoded}`;
   try {
@@ -198,6 +175,9 @@ export function DepositScreen() {
   const [draftEnd, setDraftEnd] = useState(todayIST);
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
+  const [allData, setAllData] = useState(false);
+  const [midPickerOpen, setMidPickerOpen] = useState(false);
+  const [midPickerQuery, setMidPickerQuery] = useState('');
   const [status, setStatus] = useState<string>('Pending');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -262,13 +242,7 @@ export function DepositScreen() {
     void (async () => {
       const res = await secureApi<unknown>('deposits.mids', {});
       if (!res.ok) return;
-      const body = unpackPayload(res.data) as { items?: unknown };
-      const list = Array.isArray(res.data)
-        ? (res.data as { mid?: string | number }[])
-        : Array.isArray(body.items)
-          ? (body.items as { mid?: string | number }[])
-          : asList<{ mid?: string | number }>(res.data);
-      setMids(list.filter((m) => m && m.mid != null && m.mid !== '').map((m) => String(m.mid)));
+      setMids(parseDistinctMidOptions(res.data));
     })();
   }, []);
 
@@ -287,8 +261,16 @@ export function DepositScreen() {
         pageNo: page,
         filter,
       };
-      if (startDate) payload.startDate = startDate;
-      if (endDate) payload.endDate = endDate;
+      if (!allData) {
+        if (startDate && endDate) {
+          payload.startDate = startDate;
+          payload.endDate = endDate;
+        } else {
+          const today = todayIST();
+          payload.startDate = today;
+          payload.endDate = today;
+        }
+      }
       const res = await secureApi<unknown>('deposits.transactions', payload);
       if (gen !== genRef.current) return;
       if (!res.ok) {
@@ -306,22 +288,44 @@ export function DepositScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [status, applied, page, pageSize, startDate, endDate]);
+  }, [status, applied, page, pageSize, startDate, endDate, allData]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const applyDates = useCallback(() => {
+    setAllData(false);
     setStartDate(draftStart);
     setEndDate(draftEnd);
     setPage(1);
   }, [draftStart, draftEnd]);
 
+  const applyAllData = useCallback(() => {
+    setDraftStart('');
+    setDraftEnd('');
+    setStartDate('');
+    setEndDate('');
+    setAllData(true);
+    setPage(1);
+  }, []);
+
+  const clearDates = useCallback(() => {
+    setDraftStart('');
+    setDraftEnd('');
+    setAllData(false);
+  }, []);
+
   const search = useCallback(() => {
     setApplied({ field: searchField, text: draftSearch });
     setPage(1);
   }, [searchField, draftSearch]);
+
+  const filteredMids = useMemo(() => {
+    const q = midPickerQuery.trim().toLowerCase();
+    if (!q) return mids;
+    return mids.filter((m) => m.toLowerCase().includes(q));
+  }, [mids, midPickerQuery]);
 
   // Approve → open Manual Settle modal (desktop SettleDialog parity, simplified).
   const openSettle = useCallback(
@@ -685,22 +689,50 @@ export function DepositScreen() {
     );
   }, [sheetRow, canWhatsApp, canShowMobile]);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (r: DepositRow, i: number) => `row-${i}-${String(r._id || r.orderId || '')}`,
+    [],
+  );
+
+  const openSecondary = useCallback((r: DepositRow) => {
+    setSecName('');
+    setSecRow(r);
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item: r }: ListRenderItemInfo<DepositRow>) => (
+      <DepositCard
+        row={r}
+        canPencil={canPencil}
+        canShowMobile={canShowMobile}
+        checkingId={checkingId}
+        empCodeName={(() => {
+          const code = String(r.empCode || '').trim();
+          return code ? empCodeNameMap[code] || '' : '';
+        })()}
+        onOpenSheet={() => setSheetRow(r)}
+        onApprove={() => openSettle(r)}
+        onSecondary={() => openSecondary(r)}
+        onCheck={(check) => void markChecked(r, check)}
+      />
+    ),
+    [
+      canPencil,
+      canShowMobile,
+      checkingId,
+      empCodeNameMap,
+      openSettle,
+      openSecondary,
+      markChecked,
+    ],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Deposit</Text>
       <Text style={styles.sub}>
-        {startDate} → {endDate} · Total: {total.toLocaleString('en-IN')}
+        {allData ? 'All data' : `${startDate} → ${endDate}`} · Total:{' '}
+        {total.toLocaleString('en-IN')}
       </Text>
 
       <DetailFilterBar
@@ -710,6 +742,8 @@ export function DepositScreen() {
         onStartDateChange={setDraftStart}
         onEndDateChange={setDraftEnd}
         onApply={applyDates}
+        onAllData={applyAllData}
+        onClearDates={clearDates}
         pageSize={pageSize}
         onPageSizeChange={(n) => {
           setPageSize(n);
@@ -756,155 +790,46 @@ export function DepositScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {!loading && !rows.length ? <Text style={styles.empty}>No deposits found</Text> : null}
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
 
-      {rows.map((r, i) => {
-        const pending = String(r.status || '').toLowerCase() === 'pending';
-        const canApprove = canEditDeposit(r, canPencil);
-        const badge = statusBadge(r.status);
-        return (
-          <TouchableOpacity
-            key={`row-${i}-${String(r._id || r.orderId || '')}`}
-            style={styles.card}
-            activeOpacity={0.75}
-            onPress={() => setSheetRow(r)}
-          >
-            <View style={styles.cardTop}>
-              <Text style={styles.cardName} numberOfLines={1}>
-                {display(r.userName)}
-              </Text>
-              <View style={styles.statusRow}>
-                <View style={[styles.statusPill, badge ? { backgroundColor: badge } : null]}>
-                  <Text style={styles.statusPillText}>{display(r.status)}</Text>
-                </View>
-                {canApprove ? (
-                  <TouchableOpacity
-                    style={styles.approveIconBtn}
-                    onPress={() => openSettle(r)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    accessibilityLabel="Approve deposit"
-                  >
-                    <MaterialCommunityIcons name="check-circle" size={22} color="#16a34a" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </View>
-            <Text style={styles.cardAmount}>₹ {formatIN(r.amount)}</Text>
-            <View style={styles.cardGrid}>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>Emp Code</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(r.empCode)}
-                </Text>
-                {(() => {
-                  const code = String(r.empCode || '').trim();
-                  const name = code ? empCodeNameMap[code] : '';
-                  return name ? (
-                    <Text style={styles.cardEmpName} numberOfLines={1}>
-                      {name}
-                    </Text>
-                  ) : null;
-                })()}
-              </View>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>Payment Method</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {display(r.paymentGatewayName || r.paymentType)}
-                </Text>
-              </View>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>Mobile</Text>
-                <Text style={styles.cardValue} numberOfLines={1}>
-                  {maskMobile(r.userMobile || r.mobile, canShowMobile)}
-                </Text>
-              </View>
-              <View style={styles.cardCell}>
-                <Text style={styles.cardLabel}>App</Text>
-                <View style={styles.appRow}>
-                  <Text style={[styles.cardValue, styles.appValue]} numberOfLines={1}>
-                    {display(appCodeForName(r.clientName) || r.clientName)}
-                  </Text>
-                  {pending || canApprove ? (
-                    <TouchableOpacity
-                      style={styles.secondaryChip}
-                      onPress={() => {
-                        setSecName('');
-                        setSecRow(r);
-                      }}
-                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                    >
-                      <Text style={styles.secondaryChipText}>+ Secondary</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              </View>
-            </View>
-            {canShowCheckAction(r, canPencil) ? (
-              <View style={styles.cardBtnRow}>
-                {r.checkBy ? (
-                  <Text style={styles.checkDone} numberOfLines={1}>
-                    ✓ {display(r.checkBy.name)}
-                  </Text>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.checkBtn,
-                      checkingId === `${r.orderId}-first` && styles.btnDisabled,
-                    ]}
-                    disabled={!!checkingId}
-                    onPress={() => void markChecked(r, 'first')}
-                  >
-                    <Text style={styles.checkBtnText}>
-                      {checkingId === `${r.orderId}-first` ? '…' : 'Check'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {r.crossCheckBy ? (
-                  <Text style={styles.checkDone} numberOfLines={1}>
-                    ✓✓ {display(r.crossCheckBy.name)}
-                  </Text>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.checkBtn,
-                      checkingId === `${r.orderId}-second` && styles.btnDisabled,
-                    ]}
-                    disabled={!!checkingId}
-                    onPress={() => void markChecked(r, 'second')}
-                  >
-                    <Text style={styles.checkBtnText}>
-                      {checkingId === `${r.orderId}-second` ? '…' : 'Cross Check'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : null}
-            {pending && !canApprove && canShowCheckAction(r, canPencil) ? (
-              <Text style={styles.checkHint}>Approve after Check + Cross Check</Text>
-            ) : null}
-            <Text style={styles.cardHint}>Tap for all details</Text>
-          </TouchableOpacity>
-        );
-      })}
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
+  return (
+    <View style={styles.screen}>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No deposits found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+        refreshEnabled={!midPickerOpen}
+        extraData={checkingId}
+      />
 
       <RowDetailSheet
         visible={sheetRow !== null}
@@ -962,23 +887,20 @@ export function DepositScreen() {
 
               <Text style={styles.fieldLabel}>MID</Text>
               {mids.length ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.optionRow}>
-                    {mids.map((m) => (
-                      <TouchableOpacity
-                        key={m}
-                        style={[styles.optionChip, sMid === m && styles.optionChipActive]}
-                        onPress={() => setSMid(m)}
-                      >
-                        <Text
-                          style={[styles.optionChipText, sMid === m && styles.optionChipTextActive]}
-                        >
-                          {m}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
+                <TouchableOpacity
+                  style={styles.midSelectBtn}
+                  onPress={() => {
+                    setMidPickerQuery('');
+                    setMidPickerOpen(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select MID"
+                >
+                  <Text style={styles.midSelectBtnText} numberOfLines={1}>
+                    {sMid || 'Select MID'}
+                  </Text>
+                  <Text style={styles.midSelectChevron}>▾</Text>
+                </TouchableOpacity>
               ) : (
                 <TextInput
                   style={styles.input}
@@ -1086,7 +1008,188 @@ export function DepositScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+
+      <Modal
+        visible={midPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMidPickerOpen(false)}
+      >
+        <View style={styles.pickerBackdrop}>
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>Select MID</Text>
+            <TextInput
+              style={styles.pickerSearch}
+              value={midPickerQuery}
+              onChangeText={setMidPickerQuery}
+              placeholder="Search MID…"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              blurOnSubmit={false}
+            />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={styles.pickerList}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredMids.map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.pickerRow, sMid === m && styles.pickerRowActive]}
+                  onPress={() => {
+                    setSMid(m);
+                    setMidPickerOpen(false);
+                  }}
+                >
+                  <Text style={[styles.pickerRowText, sMid === m && styles.pickerRowTextActive]}>
+                    {m}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.pickerClose} onPress={() => setMidPickerOpen(false)}>
+              <Text style={styles.pickerCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
+
+type DepositCardProps = {
+  row: DepositRow;
+  canPencil: boolean;
+  canShowMobile: boolean;
+  checkingId: string;
+  empCodeName: string;
+  onOpenSheet: () => void;
+  onApprove: () => void;
+  onSecondary: () => void;
+  onCheck: (check: 'first' | 'second') => void;
+};
+
+const DepositCard = memo(function DepositCard({
+  row: r,
+  canPencil,
+  canShowMobile,
+  checkingId,
+  empCodeName,
+  onOpenSheet,
+  onApprove,
+  onSecondary,
+  onCheck,
+}: DepositCardProps) {
+  const pending = String(r.status || '').toLowerCase() === 'pending';
+  const canApprove = canEditDeposit(r, canPencil);
+  const badge = statusBadge(r.status);
+  const showChecks = canShowCheckAction(r, canPencil);
+
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardTop}>
+        <Text style={styles.cardName} numberOfLines={1}>
+          {display(r.userName)}
+        </Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusPill, badge ? { backgroundColor: badge } : null]}>
+            <Text style={styles.statusPillText}>{display(r.status)}</Text>
+          </View>
+          {canApprove ? (
+            <TouchableOpacity
+              style={styles.approveIconBtn}
+              onPress={onApprove}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityLabel="Approve deposit"
+            >
+              <MaterialCommunityIcons name="check-circle" size={22} color="#16a34a" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+      <Text style={styles.cardAmount}>₹ {formatIN(r.amount)}</Text>
+      <View style={styles.cardGrid}>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Emp Code</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {display(r.empCode)}
+          </Text>
+          {empCodeName ? (
+            <Text style={styles.cardEmpName} numberOfLines={1}>
+              {empCodeName}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Payment Method</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {display(r.paymentGatewayName || r.paymentType)}
+          </Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>Mobile</Text>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {maskMobile(r.userMobile || r.mobile, canShowMobile)}
+          </Text>
+        </View>
+        <View style={styles.cardCell}>
+          <Text style={styles.cardLabel}>App</Text>
+          <View style={styles.appRow}>
+            <Text style={[styles.cardValue, styles.appValue]} numberOfLines={1}>
+              {display(appCodeForName(r.clientName) || r.clientName)}
+            </Text>
+            {pending || canApprove ? (
+              <TouchableOpacity
+                style={styles.secondaryChip}
+                onPress={onSecondary}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              >
+                <Text style={styles.secondaryChipText}>+ Secondary</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      </View>
+      {showChecks ? (
+        <View style={styles.cardBtnRow}>
+          {r.checkBy ? (
+            <Text style={styles.checkDone} numberOfLines={1}>
+              ✓ {display(r.checkBy.name)}
+            </Text>
+          ) : (
+            <TouchableOpacity
+              style={[styles.checkBtn, checkingId === `${r.orderId}-first` && styles.btnDisabled]}
+              disabled={!!checkingId}
+              onPress={() => onCheck('first')}
+            >
+              <Text style={styles.checkBtnText}>
+                {checkingId === `${r.orderId}-first` ? '…' : 'Check'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {r.crossCheckBy ? (
+            <Text style={styles.checkDone} numberOfLines={1}>
+              ✓✓ {display(r.crossCheckBy.name)}
+            </Text>
+          ) : (
+            <TouchableOpacity
+              style={[styles.checkBtn, checkingId === `${r.orderId}-second` && styles.btnDisabled]}
+              disabled={!!checkingId}
+              onPress={() => onCheck('second')}
+            >
+              <Text style={styles.checkBtnText}>
+                {checkingId === `${r.orderId}-second` ? '…' : 'Cross Check'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : null}
+      {pending && !canApprove && showChecks ? (
+        <Text style={styles.checkHint}>Approve after Check + Cross Check</Text>
+      ) : null}
+      <Text style={styles.cardHint}>Tap for all details</Text>
+    </TouchableOpacity>
+  );
+});
 

@@ -3,15 +3,15 @@
  * Laxmi parity: Beneficiary List (Pending) filter forces Pending and omits dates.
  * Row actions reuse useWithdrawalActions (lock/check/approve/bulk/QR/Add Bene).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import {
   ACTIVE_USER_WITHDRAWAL_SORT_BY,
@@ -37,6 +37,7 @@ import {
   type ActiveUserWithdrawalSortOrder,
 } from '@astro/shared';
 import { colors, spacing } from '../../../theme';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission, isCallerRole } from '../../../auth/permissions';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
@@ -50,8 +51,9 @@ import { toWithdrawalRec } from '../../withdrawal/toWithdrawalRec';
 import { display, statusBadgeBg, type Rec } from '../../withdrawal/helpers';
 import { styles as wdStyles } from '../../WithdrawalScreen.styles';
 import { styles } from './ActiveUserWithdrawalScreen.styles';
+import { maskMobile } from '../../../utils/display';
 
-const PAGE_SIZE_OPTIONS = pickPageSizes([20, 50, 100, 200]);
+const PAGE_SIZE_OPTIONS = pickPageSizes([20, 50]);
 
 type AppliedFilters = {
   empCode: string;
@@ -67,11 +69,6 @@ function formatMoney(value: unknown): string {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
   return `₹${Math.round(n).toLocaleString('en-IN')}`;
-}
-
-function maskMobile(value: string, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? value : '**********';
 }
 
 export function ActiveUserWithdrawalScreen() {
@@ -359,32 +356,76 @@ export function ActiveUserWithdrawalScreen() {
     return fields;
   }, [applied.empCode, canShowMobile, isCaller, selected]);
 
-  const onCardPress = (row: Rec) => {
-    if (!bulkMode) {
-      setSelected(row);
-      return;
-    }
-    const id = txnIdOf(row);
-    if (!id) return;
-    setBulkSel((previous) => {
-      const next = { ...previous };
-      if (next[id]) delete next[id];
-      else next[id] = row;
-      return next;
-    });
-  };
+  const onCardPress = useCallback(
+    (row: Rec) => {
+      if (!bulkMode) {
+        setSelected(row);
+        return;
+      }
+      const id = txnIdOf(row);
+      if (!id) return;
+      setBulkSel((previous) => {
+        const next = { ...previous };
+        if (next[id]) delete next[id];
+        else next[id] = row;
+        return next;
+      });
+    },
+    [bulkMode, setSelected, txnIdOf, setBulkSel],
+  );
 
   const beneActive = beneficiaryAccounts.length > 0;
   const draftBeneActive = draftBeneficiaryAccounts.length > 0;
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.primary} />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Rec, index: number) => pickWithdrawalRowKey(row, index),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Rec>) => {
+      const id = txnIdOf(row);
+      const isBulkSelected = Boolean(id && bulkSel[id]);
+      return (
+        <ActiveWithdrawalCard
+          row={row}
+          index={index}
+          page={page}
+          pageSize={pageSize}
+          appliedEmpCode={applied.empCode}
+          isBulkSelected={isBulkSelected}
+          checksDisabled={perms.checksDisabled}
+          bulkMode={bulkMode}
+          actionBusy={actionBusy}
+          addBeneBusy={addBeneBusy}
+          canAddBeneficiary={perms.actions}
+          onPress={() => onCardPress(row)}
+          onBotReport={openBotReport}
+          onAddBeneficiary={openAddBene}
+          onCheck={doCheck}
+        />
+      );
+    },
+    [
+      page,
+      pageSize,
+      applied.empCode,
+      bulkSel,
+      perms.checksDisabled,
+      perms.actions,
+      bulkMode,
+      actionBusy,
+      addBeneBusy,
+      txnIdOf,
+      onCardPress,
+      openBotReport,
+      openAddBene,
+      doCheck,
+    ],
+  );
+
+  const listHeader = (
+    <>
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Active User Withdrawal</Text>
@@ -406,159 +447,167 @@ export function ActiveUserWithdrawalScreen() {
         </TouchableOpacity>
         {filtersExpanded ? (
           <>
-        <Text style={styles.fieldLabel}>Emp Code</Text>
-        <TextInput
-          style={styles.textInput}
-          value={draftEmpCode}
-          onChangeText={setDraftEmpCode}
-          placeholder="e.g. EMP001"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="characters"
-          autoCorrect={false}
-        />
+            <Text style={styles.fieldLabel}>Emp Code</Text>
+            <TextInput
+              style={styles.textInput}
+              value={draftEmpCode}
+              onChangeText={setDraftEmpCode}
+              placeholder="e.g. EMP001"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
 
-        <Text style={styles.fieldLabel}>From</Text>
-        <DateField value={startDate} onChange={setStartDate} />
-        <Text style={styles.fieldLabel}>To</Text>
-        <DateField value={endDate} onChange={setEndDate} />
+            <Text style={styles.fieldLabel}>From</Text>
+            <DateField value={startDate} onChange={setStartDate} />
+            <Text style={styles.fieldLabel}>To</Text>
+            <DateField value={endDate} onChange={setEndDate} />
 
-        <Text style={styles.fieldLabel}>Status</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-          {ACTIVE_USER_WITHDRAWAL_STATUSES.map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.chip, status === opt.value && styles.chipActive]}
-              onPress={() => {
-                setStatus(opt.value);
-                setApplied((prev) => ({ ...prev, status: opt.value }));
-                setPage(1);
-              }}
-            >
-              <Text style={[styles.chipText, status === opt.value && styles.chipTextActive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Text style={styles.fieldLabel}>Beneficiary List (Pending)</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-          <TouchableOpacity
-            style={[
-              styles.chip,
-              (benePendingOpen || beneActive) && styles.chipActive,
-            ]}
-            onPress={toggleBenePendingPanel}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                (benePendingOpen || beneActive) && styles.chipTextActive,
-              ]}
-            >
-              {beneficiaryAccounts.length === 0
-                ? `Bene Pending ${benePendingOpen ? '▲' : '▼'}`
-                : beneficiaryAccounts.length === 1
-                  ? (() => {
-                      const name = beneficiaryAccounts[0];
-                      const opt = beneAccOptions.find((o) => o.name === name);
-                      return opt
-                        ? `${opt.name} (${opt.pendingWithdrawalCount})`
-                        : name;
-                    })()
-                  : `${beneficiaryAccounts.length} Bene`}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-        {benePendingOpen ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-            <TouchableOpacity
-              style={[styles.chip, !draftBeneActive && styles.chipActive]}
-              onPress={() => setDraftBeneficiaryAccounts([])}
-            >
-              <Text style={[styles.chipText, !draftBeneActive && styles.chipTextActive]}>All</Text>
-            </TouchableOpacity>
-            {beneAccOptions.map((option) => {
-              const active = draftBeneficiaryAccounts.includes(option.name);
-              return (
+            <Text style={styles.fieldLabel}>Status</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {ACTIVE_USER_WITHDRAWAL_STATUSES.map((opt) => (
                 <TouchableOpacity
-                  key={option.name}
-                  style={[styles.chip, active && styles.chipActive]}
+                  key={opt.value}
+                  style={[styles.chip, status === opt.value && styles.chipActive]}
                   onPress={() => {
-                    setDraftBeneficiaryAccounts((prev) =>
-                      active ? prev.filter((n) => n !== option.name) : [...prev, option.name],
-                    );
+                    setStatus(opt.value);
+                    setApplied((prev) => ({ ...prev, status: opt.value }));
+                    setPage(1);
                   }}
                 >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {option.name} ({option.pendingWithdrawalCount})
+                  <Text style={[styles.chipText, status === opt.value && styles.chipTextActive]}>
+                    {opt.label}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              style={[styles.chip, styles.chipActive]}
-              onPress={applyBenePendingPanel}
-            >
-              <Text style={[styles.chipText, styles.chipTextActive]}>Done</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        ) : null}
+              ))}
+            </ScrollView>
 
-        <Text style={styles.fieldLabel}>Sort by</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-          {ACTIVE_USER_WITHDRAWAL_SORT_BY.map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.chip, sortBy === opt.value && styles.chipActive]}
-              onPress={() => setSortBy(opt.value)}
-            >
-              <Text style={[styles.chipText, sortBy === opt.value && styles.chipTextActive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            <Text style={styles.fieldLabel}>Beneficiary List (Pending)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              <TouchableOpacity
+                style={[styles.chip, (benePendingOpen || beneActive) && styles.chipActive]}
+                onPress={toggleBenePendingPanel}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    (benePendingOpen || beneActive) && styles.chipTextActive,
+                  ]}
+                >
+                  {beneficiaryAccounts.length === 0
+                    ? `Bene Pending ${benePendingOpen ? '▲' : '▼'}`
+                    : beneficiaryAccounts.length === 1
+                      ? (() => {
+                          const name = beneficiaryAccounts[0];
+                          const opt = beneAccOptions.find((o) => o.name === name);
+                          return opt
+                            ? `${opt.name} (${opt.pendingWithdrawalCount})`
+                            : name;
+                        })()
+                      : `${beneficiaryAccounts.length} Bene`}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+            {benePendingOpen ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+                <TouchableOpacity
+                  style={[styles.chip, !draftBeneActive && styles.chipActive]}
+                  onPress={() => setDraftBeneficiaryAccounts([])}
+                >
+                  <Text style={[styles.chipText, !draftBeneActive && styles.chipTextActive]}>
+                    All
+                  </Text>
+                </TouchableOpacity>
+                {beneAccOptions.map((option) => {
+                  const active = draftBeneficiaryAccounts.includes(option.name);
+                  return (
+                    <TouchableOpacity
+                      key={option.name}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => {
+                        setDraftBeneficiaryAccounts((prev) =>
+                          active
+                            ? prev.filter((n) => n !== option.name)
+                            : [...prev, option.name],
+                        );
+                      }}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {option.name} ({option.pendingWithdrawalCount})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={[styles.chip, styles.chipActive]}
+                  onPress={applyBenePendingPanel}
+                >
+                  <Text style={[styles.chipText, styles.chipTextActive]}>Done</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : null}
 
-        <Text style={styles.fieldLabel}>Order</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-          {ACTIVE_USER_WITHDRAWAL_SORT_ORDER.map((opt) => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.chip, sortOrder === opt.value && styles.chipActive]}
-              onPress={() => setSortOrder(opt.value)}
-            >
-              <Text style={[styles.chipText, sortOrder === opt.value && styles.chipTextActive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            <Text style={styles.fieldLabel}>Sort by</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {ACTIVE_USER_WITHDRAWAL_SORT_BY.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.chip, sortBy === opt.value && styles.chipActive]}
+                  onPress={() => setSortBy(opt.value)}
+                >
+                  <Text style={[styles.chipText, sortBy === opt.value && styles.chipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
-        <Text style={styles.fieldLabel}>Per page</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-          {PAGE_SIZE_OPTIONS.map((opt) => (
-            <TouchableOpacity
-              key={opt}
-              style={[styles.chip, pageSize === opt && styles.chipActive]}
-              onPress={() => {
-                setPageSize(opt);
-                setPage(1);
-              }}
-            >
-              <Text style={[styles.chipText, pageSize === opt && styles.chipTextActive]}>{opt}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            <Text style={styles.fieldLabel}>Order</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {ACTIVE_USER_WITHDRAWAL_SORT_ORDER.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.chip, sortOrder === opt.value && styles.chipActive]}
+                  onPress={() => setSortOrder(opt.value)}
+                >
+                  <Text
+                    style={[styles.chipText, sortOrder === opt.value && styles.chipTextActive]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
-        <View style={styles.filterActions}>
-          <TouchableOpacity style={[styles.formBtn, styles.formBtnPrimary]} onPress={applyFilters}>
-            <Text style={styles.formBtnPrimaryText}>Search</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.formBtn, styles.formBtnGhost]} onPress={handleClear}>
-            <Text style={styles.formBtnGhostText}>Clear</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.fieldLabel}>Per page</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.chip, pageSize === opt && styles.chipActive]}
+                  onPress={() => {
+                    setPageSize(opt);
+                    setPage(1);
+                  }}
+                >
+                  <Text style={[styles.chipText, pageSize === opt && styles.chipTextActive]}>
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.filterActions}>
+              <TouchableOpacity
+                style={[styles.formBtn, styles.formBtnPrimary]}
+                onPress={applyFilters}
+              >
+                <Text style={styles.formBtnPrimaryText}>Search</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.formBtn, styles.formBtnGhost]} onPress={handleClear}>
+                <Text style={styles.formBtnGhostText}>Clear</Text>
+              </TouchableOpacity>
+            </View>
           </>
         ) : null}
       </View>
@@ -619,69 +668,51 @@ export function ActiveUserWithdrawalScreen() {
         </View>
       ) : null}
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? <Text style={styles.hint}>No withdrawals found</Text> : null}
       {bulkMode ? (
         <Text style={styles.hint}>Tap cards to select/deselect for bulk actions</Text>
       ) : rows.length > 0 ? (
         <Text style={styles.hint}>Tap a card for details & actions</Text>
       ) : null}
+    </>
+  );
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const id = txnIdOf(row);
-          const isBulkSelected = Boolean(id && bulkSel[id]);
-          return (
-            <TouchableOpacity
-              key={pickWithdrawalRowKey(row, index)}
-              style={[styles.card, isBulkSelected && styles.cardBulkSelected]}
-              activeOpacity={0.75}
-              onPress={() => onCardPress(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text
-                  style={[
-                    styles.statusPill,
-                    { backgroundColor: statusBadgeBg(row.status), color: '#fff' },
-                  ]}
-                >
-                  {pickWithdrawalStatus(row)}
-                </Text>
-              </View>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {pickWithdrawalName(row)}
-              </Text>
-              <Text style={styles.cardMeta} numberOfLines={1}>
-                {pickWithdrawalDpId(row) || '—'} ·{' '}
-                {String(appCodeForName(pickWithdrawalApp(row)) || '—')}
-                {row.empCode || applied.empCode
-                  ? ` · ${String(row.empCode || applied.empCode)}`
-                  : ''}
-              </Text>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft}>
-                  {formatMoney(pickWithdrawalAmount(row) ?? row.amount)}
-                </Text>
-                <Text style={styles.cardSplitRight}>
-                  {formatDisplayDate(pickWithdrawalCreatedAt(row)) || '—'}
-                </Text>
-              </View>
-              <WithdrawalCardFooter
-                row={row}
-                checksDisabled={perms.checksDisabled}
-                bulkMode={bulkMode}
-                actionBusy={actionBusy}
-                addBeneBusy={addBeneBusy}
-                canAddBeneficiary={perms.actions}
-                onBotReport={openBotReport}
-                onAddBeneficiary={openAddBene}
-                onCheck={doCheck}
-              />
-            </TouchableOpacity>
-          );
-        })}
+  const listFooter =
+    rows.length > 0 ? (
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+          onPress={() => page > 1 && setPage((p) => p - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {page} / {totalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+          onPress={() => page < totalPages && setPage((p) => p + 1)}
+        >
+          Next ›
+        </Text>
       </View>
+    ) : null;
+
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No withdrawals found"
+        refreshing={loading}
+        onRefresh={onRefresh}
+        extraData={{ bulkMode, bulkSel, actionBusy, addBeneBusy }}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -744,27 +775,89 @@ export function ActiveUserWithdrawalScreen() {
         remark={remark}
         setRemark={setRemark}
       />
-
-      {rows.length > 0 ? (
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-            onPress={() => page > 1 && setPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {page} / {totalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-            onPress={() => page < totalPages && setPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
-      ) : null}
-    </ScrollView>
+    </>
   );
 }
+
+type ActiveWithdrawalCardProps = {
+  row: Rec;
+  index: number;
+  page: number;
+  pageSize: number;
+  appliedEmpCode: string;
+  isBulkSelected: boolean;
+  checksDisabled: boolean;
+  bulkMode: boolean;
+  actionBusy: boolean;
+  addBeneBusy: boolean;
+  canAddBeneficiary: boolean;
+  onPress: () => void;
+  onBotReport: (row: Rec) => void;
+  onAddBeneficiary: (row: Rec) => Promise<void>;
+  onCheck: (row: Rec, side: 'first' | 'second', value: boolean) => Promise<void>;
+};
+
+const ActiveWithdrawalCard = memo(function ActiveWithdrawalCard({
+  row,
+  index,
+  page,
+  pageSize,
+  appliedEmpCode,
+  isBulkSelected,
+  checksDisabled,
+  bulkMode,
+  actionBusy,
+  addBeneBusy,
+  canAddBeneficiary,
+  onPress,
+  onBotReport,
+  onAddBeneficiary,
+  onCheck,
+}: ActiveWithdrawalCardProps) {
+  return (
+    <TouchableOpacity
+      style={[styles.card, isBulkSelected && styles.cardBulkSelected]}
+      activeOpacity={0.75}
+      onPress={onPress}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text
+          style={[
+            styles.statusPill,
+            { backgroundColor: statusBadgeBg(row.status), color: '#fff' },
+          ]}
+        >
+          {pickWithdrawalStatus(row)}
+        </Text>
+      </View>
+      <Text style={styles.cardTitle} numberOfLines={1}>
+        {pickWithdrawalName(row)}
+      </Text>
+      <Text style={styles.cardMeta} numberOfLines={1}>
+        {pickWithdrawalDpId(row) || '—'} · {String(appCodeForName(pickWithdrawalApp(row)) || '—')}
+        {row.empCode || appliedEmpCode ? ` · ${String(row.empCode || appliedEmpCode)}` : ''}
+      </Text>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>
+          {formatMoney(pickWithdrawalAmount(row) ?? row.amount)}
+        </Text>
+        <Text style={styles.cardSplitRight}>
+          {formatDisplayDate(pickWithdrawalCreatedAt(row)) || '—'}
+        </Text>
+      </View>
+      <WithdrawalCardFooter
+        row={row}
+        checksDisabled={checksDisabled}
+        bulkMode={bulkMode}
+        actionBusy={actionBusy}
+        addBeneBusy={addBeneBusy}
+        canAddBeneficiary={canAddBeneficiary}
+        onBotReport={onBotReport}
+        onAddBeneficiary={onAddBeneficiary}
+        onCheck={onCheck}
+      />
+    </TouchableOpacity>
+  );
+});
 

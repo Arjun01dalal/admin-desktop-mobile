@@ -9,18 +9,28 @@
  * (bonusWallet.fundApproved / fundPending / fundTransferIn), paginated with
  * name/mobile search; card tap opens the full detail sheet.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
 import { pickPageSizes, asPaged, unpackPayload } from '@astro/shared';
 import { colors } from '../../../theme';
 import { toDisplayText } from '../../../dashboards/jyotish/jyotishMapping';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './BonusWalletFundRequestScreen.styles';
+import { display, maskMobile } from '../../../utils/display';
 
 type NavType = 'approved' | 'pending' | 'totalData';
 
@@ -56,7 +66,7 @@ type FundRow = {
   updatedAt?: string | number;
 };
 
-const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50, 100, 200]);
+const PAGE_SIZE_OPTIONS = pickPageSizes([25, 50]);
 
 const ACTION_BY_TYPE: Record<NavType, string> = {
   pending: 'bonusWallet.fundPending',
@@ -69,16 +79,6 @@ const TITLE_BY_TYPE: Record<NavType, string> = {
   approved: 'Approved',
   totalData: 'Total Data',
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
-
-function maskMobile(value: unknown, canShow: boolean): string {
-  if (!value) return '—';
-  return canShow ? String(value) : '**********';
-}
 
 function formatIN(value: unknown): string {
   const n = Number(value ?? 0);
@@ -458,20 +458,28 @@ export function BonusWalletFundRequestScreen() {
   }, [sheetRow, actingId, handleAction]);
 
   // ---------- Table sub-view ----------
+  const tableKeyExtractor = useCallback(
+    (row: FundRow, index: number) => `row-${index}-${String(row._id || '')}`,
+    [],
+  );
+
+  const renderTableItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<FundRow>) => (
+      <BonusWalletFundRequestCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        canShowMobile={!!canShowMobile}
+        onOpenSheet={() => setSheetRow(row)}
+      />
+    ),
+    [page, pageSize, canShowMobile],
+  );
+
   if (view === 'table') {
-    return (
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={tableLoading}
-            onRefresh={() => void loadTable()}
-            tintColor={colors.primary}
-          />
-        }
-      >
+    const listHeader = (
+      <>
         <TouchableOpacity onPress={() => setView('main')}>
           <Text style={styles.backLink}>‹ Back to Summary</Text>
         </TouchableOpacity>
@@ -522,81 +530,44 @@ export function BonusWalletFundRequestScreen() {
             <Text style={styles.errorText}>{tableError}</Text>
           </View>
         ) : null}
+      </>
+    );
 
-        {tableLoading && tableRows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-        {!tableLoading && tableRows.length === 0 ? (
-          <Text style={styles.hint}>No records found</Text>
-        ) : null}
+    const listFooter = (
+      <View style={styles.pager}>
+        <Text
+          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+          onPress={() => page > 1 && setPage((p) => p - 1)}
+        >
+          ‹ Prev
+        </Text>
+        <Text style={styles.pagerLabel}>
+          Page {page} / {tableTotalPages}
+        </Text>
+        <Text
+          style={[styles.pagerBtn, page >= tableTotalPages && styles.pagerDisabled]}
+          onPress={() => page < tableTotalPages && setPage((p) => p + 1)}
+        >
+          Next ›
+        </Text>
+      </View>
+    );
 
-        <View style={styles.list}>
-          {tableRows.map((row, index) => {
-            const badge = statusColor(row.status);
-            return (
-              <TouchableOpacity
-                key={`row-${index}-${String(row._id || '')}`}
-                style={styles.card}
-                activeOpacity={0.75}
-                onPress={() => setSheetRow(row)}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {display(row.name)}
-                  </Text>
-                  <Text
-                    style={[styles.statusPill, { color: badge, backgroundColor: `${badge}22` }]}
-                    numberOfLines={1}
-                  >
-                    {display(row.status)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Mobile</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {maskMobile(row.mobile, canShowMobile)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Amount</Text>
-                  <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
-                </View>
-                <View style={styles.cardSplitRow}>
-                  <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                    Open: {display(row.bonusWalletOpenBalance)}
-                  </Text>
-                  <Text style={styles.cardSplitRight} numberOfLines={1}>
-                    Close: {display(row.bonusWalletClosingBalance)}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>Created</Text>
-                  <Text style={styles.cardValue} numberOfLines={1}>
-                    {formatDateTime(row.createdOn ?? row.createdAt)}
-                  </Text>
-                </View>
-                <Text style={styles.cardHint}>Tap card for details & actions</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={styles.pager}>
-          <Text
-            style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-            onPress={() => page > 1 && setPage((p) => p - 1)}
-          >
-            ‹ Prev
-          </Text>
-          <Text style={styles.pagerLabel}>
-            Page {page} / {tableTotalPages}
-          </Text>
-          <Text
-            style={[styles.pagerBtn, page >= tableTotalPages && styles.pagerDisabled]}
-            onPress={() => page < tableTotalPages && setPage((p) => p + 1)}
-          >
-            Next ›
-          </Text>
-        </View>
+    return (
+      <View style={styles.screen}>
+        <ScreenFlatList
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          data={tableRows}
+          keyExtractor={tableKeyExtractor}
+          renderItem={renderTableItem}
+          listHeader={listHeader}
+          listFooter={listFooter}
+          loading={tableLoading}
+          emptyMessage="No records found"
+          refreshing={tableLoading}
+          onRefresh={() => void loadTable()}
+        />
 
         <RowDetailSheet
           visible={sheetRow !== null}
@@ -605,7 +576,7 @@ export function BonusWalletFundRequestScreen() {
           actions={sheetActions}
           onClose={() => setSheetRow(null)}
         />
-      </ScrollView>
+      </View>
     );
   }
 
@@ -674,4 +645,65 @@ export function BonusWalletFundRequestScreen() {
     </ScrollView>
   );
 }
+
+type BonusWalletFundRequestCardProps = {
+  row: FundRow;
+  index: number;
+  page: number;
+  pageSize: number;
+  canShowMobile: boolean;
+  onOpenSheet: () => void;
+};
+
+const BonusWalletFundRequestCard = memo(function BonusWalletFundRequestCard({
+  row,
+  index,
+  page,
+  pageSize,
+  canShowMobile,
+  onOpenSheet,
+}: BonusWalletFundRequestCardProps) {
+  const badge = statusColor(row.status);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.name)}
+        </Text>
+        <Text
+          style={[styles.statusPill, { color: badge, backgroundColor: `${badge}22` }]}
+          numberOfLines={1}
+        >
+          {display(row.status)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {maskMobile(row.mobile, canShowMobile)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Amount</Text>
+        <Text style={styles.cardValue}>{formatIN(row.amount)}</Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          Open: {display(row.bonusWalletOpenBalance)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Close: {display(row.bonusWalletClosingBalance)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Created</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {formatDateTime(row.createdOn ?? row.createdAt)}
+        </Text>
+      </View>
+      <Text style={styles.cardHint}>Tap card for details & actions</Text>
+    </TouchableOpacity>
+  );
+});
 

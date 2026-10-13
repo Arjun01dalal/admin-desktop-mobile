@@ -1,16 +1,20 @@
 /**
  * Sheet Download Report — port of desktop SheetDownloadReportPage.
- * reports.getAllMidOld ({}) for the Mid filter; reports.sheetDownloadAudit for the list.
+ * reports.getAllMidOld ({}) → getAllDistinctMids for the Mid filter;
+ * reports.sheetDownloadAudit for the list.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { colors } from '../../../theme';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
+import { parseDistinctMidOptions } from '@astro/shared';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
+import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
+import { usePagedSecureQuery } from '../../../hooks/usePagedSecureQuery';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
+import { display } from '../../../utils/display';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { styles } from './SheetDownloadReportScreen.styles';
+import { styles } from './reportList.styles';
 
 type Row = {
   _id?: string;
@@ -18,11 +22,6 @@ type Row = {
   filter?: { type?: string; mid?: string };
   [key: string]: unknown;
 };
-
-function display(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  return String(value);
-}
 
 export function SheetDownloadReportScreen() {
   const today = todayIST();
@@ -34,63 +33,49 @@ export function SheetDownloadReportScreen() {
   const [mid, setMid] = useState('');
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [selected, setSelected] = useState<Row | null>(null);
-  const genRef = useRef(0);
 
   // Load Mid options once.
   useEffect(() => {
     void (async () => {
       const res = await secureApi<unknown>('reports.getAllMidOld', {});
       if (!res.ok) return;
-      const raw = res.data;
-      const list = Array.isArray(raw)
-        ? raw
-        : Array.isArray((raw as { payload?: unknown[] })?.payload)
-          ? ((raw as { payload?: unknown[] }).payload as unknown[])
-          : [];
-      const opts = list.map((gw) => String((gw as { mid?: unknown })?.mid || '')).filter(Boolean);
-      setMids([...new Set(opts)]);
+      setMids(parseDistinctMidOptions(res.data));
     })();
   }, []);
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await secureApi<unknown>('reports.sheetDownloadAudit', {
-        startDate: startDate || todayIST(),
-        endDate: endDate || todayIST(),
-        itemsPerPage: pageSize,
-        pageNo: page,
-        filter: { mid: mid || undefined },
-      });
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load sheet download report');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        return;
-      }
-      const data = (res.data || {}) as { items?: unknown; total?: unknown; totalPages?: unknown };
-      setSelected(null);
-      setRows(Array.isArray(data.items) ? (data.items as Row[]) : []);
-      setTotal(Number(data.total) || 0);
-      setTotalPages(Math.max(1, Number(data.totalPages) || 1));
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
-  }, [startDate, endDate, pageSize, page, mid]);
+  const buildPayload = useCallback(
+    () => ({
+      startDate: startDate || todayIST(),
+      endDate: endDate || todayIST(),
+      itemsPerPage: pageSize,
+      pageNo: page,
+      filter: { mid: mid || undefined },
+    }),
+    [startDate, endDate, pageSize, page, mid],
+  );
+
+  const unpack = useCallback((data: unknown) => {
+    const body = (data || {}) as { items?: unknown; total?: unknown; totalPages?: unknown };
+    const list = Array.isArray(body.items) ? (body.items as Row[]) : [];
+    return {
+      rows: list,
+      total: Number(body.total) || 0,
+      totalPages: Math.max(1, Number(body.totalPages) || 1),
+    };
+  }, []);
+
+  const { rows, total, totalPages, loading, error, load } = usePagedSecureQuery<Row>({
+    action: 'reports.sheetDownloadAudit',
+    buildPayload,
+    unpack,
+    autoDeps: [startDate, endDate, pageSize, page, mid],
+    errorMessage: 'Failed to load sheet download report',
+  });
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setSelected(null);
+  }, [rows]);
 
   const columns = useMemo<DataTableColumn<Row>[]>(
     () => [
@@ -124,19 +109,26 @@ export function SheetDownloadReportScreen() {
     [page, pageSize],
   );
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={() => void load()}
-          tintColor={colors.primary}
-        />
-      }
-    >
+  const keyExtractor = useCallback(
+    (row: Row, index: number) => `row-${index}-${String(row._id ?? '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<Row>) => (
+      <SheetDownloadCard
+        row={row}
+        index={index}
+        page={page}
+        pageSize={pageSize}
+        onPress={() => setSelected(row)}
+      />
+    ),
+    [page, pageSize],
+  );
+
+  const listHeader = (
+    <>
       <Text style={styles.title}>Sheet Download Report</Text>
       <Text style={styles.sub}>
         {startDate} → {endDate} · Total Record : {total.toLocaleString('en-IN')}
@@ -159,7 +151,6 @@ export function SheetDownloadReportScreen() {
         }}
       />
 
-      {/* Mid filter chips */}
       {mids.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRow}>
           <TouchableOpacity
@@ -191,43 +182,44 @@ export function SheetDownloadReportScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+    </>
+  );
 
-      {loading && rows.length === 0 ? <Text style={styles.hint}>Loading…</Text> : null}
-      {!loading && rows.length === 0 ? (
-        <Text style={styles.hint}>No download records found</Text>
-      ) : null}
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const date = row.downloadedBy?.date;
-          return (
-            <TouchableOpacity
-              key={`row-${index}-${String(row._id ?? '')}`}
-              style={styles.card}
-              activeOpacity={0.75}
-              onPress={() => setSelected(row)}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {display(row.downloadedBy?.name)}
-                </Text>
-              </View>
-              <View style={styles.cardSplitRow}>
-                <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                  MID: {display(row.filter?.mid)}
-                </Text>
-                <Text style={styles.cardSplitRight} numberOfLines={1}>
-                  Type: {display(row.filter?.type)}
-                </Text>
-              </View>
-              <Text style={styles.cardSplitLeft} numberOfLines={1}>
-                {date ? `${formatDisplayDate(date)} - ${formatDisplayTime(date)}` : '—'}
-              </Text>
-              <Text style={styles.cardHint}>Tap card for details</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+  const listFooter = (
+    <View style={styles.pager}>
+      <Text
+        style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
+        onPress={() => page > 1 && setPage((p) => p - 1)}
+      >
+        ‹ Prev
+      </Text>
+      <Text style={styles.pagerLabel}>
+        Page {page} / {totalPages}
+      </Text>
+      <Text
+        style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
+        onPress={() => page < totalPages && setPage((p) => p + 1)}
+      >
+        Next ›
+      </Text>
+    </View>
+  );
+
+  return (
+    <>
+      <ScreenFlatList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        data={rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        listHeader={listHeader}
+        listFooter={listFooter}
+        loading={loading}
+        emptyMessage="No download records found"
+        refreshing={loading}
+        onRefresh={() => void load()}
+      />
 
       <RowDetailSheet
         visible={selected !== null}
@@ -241,25 +233,46 @@ export function SheetDownloadReportScreen() {
         }
         onClose={() => setSelected(null)}
       />
-
-      <View style={styles.pager}>
-        <Text
-          style={[styles.pagerBtn, page <= 1 && styles.pagerDisabled]}
-          onPress={() => page > 1 && setPage((p) => p - 1)}
-        >
-          ‹ Prev
-        </Text>
-        <Text style={styles.pagerLabel}>
-          Page {page} / {totalPages}
-        </Text>
-        <Text
-          style={[styles.pagerBtn, page >= totalPages && styles.pagerDisabled]}
-          onPress={() => page < totalPages && setPage((p) => p + 1)}
-        >
-          Next ›
-        </Text>
-      </View>
-    </ScrollView>
+    </>
   );
 }
 
+type SheetDownloadCardProps = {
+  row: Row;
+  index: number;
+  page: number;
+  pageSize: number;
+  onPress: () => void;
+};
+
+const SheetDownloadCard = memo(function SheetDownloadCard({
+  row,
+  index,
+  page,
+  pageSize,
+  onPress,
+}: SheetDownloadCardProps) {
+  const date = row.downloadedBy?.date;
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {display(row.downloadedBy?.name)}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          MID: {display(row.filter?.mid)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Type: {display(row.filter?.type)}
+        </Text>
+      </View>
+      <Text style={styles.cardSplitLeft} numberOfLines={1}>
+        {date ? `${formatDisplayDate(date)} - ${formatDisplayTime(date)}` : '—'}
+      </Text>
+      <Text style={styles.cardHint}>Tap card for details</Text>
+    </TouchableOpacity>
+  );
+});
