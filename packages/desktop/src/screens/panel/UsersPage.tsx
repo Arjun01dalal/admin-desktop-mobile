@@ -91,14 +91,9 @@ export function UsersPage() {
   const showDates =
     hasPermission('user_table') || hasPermission('View_Users') || hasPermission('All_user_table');
   const canRegister = !isCaller && hasPermission('Register_New_User');
-  // Match laxminarayan + keep visible for Users operators
-  const canCreateUser =
-    !isCaller &&
-    (hasPermission('create_new_user') ||
-      hasPermission('Register_New_User') ||
-      hasPermission('View_Users'));
-  const canCreateAdmin =
-    !isCaller && (hasPermission('create_new_user') || hasPermission('View_Users'));
+  // Match admin-panel: create_new_user / create_admin_user are separate roles
+  const canCreateUser = !isCaller && hasPermission('create_new_user');
+  const canCreateAdmin = !isCaller && hasPermission('create_admin_user');
   const canAddToBot = hasPermission('add_to_bot');
   const canAddToDialer = hasPermission('add_to_dilaler');
   const canAddUserData = hasPermission('show_user_upload_data');

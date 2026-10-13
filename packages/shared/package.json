@@ -26,6 +26,7 @@
     "./updateGameImage": "./src/updateGameImage.ts",
     "./ludoRtp": "./src/ludoRtp.ts",
     "./walletOtp": "./src/walletOtp.ts",
+    "./createUserForm": "./src/createUserForm.ts",
     "./subAdminFcm": "./src/subAdminFcm.ts",
     "./depositWithdrawalReport": "./src/depositWithdrawalReport.ts",
     "./activeUserWithdrawal": "./src/activeUserWithdrawal.ts",

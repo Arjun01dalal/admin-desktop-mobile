@@ -88,7 +88,9 @@ export function UsersScreen() {
   const route = useRoute();
   const routeParams = (route.params || {}) as UsersRouteParams;
   const canOpenReport = hasPermission('wallet_history');
-  const canCreate = !isCaller && hasPermission('create_new_user');
+  const canCreate =
+    !isCaller &&
+    (hasPermission('create_new_user') || hasPermission('create_admin_user'));
 
   const typeOptions = useMemo(
     () =>
@@ -1129,7 +1131,12 @@ export function UsersScreen() {
               <Text style={styles.createClose}>✕</Text>
             </TouchableOpacity>
           </View>
-          <CreateUserScreen />
+          <CreateUserScreen
+            onCreated={() => {
+              setCreateOpen(false);
+              void load();
+            }}
+          />
         </View>
       </Modal>
     </>

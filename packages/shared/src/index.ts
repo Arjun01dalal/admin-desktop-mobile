@@ -23,6 +23,7 @@ export * from './whatsappInbox';
 export * from './updateGameImage';
 export * from './ludoRtp';
 export * from './walletOtp';
+export * from './createUserForm';
 export * from './subAdminFcm';
 export * from './depositWithdrawalReport';
 export * from './incomingBotMatch';
