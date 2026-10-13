@@ -244,6 +244,12 @@ export function statusColor(s: unknown): string | undefined {
   return undefined;
 }
 
+/** API may send boolean, string "true", or 1. */
+export function isRedFlag(row: Rec | null | undefined): boolean {
+  const v = row?.redFlag;
+  return v === true || v === 'true' || v === 1;
+}
+
 export function statusBadgeBg(status: unknown): string {
   const s = String(status || '').toLowerCase();
   if (s === 'approved' || s === 'manual approved' || s === 'success') return '#16a34a';

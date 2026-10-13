@@ -62,6 +62,7 @@ export function useWithdrawalScreen() {
   const sheetAfterOtp = useRef<(() => void | Promise<boolean>) | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [sortChecked, setSortChecked] = useState(false);
+  const [redFlagOnly, setRedFlagOnly] = useState(false);
   const [bankAmtDraft, setBankAmtDraft] = useState('');
   const [bankAmt, setBankAmt] = useState('');
   const [midFilter, setMidFilter] = useState('');
@@ -120,6 +121,7 @@ export function useWithdrawalScreen() {
       }
       if (applied.text.trim()) filter[applied.field] = applied.text.trim();
       if (sortChecked) filter.sort = true;
+      if (redFlagOnly) filter.redFlag = true;
       if (bankAmt.trim()) filter.bankAmt = bankAmt.trim();
       if (midFilter) filter.mid = midFilter;
       const payload: Rec = {
@@ -165,6 +167,7 @@ export function useWithdrawalScreen() {
     allData,
     perms.showAll,
     sortChecked,
+    redFlagOnly,
     bankAmt,
     midFilter,
     selectedBeneficiaryAccounts,
@@ -484,6 +487,7 @@ export function useWithdrawalScreen() {
     setSearchDraft('');
     setApplied({ field: 'userName', text: '' });
     setSortChecked(false);
+    setRedFlagOnly(false);
     setBankAmtDraft('');
     setBankAmt('');
     setMidFilter('');
@@ -554,6 +558,8 @@ export function useWithdrawalScreen() {
     setToolsOpen,
     sortChecked,
     setSortChecked,
+    redFlagOnly,
+    setRedFlagOnly,
     bankAmtDraft,
     setBankAmtDraft,
     bankAmt,

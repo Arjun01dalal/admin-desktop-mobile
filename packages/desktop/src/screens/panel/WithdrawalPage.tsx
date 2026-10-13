@@ -8,6 +8,7 @@ import {
   Chip,
   CircularProgress,
   Collapse,
+  FormControlLabel,
   IconButton,
   ListItemText,
   MenuItem,
@@ -110,6 +111,7 @@ export function WithdrawalPage() {
   const [selectedBeneficiaryAccounts, setSelectedBeneficiaryAccounts] = useState<string[]>([]);
   const [draftBeneficiaryAccounts, setDraftBeneficiaryAccounts] = useState<string[]>([]);
   const [beneSelectOpen, setBeneSelectOpen] = useState(false);
+  const [redFlagOnly, setRedFlagOnly] = useState(false);
   const draftBeneRef = useRef<string[]>([]);
   draftBeneRef.current = draftBeneficiaryAccounts;
   const [summary, setSummary] = useState<WithdrawalSummary>(emptyWithdrawalSummary);
@@ -146,6 +148,7 @@ export function WithdrawalPage() {
     if (f.ifscCode.trim()) filter.ifscCode = f.ifscCode.trim();
     if (f.mid) filter.mid = f.mid;
     if (f.playedGames) filter.playedGames = f.playedGames;
+    if (redFlagOnly) filter.redFlag = true;
 
     const effectiveStatus =
       selectedBeneficiaryAccounts.length > 0 ? 'Pending' : f.status;
@@ -175,6 +178,7 @@ export function WithdrawalPage() {
     admin?.clientName,
     admin?.allotedApps,
     selectedBeneficiaryAccounts,
+    redFlagOnly,
   ]);
 
   const unpack = useCallback((res: { data?: unknown }) => asPaged<WithdrawalRow>(res.data), []);
@@ -183,7 +187,7 @@ export function WithdrawalPage() {
     action: 'withdrawals.transactions',
     buildPayload,
     unpack,
-    autoDeps: [page, itemsPerPage, query, selectedBeneficiaryAccounts],
+    autoDeps: [page, itemsPerPage, query, selectedBeneficiaryAccounts, redFlagOnly],
     errorMessage: 'Failed to load withdrawals',
     cacheTtlMs: 0,
   });
@@ -283,6 +287,7 @@ export function WithdrawalPage() {
     setSelectedBeneficiaryAccounts([]);
     setDraftBeneficiaryAccounts([]);
     setBeneSelectOpen(false);
+    setRedFlagOnly(false);
     setQuery({ startDate: '', endDate: '', allData: false, filters: EMPTY_FILTERS });
     setPage(1);
   }, []);
@@ -712,6 +717,21 @@ export function WithdrawalPage() {
                   </MenuItem>
                 ))}
               </TextField>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={redFlagOnly}
+                    onChange={(e) => {
+                      setRedFlagOnly(e.target.checked);
+                      setPage(1);
+                    }}
+                    sx={{ color: '#c62828', '&.Mui-checked': { color: '#c62828' } }}
+                  />
+                }
+                label="Red Flag"
+                sx={{ ml: 0.5, '& .MuiFormControlLabel-label': { fontSize: 13, fontWeight: 600 } }}
+              />
             </Stack>
           </Box>
         </Collapse>

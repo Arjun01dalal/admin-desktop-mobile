@@ -6,8 +6,10 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import FlagIcon from '@mui/icons-material/Flag';
 import { type CommonTableColumn } from '@/components/CommonTable';
 import { appCodeForName } from '@/constants/clientNames';
 import {
@@ -36,6 +38,7 @@ import {
   canShowApproveAction,
   canRejectRow,
   isTerminal,
+  isRedFlag,
   pendingAgeColor,
   withdrawalRowBg,
   maskAccount,
@@ -109,7 +112,7 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
       {
         id: 'select',
         label: '#',
-        width: 64,
+        width: 96,
         stickyLeft: true,
         render: (row, index) => {
           const id = orderIdOf(row);
@@ -122,8 +125,16 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
             status !== 'Rejected' &&
             status !== 'Reverse' &&
             status !== 'Failed';
+          const flagged = isRedFlag(row);
           return (
-            <Stack direction="row" spacing={0.25} alignItems="center" justifyContent="center">
+            <Stack
+              direction="row"
+              spacing={0.5}
+              alignItems="center"
+              justifyContent="center"
+              flexWrap="wrap"
+              useFlexGap
+            >
               {showBulkCheckbox ? (
                 <Checkbox
                   size="small"
@@ -133,6 +144,33 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
                 />
               ) : null}
               <span>{(ctx.page - 1) * ctx.pageSize + index + 1}</span>
+              {flagged ? (
+                <Tooltip title="Red Flag" arrow>
+                  <Box
+                    component="span"
+                    aria-label="Red flag"
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.35,
+                      px: 0.6,
+                      py: 0.2,
+                      borderRadius: 1,
+                      bgcolor: '#d32f2f',
+                      color: '#fff',
+                      flexShrink: 0,
+                      boxShadow: '0 0 0 1px rgba(211,47,47,0.35)',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: 0.3,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    <FlagIcon sx={{ fontSize: 14, color: '#fff' }} />
+                    FLAG
+                  </Box>
+                </Tooltip>
+              ) : null}
             </Stack>
           );
         },

@@ -35,5 +35,6 @@ export function toWithdrawalRow(
     accountNo: accountNo || undefined,
     clientName: String(r.clientName || r.appName || '').trim() || undefined,
     status: String(r.status || '').trim() || undefined,
+    redFlag: r.redFlag as boolean | string | number | undefined,
   };
 }

@@ -23,6 +23,7 @@ import { TotalBeneListModal } from './withdrawal/TotalBeneListModal';
 import {
   display,
   fmtAmount,
+  isRedFlag,
   sendToBankName,
   statusBadgeBg,
   type Rec,
@@ -154,6 +155,8 @@ export function WithdrawalScreen() {
     setToolsOpen,
     sortChecked,
     setSortChecked,
+    redFlagOnly,
+    setRedFlagOnly,
     bankAmtDraft,
     setBankAmtDraft,
     bankAmt,
@@ -206,17 +209,30 @@ export function WithdrawalScreen() {
 
   const renderWithdrawalMidIcon = useCallback(
     (row: Rec) => {
+      const flagged = isRedFlag(row);
       const reportUserId = resolveWithdrawalReportUserId(row);
-      if (!reportUserId || !showWithdrawalMidReport(String(row.status || ''))) return null;
+      const showMid =
+        Boolean(reportUserId) && showWithdrawalMidReport(String(row.status || ''));
+      if (!flagged && !showMid) return null;
       return (
-        <TouchableOpacity
-          accessibilityLabel="Choose MID for Withdrawal"
-          onPress={() => openMidReport(row)}
-          style={styles.midReportBtn}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          <MaterialCommunityIcons name="chart-box-outline" size={15} color="#ff9f0a" />
-        </TouchableOpacity>
+        <View style={styles.titleSuffixRow}>
+          {flagged ? (
+            <View style={styles.redFlagBadge} accessibilityLabel="Red flag">
+              <MaterialCommunityIcons name="flag" size={14} color="#fff" />
+              <Text style={styles.redFlagBadgeText}>FLAG</Text>
+            </View>
+          ) : null}
+          {showMid ? (
+            <TouchableOpacity
+              accessibilityLabel="Choose MID for Withdrawal"
+              onPress={() => openMidReport(row)}
+              style={styles.midReportBtn}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <MaterialCommunityIcons name="chart-box-outline" size={15} color="#ff9f0a" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       );
     },
     [openMidReport],
@@ -245,6 +261,8 @@ export function WithdrawalScreen() {
         setToolsOpen={setToolsOpen}
         sortChecked={sortChecked}
         setSortChecked={setSortChecked}
+        redFlagOnly={redFlagOnly}
+        setRedFlagOnly={setRedFlagOnly}
         bankAmtDraft={bankAmtDraft}
         setBankAmtDraft={setBankAmtDraft}
         bankAmt={bankAmt}

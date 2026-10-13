@@ -69,6 +69,8 @@ export type WithdrawalRow = {
   totalPoints?: number;
   validationResults?: ValidationItem[];
   upiId?: string;
+  /** Fraud / risk marker from API — show red flag on the txn. */
+  redFlag?: boolean | string | number;
   /** Allow Active User Withdrawal / API extras without losing typed fields. */
   [key: string]: unknown;
 };

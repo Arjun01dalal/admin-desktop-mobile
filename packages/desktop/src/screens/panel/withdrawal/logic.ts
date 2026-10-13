@@ -5,6 +5,12 @@ export function orderIdOf(row: WithdrawalRow): string {
   return String(row.orderId || row.order_id || row.transactionId || row._id || '');
 }
 
+/** API may send boolean, string "true", or 1. */
+export function isRedFlag(row: WithdrawalRow | Record<string, unknown> | null | undefined): boolean {
+  const v = row?.redFlag;
+  return v === true || v === 'true' || v === 1;
+}
+
 export function midLabel(m: {
   paymentGatewayName?: string;
   name?: string;

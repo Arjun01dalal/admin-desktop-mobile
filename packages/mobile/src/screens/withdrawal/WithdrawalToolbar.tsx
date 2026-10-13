@@ -13,6 +13,8 @@ type WithdrawalToolbarProps = {
   setToolsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   sortChecked: boolean;
   setSortChecked: React.Dispatch<React.SetStateAction<boolean>>;
+  redFlagOnly: boolean;
+  setRedFlagOnly: React.Dispatch<React.SetStateAction<boolean>>;
   bankAmtDraft: string;
   setBankAmtDraft: (value: string) => void;
   bankAmt: string;
@@ -74,6 +76,8 @@ export function WithdrawalToolbar({
   setToolsOpen,
   sortChecked,
   setSortChecked,
+  redFlagOnly,
+  setRedFlagOnly,
   bankAmtDraft,
   setBankAmtDraft,
   bankAmt,
@@ -140,7 +144,11 @@ export function WithdrawalToolbar({
           <Text style={[styles.chipText, toolsOpen && styles.chipTextActive]}>
             Tools {toolsOpen ? '▲' : '▼'}
             {!toolsOpen &&
-            (sortChecked || bankAmt || midFilter || selectedBeneficiaryAccounts.length > 0)
+            (sortChecked ||
+              redFlagOnly ||
+              bankAmt ||
+              midFilter ||
+              selectedBeneficiaryAccounts.length > 0)
               ? ' •'
               : ''}
           </Text>
@@ -157,6 +165,17 @@ export function WithdrawalToolbar({
           >
             <Text style={[styles.chipText, sortChecked && styles.chipTextActive]}>
               Sort {sortChecked ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, redFlagOnly && styles.chipRedFlag]}
+            onPress={() => {
+              setRedFlagOnly((v) => !v);
+              setPage(1);
+            }}
+          >
+            <Text style={[styles.chipText, redFlagOnly && styles.chipRedFlagText]}>
+              Red Flag {redFlagOnly ? '✓' : ''}
             </Text>
           </TouchableOpacity>
           <TextInput
