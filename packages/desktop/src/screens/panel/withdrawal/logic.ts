@@ -27,11 +27,9 @@ export function extractBeneficiaryAccounts(row: WithdrawalRow): string[] {
 }
 
 export function sendToBankName(row: WithdrawalRow): string {
-  // Old panel: accountHolderName.slice(0,6)-dp_id.slice(-6)
-  const name = String(row.accountHolderName || row.userName || '').slice(0, 6);
-  const dp = String(row.dp_id || '').slice(-6);
-  if (!name && !dp) return '—';
-  return `${name}${dp ? `-${dp}` : ''}`;
+  // transactionId for Name (Send to Bank) + UPI Note (not name-dp_id).
+  const txn = String(row.transactionId || row.orderId || row.order_id || row._id || '').trim();
+  return txn || '—';
 }
 
 export function displayUserName(row: WithdrawalRow): string {

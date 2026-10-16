@@ -16,7 +16,8 @@ function buildUpiUrl({ pa, pn, am, tn, tr }: Props): string {
   if (pn) params.set('pn', pn);
   if (am != null && am !== '') params.set('am', String(am));
   params.set('cu', 'INR');
-  if (tn) params.set('tn', tn);
+  const note = String(tn || '').trim();
+  if (note) params.set('tn', note);
   if (tr) params.set('tr', tr);
   return `upi://pay?${params.toString()}`;
 }

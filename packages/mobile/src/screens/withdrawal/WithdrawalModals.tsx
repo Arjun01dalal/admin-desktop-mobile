@@ -13,7 +13,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { colors, radius, spacing } from '../../theme';
 import { ValidationDetailsBlock } from './ValidationDetails';
-import { display, fmtAmount, formatValidationCheckedAt, num, type Rec } from './helpers';
+import {
+  display,
+  fmtAmount,
+  formatValidationCheckedAt,
+  num,
+  sendToBankName,
+  type Rec,
+} from './helpers';
 import { styles } from '../WithdrawalScreen.styles';
 
 type WithdrawalModalsProps = {
@@ -562,6 +569,11 @@ export function WithdrawalModals(props: WithdrawalModalsProps) {
               <Text style={[styles.modalSub, { textAlign: 'center' }]}>
                 {String(qrRow?.upiId ?? '')}
               </Text>
+              {qrRow && sendToBankName(qrRow) ? (
+                <Text style={[styles.modalSub, { textAlign: 'center' }]}>
+                  Note:{sendToBankName(qrRow)}
+                </Text>
+              ) : null}
               <View style={styles.qrIconRow}>
                 <TouchableOpacity
                   style={[styles.qrIconBtn, { backgroundColor: '#5f259f' }]}

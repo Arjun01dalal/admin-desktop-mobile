@@ -19,6 +19,7 @@ import { useDeferredTimeout } from '../../hooks/useDeferredTimeout';
 import { BOT_CHECK_HIDDEN_STATUSES, GATEWAY_OPTIONS } from './constants';
 import {
   bothChecksOk,
+  buildUpiPayUrl,
   buildUpiQuery,
   canRejectRow,
   canShowApproveAction,
@@ -276,6 +277,7 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
   );
 
   const qrQuery = useMemo(() => (qrRow ? buildUpiQuery(qrRow) : ''), [qrRow]);
+  const qrPayUrl = useMemo(() => (qrRow ? buildUpiPayUrl(qrRow) : ''), [qrRow]);
   const openUpiApp = useCallback(
     async (app: 'phonepe' | 'gpay') => {
       if (!qrQuery) return;
@@ -801,6 +803,7 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
     qrRow,
     setQrRow,
     qrQuery,
+    qrPayUrl,
     qrRef,
     openUpiApp,
     downloadQr,

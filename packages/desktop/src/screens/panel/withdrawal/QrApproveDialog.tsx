@@ -46,7 +46,8 @@ export function QrApproveDialog({
   onSubmit,
 }: Props) {
   const gateways = Array.from(new Set([...MANUAL_GATEWAYS, ...payoutGateways]));
-  const note = row ? `Note:${sendToBankName(row)}` : '';
+  const noteId = row ? sendToBankName(row) : '';
+  const note = noteId && noteId !== '—' ? `Note:${noteId}` : '';
 
   return (
     <Dialog
@@ -82,6 +83,12 @@ export function QrApproveDialog({
               <>
                 <br />
                 {row.upiId}
+              </>
+            ) : null}
+            {note ? (
+              <>
+                <br />
+                {note}
               </>
             ) : null}
           </Typography>

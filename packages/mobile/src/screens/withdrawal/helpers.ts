@@ -25,23 +25,30 @@ export function fmtAmount(v: unknown): string {
   return Math.floor(num(v)).toLocaleString('en-IN');
 }
 
-/** Admin/desktop parity: first 6 of name + last 6 of dp_id. */
+/** Name (Send to Bank) + UPI Note — transactionId (fallback orderId), not name-dp_id. */
 export function sendToBankName(r: Rec): string {
-  const name = String(r.accountHolderName ?? r.userName ?? '').slice(0, 6);
-  const dp = String(r.dp_id ?? '').slice(-6);
-  if (!name && !dp) return '';
-  return `${name}${dp ? `-${dp}` : ''}`;
+  return String(r.transactionId ?? r.orderId ?? r.order_id ?? r._id ?? '').trim();
 }
 
-/** Desktop UPIQR parity: build the UPI payment query string. */
+/** Query string for PhonePe / GPay deep links (`phonepe://pay?…`). */
 export function buildUpiQuery(r: Rec): string {
   const params = new URLSearchParams();
-  params.set('pa', String(r.upiId ?? ''));
-  if (r.amount !== undefined && r.amount !== null) params.set('am', String(r.amount));
+  const pa = String(r.upiId ?? '').trim();
+  if (pa) params.set('pa', pa);
+  if (r.amount !== undefined && r.amount !== null && String(r.amount) !== '') {
+    params.set('am', String(r.amount));
+  }
   params.set('cu', 'INR');
-  params.set('tn', `Note:${sendToBankName(r)}`);
+  const noteId = sendToBankName(r);
+  if (noteId) params.set('tn', `Note:${noteId}`);
   params.set('tr', `ORD-${Date.now()}`);
   return params.toString();
+}
+
+/** Full UPI URL for QR payload (`upi://pay?…`) — required so scanners read `tn` note. */
+export function buildUpiPayUrl(r: Rec): string {
+  const q = buildUpiQuery(r);
+  return q ? `upi://pay?${q}` : '';
 }
 
 /* ----------------------------- response shapes ---------------------------- */

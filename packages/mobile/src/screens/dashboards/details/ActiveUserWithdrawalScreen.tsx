@@ -197,6 +197,7 @@ export function ActiveUserWithdrawalScreen() {
     qrRow,
     setQrRow,
     qrQuery,
+    qrPayUrl,
     qrRef,
     openUpiApp,
     downloadQr,
@@ -765,7 +766,7 @@ export function ActiveUserWithdrawalScreen() {
         doStatusUpdate={doStatusUpdate}
         qrRow={qrRow}
         setQrRow={setQrRow}
-        qrUrl={qrQuery}
+        qrUrl={qrPayUrl}
         qrRef={qrRef}
         openUpiApp={openUpiApp}
         downloadQr={downloadQr}
