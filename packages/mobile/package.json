@@ -59,7 +59,7 @@
   "scripts": {
     "start": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo start",
     "start:go": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo start --go --lan",
-    "android": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo run:android",
+    "android": "bash scripts/run-android.sh",
     "ios": "mkdir -p .metro-tmp && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TMPDIR=\"$PWD/.metro-tmp\" && expo run:ios",
     "web": "mkdir -p .metro-tmp && TMPDIR=\"$PWD/.metro-tmp\" expo start --web",
     "check:ota-config": "node scripts/check-ota-config.cjs",

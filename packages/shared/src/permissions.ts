@@ -565,7 +565,8 @@ function roleAllowlist(
   }
 
   const name = getRoleName(user, storage);
-  if (roleNameVariants(name).some((v) => v === 'caller' || v === 'caller_new')) {
+  const nameVariants = roleNameVariants(name);
+  if (nameVariants.some((v) => v === 'caller' || v === 'caller_new')) {
     return ROLE_NAV_ALLOWLIST['6864ced73cc84c862f86c17f'];
   }
 

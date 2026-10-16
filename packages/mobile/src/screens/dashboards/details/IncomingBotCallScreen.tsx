@@ -23,6 +23,8 @@ import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import {
   buildIncomingBotSyncPayload,
+  canViewIncomingBotCall,
+  shouldHideIncomingBotPlayRecording,
   extractIncomingBotCallUsers,
   formatIncomingBotCommentAuthor,
   formatIncomingBotCommentWhen,
@@ -33,14 +35,19 @@ import {
   mapIncomingBotUsersToCalls,
   mergeIncomingBotCallsPreservingComments,
   mergeIncomingBotCommentOntoCalls,
+  normalizeIncomingBotEmpCode,
   parseIncomingBotSyncStats,
   type IncomingBotCallerComment,
   type IncomingBotCallRow,
 } from '@astro/shared';
 import { colors, spacing } from '../../../theme';
 import { secureApi } from '../../../api/client';
-import { hasPermission } from '../../../auth/permissions';
-import { getStoredUser } from '../../../lib/webShim';
+import {
+  getRoleId,
+  getSessionUser,
+  hasPermission,
+  isCallerRole,
+} from '../../../auth/permissions';
 import { openPanelTarget } from '../../../navigation/panelDetail';
 import { addToDialerBatch } from '../../../utils/externalDialer';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
@@ -126,7 +133,23 @@ export function IncomingBotCallScreen() {
   const { defer } = useDeferredTimeout();
   const canShowMobile = hasPermission('show_mobile');
   const canShowSkyTalk = hasPermission('show_skyTalk');
-  const admin = useMemo(() => getStoredUser<{ _id?: string; name?: string }>(), []);
+  const admin = useMemo(() => getSessionUser(), []);
+  const loginEmpCode = useMemo(
+    () => normalizeIncomingBotEmpCode(admin?.empCode),
+    [admin?.empCode],
+  );
+  const loginRoleId = useMemo(() => getRoleId(admin), [admin]);
+  const loginUserId = useMemo(() => String(admin?._id || '').trim(), [admin?._id]);
+  const isCaller = useMemo(() => isCallerRole(admin), [admin]);
+  const hidePlayRecording = useMemo(
+    () =>
+      shouldHideIncomingBotPlayRecording({
+        isCaller,
+        roleId: loginRoleId,
+        userId: loginUserId,
+      }),
+    [isCaller, loginRoleId, loginUserId],
+  );
   const [startDate, setStartDate] = useState(() => incomingBotDefaultDateInputValue());
   const [endDate, setEndDate] = useState(() => incomingBotDefaultDateInputValue());
   const [draftStart, setDraftStart] = useState(() => incomingBotDefaultDateInputValue());
@@ -258,6 +281,15 @@ export function IncomingBotCallScreen() {
     const sidQ = appliedSid.toLowerCase();
     return rows.filter((call) => {
       if (
+        !canViewIncomingBotCall(call.empCode, {
+          loginEmpCode,
+          roleId: loginRoleId,
+          userId: loginUserId,
+        })
+      ) {
+        return false;
+      }
+      if (
         fromQ &&
         !String(call.from || '')
           .toLowerCase()
@@ -280,7 +312,7 @@ export function IncomingBotCallScreen() {
         return false;
       return true;
     });
-  }, [rows, appliedFrom, appliedTo, appliedSid]);
+  }, [rows, appliedFrom, appliedTo, appliedSid, loginEmpCode, loginRoleId, loginUserId]);
 
   const fetchSummary = useCallback(async (call: IncomingCall) => {
     const gen = ++summaryGenRef.current;
@@ -486,9 +518,11 @@ export function IncomingBotCallScreen() {
       { label: 'Status', value: display(sheetRow.status) },
       { label: 'Duration (min)', value: formatDurationInMin(sheetRow.duration) },
       { label: 'Start Time', value: formatDateTime(sheetRow.start_time) },
-      { label: 'Recording', value: sheetRow.recording_url ? 'Available' : '—' },
+      ...(hidePlayRecording
+        ? []
+        : [{ label: 'Recording', value: sheetRow.recording_url ? 'Available' : '—' }]),
     ];
-  }, [sheetRow, canShowMobile]);
+  }, [sheetRow, canShowMobile, hidePlayRecording]);
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
@@ -525,14 +559,19 @@ export function IncomingBotCallScreen() {
         onPress: () => openUserReport(row),
       });
     }
-    if (row.recording_url) {
+    if (!hidePlayRecording && row.recording_url) {
       actions.push({
         label: 'Play Recording',
         tone: 'default',
         onPress: () => playRecording(row.recording_url),
       });
     }
-    actions.push({ label: 'View Summary', tone: 'primary', onPress: () => void openSummary(row) });
+    // Callers get transcript via summary; no audio play.
+    actions.push({
+      label: hidePlayRecording ? 'View Transcript' : 'View Summary',
+      tone: 'primary',
+      onPress: () => void openSummary(row),
+    });
     return actions;
   }, [
     sheetRow,
@@ -543,7 +582,38 @@ export function IncomingBotCallScreen() {
     playRecording,
     openSummary,
     openUserReport,
+    hidePlayRecording,
   ]);
+
+  const keyExtractor = useCallback(
+    (row: IncomingBotCallRow, index: number) =>
+      `row-${index}-${String(row.sid || row.doc_id || '')}`,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: row, index }: ListRenderItemInfo<IncomingBotCallRow>) => (
+      <IncomingBotCallCard
+        row={row}
+        index={index}
+        canShowMobile={canShowMobile}
+        hidePlayRecording={hidePlayRecording}
+        dialerBusy={dialerBusySid === String(row.sid || '')}
+        onPress={() => setSheetRow(row)}
+        onCall={() => void connectToDialer(row)}
+        onComment={() => openAddComment(row)}
+        onViewComments={() => openViewComments(row)}
+      />
+    ),
+    [
+      canShowMobile,
+      hidePlayRecording,
+      dialerBusySid,
+      connectToDialer,
+      openAddComment,
+      openViewComments,
+    ],
+  );
 
   if (showSkyTalk && canShowSkyTalk) {
     return (
@@ -567,28 +637,6 @@ export function IncomingBotCallScreen() {
       </View>
     );
   }
-
-  const keyExtractor = useCallback(
-    (row: IncomingBotCallRow, index: number) =>
-      `row-${index}-${String(row.sid || row.doc_id || '')}`,
-    [],
-  );
-
-  const renderItem = useCallback(
-    ({ item: row, index }: ListRenderItemInfo<IncomingBotCallRow>) => (
-      <IncomingBotCallCard
-        row={row}
-        index={index}
-        canShowMobile={canShowMobile}
-        dialerBusy={dialerBusySid === String(row.sid || '')}
-        onPress={() => setSheetRow(row)}
-        onCall={() => void connectToDialer(row)}
-        onComment={() => openAddComment(row)}
-        onViewComments={() => openViewComments(row)}
-      />
-    ),
-    [canShowMobile, dialerBusySid, connectToDialer, openAddComment, openViewComments],
-  );
 
   const listHeader = (
     <>
@@ -853,6 +901,7 @@ type IncomingBotCallCardProps = {
   row: IncomingBotCallRow;
   index: number;
   canShowMobile: boolean;
+  hidePlayRecording: boolean;
   dialerBusy: boolean;
   onPress: () => void;
   onCall: () => void;
@@ -864,6 +913,7 @@ const IncomingBotCallCard = memo(function IncomingBotCallCard({
   row,
   index,
   canShowMobile,
+  hidePlayRecording,
   dialerBusy,
   onPress,
   onCall,
@@ -913,7 +963,11 @@ const IncomingBotCallCard = memo(function IncomingBotCallCard({
           {formatDateTime(row.start_time)}
         </Text>
         <Text style={styles.cardSplitRight} numberOfLines={1}>
-          {row.recording_url ? '🎙 Recording' : 'No recording'}
+          {hidePlayRecording
+            ? 'Transcript'
+            : row.recording_url
+              ? '🎙 Recording'
+              : 'No recording'}
         </Text>
       </View>
       <View style={styles.cardActions}>

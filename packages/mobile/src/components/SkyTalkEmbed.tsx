@@ -3,10 +3,18 @@
  * Unmounts while inactive to free native memory.
  */
 import React, { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SKYTALK_EMBED_URL } from '@astro/shared';
 import { colors } from '../theme';
+import { styles } from './SkyTalkEmbed.styles';
 
 type Props = {
   /** When false, WebView is unmounted (paused). Remounts when becoming true. */
@@ -27,12 +35,20 @@ export function SkyTalkEmbed({
 }: Props) {
   const [frameKey, setFrameKey] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!active) return;
     setLoading(true);
+    setError(null);
     setFrameKey(Date.now());
   }, [active, remountToken]);
+
+  const retry = () => {
+    setLoading(true);
+    setError(null);
+    setFrameKey(Date.now());
+  };
 
   return (
     <View style={[styles.frame, style]}>
@@ -43,6 +59,13 @@ export function SkyTalkEmbed({
           ) : (
             <Text style={styles.pausedText}>Paused</Text>
           )}
+        </View>
+      ) : error ? (
+        <View style={styles.loader}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={retry}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
@@ -63,38 +86,25 @@ export function SkyTalkEmbed({
             allowsFullscreenVideo
             setSupportMultipleWindows={false}
             mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+            onLoadStart={() => {
+              setLoading(true);
+              setError(null);
+            }}
             onLoadEnd={() => setLoading(false)}
+            onError={(e) => {
+              setLoading(false);
+              setError(e.nativeEvent?.description || 'Failed to load Sky Talk');
+            }}
+            onHttpError={(e) => {
+              const status = e.nativeEvent?.statusCode;
+              if (status && status >= 400) {
+                setLoading(false);
+                setError(`Sky Talk failed to load (HTTP ${status})`);
+              }
+            }}
           />
         </>
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  frame: {
-    flex: 1,
-    minHeight: 0,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  loader: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    zIndex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-  },
-  pausedText: {
-    color: colors.muted,
-    textAlign: 'center',
-  },
-});

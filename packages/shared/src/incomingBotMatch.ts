@@ -63,9 +63,81 @@ export type IncomingBotCallRow = {
   dp_id?: string;
   app_name?: string;
   mobile?: string;
+  empCode?: string;
   doc_id?: string;
   comments?: IncomingBotCallerComment[];
 };
+
+/** Default / unassigned bucket on Incoming Bot. */
+export const INCOMING_BOT_DEFAULT_EMP_CODE = '001';
+
+/**
+ * Role_ID or user `_id` that only sees empCode `001` + empty/Unassign rows
+ * (admin-panel-domains IncomingBotCall).
+ */
+export const INCOMING_BOT_DEFAULT_EMP_FILTER_ID = '694d4f1ba8b2fd753572f6bf';
+
+export function normalizeIncomingBotEmpCode(code?: string | null): string {
+  const c = String(code ?? '').trim();
+  if (!c || c === 'undefined' || c === 'null' || c === '-') return '';
+  return c;
+}
+
+/** `001` or missing / Unassign empCode. */
+export function isIncomingBotDefaultEmpCodeRecord(code?: string | null): boolean {
+  const c = normalizeIncomingBotEmpCode(code);
+  return c === '' || c === INCOMING_BOT_DEFAULT_EMP_CODE;
+}
+
+export function isIncomingBotDefaultEmpFilterUser(opts: {
+  roleId?: string | null;
+  userId?: string | null;
+}): boolean {
+  const roleId = String(opts.roleId || '').trim();
+  const userId = String(opts.userId || '').trim();
+  return (
+    roleId === INCOMING_BOT_DEFAULT_EMP_FILTER_ID ||
+    userId === INCOMING_BOT_DEFAULT_EMP_FILTER_ID
+  );
+}
+
+/**
+ * Visibility rules (admin-panel parity + "empCode wale ko apne calls"):
+ * - special id/role → only 001 + Unassign
+ * - login has empCode → only that empCode
+ * - else → all
+ */
+export function canViewIncomingBotCall(
+  callEmpCode: string | null | undefined,
+  opts: {
+    loginEmpCode?: string | null;
+    roleId?: string | null;
+    userId?: string | null;
+  },
+): boolean {
+  if (isIncomingBotDefaultEmpFilterUser(opts)) {
+    return isIncomingBotDefaultEmpCodeRecord(callEmpCode);
+  }
+
+  const login = normalizeIncomingBotEmpCode(opts.loginEmpCode);
+  if (login) {
+    return normalizeIncomingBotEmpCode(callEmpCode) === login;
+  }
+
+  return true;
+}
+
+/**
+ * Callers (incl. caller_new) + default-emp role see transcript/summary only —
+ * no Play Recording (admin-panel-domains IncomingBotCall parity).
+ */
+export function shouldHideIncomingBotPlayRecording(opts: {
+  isCaller?: boolean;
+  roleId?: string | null;
+  userId?: string | null;
+}): boolean {
+  return Boolean(opts.isCaller) || isIncomingBotDefaultEmpFilterUser(opts);
+}
 
 export type IncomingBotMatchedUser = {
   name: string;
@@ -279,6 +351,11 @@ export function mapIncomingBotUserToCall(user: IncomingBotCallUser): IncomingBot
     dp_id: String(user.userId || user.dp_id || user.dpId || '') || undefined,
     app_name: String(user.app_name || user.clientName || '') || undefined,
     mobile: from || undefined,
+    empCode: (() => {
+      const raw = String(user.empCode ?? user.emp_code ?? '').trim();
+      if (!raw || raw === 'undefined' || raw === 'null' || raw === '-') return undefined;
+      return raw;
+    })(),
     doc_id: String(user._id || '') || undefined,
     comments: extractComments(user),
   };

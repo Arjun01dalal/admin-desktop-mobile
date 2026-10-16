@@ -27,6 +27,8 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   buildIncomingBotSyncPayload,
+  canViewIncomingBotCall,
+  shouldHideIncomingBotPlayRecording,
   extractIncomingBotCallUsers,
   formatIncomingBotCommentAuthor,
   formatIncomingBotCommentWhen,
@@ -38,12 +40,13 @@ import {
   mapIncomingBotUsersToCalls,
   mergeIncomingBotCallsPreservingComments,
   mergeIncomingBotCommentOntoCalls,
+  normalizeIncomingBotEmpCode,
   parseIncomingBotSyncStats,
   type IncomingBotCallerComment,
   type IncomingBotCallRow,
 } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
-import { getSessionUser, hasPermission } from '@/auth/permissions';
+import { getRoleId, getSessionUser, hasPermission, isCallerRole } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
 import { TablePanel } from '@/components/TablePanel';
@@ -262,6 +265,23 @@ function SectionCard({ title, children }: { title: string; children: React.React
 export function IncomingBotCallPage() {
   const navigate = useNavigate();
   const canShowMobile = hasPermission('show_mobile');
+  const admin = useMemo(() => getSessionUser(), []);
+  const loginEmpCode = useMemo(
+    () => normalizeIncomingBotEmpCode(admin?.empCode),
+    [admin?.empCode],
+  );
+  const loginRoleId = useMemo(() => getRoleId(admin), [admin]);
+  const loginUserId = useMemo(() => String(admin?._id || '').trim(), [admin?._id]);
+  const isCaller = useMemo(() => isCallerRole(admin), [admin]);
+  const hidePlayRecording = useMemo(
+    () =>
+      shouldHideIncomingBotPlayRecording({
+        isCaller,
+        roleId: loginRoleId,
+        userId: loginUserId,
+      }),
+    [isCaller, loginRoleId, loginUserId],
+  );
   const minDate = useMemo(() => incomingBotMinDateInputValue(), []);
   const [startDate, setStartDate] = useState(() => incomingBotDefaultDateInputValue());
   const [endDate, setEndDate] = useState(() => incomingBotDefaultDateInputValue());
@@ -356,6 +376,15 @@ export function IncomingBotCallPage() {
     const sidQ = appliedSid.toLowerCase();
     return rows.filter((call) => {
       if (
+        !canViewIncomingBotCall(call.empCode, {
+          loginEmpCode,
+          roleId: loginRoleId,
+          userId: loginUserId,
+        })
+      ) {
+        return false;
+      }
+      if (
         fromQ &&
         !String(call.from || '')
           .toLowerCase()
@@ -378,7 +407,7 @@ export function IncomingBotCallPage() {
         return false;
       return true;
     });
-  }, [rows, appliedFrom, appliedTo, appliedSid]);
+  }, [rows, appliedFrom, appliedTo, appliedSid, loginEmpCode, loginRoleId, loginUserId]);
 
   const closeSummary = useCallback(() => {
     setSummaryOpen(false);
@@ -721,23 +750,25 @@ export function IncomingBotCallPage() {
       {
         id: 'action',
         label: 'Action',
-        width: 120,
+        width: hidePlayRecording ? 72 : 120,
         render: (row) => (
           <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-            <Box sx={{ width: 34, height: 34, display: 'grid', placeItems: 'center' }}>
-              {row.recording_url ? (
-                <Tooltip title="Play Recording">
-                  <IconButton
-                    size="small"
-                    onClick={() => setRecordingUrl(row.recording_url!)}
-                    sx={{ color: '#ff9f0a' }}
-                  >
-                    <PlayArrowOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              ) : null}
-            </Box>
-            <Tooltip title="View Summary">
+            {!hidePlayRecording ? (
+              <Box sx={{ width: 34, height: 34, display: 'grid', placeItems: 'center' }}>
+                {row.recording_url ? (
+                  <Tooltip title="Play Recording">
+                    <IconButton
+                      size="small"
+                      onClick={() => setRecordingUrl(row.recording_url!)}
+                      sx={{ color: '#ff9f0a' }}
+                    >
+                      <PlayArrowOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
+              </Box>
+            ) : null}
+            <Tooltip title={hidePlayRecording ? 'View Transcript' : 'View Summary'}>
               <IconButton
                 size="small"
                 onClick={() => void openSummary(row)}
@@ -751,6 +782,7 @@ export function IncomingBotCallPage() {
       },
     ],
     [
+      hidePlayRecording,
       searchFrom,
       searchTo,
       searchSid,

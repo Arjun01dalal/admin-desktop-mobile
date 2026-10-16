@@ -105,7 +105,13 @@ export const styles = makeStyles({
     padding: spacing(3),
     marginBottom: spacing(3),
   },
+  errorText: { color: colors.destructive, fontSize: 13 },
   hint: { color: colors.muted, fontSize: 13, marginBottom: spacing(2) },
+  content: {
+    paddingHorizontal: spacing(3),
+    paddingTop: spacing(2),
+    paddingBottom: spacing(8),
+  },
   list: { gap: spacing(2) },
   card: {
     backgroundColor: colors.surface,
@@ -113,6 +119,7 @@ export const styles = makeStyles({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing(3),
+    marginBottom: spacing(2.5),
   },
   cardNoComment: {
     backgroundColor: 'rgba(255,159,10,0.08)',
