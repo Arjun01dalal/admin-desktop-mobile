@@ -10,7 +10,7 @@ export type NavItem = {
 
 /**
  * Panel side nav — visibility is driven by Role_ID → Responsibilities from login.
- * Items without `permission` (Welcome) are always visible unless caller-hidden in canAccessNavItem.
+ * Items without `permission` (e.g. Welcome) are always visible; others use login Responsibilities.
  */
 export const NAV_ITEMS: NavItem[] = [
   { id: 'welcome', label: 'Welcome', path: '/welcome' },

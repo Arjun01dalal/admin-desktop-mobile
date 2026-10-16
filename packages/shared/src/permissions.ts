@@ -244,36 +244,6 @@ const DASHBOARD_USER_IDS = new Set([
 
 const DASHBOARD_MOBILES = new Set(['9536952171', '9536952170', '9990099909']);
 
-/** Hard menu allowlists by Role_ID — when set, only these nav ids can appear
- *  (plus any item whose Responsibility is granted — see canAccessNavItem). */
-const ROLE_NAV_ALLOWLIST: Record<string, readonly string[]> = {
-  // caller / caller_new — Bot Performance + State wise Registration hidden
-  '68945961c99bca8bbc8b61ed': [
-    'welcome',
-    'callerResponsibility',
-    'callLogs',
-    'newRegisters',
-    'users',
-    'mobileApp',
-  ],
-  '6864ced73cc84c862f86c17f': [
-    'welcome',
-    'callerResponsibility',
-    'callLogs',
-    'newRegisters',
-    'users',
-    'mobileApp',
-  ],
-  '694c2f99a8b2fd753572f671': [
-    'welcome',
-    'callerResponsibility',
-    'callLogs',
-    'newRegisters',
-    'users',
-    'mobileApp',
-  ],
-};
-
 function normalizeRoleName(value: string): string {
   return value
     .trim()
@@ -552,27 +522,6 @@ export function canAccessDashboard(
   return false;
 }
 
-function roleAllowlist(
-  user: PermissionUser | null,
-  storage?: PermissionStorage | null,
-): readonly string[] | null {
-  const roleId = getRoleId(user, storage);
-  if (roleId && ROLE_NAV_ALLOWLIST[roleId]) return ROLE_NAV_ALLOWLIST[roleId];
-
-  // Fallback for caller Role_IDs added later in CALLER_ROLE_IDS
-  if (roleId && CALLER_ROLE_IDS.has(roleId) && !CALLER_HEAD_ROLE_IDS.has(roleId)) {
-    return ROLE_NAV_ALLOWLIST['6864ced73cc84c862f86c17f'];
-  }
-
-  const name = getRoleName(user, storage);
-  const nameVariants = roleNameVariants(name);
-  if (nameVariants.some((v) => v === 'caller' || v === 'caller_new')) {
-    return ROLE_NAV_ALLOWLIST['6864ced73cc84c862f86c17f'];
-  }
-
-  return null;
-}
-
 /** Full / Dev / QA — show complete menu without waiting on new Responsibility rows. */
 export function isFullAccessNavRole(
   user: PermissionUser | null = null,
@@ -658,20 +607,12 @@ export function canShowMyCoinHistory(user: PermissionUser | null = null): boolea
   return v === true || v === 'true' || v === 1 || v === '1';
 }
 
-/** Final nav visibility: Role_ID allowlist + Responsibilities + dashboard Role_ID gate. */
+/** Final nav visibility: login Responsibilities (+ a few non-Responsibility gates). */
 export function canAccessNavItem(
   item: { id: string; permission?: string },
   user: PermissionUser | null = null,
   storage?: PermissionStorage | null,
 ): boolean {
-  // Callers must not see these tabs (even if Responsibilities / legacy unlocks say otherwise).
-  if (
-    isCallerRole(user, storage) &&
-    (item.id === 'botPerformance' || item.id === 'stateWiseRegistration')
-  ) {
-    return false;
-  }
-
   // Coin-role flag only (Laxmi SideNavItems show: User.data.showCoins).
   if (item.id === 'showMyCoinHistory') {
     return canShowMyCoinHistory(user);
@@ -684,26 +625,14 @@ export function canAccessNavItem(
     );
   }
 
-  // Ungated items (Welcome) — always in the drawer for every role except caller-hidden ids above.
-  if (!item.permission && item.id !== 'botPerformance') return true;
-
-  // Always show Bot Performance for non-callers (laxminarayan App.tsx mounts it without Responsibility).
-  if (item.id === 'botPerformance') return true;
+  // Ungated items (Welcome / Bot Performance) — no Responsibility on the nav item.
+  if (!item.permission) return true;
 
   // Full / dev / QA access — show the complete menu without waiting on new Responsibility rows.
   if (isFullAccessNavRole(user, storage)) return true;
 
   if (item.id === 'midLimits') {
     return canViewMidLimits(user, storage);
-  }
-
-  const allow = roleAllowlist(user, storage);
-  // Hard role allowlist is the base set (e.g. callers). Also honor Responsibilities
-  // so pages unlock when the backend grants the permission.
-  if (allow) {
-    if (allow.includes(item.id)) return true;
-    if (item.permission && hasPermission(item.permission, user)) return true;
-    return false;
   }
 
   if (item.id === 'dashboard' || item.id === 'vipDashboard' || item.id === 'combinedDashboard') {
