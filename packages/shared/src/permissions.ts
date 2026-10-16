@@ -677,6 +677,13 @@ export function canAccessNavItem(
     return canShowMyCoinHistory(user);
   }
 
+  // Active User Withdrawal — Role_Name `active_user_withdrawal` only.
+  if (item.id === 'activeUserWithdrawal') {
+    return roleNameVariants(getRoleName(user, storage)).some(
+      (v) => v === 'active_user_withdrawal',
+    );
+  }
+
   // Ungated items (Welcome) — always in the drawer for every role except caller-hidden ids above.
   if (!item.permission && item.id !== 'botPerformance') return true;
 
