@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getRoleName, hasPermission, Permissions } from '@/auth/permissions';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
+import { apiOtpFailed } from '@astro/shared/walletOtp';
 import { SHOW_EDIT_EMP_CODE, resolveBlockOtpMobile } from './constants';
 import { MAX_REMARK, extractRoleId, normalizeRoleOptions, type RoleOption, type SubAdminEditType } from './usersHelpers';
 import type { UsersAdmin } from './useUsersQuery';
@@ -80,7 +81,7 @@ export function useUsersActions({
     setBlockNextStatus(false);
   }, []);
 
-  /** Open OTP+remark dialog, then send OTP to SuperAdmin (always asks OTP). */
+  /** Open OTP+remark dialog, then send OTP (walletToWallet) before block/unblock. */
   const startBlockWithOtp = useCallback(
     async (row: UserRow) => {
       if (isCaller) return;
@@ -93,14 +94,14 @@ export function useUsersActions({
       setOtpSending(true);
       setActionBusyId(row._id);
       try {
-        const res = await secureApi('users.sendBlockOtp', {
+        const res = await secureApi('users.sendWalletOtp', {
           mobile: resolveBlockOtpMobile(admin?.mobile),
         });
-        if (!res.ok) {
+        if (apiOtpFailed(res)) {
           toast.error(res.message || 'Failed to send OTP');
           return;
         }
-        toast.success('OTP sent successfully to SuperAdmin');
+        toast.success(res.message || 'OTP sent successfully');
       } finally {
         setOtpSending(false);
         setActionBusyId('');
@@ -112,14 +113,14 @@ export function useUsersActions({
   const resendBlockOtp = useCallback(async () => {
     setOtpSending(true);
     try {
-      const res = await secureApi('users.sendBlockOtp', {
+      const res = await secureApi('users.sendWalletOtp', {
         mobile: resolveBlockOtpMobile(admin?.mobile),
       });
-      if (!res.ok) {
+      if (apiOtpFailed(res)) {
         toast.error(res.message || 'Failed to resend OTP');
         return;
       }
-      toast.success('OTP resent successfully to SuperAdmin');
+      toast.success(res.message || 'OTP resent successfully');
     } finally {
       setOtpSending(false);
     }
@@ -146,7 +147,7 @@ export function useUsersActions({
         mobile: resolveBlockOtpMobile(admin?.mobile),
         otp: Number.parseInt(otp.trim(), 10),
       });
-      if (!verify.ok) {
+      if (apiOtpFailed(verify)) {
         toast.error(verify.message || 'Invalid OTP');
         return;
       }
@@ -475,14 +476,14 @@ export function useUsersActions({
       const next = !row.block;
       setBlockCallerBusy(true);
       try {
-        const res = await secureApi('users.sendBlockOtp', {
+        const res = await secureApi('users.sendWalletOtp', {
           mobile: resolveBlockOtpMobile(admin?.mobile),
         });
-        if (!res.ok) {
+        if (apiOtpFailed(res)) {
           toast.error(res.message || 'Failed to send OTP');
           return;
         }
-        toast.success('OTP sent successfully to SuperAdmin');
+        toast.success(res.message || 'OTP sent successfully');
         setBlockCallerTarget(row);
         setBlockCallerNext(next);
         setBlockCallerRemark('');
@@ -510,7 +511,7 @@ export function useUsersActions({
         mobile: resolveBlockOtpMobile(admin?.mobile),
         otp: Number(blockCallerOtp.trim()),
       });
-      if (!verify.ok) {
+      if (apiOtpFailed(verify)) {
         toast.error(verify.message || 'Invalid OTP');
         return;
       }

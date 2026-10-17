@@ -1,5 +1,6 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'react-toastify';
+import { apiOtpFailed } from '@astro/shared/walletOtp';
 import { secureApi } from '@/api/secureClient';
 import { resolveBlockOtpMobile } from '@/screens/panel/users/constants';
 import { withRegistrationComment } from '@astro/shared/rowComments';
@@ -25,7 +26,7 @@ export function useNewRegistersActions(
     setBlockNextStatus(false);
   }, []);
 
-  /** Open OTP+remark dialog and send OTP to SuperAdmin (Users / Laxmi flow). */
+  /** Open OTP+remark dialog and send OTP (walletToWallet) before block/unblock. */
   const startBlockWithOtp = useCallback(
     async (row: UserRow) => {
       if (!row._id) return;
@@ -38,14 +39,14 @@ export function useNewRegistersActions(
       setOtpSending(true);
       setActionBusyId(row._id);
       try {
-        const res = await secureApi('users.sendBlockOtp', {
+        const res = await secureApi('users.sendWalletOtp', {
           mobile: resolveBlockOtpMobile(admin?.mobile),
         });
-        if (!res.ok) {
+        if (apiOtpFailed(res)) {
           toast.error(res.message || 'Failed to send OTP');
           return;
         }
-        toast.success('OTP sent successfully to SuperAdmin');
+        toast.success(res.message || 'OTP sent successfully');
       } finally {
         setOtpSending(false);
         setActionBusyId('');
@@ -57,14 +58,14 @@ export function useNewRegistersActions(
   const resendBlockOtp = useCallback(async () => {
     setOtpSending(true);
     try {
-      const res = await secureApi('users.sendBlockOtp', {
+      const res = await secureApi('users.sendWalletOtp', {
         mobile: resolveBlockOtpMobile(admin?.mobile),
       });
-      if (!res.ok) {
+      if (apiOtpFailed(res)) {
         toast.error(res.message || 'Failed to resend OTP');
         return;
       }
-      toast.success('OTP resent successfully to SuperAdmin');
+      toast.success(res.message || 'OTP resent successfully');
     } finally {
       setOtpSending(false);
     }
@@ -91,7 +92,7 @@ export function useNewRegistersActions(
         mobile: resolveBlockOtpMobile(admin?.mobile),
         otp: Number.parseInt(otp.trim(), 10),
       });
-      if (!verify.ok) {
+      if (apiOtpFailed(verify)) {
         toast.error(verify.message || 'Invalid OTP');
         return;
       }

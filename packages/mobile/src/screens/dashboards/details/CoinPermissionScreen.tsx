@@ -7,7 +7,7 @@
  *  - Add/Remove coin role       → subadmin.updateCoinRoles { _id:[id], type }
  *  - Add/Remove Coin Permission → subadmin.removeCoinPermission { _id, status }
  *  - Edit Coin Limit            → reports.addCoin { _id, coin, coinUpdatedBy }
- *  - Block / Un Block (remark)  → ops.blockCaller { _id, Role_ID, status, blockReason }
+ *  - Block / Un Block (OTP + remark) → sendWalletOtp → verifyBlockOtp → ops.blockCaller
  *  - Add/Remove App (allowlisted Role_IDs only) → subadmin.updateAppHeads { userId, app, type }
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -24,6 +24,7 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { pickPageSizes, asPaged, CLIENT_NAMES } from '@astro/shared';
+import { apiOtpFailed, resolveBlockOtpMobile } from '@astro/shared/walletOtp';
 import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
@@ -82,10 +83,12 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   const [coinValue, setCoinValue] = useState('');
   const [coinUserId, setCoinUserId] = useState('');
 
-  // Block / Un Block remark modal
+  // Block / Un Block OTP + remark modal
   const [blockOpen, setBlockOpen] = useState(false);
   const [blockRemark, setBlockRemark] = useState('');
+  const [blockOtp, setBlockOtp] = useState('');
   const [blockTarget, setBlockTarget] = useState<Row | null>(null);
+  const otpMobile = useMemo(() => resolveBlockOtpMobile(user?.mobile), [user?.mobile]);
 
   // Add / Remove App modal
   const [appOpen, setAppOpen] = useState(false);
@@ -180,8 +183,32 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
     if (busy) return;
     setBlockOpen(false);
     setBlockRemark('');
+    setBlockOtp('');
     setBlockTarget(null);
   }, [busy]);
+
+  const openBlockModal = useCallback(
+    async (row: Row) => {
+      setBlockTarget(row);
+      setBlockRemark('');
+      setBlockOtp('');
+      setBlockOpen(true);
+      setBusy(true);
+      try {
+        const res = await secureApi<unknown>('users.sendWalletOtp', { mobile: otpMobile });
+        if (apiOtpFailed(res)) {
+          Alert.alert(res.message || 'Failed to send OTP');
+          setBlockOpen(false);
+          setBlockTarget(null);
+          return;
+        }
+        Alert.alert('OTP sent', res.message || 'Enter the OTP to continue.');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [otpMobile],
+  );
 
   const closeAppModal = useCallback(() => {
     if (busy) return;
@@ -236,6 +263,10 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
   }, [coinUserId, coinValue, runMutation, user]);
 
   const submitBlock = useCallback(async () => {
+    if (!/^\d{4,8}$/.test(blockOtp.trim())) {
+      Alert.alert('Please enter a valid OTP');
+      return;
+    }
     if (!blockRemark.trim()) {
       Alert.alert('Please enter remark');
       return;
@@ -243,22 +274,42 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
     const row = blockTarget;
     if (!row) return;
     const nextBlocked = !row.block;
-    const updated = await runMutation(
-      () =>
-        secureApi<unknown>('ops.blockCaller', {
-          _id: row._id,
-          Role_ID: row.Role_ID,
-          status: nextBlocked,
-          blockReason: blockRemark.trim(),
-        }),
-      nextBlocked ? 'User blocked successfully' : 'User unblocked successfully',
-    );
-    if (updated) {
+    setBusy(true);
+    try {
+      const verify = await secureApi<unknown>('users.verifyBlockOtp', {
+        mobile: otpMobile,
+        otp: Number(blockOtp.trim()),
+      });
+      if (apiOtpFailed(verify)) {
+        Alert.alert(verify.message || 'Invalid OTP');
+        return;
+      }
+      const res = await secureApi<unknown>('ops.blockCaller', {
+        _id: row._id,
+        Role_ID: row.Role_ID,
+        status: nextBlocked,
+        blockReason: blockRemark.trim(),
+      });
+      if (!res.ok || res.success === false) {
+        Alert.alert(res.message || 'Request failed');
+        return;
+      }
+      Alert.alert(
+        res.message ||
+          (nextBlocked ? 'User blocked successfully' : 'User unblocked successfully'),
+      );
       setBlockOpen(false);
       setBlockRemark('');
+      setBlockOtp('');
       setBlockTarget(null);
+      setSheetRow(null);
+      await load();
+    } catch (err) {
+      Alert.alert(err instanceof Error ? err.message : 'Request failed');
+    } finally {
+      setBusy(false);
     }
-  }, [blockTarget, blockRemark, runMutation]);
+  }, [blockTarget, blockOtp, blockRemark, otpMobile, load]);
 
   const submitApp = useCallback(async () => {
     const row = appTarget;
@@ -391,11 +442,7 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       label: row.block === true ? 'Un Block' : 'Block',
       tone: 'warning',
       disabled: busy,
-      onPress: () => {
-        setBlockTarget(row);
-        setBlockRemark('');
-        openAfterSheetClose(() => setBlockOpen(true));
-      },
+      onPress: () => openAfterSheetClose(() => void openBlockModal(row)),
     });
     if (canAddApps) {
       actions.push({
@@ -422,7 +469,15 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
       },
     });
     return actions;
-  }, [sheetRow, busy, canAddApps, handleCoinRole, handleRemovePermission, openAfterSheetClose]);
+  }, [
+    sheetRow,
+    busy,
+    canAddApps,
+    handleCoinRole,
+    handleRemovePermission,
+    openAfterSheetClose,
+    openBlockModal,
+  ]);
 
   const appOptions: readonly string[] =
     appMode === 'add' ? (CLIENT_NAMES as readonly string[]) : appTarget?.allotedApps || [];
@@ -610,6 +665,16 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
             <Text style={styles.formTitle}>
               {blockTarget?.block === true ? 'Un Block' : 'Block'} {display(blockTarget?.name)}
             </Text>
+            <Text style={styles.mutedText}>OTP sent — verify then enter remark.</Text>
+            <TextInput
+              style={styles.input}
+              value={blockOtp}
+              onChangeText={(t) => setBlockOtp(t.replace(/\D/g, '').slice(0, 8))}
+              placeholder="OTP"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              maxLength={8}
+            />
             <TextInput
               style={styles.input}
               value={blockRemark}
@@ -630,7 +695,13 @@ export function CoinPermissionScreen({ onBack }: { onBack: () => void }) {
                 onPress={() => void submitBlock()}
                 disabled={busy}
               >
-                <Text style={styles.formBtnPrimaryText}>{busy ? 'Saving…' : 'Submit'}</Text>
+                <Text style={styles.formBtnPrimaryText}>
+                  {busy
+                    ? 'Saving…'
+                    : blockTarget?.block === true
+                      ? 'Verify & Unblock'
+                      : 'Verify & Block'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

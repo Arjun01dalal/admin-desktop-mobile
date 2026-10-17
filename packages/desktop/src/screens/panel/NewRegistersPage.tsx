@@ -367,7 +367,9 @@ export function NewRegistersPage() {
         <DialogTitle>{block.nextStatus ? 'Block' : 'Unblock'} user</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, mt: 0.5 }}>
-            {block.otpSending ? 'Sending OTP to SuperAdmin…' : 'Enter OTP and remark to continue.'}
+            {block.otpSending
+              ? 'Sending OTP…'
+              : 'Verify OTP, then enter remark to block/unblock.'}
           </Typography>
           <TextField
             autoFocus

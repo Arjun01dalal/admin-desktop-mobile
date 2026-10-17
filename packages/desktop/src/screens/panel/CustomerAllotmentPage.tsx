@@ -27,6 +27,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { toast } from 'react-toastify';
+import { apiOtpFailed, resolveBlockOtpMobile } from '@astro/shared/walletOtp';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
@@ -36,6 +37,7 @@ import { useRequestGeneration } from '@/hooks/useRequestGeneration';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { display, maskMobile } from '@/screens/panel/shared';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
+import { getStoredUser } from '@/utils/dates';
 
 type DepositStat = { count?: number; totalAmount?: number };
 
@@ -194,8 +196,11 @@ export function CustomerAllotmentPage() {
   const [error, setError] = useState<string | null>(null);
   const { next, isCurrent, begin, end } = useRequestGeneration();
 
+  const admin = getStoredUser<{ mobile?: string }>();
   const [blockTarget, setBlockTarget] = useState<AllotmentRow | null>(null);
   const [blockRemark, setBlockRemark] = useState('');
+  const [blockOtp, setBlockOtp] = useState('');
+  const [blockOtpSending, setBlockOtpSending] = useState(false);
   const [blockSubmitting, setBlockSubmitting] = useState(false);
 
   const [reportTarget, setReportTarget] = useState<AllotmentRow | null>(null);
@@ -374,13 +379,49 @@ export function CustomerAllotmentPage() {
     [navigate],
   );
 
+  const openBlockDialog = useCallback(
+    async (row: AllotmentRow) => {
+      setBlockTarget(row);
+      setBlockRemark('');
+      setBlockOtp('');
+      setBlockOtpSending(true);
+      try {
+        const res = await secureApi('users.sendWalletOtp', {
+          mobile: resolveBlockOtpMobile(admin?.mobile),
+        });
+        if (apiOtpFailed(res)) {
+          toast.error(res.message || 'Failed to send OTP');
+          setBlockTarget(null);
+          return;
+        }
+        toast.success(res.message || 'OTP sent successfully');
+      } finally {
+        setBlockOtpSending(false);
+      }
+    },
+    [admin?.mobile],
+  );
+
   const submitBlock = useCallback(async () => {
-    if (!blockTarget?._id || !blockRemark.trim()) {
+    if (!blockTarget?._id) return;
+    if (!blockOtp.trim()) {
+      toast.error('Please enter OTP');
+      return;
+    }
+    if (!blockRemark.trim()) {
       toast.error('Please enter a remark');
       return;
     }
     setBlockSubmitting(true);
     try {
+      const verify = await secureApi('users.verifyBlockOtp', {
+        mobile: resolveBlockOtpMobile(admin?.mobile),
+        otp: Number.parseInt(blockOtp.trim(), 10),
+      });
+      if (apiOtpFailed(verify)) {
+        toast.error(verify.message || 'Invalid OTP');
+        return;
+      }
       const res = await secureApi('ops.blockCaller', {
         _id: blockTarget._id,
         Role_ID: blockTarget.Role_ID,
@@ -394,11 +435,12 @@ export function CustomerAllotmentPage() {
       toast.success(blockTarget.block ? 'Caller unblocked' : 'Caller blocked');
       setBlockTarget(null);
       setBlockRemark('');
+      setBlockOtp('');
       void loadCustomers(page);
     } finally {
       setBlockSubmitting(false);
     }
-  }, [blockTarget, blockRemark, loadCustomers, page]);
+  }, [admin?.mobile, blockTarget, blockOtp, blockRemark, loadCustomers, page]);
 
   const runCallerReport = useCallback(
     async (mode: 'today' | 'range' | 'all') => {
@@ -542,10 +584,7 @@ export function CustomerAllotmentPage() {
             size="small"
             variant="contained"
             startIcon={<BlockIcon sx={{ fontSize: 16 }} />}
-            onClick={() => {
-              setBlockTarget(row);
-              setBlockRemark('');
-            }}
+            onClick={() => void openBlockDialog(row)}
             sx={
               row.block
                 ? {
@@ -613,6 +652,7 @@ export function CustomerAllotmentPage() {
       pageSize,
       depositLoading,
       openAllotted,
+      openBlockDialog,
       openCallerReport,
     ],
   );
@@ -715,8 +755,22 @@ export function CustomerAllotmentPage() {
       >
         <DialogTitle>{blockTarget?.block ? 'Unblock Caller' : 'Block Caller'}</DialogTitle>
         <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, mt: 0.5 }}>
+            {blockOtpSending
+              ? 'Sending OTP…'
+              : 'Verify OTP, then enter remark to block/unblock.'}
+          </Typography>
           <TextField
             autoFocus
+            fullWidth
+            label="OTP"
+            value={blockOtp}
+            onChange={(e) => setBlockOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            inputMode="numeric"
+            disabled={blockOtpSending}
+            sx={{ mb: 2 }}
+          />
+          <TextField
             fullWidth
             multiline
             minRows={3}
@@ -724,25 +778,32 @@ export function CustomerAllotmentPage() {
             value={blockRemark}
             onChange={(e) => setBlockRemark(e.target.value)}
             placeholder="Please enter remark"
-            sx={{ mt: 1 }}
+            disabled={blockOtpSending}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setBlockTarget(null)} disabled={blockSubmitting}>
+          <Button
+            onClick={() => {
+              setBlockTarget(null);
+              setBlockOtp('');
+              setBlockRemark('');
+            }}
+            disabled={blockSubmitting || blockOtpSending}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
             onClick={() => void submitBlock()}
-            disabled={blockSubmitting}
+            disabled={blockSubmitting || blockOtpSending}
             sx={orangeBtnSx}
           >
             {blockSubmitting ? (
               <CircularProgress size={18} color="inherit" />
             ) : blockTarget?.block ? (
-              'Unblock'
+              'Verify & Unblock'
             ) : (
-              'Block'
+              'Verify & Block'
             )}
           </Button>
         </DialogActions>

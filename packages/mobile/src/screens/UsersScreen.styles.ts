@@ -117,6 +117,7 @@ export const styles = makeStyles({
     borderColor: colors.border,
     padding: spacing(3),
     gap: spacing(3),
+    marginBottom: spacing(2),
   },
   avatar: {
     width: 42,

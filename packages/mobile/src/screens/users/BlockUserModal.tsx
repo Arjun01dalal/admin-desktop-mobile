@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { apiOtpFailed } from '@astro/shared/walletOtp';
 import { secureApi } from '../../api/client';
 import { getSessionUser } from '../../auth/permissions';
 import { colors } from '../../theme';
@@ -47,12 +48,13 @@ export function BlockUserModal({
     }
     setBusy(true);
     try {
-      const res = await secureApi<unknown>('users.sendBlockOtp', { mobile: target });
-      if (!res.ok) {
+      const res = await secureApi<unknown>('users.sendWalletOtp', { mobile: target });
+      if (apiOtpFailed(res)) {
         Alert.alert(res.message || 'Failed to send OTP');
         return;
       }
       setStep('otp');
+      Alert.alert('OTP sent', res.message || 'Enter the OTP to continue.');
     } finally {
       setBusy(false);
     }
@@ -69,7 +71,7 @@ export function BlockUserModal({
         mobile: target,
         otp: Number(otp.trim()),
       });
-      if (!v.ok) {
+      if (apiOtpFailed(v)) {
         Alert.alert(v.message || 'Invalid OTP');
         return;
       }

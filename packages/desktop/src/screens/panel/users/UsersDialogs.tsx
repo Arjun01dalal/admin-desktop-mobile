@@ -157,7 +157,9 @@ export function UsersDialogs({ block, dump, subEdit, role, realName, blockCaller
         <DialogTitle>{block.nextStatus ? 'Block' : 'Unblock'} user</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {block.otpSending ? 'Sending OTP to SuperAdmin…' : 'Enter OTP and remark to continue.'}
+            {block.otpSending
+              ? 'Sending OTP…'
+              : 'Verify OTP, then enter remark to block/unblock.'}
           </Typography>
           <TextField
             autoFocus
@@ -337,6 +339,9 @@ export function UsersDialogs({ block, dump, subEdit, role, realName, blockCaller
       >
         <DialogTitle>{blockCaller.next ? 'Block Caller' : 'Un Block Caller'}</DialogTitle>
         <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, mt: 0.5 }}>
+            OTP was sent. Verify OTP and remark to continue.
+          </Typography>
           <TextField
             autoFocus
             fullWidth
@@ -344,7 +349,7 @@ export function UsersDialogs({ block, dump, subEdit, role, realName, blockCaller
             label="OTP"
             value={blockCaller.otp}
             onChange={(e) => blockCaller.setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            sx={{ mt: 1, mb: 2 }}
+            sx={{ mb: 2 }}
           />
           <TextField
             fullWidth
