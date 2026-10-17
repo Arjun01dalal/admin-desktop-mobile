@@ -50,6 +50,7 @@ import {
   BotDataPage,
   BotPerformancePage,
   IncomingBotCallPage,
+  C2cCampaignDataPage,
   SkyTalkPage,
   RolesResponsibilitiesPage,
   CasinoSwitchPage,
@@ -181,6 +182,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/game-activity/details" element={<GameActivityDetailsPage />} />
             <Route path="/game-activity/user-stats" element={<GameUserStatsPage />} />
             <Route path="/call-logs" element={<CallLogsPage />} />
+            <Route path="/c2c-campaign-data" element={<C2cCampaignDataPage />} />
             <Route path="/dialer-push-data" element={<DialerPushDataPage />} />
             <Route path="/new-registers" element={<NewRegistersPage />} />
             <Route path="/register-user-report" element={<StateWiseRegistrationPage />} />

@@ -11,6 +11,7 @@ export const styles = makeStyles({
     padding: spacing(3),
     gap: spacing(2),
     marginTop: spacing(3),
+    marginBottom: spacing(3),
   },
   filterBox: {
     backgroundColor: colors.surface,
@@ -20,6 +21,7 @@ export const styles = makeStyles({
     padding: spacing(3),
     gap: spacing(2),
     marginTop: spacing(3),
+    marginBottom: spacing(3),
   },
   filterHeader: {
     flexDirection: 'row',

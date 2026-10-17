@@ -58,6 +58,21 @@ export const LAZY_IMPLEMENTED: Record<string, () => AnyScreen> = {
     named(require('../screens/dashboards/details/CallLogsScreen'), 'CallLogsScreen'),
   '/gtel-calls': () =>
     named(require('../screens/dashboards/details/GtelCallsScreen'), 'GtelCallsScreen'),
+  '/gtel-caller-dashboard': () =>
+    named(
+      require('../screens/dashboards/details/CallerDashboardScreen'),
+      'CallerDashboardScreen',
+    ),
+  '/c2c-campaign-data': () =>
+    named(
+      require('../screens/dashboards/details/C2cCampaignDataScreen'),
+      'C2cCampaignDataScreen',
+    ),
+  '/c2c-campaign-detail': () =>
+    named(
+      require('../screens/dashboards/details/C2cCampaignDetailScreen'),
+      'C2cCampaignDetailScreen',
+    ),
   '/dialer-push-data': () =>
     named(require('../screens/dashboards/details/DialerPushDataScreen'), 'DialerPushDataScreen'),
   '/new-registers': () =>

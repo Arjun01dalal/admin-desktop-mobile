@@ -1,12 +1,22 @@
 /**
  * Caller / caller-head Role_IDs and related constants.
  * Shared by desktop + mobile permission / nav logic.
+ *
+ * Store Role_IDs only — never role display names in these collections.
  */
-export const CALLER_HEAD_ROLE_IDS = new Set([
-  '6862429e3cc84c862f86c14a',
+
+/** Global caller-head Role_ID list (IDs only). */
+export const CALLER_HEAD = [
+  '6aa555b6719a326039062bb2',
+  '6aa173675a27a3cd3f30fb88',
+  '6ad2439374fc2149f8121ccd',
+  '6972104ee8e409d797e793c3',
   '68cec78a752033c0eb673e56',
-  '68ad566d752033c0eb673b95',
-]);
+  '6862429e3cc84c862f86c14a',
+] as const;
+
+/** Set view of {@link CALLER_HEAD} for O(1) membership checks. */
+export const CALLER_HEAD_ROLE_IDS = new Set<string>(CALLER_HEAD);
 
 export const CALLER_ROLE_IDS = new Set([
   '68945961c99bca8bbc8b61ed',

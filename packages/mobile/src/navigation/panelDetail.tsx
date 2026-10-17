@@ -49,6 +49,7 @@ const DETAIL_PERMISSION_BY_PATH: Readonly<Record<string, Permission>> = {
   '/ludo-user-ggr-by-round': Permissions.house_game,
   '/ludo-player-wise-rtp': Permissions.house_game,
   '/leaderboardCustomerCount': Permissions.caller_leaderboard_tab,
+  '/gtel-calls': Permissions.show_gtel_calls,
   '/user-report': Permissions.View_Users,
   '/user_exposure': Permissions.View_Users,
   '/bonus-wallet-referral-earning': Permissions.View_Users,
@@ -303,6 +304,13 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     ),
   },
   {
+    path: '/gtel-calls',
+    title: 'Gtel Calls',
+    getComponent: lazyOnce('/gtel-calls', () =>
+      named(require('../screens/dashboards/details/GtelCallsScreen'), 'GtelCallsScreen'),
+    ),
+  },
+  {
     path: '/user-report',
     title: 'User Report',
     getComponent: lazyOnce('/user-report', () =>
@@ -363,8 +371,19 @@ const ROUTES_BY_PATH = new Map(PANEL_DETAIL_ROUTES.map((r) => [r.path, r]));
  * cannot protect them from deep links or stale navigation state.
  */
 export function canAccessPanelDetail(path: string, user: AuthUser | null | undefined): boolean {
+  if (!user) return false;
+  // Caller Dashboard → Calls uses the same Gtel Calls screen; allow either perm.
+  if (path === '/gtel-calls') {
+    return (
+      canAccessNavItem({ id: 'detail:/gtel-calls', permission: Permissions.show_gtel_calls }, user) ||
+      canAccessNavItem(
+        { id: 'detail:/gtel-calls-dash', permission: Permissions.show_gtel_dashboard },
+        user,
+      )
+    );
+  }
   const permission = DETAIL_PERMISSION_BY_PATH[path];
-  if (!permission || !user) return false;
+  if (!permission) return false;
   return canAccessNavItem({ id: `detail:${path}`, permission }, user);
 }
 

@@ -56,6 +56,9 @@ type RootStackParamList = {
   profile: undefined;
   '/active-user-withdrawal': undefined;
   '/incoming-bot-call': undefined;
+  '/gtel-caller-dashboard': undefined;
+  '/gtel-caller-calls': undefined;
+  '/c2c-campaign-detail': undefined;
   [route: string]: undefined;
 };
 
@@ -77,6 +80,23 @@ function LazyScreened({
 }) {
   const Impl = resolveLazyScreen(path);
   return <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>;
+}
+
+/** Stable route components — avoid remount loops when Drawer re-renders / setOptions runs. */
+const drawerRouteCache = new Map<string, React.ComponentType>();
+
+function getDrawerRouteComponent(path: string, title: string): React.ComponentType {
+  const key = `${path}\0${title}`;
+  let Route = drawerRouteCache.get(key);
+  if (!Route) {
+    function DrawerRoute() {
+      return <LazyScreened path={path} title={title} />;
+    }
+    DrawerRoute.displayName = `DrawerRoute(${path})`;
+    Route = DrawerRoute;
+    drawerRouteCache.set(key, Route);
+  }
+  return Route;
 }
 
 function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] }) {
@@ -250,12 +270,7 @@ function PanelDrawer({ items }: { items: NavItem[] }) {
               key={item.id}
               name={screenNameFor(item)}
               options={{ title, freezeOnBlur: true }}
-              getComponent={() => {
-                function Route() {
-                  return <LazyScreened path={item.path} title={title} />;
-                }
-                return Route;
-              }}
+              getComponent={() => getDrawerRouteComponent(item.path, title)}
             />
           );
         })}
@@ -342,6 +357,62 @@ export function AppNavigator() {
                     <LazyScreened
                       path="/incoming-bot-call"
                       title={toDisplayText('Incoming Bot Call')}
+                    />
+                  );
+                }
+                return Route;
+              }}
+            />
+            <RootStack.Screen
+              name="/gtel-caller-dashboard"
+              options={{
+                title: toDisplayText('Caller Dashboard'),
+                freezeOnBlur: true,
+              }}
+              getComponent={() => {
+                function Route() {
+                  return (
+                    <LazyScreened
+                      path="/gtel-caller-dashboard"
+                      title={toDisplayText('Caller Dashboard')}
+                    />
+                  );
+                }
+                return Route;
+              }}
+            />
+            {/* Dashboard → Calls: unguarded LazyScreen so hideHeroActions params apply
+                even when the user only has show_gtel_dashboard (not show_gtel_calls). */}
+            <RootStack.Screen
+              name="/gtel-caller-calls"
+              options={{
+                title: toDisplayText('Gtel Calls'),
+                freezeOnBlur: true,
+              }}
+              getComponent={() => {
+                function Route() {
+                  return (
+                    <LazyScreened
+                      path="/gtel-calls"
+                      title={toDisplayText('Gtel Calls')}
+                    />
+                  );
+                }
+                return Route;
+              }}
+            />
+            <RootStack.Screen
+              name="/c2c-campaign-detail"
+              options={{
+                title: toDisplayText('Campaign'),
+                freezeOnBlur: true,
+              }}
+              getComponent={() => {
+                function Route() {
+                  return (
+                    <LazyScreened
+                      path="/c2c-campaign-detail"
+                      title={toDisplayText('Campaign')}
                     />
                   );
                 }

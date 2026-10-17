@@ -130,8 +130,9 @@ export const Permissions = {
   show_mobile: 'show_mobile',
   /** Gtel Calls page (admin-panel-domains GtelCalls). */
   show_gtel_calls: 'show_gtel_calls',
-  /** Click-to-call button on Gtel Calls. */
+  show_gtel_dashboard: 'show_gtel_dashboard',
   show_c2cBtn: 'show_c2cBtn',
+  c2c_campaign_data: 'c2c_campaign_data',
   contact_visibility_none: 'contact_visibility_none',
   show_download_botton: 'show_download_botton',
   whatsapp_icon: 'whatsapp_icon',
@@ -388,7 +389,20 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'gtel_calls',
     'gtelCalls',
   ],
+  show_gtel_dashboard: [
+    'show_gtel_dashboard',
+    'Show_Gtel_Dashboard',
+    'Gtel Dashboard',
+    'gtel_dashboard',
+    'gtelDashboard',
+  ],
   show_c2cBtn: ['show_c2cBtn', 'show_c2c_btn', 'Show_C2C_Btn', 'c2cBtn'],
+  c2c_campaign_data: [
+    'c2c_campaign_data',
+    'C2C_Campaign_Data',
+    'C2C Campaign Data',
+    'c2cCampaignData',
+  ],
   update_ludo_bets: ['update_ludo_bets', 'Update_Ludo_Bets', 'update_ludo_bet', 'Update Ludo Bets'],
   show_wining_btn: [
     'show_wining_btn',

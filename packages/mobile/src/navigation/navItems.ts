@@ -95,6 +95,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.show_gtel_calls,
   },
   {
+    id: 'c2cCampaignData',
+    label: 'C2C Campaign Data',
+    path: '/c2c-campaign-data',
+    permission: Permissions.c2c_campaign_data,
+  },
+  {
     id: 'dialerPushData',
     label: 'Dialer Push Data',
     path: '/dialer-push-data',

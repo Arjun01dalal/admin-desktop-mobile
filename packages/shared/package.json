@@ -37,6 +37,8 @@
     "./gameUserStats": "./src/gameUserStats.ts",
     "./depositRules": "./src/depositRules.ts",
     "./gtelCalls": "./src/gtelCalls.ts",
+    "./gtelCallerDashboard": "./src/gtelCallerDashboard.ts",
+    "./c2cCampaign": "./src/c2cCampaign.ts",
     "./rowComments": "./src/rowComments.ts",
     "./withdrawalFund": "./src/withdrawalFund.ts",
     "./finalBook": "./src/finalBook.ts",

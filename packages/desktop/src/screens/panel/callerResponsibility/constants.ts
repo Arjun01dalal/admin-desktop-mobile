@@ -2,6 +2,7 @@
  * Caller role constants — re-exported from @astro/shared (single source of truth).
  */
 export {
+  CALLER_HEAD,
   CALLER_HEAD_ROLE_IDS,
   CALLER_ROLE_IDS,
   FULL_ALLOTMENT_ROLE_IDS,

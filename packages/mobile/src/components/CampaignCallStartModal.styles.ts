@@ -1,0 +1,70 @@
+import { makeStyles } from '../styles/common';
+import { colors, radius, spacing } from '../theme';
+
+export const styles = makeStyles({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: '88%',
+    paddingHorizontal: spacing(4),
+    paddingTop: spacing(3),
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginBottom: spacing(2),
+  },
+  title: { color: colors.foreground, fontSize: 18, fontWeight: '800' },
+  sub: { color: colors.muted, fontSize: 12, marginTop: spacing(1), marginBottom: spacing(3) },
+  card: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing(3),
+    gap: spacing(1.5),
+  },
+  name: { color: colors.foreground, fontSize: 16, fontWeight: '800' },
+  line: { color: colors.foreground, fontSize: 13, fontWeight: '600' },
+  muted: { color: colors.muted, fontSize: 12 },
+  empty: {
+    color: colors.muted,
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: spacing(6),
+  },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(2),
+    marginTop: spacing(3),
+    marginBottom: spacing(2),
+  },
+  btn: {
+    flexGrow: 1,
+    minWidth: 120,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+  },
+  btnGhost: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  btnText: { color: colors.primaryForeground, fontWeight: '800', fontSize: 13 },
+  btnGhostText: { color: colors.foreground, fontWeight: '700', fontSize: 13 },
+  err: { color: colors.destructive, fontSize: 12, marginTop: spacing(1) },
+});

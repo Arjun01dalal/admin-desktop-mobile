@@ -31,6 +31,11 @@ export type GtelC2cTarget = {
   userName?: string;
   appName?: string;
   lastActivity?: string;
+  /** When set, dialer uses campaign path (admin C2C Campaign parity). */
+  campaignDataId?: string;
+  source?: 'Manual' | 'Campaign';
+  /** Number not in DB — POST click-to-call with isProspect: true. */
+  isProspect?: boolean;
 };
 
 type Props = {
@@ -103,11 +108,23 @@ export function GtelClick2CallModal({ target, onClose, onEnded, canShowMobile }:
       const phone = sanitizeGtelPhone(next.phoneNumber);
       const ext = getNumericExtension(admin?.extensionId);
       const nextCallId = createGtelCallId();
+      const isCampaign = Boolean(next.campaignDataId);
       setStarting(true);
       setMsg('');
       setActive(next);
       try {
-        if (!ext) {
+        if (!phone) {
+          setMsg('Phone number is required');
+          onClose();
+          return;
+        }
+        // Campaign dials omit extension; manual / prospect need one.
+        if (!isCampaign && !ext) {
+          if (next.isProspect) {
+            setMsg('Extension not found for prospect call');
+            onClose();
+            return;
+          }
           setCallId(nextCallId);
           setExtension('—');
           setStartedAt(Date.now());
@@ -118,25 +135,40 @@ export function GtelClick2CallModal({ target, onClose, onEnded, canShowMobile }:
           void loadDispositions();
           return;
         }
-        if (!phone) {
-          setMsg('Phone number is required');
-          onClose();
-          return;
-        }
-        const res = await secureApi('gtel.clickToCall', {
-          callId: nextCallId,
-          phoneNumber: phone,
-          extension: ext,
-          userId: next.userId || '',
-          subAdminId: String(admin?._id || ''),
-        });
+        const res = await secureApi(
+          'gtel.clickToCall',
+          next.isProspect
+            ? {
+                callId: nextCallId,
+                phoneNumber: phone,
+                isProspect: true,
+                source: next.source || 'Manual',
+                extension: ext,
+              }
+            : {
+                callId: nextCallId,
+                phoneNumber: phone,
+                ...(isCampaign
+                  ? {
+                      campaignDataId: next.campaignDataId,
+                      source: next.source || 'Campaign',
+                      userId: next.userId || '',
+                    }
+                  : {
+                      extension: ext,
+                      userId: next.userId || '',
+                      subAdminId: String(admin?._id || ''),
+                      source: next.source || 'Manual',
+                    }),
+              },
+        );
         if (!res.ok || res.success === false) {
           setMsg(res.message || 'Call could not be initiated');
           onClose();
           return;
         }
         setCallId(nextCallId);
-        setExtension(ext);
+        setExtension(isCampaign ? 'Campaign' : ext);
         setStartedAt(Date.now());
         setElapsed(0);
         setEnded(false);

@@ -153,6 +153,10 @@ const IncomingBotCallPage = lazyNamed(
   () => import('@/screens/panel/IncomingBotCallPage'),
   'IncomingBotCallPage',
 );
+const C2cCampaignDataPage = lazyNamed(
+  () => import('@/screens/panel/C2cCampaignDataPage'),
+  'C2cCampaignDataPage',
+);
 const SkyTalkPage = lazyNamed(() => import('@/screens/panel/SkyTalkPage'), 'SkyTalkPage');
 const RolesResponsibilitiesPage = lazyNamed(
   () => import('@/screens/panel/RolesResponsibilitiesPage'),
@@ -416,6 +420,7 @@ export {
   BotDataPage,
   BotPerformancePage,
   IncomingBotCallPage,
+  C2cCampaignDataPage,
   SkyTalkPage,
   RolesResponsibilitiesPage,
   CasinoSwitchPage,

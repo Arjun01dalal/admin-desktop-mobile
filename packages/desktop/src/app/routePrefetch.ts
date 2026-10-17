@@ -81,6 +81,7 @@ const LOADERS: Record<string, Loader> = {
   '/botData': () => import('@/screens/panel/BotDataPage'),
   '/botPerformance': () => import('@/screens/panel/BotPerformancePage'),
   '/incoming-bot-call': () => import('@/screens/panel/IncomingBotCallPage'),
+  '/c2c-campaign-data': () => import('@/screens/panel/C2cCampaignDataPage'),
   '/sky-talk': () => import('@/screens/panel/SkyTalkPage'),
   '/roles-responsibilities': () => import('@/screens/panel/RolesResponsibilitiesPage'),
   '/dynamic-casino-switching': () => import('@/screens/panel/CasinoSwitchPage'),

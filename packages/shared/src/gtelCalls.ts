@@ -65,6 +65,9 @@ export type GtelCall = {
   [key: string]: unknown;
 };
 
+/** Status bucket used by mobile/desktop summary filter chips. */
+export type GtelStatusFilter = '' | 'answered' | 'noAnswer' | 'failed' | 'pending';
+
 export type GtelFilters = {
   from: string;
   to: string;
@@ -72,7 +75,76 @@ export type GtelFilters = {
   phoneNumber: string;
   disposition: string;
   empCode: string;
+  /** Dialer status bucket — sent as statusByDialer when set. */
+  status: GtelStatusFilter;
 };
+
+export const GTEL_STATUS_FILTER_CARDS: {
+  key: Exclude<GtelStatusFilter, ''>;
+  label: string;
+  /** Value sent to GET /dialer/calls?statusByDialer= */
+  apiValue: string;
+}[] = [
+  { key: 'answered', label: 'Answered', apiValue: 'ANSWER' },
+  { key: 'noAnswer', label: 'No Answer', apiValue: 'NO ANSWER' },
+  { key: 'failed', label: 'Failed', apiValue: 'FAILED' },
+  { key: 'pending', label: 'Pending', apiValue: 'PENDING' },
+];
+
+/** Match a call row to a summary status bucket (status + statusByDialer). */
+export function gtelCallMatchesStatus(
+  call: GtelCall,
+  filter: GtelStatusFilter,
+): boolean {
+  if (!filter) return true;
+  const raw = `${call.statusByDialer || ''} ${call.status || ''}`.toUpperCase();
+  if (filter === 'answered') {
+    return raw.includes('ANSWER') && !raw.includes('NO');
+  }
+  if (filter === 'noAnswer') {
+    return (
+      raw.includes('NO ANSWER') ||
+      raw.includes('NOANSWER') ||
+      raw.includes('NO_ANSWER')
+    );
+  }
+  if (filter === 'failed') return raw.includes('FAIL');
+  if (filter === 'pending') {
+    return (
+      raw.includes('PEND') ||
+      raw.includes('RING') ||
+      raw.includes('QUEUE') ||
+      raw.includes('INIT')
+    );
+  }
+  return true;
+}
+
+/** Pick summary count for a status bucket from API summary / cards. */
+export function gtelSummaryCountForStatus(
+  summary: Record<string, unknown> | null,
+  cards: GtelSummaryCard[],
+  key: Exclude<GtelStatusFilter, ''>,
+): number {
+  const aliases: Record<Exclude<GtelStatusFilter, ''>, string[]> = {
+    answered: ['answered', 'answeredcount', 'answer', 'answeredcalls'],
+    noAnswer: ['noanswer', 'noanswercount', 'no_answer', 'notanswered'],
+    failed: ['failed', 'failedcount', 'fail'],
+    pending: ['pending', 'pendingcount', 'ringing', 'queued'],
+  };
+  const wanted = new Set(aliases[key]);
+  for (const card of cards) {
+    const norm = card.key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (wanted.has(norm)) return Number(card.value) || 0;
+  }
+  if (summary) {
+    for (const [k, v] of Object.entries(summary)) {
+      const norm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (wanted.has(norm) && Number.isFinite(Number(v))) return Number(v);
+    }
+  }
+  return 0;
+}
 
 export type GtelSummaryCard = { key: string; label: string; value: number };
 
@@ -151,8 +223,32 @@ export function gtelDisplay(...values: unknown[]): string {
   return '—';
 }
 
+function nestedCustomer(call: GtelCall): Record<string, unknown> {
+  for (const key of ['customer', 'Customer', 'user', 'User', 'client', 'Client'] as const) {
+    const nested = call[key];
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      return nested as Record<string, unknown>;
+    }
+  }
+  return {};
+}
+
+function pickCallField(call: GtelCall, keys: string[]): unknown {
+  const customer = nestedCustomer(call);
+  for (const key of keys) {
+    const nested = customer[key];
+    if (nested != null && String(nested).trim() !== '') return nested;
+  }
+  for (const key of keys) {
+    const direct = call[key];
+    if (direct != null && String(direct).trim() !== '') return direct;
+  }
+  return null;
+}
+
 export function getGtelUsername(call: GtelCall): string {
   return gtelDisplay(
+    pickCallField(call, ['username', 'userName', 'name', 'clientName', 'fullName']),
     call.user?.name,
     call.user?.userName,
     call.user?.username,
@@ -182,7 +278,9 @@ export function getGtelCity(call: GtelCall): string {
 }
 
 export function getGtelDpiId(call: GtelCall): string {
+  // Prefer nested customer/user id — avoid top-level call `_id` (admin CallerCallsModal).
   return gtelDisplay(
+    pickCallField(call, ['dpid', 'dpi_id', 'dp_id', 'dpId', 'userId', '_id', 'id']),
     call.user?.dpid,
     call.user?.dpi_id,
     call.user?.dp_id,
@@ -192,6 +290,156 @@ export function getGtelDpiId(call: GtelCall): string {
     call.userId,
   );
 }
+
+export function getGtelCallId(call: GtelCall): string {
+  return gtelDisplay(call.callId, call.dialerUniqueId, (call as { sid?: unknown }).sid, call._id);
+}
+
+export type GtelVerticalCode = 'E' | 'C' | 'S';
+
+const VERTICAL_LABELS: Record<GtelVerticalCode, string> = {
+  E: 'Exch Players',
+  C: 'Casino Players',
+  S: 'SM Players',
+};
+
+function labelVerticalCode(code: string): string {
+  const upper = code.trim().toUpperCase();
+  if (upper === 'E' || upper === 'C' || upper === 'S') {
+    return VERTICAL_LABELS[upper as GtelVerticalCode];
+  }
+  return code.trim();
+}
+
+/** Parse customer.played → unique E/C/S codes (admin CallerCallsModal). */
+export function getGtelPlayedVerticals(call: GtelCall): GtelVerticalCode[] {
+  const raw = pickCallField(call, ['played', 'isPlayed', 'hasPlayed']);
+  const codes = new Set<GtelVerticalCode>();
+  const add = (item: unknown) => {
+    const code = String(item ?? '')
+      .trim()
+      .toUpperCase();
+    if (code === 'E' || code === 'C' || code === 'S') codes.add(code);
+  };
+  if (Array.isArray(raw)) {
+    raw.forEach(add);
+  } else if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (t.startsWith('[') && t.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(t) as unknown;
+        if (Array.isArray(parsed)) parsed.forEach(add);
+      } catch {
+        t.split(/[,|\s]+/).forEach(add);
+      }
+    } else {
+      t.split(/[,|\s]+/).forEach(add);
+    }
+  }
+  return (['E', 'C', 'S'] as const).filter((v) => codes.has(v));
+}
+
+export function getGtelPlayedLabel(call: GtelCall): string {
+  const verts = getGtelPlayedVerticals(call);
+  if (!verts.length) return '—';
+  return verts.map((v) => VERTICAL_LABELS[v]).join(', ');
+}
+
+function isTruthyFlag(value: unknown): boolean {
+  if (value == null || value === '') return false;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (Array.isArray(value)) return value.length > 0;
+  const t = String(value).trim().toLowerCase();
+  if (!t) return false;
+  return !['false', '0', 'no', 'n', 'null', 'undefined', '—', '-'].includes(t);
+}
+
+/** Personal connection compliance flagged CX/call. */
+export function isGtelFlaggedCall(call: GtelCall): boolean {
+  if (
+    isTruthyFlag(
+      pickCallField(call, [
+        'flagged',
+        'isFlagged',
+        'personalConnectionFlagged',
+        'personalConnectFlagged',
+        'complianceFlagged',
+      ]),
+    )
+  ) {
+    return true;
+  }
+  if (
+    isTruthyFlag(
+      pickCallField(call, ['personalConnectIntent', 'personal_connect_intent', 'personalConnect']),
+    )
+  ) {
+    return true;
+  }
+  return isTruthyFlag(
+    pickCallField(call, ['personalConnectCategories', 'personal_connect_categories']),
+  );
+}
+
+export function getGtelPersonalConnectIntent(call: GtelCall): string {
+  const value = pickCallField(call, [
+    'personalConnectIntent',
+    'personal_connect_intent',
+    'personalConnect',
+  ]);
+  if (value == null || value === '') return '—';
+  if (Array.isArray(value)) {
+    const parts = value.map((v) => String(v ?? '').trim()).filter(Boolean);
+    return parts.length ? parts.join(', ') : '—';
+  }
+  const text = String(value).trim();
+  return text || '—';
+}
+
+export function getGtelCallSource(call: GtelCall): string {
+  return gtelDisplay(
+    pickCallField(call, [
+      'source',
+      'callSource',
+      'allotmentType',
+      'allotment_type',
+      'origin',
+      'channel',
+    ]),
+  );
+}
+
+/** Unique CX counts by vertical / flagged — admin Caller Calls CX Summary. */
+export function buildGtelCxSummaryCounts(calls: GtelCall[]): {
+  E: number;
+  C: number;
+  S: number;
+  flagged: number;
+} {
+  const sets: Record<GtelVerticalCode, Set<string>> = {
+    E: new Set(),
+    C: new Set(),
+    S: new Set(),
+  };
+  const flaggedIds = new Set<string>();
+  calls.forEach((call, index) => {
+    const id =
+      getGtelDpiId(call) !== '—'
+        ? getGtelDpiId(call)
+        : gtelDisplay(call.phoneNumber, getGtelUsername(call), `row:${index}`);
+    for (const vert of getGtelPlayedVerticals(call)) sets[vert].add(id);
+    if (isGtelFlaggedCall(call)) flaggedIds.add(id);
+  });
+  return {
+    E: sets.E.size,
+    C: sets.C.size,
+    S: sets.S.size,
+    flagged: flaggedIds.size,
+  };
+}
+
+export { VERTICAL_LABELS as GTEL_VERTICAL_LABELS, labelVerticalCode as gtelLabelVerticalCode };
 
 export function getGtelCallerEmpCode(call: GtelCall): string {
   return gtelDisplay(call.empCode, call.emp_code);
@@ -213,7 +461,11 @@ export function getGtelLastActivityRaw(call: GtelCall): string {
 }
 
 export function getGtelPersonalConnect(call: GtelCall): { empty: boolean; text: string } {
-  const raw = call.personalConnectCategories;
+  const intent = getGtelPersonalConnectIntent(call);
+  if (intent !== '—') return { empty: false, text: intent };
+  const raw =
+    pickCallField(call, ['personalConnectCategories', 'personal_connect_categories']) ??
+    call.personalConnectCategories;
   if (raw == null || raw === '') return { empty: true, text: '—' };
   if (Array.isArray(raw)) {
     const values = raw.map((item) => String(item ?? '').trim()).filter(Boolean);
@@ -472,6 +724,10 @@ export function buildGtelCallsQuery(args: {
     params.phoneNumber = filters.phoneNumber.trim();
   }
   if (filters.disposition) params.disposition = filters.disposition;
+  if (filters.status) {
+    const card = GTEL_STATUS_FILTER_CARDS.find((c) => c.key === filters.status);
+    if (card) params.statusByDialer = card.apiValue;
+  }
   const empCodeFilter = args.shouldLockEmpCode
     ? args.loginEmpCode
     : filters.empCode.trim();
@@ -517,6 +773,68 @@ export function normalizeGtelCallsPage(
   };
 }
 
+/** Pull a single call from GET /dialer/calls?callId=… payload. */
+export function extractGtelCallById(payload: unknown, callId: string): GtelCall | null {
+  const wanted = String(callId || '').trim();
+  if (!wanted) return null;
+
+  const asList = (value: unknown): GtelCall[] => {
+    if (!Array.isArray(value)) return [];
+    return value.filter(
+      (item): item is GtelCall => !!item && typeof item === 'object' && !Array.isArray(item),
+    );
+  };
+
+  const matchCall = (row: GtelCall) => {
+    const id = String(row.callId ?? (row as { call_id?: unknown }).call_id ?? row._id ?? '').trim();
+    return Boolean(id && id === wanted);
+  };
+
+  const body = unwrapBody(payload);
+  if (Array.isArray(body)) {
+    const rows = asList(body);
+    return rows.find(matchCall) || rows[0] || null;
+  }
+
+  const record = asRecord(body);
+  for (const key of ['items', 'calls', 'data', 'rows', 'docs', 'results'] as const) {
+    const rows = asList(record[key]);
+    if (!rows.length) continue;
+    return rows.find(matchCall) || rows[0] || null;
+  }
+  if (matchCall(record as GtelCall)) return record as GtelCall;
+  return null;
+}
+
+export function pickGtelRecordingUrl(call: GtelCall | Record<string, unknown> | null): string {
+  if (!call) return '';
+  const raw =
+    call.recordingUrl ??
+    (call as { recording_url?: unknown }).recording_url ??
+    (call as { recording?: unknown }).recording ??
+    (call as { RecordingUrl?: unknown }).RecordingUrl;
+  return raw != null ? String(raw).trim() : '';
+}
+
+export function pickGtelTranscription(call: GtelCall | Record<string, unknown> | null): string {
+  if (!call) return '';
+  const raw =
+    call.transcription ??
+    (call as { transcript?: unknown }).transcript ??
+    (call as { Transcription?: unknown }).Transcription ??
+    (call as { summary?: unknown }).summary;
+  if (raw == null) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'object') {
+    try {
+      return JSON.stringify(raw, null, 2);
+    } catch {
+      return '';
+    }
+  }
+  return String(raw).trim();
+}
+
 export function createGtelCallId(): string {
   return `c2c-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -533,5 +851,6 @@ export function emptyGtelFilters(today: string, lockedEmpCode = ''): GtelFilters
     phoneNumber: '',
     disposition: '',
     empCode: lockedEmpCode,
+    status: '',
   };
 }
