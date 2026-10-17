@@ -3,6 +3,17 @@ import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 
 export const styles = makeStyles({
+  /** FlatList ignores flex gap between rows — space cards explicitly. */
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2.5),
+    gap: 2,
+    marginBottom: spacing(2.5),
+  },
   downloadBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,

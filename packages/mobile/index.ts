@@ -11,7 +11,7 @@ require('react-native-safe-area-context');
 require('react-native-screens');
 require('react-native-reanimated');
 require('@react-navigation/native');
-require('@react-navigation/drawer');
+require('@react-navigation/native-stack');
 require('@react-native-async-storage/async-storage');
 require('expo-secure-store');
 require('expo-location');

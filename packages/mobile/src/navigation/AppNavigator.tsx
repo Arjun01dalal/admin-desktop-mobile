@@ -1,4 +1,7 @@
-import React, { useMemo, useState } from 'react';
+/**
+ * Root navigation — Menu hub + native stack (no drawer).
+ */
+import React, { useMemo } from 'react';
 import {
   NavigationContainer,
   DarkTheme,
@@ -6,22 +9,10 @@ import {
   useNavigation,
 } from '@react-navigation/native';
 import {
-  createDrawerNavigator,
-  DrawerContentScrollView,
-  DrawerItem,
-  type DrawerContentComponentProps,
-} from '@react-navigation/drawer';
-import {
   createNativeStackNavigator,
   type NativeStackNavigationProp,
 } from '@react-navigation/native-stack';
-import {
-  Text,
-  TextInput,
-  View,
-  TouchableOpacity,
-  useWindowDimensions,
-} from 'react-native';
+import { Text, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { AppBackground } from '../components/AppBackground';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,10 +28,7 @@ import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
 import { useRevealCodes } from '../context/useRevealCodes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { colors, isDarkTheme } from '../theme';
-import { getAppVersion } from '../utils/appVersion';
 import { styles } from './AppNavigator.styles';
-
-const Drawer = createDrawerNavigator();
 
 /** Stack routes that keep WebViews / live polling — unmount when left. */
 const HEAVY_STACK_UNMOUNT = new Set([
@@ -51,8 +39,11 @@ const HEAVY_STACK_UNMOUNT = new Set([
   '/sky-talk',
 ]);
 
+/** Nav items hosted only as path-named stack screens (not by id). */
+const STACK_ONLY_NAV_IDS = new Set(['activeUserWithdrawal', 'incomingBotCall']);
+
 type RootStackParamList = {
-  panel: undefined;
+  welcome: undefined;
   profile: undefined;
   '/active-user-withdrawal': undefined;
   '/incoming-bot-call': undefined;
@@ -71,115 +62,26 @@ function screenNameFor(item: NavItem): string {
 }
 
 /** Load screen module on first visit; wrap with safe-area chrome (no per-screen background). */
-function LazyScreened({
-  path,
-  title,
-}: {
-  path: string;
-  title: string;
-}) {
+function LazyScreened({ path, title }: { path: string; title: string }) {
   const Impl = resolveLazyScreen(path);
   return <Screened>{Impl ? <Impl /> : <PlaceholderScreen title={title} />}</Screened>;
 }
 
-/** Stable route components — avoid remount loops when Drawer re-renders / setOptions runs. */
-const drawerRouteCache = new Map<string, React.ComponentType>();
+/** Stable route components — avoid remount loops when setOptions runs. */
+const routeCache = new Map<string, React.ComponentType>();
 
-function getDrawerRouteComponent(path: string, title: string): React.ComponentType {
+function getStackRouteComponent(path: string, title: string): React.ComponentType {
   const key = `${path}\0${title}`;
-  let Route = drawerRouteCache.get(key);
+  let Route = routeCache.get(key);
   if (!Route) {
-    function DrawerRoute() {
+    function StackRoute() {
       return <LazyScreened path={path} title={title} />;
     }
-    DrawerRoute.displayName = `DrawerRoute(${path})`;
-    Route = DrawerRoute;
-    drawerRouteCache.set(key, Route);
+    StackRoute.displayName = `StackRoute(${path})`;
+    Route = StackRoute;
+    routeCache.set(key, Route);
   }
   return Route;
-}
-
-function CustomDrawer(props: DrawerContentComponentProps & { items: NavItem[] }) {
-  const { items, ...rest } = props;
-  const { user } = useAuth();
-  useRevealCodes(); // refresh drawer labels immediately after OTP reveal
-  const current = rest.state.routes[rest.state.index]?.name;
-  const [menuQuery, setMenuQuery] = useState('');
-  const visibleItems = menuQuery.trim()
-    ? items.filter((item) =>
-        toDisplayText(item.label).toLowerCase().includes(menuQuery.trim().toLowerCase()),
-      )
-    : items;
-  return (
-    <SafeAreaView edges={['top', 'bottom', 'left']} style={styles.drawerRoot}>
-      <View style={styles.drawerStickyTop}>
-        <View style={styles.drawerHeader}>
-          <Text style={styles.drawerTitle}>Astro</Text>
-          {user?.name ? <Text style={styles.drawerSub}>{user.name}</Text> : null}
-        </View>
-        <View style={styles.drawerSearchWrap}>
-          <TextInput
-            style={styles.drawerSearch}
-            value={menuQuery}
-            onChangeText={setMenuQuery}
-            placeholder="🔍 Search menu…"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {menuQuery.trim() ? (
-            <TouchableOpacity
-              style={styles.drawerSearchClear}
-              onPress={() => setMenuQuery('')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="Clear menu search"
-            >
-              <Text style={styles.drawerSearchClearText}>✕</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </View>
-      <DrawerContentScrollView
-        {...rest}
-        style={styles.drawerScroll}
-        contentContainerStyle={styles.drawerScrollContent}
-      >
-        {visibleItems.length === 0 ? <Text style={styles.drawerNoMatch}>No menu found</Text> : null}
-        {visibleItems.map((item) => (
-          <DrawerItem
-            key={item.id}
-            label={toDisplayText(item.label)}
-            focused={current === screenNameFor(item)}
-            activeTintColor={colors.primary}
-            inactiveTintColor={colors.muted}
-            onPress={() => {
-              const nav = rest.navigation;
-              if (item.id === 'activeUserWithdrawal' || item.id === 'incomingBotCall') {
-                nav.closeDrawer();
-                const parent = nav.getParent<NativeStackNavigationProp<RootStackParamList>>();
-                if (parent) {
-                  parent.navigate(
-                    item.id === 'incomingBotCall'
-                      ? '/incoming-bot-call'
-                      : '/active-user-withdrawal',
-                  );
-                }
-                return;
-              }
-              nav.navigate(screenNameFor(item));
-              nav.closeDrawer();
-            }}
-            style={styles.drawerItem}
-            labelStyle={styles.drawerItemLabel}
-          />
-        ))}
-      </DrawerContentScrollView>
-      <View style={styles.drawerFooter}>
-        <Text style={styles.drawerVersion}>v{getAppVersion()}</Text>
-      </View>
-    </SafeAreaView>
-  );
 }
 
 /**
@@ -209,25 +111,26 @@ function GuardedPanelDetail({ route }: { route: (typeof PANEL_DETAIL_ROUTES)[num
   return <Comp />;
 }
 
-function PanelHeaderRight() {
+function MenuHomeHeaderButton() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   return (
-    <View style={styles.headerRightRow}>
-      <AdminLlmChatHeaderButton />
-      <ProfileHeaderButton />
-    </View>
+    <TouchableOpacity
+      style={styles.headerIconBtn}
+      onPress={() => navigation.navigate('welcome')}
+      accessibilityLabel="Menu"
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <MaterialIcons name="apps" size={24} color={colors.foreground} />
+    </TouchableOpacity>
   );
 }
 
 function ProfileHeaderButton() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   return (
     <TouchableOpacity
       style={styles.headerIconBtn}
-      onPress={() => {
-        const parent = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
-        if (parent) parent.navigate('profile');
-        else (navigation as NativeStackNavigationProp<RootStackParamList>).navigate('profile');
-      }}
+      onPress={() => navigation.navigate('profile')}
       accessibilityLabel="Profile"
     >
       <MaterialIcons name="account-circle" size={26} color={colors.foreground} />
@@ -235,46 +138,13 @@ function ProfileHeaderButton() {
   );
 }
 
-function PanelDrawer({ items }: { items: NavItem[] }) {
-  const { width: screenWidth } = useWindowDimensions();
-  const drawerWidth = Math.min(230, Math.round(screenWidth * 0.7));
-
+function HeaderRight({ showMenuHome }: { showMenuHome: boolean }) {
   return (
-    <Drawer.Navigator
-      initialRouteName="welcome"
-      drawerContent={(props) => <CustomDrawer {...props} items={items} />}
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.foreground,
-        headerTitleStyle: { fontWeight: '600', fontSize: 16 },
-        headerRight: () => <PanelHeaderRight />,
-        drawerType: 'front',
-        overlayColor: 'rgba(0,0,0,0.55)',
-        drawerStyle: {
-          backgroundColor: colors.surface,
-          width: drawerWidth,
-        },
-        sceneStyle: { backgroundColor: 'transparent' },
-        lazy: true,
-        freezeOnBlur: true,
-      }}
-    >
-      {items
-        .filter(
-          (item) => item.id !== 'activeUserWithdrawal' && item.id !== 'incomingBotCall',
-        )
-        .map((item) => {
-          const title = toDisplayText(item.label);
-          return (
-            <Drawer.Screen
-              key={item.id}
-              name={screenNameFor(item)}
-              options={{ title, freezeOnBlur: true }}
-              getComponent={() => getDrawerRouteComponent(item.path, title)}
-            />
-          );
-        })}
-    </Drawer.Navigator>
+    <View style={styles.headerRightRow}>
+      {showMenuHome ? <MenuHomeHeaderButton /> : null}
+      <AdminLlmChatHeaderButton />
+      <ProfileHeaderButton />
+    </View>
   );
 }
 
@@ -283,6 +153,11 @@ export function AppNavigator() {
   useRevealCodes();
 
   const items = useMemo(() => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)), [user]);
+
+  const panelItems = useMemo(
+    () => items.filter((item) => !STACK_ONLY_NAV_IDS.has(item.id)),
+    [items],
+  );
 
   return (
     <SosProvider enabled={!!user}>
@@ -302,18 +177,33 @@ export function AppNavigator() {
           }}
         >
           <RootStack.Navigator
-            screenOptions={{
-              headerStyle: { backgroundColor: colors.surface },
-              headerTintColor: colors.foreground,
-              headerTitleStyle: { fontWeight: '600' },
-              contentStyle: { backgroundColor: 'transparent' },
-              animation: 'slide_from_right',
-              freezeOnBlur: true,
+            initialRouteName="welcome"
+            screenOptions={({ route }) => {
+              const isMenu = route.name === 'welcome';
+              return {
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.foreground,
+                headerTitleStyle: { fontWeight: '600' as const, fontSize: 16 },
+                headerRight: () => <HeaderRight showMenuHome={!isMenu} />,
+                headerBackVisible: !isMenu,
+                contentStyle: { backgroundColor: 'transparent' },
+                animation: 'slide_from_right' as const,
+                freezeOnBlur: true,
+              };
             }}
           >
-            <RootStack.Screen name="panel" options={{ headerShown: false }}>
-              {() => <PanelDrawer items={items} />}
-            </RootStack.Screen>
+            {panelItems.map((item) => {
+              const title = toDisplayText(item.label);
+              return (
+                <RootStack.Screen
+                  key={item.id}
+                  name={screenNameFor(item)}
+                  options={{ title, freezeOnBlur: true }}
+                  getComponent={() => getStackRouteComponent(item.path, title)}
+                />
+              );
+            })}
+
             <RootStack.Screen
               name="profile"
               options={{ title: 'Profile' }}
@@ -392,10 +282,7 @@ export function AppNavigator() {
               getComponent={() => {
                 function Route() {
                   return (
-                    <LazyScreened
-                      path="/gtel-calls"
-                      title={toDisplayText('Gtel Calls')}
-                    />
+                    <LazyScreened path="/gtel-calls" title={toDisplayText('Gtel Calls')} />
                   );
                 }
                 return Route;
@@ -448,5 +335,4 @@ export function AppNavigator() {
   );
 }
 
-// Satisfy unused type lint if any
 export type { AnyScreen };
