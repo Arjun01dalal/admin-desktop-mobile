@@ -24,6 +24,7 @@ import {
   type NavCategoryGroup,
 } from '../navigation/navCategories';
 import { iconForNavItem } from '../navigation/navItemIcons';
+import { canOpenPanelPath, openPanelTarget } from '../navigation/panelDetail';
 import { NAV_ITEMS, type NavItem } from '../navigation/navItems';
 import { colors } from '../theme';
 import { styles } from './WelcomeScreen.styles';
@@ -51,6 +52,10 @@ export function WelcomeScreen() {
   /** Balance KPIs match Dashboard access (View_Dashboard). */
   const canSeeDashboard = useMemo(
     () => items.some((item) => item.id === 'dashboard'),
+    [items],
+  );
+  const canOpenWithdrawal = useMemo(
+    () => items.some((item) => item.id === 'withdrawal'),
     [items],
   );
   const { stats, loading: statsLoading, refresh } = useMenuStats(canSeeDashboard);
@@ -114,6 +119,37 @@ export function WelcomeScreen() {
     nav.navigate(screenNameFor(item));
   };
 
+  const canOpenUsersBalance = canOpenPanelPath('/balance-f');
+
+  /** Users Balance · Total → Dashboard · Pending Refund → Pending · Total Refund → Withdrawal */
+  const openStatTile = (key: 'balance' | 'deposit' | 'pending' | 'total') => {
+    const nav = navigation as {
+      navigate: (name: string, params?: Record<string, unknown>) => void;
+    };
+    // Total Users Balance → Users Balance list
+    if (key === 'balance' && canOpenUsersBalance) {
+      openPanelTarget(navigation, { href: '/balance-f' });
+      return;
+    }
+    // Total (Deposits) → Dashboard
+    if (key === 'deposit' && canSeeDashboard) {
+      nav.navigate('dashboard');
+      return;
+    }
+    if (key === 'pending' && canOpenWithdrawal) {
+      nav.navigate('withdrawal', {
+        status: 'Pending',
+        startDate: stats?.asOfDate,
+        endDate: stats?.asOfDate,
+      });
+      return;
+    }
+    // Total Refund → Withdrawal
+    if (key === 'total' && canOpenWithdrawal) {
+      nav.navigate('withdrawal');
+    }
+  };
+
   const hero = (
     <View style={styles.hero}>
       <Image
@@ -134,42 +170,75 @@ export function WelcomeScreen() {
           <View style={styles.statsRow}>
             {(
               [
-                { key: 'balance', label: 'Total Users Balance', value: stats?.balance },
-                { key: 'deposit', label: 'Total Deposits', value: stats?.totalDeposit },
                 {
-                  key: 'pending',
+                  key: 'balance' as const,
+                  label: 'Total Users Balance',
+                  value: stats?.balance,
+                  tappable: canOpenUsersBalance,
+                },
+                {
+                  key: 'deposit' as const,
+                  label: 'Total Deposits',
+                  value: stats?.totalDeposit,
+                  tappable: canSeeDashboard,
+                },
+                {
+                  key: 'pending' as const,
                   label: 'Pending Withdrawal',
                   value: stats?.pendingWithdrawal,
+                  tappable: canOpenWithdrawal,
                 },
                 {
-                  key: 'total',
+                  key: 'total' as const,
                   label: 'Total Withdrawal',
                   value: stats?.totalWithdrawal,
+                  tappable: canOpenWithdrawal,
                 },
               ] as const
-            ).map((tile) => (
-              <View key={tile.key} style={styles.statTile}>
-                <Text style={styles.statLabel} numberOfLines={2}>
-                  {toDisplayText(tile.label)}
-                </Text>
-                {statsLoading && stats == null ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colors.primary}
-                    style={styles.statSpinner}
-                  />
-                ) : (
-                  <Text
-                    style={styles.statValue}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.75}
-                  >
-                    {tile.value == null ? '—' : formatInr(tile.value)}
+            ).map((tile) => {
+              const body = (
+                <>
+                  <Text style={styles.statLabel} numberOfLines={2}>
+                    {toDisplayText(tile.label)}
                   </Text>
-                )}
-              </View>
-            ))}
+                  {statsLoading && stats == null ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary}
+                      style={styles.statSpinner}
+                    />
+                  ) : (
+                    <Text
+                      style={styles.statValue}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      {tile.value == null ? '—' : formatInr(tile.value)}
+                    </Text>
+                  )}
+                </>
+              );
+              if (!tile.tappable) {
+                return (
+                  <View key={tile.key} style={styles.statTile}>
+                    {body}
+                  </View>
+                );
+              }
+              return (
+                <TouchableOpacity
+                  key={tile.key}
+                  style={styles.statTile}
+                  onPress={() => openStatTile(tile.key)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={toDisplayText(tile.label)}
+                >
+                  {body}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </>
       ) : null}
