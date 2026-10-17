@@ -15,7 +15,6 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
   BREAKDOWN_COUNTS,
-  CAMPAIGN_LIST,
   COUNT_BY_TYPE,
   DEFAULT_PLAYED_PAGE_SIZE,
   INDIA_STATES,
@@ -38,10 +37,9 @@ import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
-import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { display, maskMobile } from '../../../utils/display';
-import { addToDialerBatch } from '../../../utils/externalDialer';
+import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './PlayedTodayYesterdayScreen.styles';
@@ -75,8 +73,6 @@ export function PlayedTodayYesterdayScreen() {
   const initialDate = typeof params.date === 'string' && params.date ? params.date : todayIST();
 
   const canShowMobile = hasPermission('show_mobile');
-  const canAddToDialer = hasPermission('add_to_dilaler');
-  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
 
   const [type, setType] = useState<PlayType>(initialType);
   const [draftDate, setDraftDate] = useState(initialDate);
@@ -98,9 +94,6 @@ export function PlayedTodayYesterdayScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Row | null>(null);
-  const [campaignId, setCampaignId] = useState('');
-  const [dialerBusy, setDialerBusy] = useState(false);
-  const [dialerMsg, setDialerMsg] = useState('');
   const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const genRef = useRef(0);
@@ -186,44 +179,6 @@ export function PlayedTodayYesterdayScreen() {
     setPage(1);
     setApplied((prev) => ({ ...prev, date: '' }));
   }, []);
-
-  const handleAddToDialer = useCallback(async () => {
-    setDialerMsg('');
-    if (!campaignId.trim()) {
-      setDialerMsg('Campaign should not be empty');
-      return;
-    }
-    if (!rows.length) {
-      setDialerMsg('No users to add to dialer');
-      return;
-    }
-    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
-    setDialerBusy(true);
-    try {
-      const res = await addToDialerBatch({
-        campaignId: campaignId.trim(),
-        serverId: campaign?.serverId,
-        leads: rows.map((r) => ({
-          _id: rowUserId(r),
-          name: rowDisplayName(r),
-          mobile: rowMobile(r),
-          city: String(r.city ?? ''),
-          state: String(r.state ?? ''),
-          clientName: String(r.clientName ?? ''),
-        })),
-      });
-      if (res.ok) {
-        await secureApi('ops.savePerformanceData', {
-          subAdminId: admin?._id,
-          dialledUserIds: rows.map((r) => rowUserId(r)).filter(Boolean),
-          extensionId: campaignId.trim(),
-        });
-      }
-      setDialerMsg(res.message || (res.ok ? 'Dialer call queued' : 'Dialer call failed'));
-    } finally {
-      setDialerBusy(false);
-    }
-  }, [admin?._id, campaignId, rows]);
 
   const sheetFields = useCallback(
     (r: Row): SheetField[] => [
@@ -375,31 +330,7 @@ export function PlayedTodayYesterdayScreen() {
           </Text>
         </TouchableOpacity>
 
-        {canAddToDialer ? (
-          <>
-            <Text style={styles.fieldLabel}>Campaign List</Text>
-            <TextInput
-              style={styles.textInput}
-              value={campaignId}
-              onChangeText={setCampaignId}
-              placeholder="Campaign id (e.g. K_1009)"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="characters"
-            />
-            <View style={styles.filterActions}>
-              <TouchableOpacity
-                style={[styles.formBtn, styles.formBtnPrimary, dialerBusy && { opacity: 0.6 }]}
-                disabled={dialerBusy}
-                onPress={() => void handleAddToDialer()}
-              >
-                <Text style={styles.formBtnPrimaryText}>
-                  {dialerBusy ? 'Adding…' : 'Add to dialer'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {dialerMsg ? <Text style={styles.hint}>{dialerMsg}</Text> : null}
-          </>
-        ) : null}
+        <AddToC2cCampaignPanel userIds={rows.map((r) => rowUserId(r)).filter(Boolean)} />
       </DetailFilterBar>
 
       {error ? (

@@ -28,16 +28,11 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import {
-  CAMPAIGN_LIST,
   LLM_CHAT_HISTORY_KEY,
   LLM_CHAT_OPEN_KEY,
-  collectUserIds,
   columnsFromRows,
   formatLlmCell,
-  getListIdForCampaign,
   historyForApi,
-  looksLikeUsersTable,
-  normalizeDialerLeads,
   parseLlmSendResult,
   rowsFromLlmPayload,
   clearLlmChatStorage,
@@ -45,8 +40,7 @@ import {
   type LlmChatMessage,
 } from '@astro/shared';
 import { secureApi } from '../api/client';
-import { canUseAdminLlmChat, getSessionUser } from '../auth/permissions';
-import { addToDialerBatch } from '../utils/externalDialer';
+import { canUseAdminLlmChat } from '../auth/permissions';
 import { appStorage } from '../lib/webShim';
 import { colors, spacing } from '../theme';
 import { LLM, styles } from './AdminLlmChatWidget.styles';
@@ -64,102 +58,15 @@ function loadStoredMessages(): LlmChatMessage[] {
 
 function ResultTable({
   rows,
-  collection,
-  extraIds,
 }: {
   rows: Record<string, unknown>[];
   collection?: string;
   extraIds?: string[];
 }) {
-  const [dialerLoading, setDialerLoading] = useState(false);
-  const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const columns = columnsFromRows(rows);
-  const showAddToDialer = looksLikeUsersTable(rows, collection);
-  const admin = getSessionUser();
-
-  const addToDialer = async () => {
-    if (!selectedCampaignId) {
-      Alert.alert('Validation', 'Please select a Campaign ID');
-      return;
-    }
-    const userIds = Array.from(new Set([...collectUserIds(rows), ...(extraIds || [])]));
-    if (userIds.length === 0) {
-      Alert.alert('Error', 'No user IDs found in this result');
-      return;
-    }
-
-    setDialerLoading(true);
-    try {
-      const res = await secureApi('users.getDialerDataByIds', { userIds });
-      if (!res.ok) {
-        Alert.alert('Error', res.message || 'Failed to load dialer leads');
-        return;
-      }
-      const leads = normalizeDialerLeads(res.data);
-      if (!leads.length) {
-        Alert.alert('Error', 'No dialer leads found for selected users');
-        return;
-      }
-      const campaignMeta = CAMPAIGN_LIST.find(
-        (item) => String(item.id).trim() === selectedCampaignId,
-      );
-      const dialerRes = await addToDialerBatch({
-        campaignId: selectedCampaignId,
-        leads,
-        serverId: campaignMeta?.serverId ?? String(admin?.serverId || ''),
-        listId: getListIdForCampaign(selectedCampaignId),
-        listName:
-          campaignMeta?.name || `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
-      });
-      if (!dialerRes.ok) {
-        Alert.alert('Error', dialerRes.message || 'Failed to push to dialer');
-        return;
-      }
-      Alert.alert('Success', dialerRes.message || `Pushed ${leads.length} leads to dialer`);
-    } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to push to dialer');
-    } finally {
-      setDialerLoading(false);
-    }
-  };
 
   return (
     <View style={styles.tableBlock}>
-      {showAddToDialer ? (
-        <View style={styles.tableToolbar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {CAMPAIGN_LIST.map((item) => {
-              const id = String(item.id).trim();
-              const active = selectedCampaignId === id;
-              return (
-                <TouchableOpacity
-                  key={id}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setSelectedCampaignId(active ? '' : id)}
-                  disabled={dialerLoading}
-                >
-                  <Text
-                    style={[styles.chipText, active && styles.chipTextActive]}
-                    numberOfLines={1}
-                  >
-                    {id}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-          <TouchableOpacity
-            style={[
-              styles.dialerBtn,
-              (dialerLoading || !selectedCampaignId) && styles.dialerBtnDisabled,
-            ]}
-            disabled={dialerLoading || !selectedCampaignId}
-            onPress={() => void addToDialer()}
-          >
-            <Text style={styles.dialerBtnText}>{dialerLoading ? 'Pushing…' : 'Add to dialer'}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
       <ScrollView horizontal>
         <View>
           <View style={styles.tableHeaderRow}>

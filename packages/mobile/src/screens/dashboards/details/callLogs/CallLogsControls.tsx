@@ -1,6 +1,5 @@
 import React from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import type { CampaignItem } from '@astro/shared/campaignList';
 import { colors } from '../../../../theme';
 import { COMMENT_OPTIONS, PAGE_SIZES, STATUS_OPTIONS } from './helpers';
 import { styles } from '../CallLogsScreen.styles';
@@ -131,88 +130,5 @@ export function PageSizePicker({ pageSize, onChange }: PageSizePickerProps) {
         </TouchableOpacity>
       ))}
     </View>
-  );
-}
-
-type DialerControlsProps = {
-  open: boolean;
-  campaignId: string;
-  campaignOptions: CampaignItem[];
-  isCaller: boolean;
-  selectedCount: number;
-  pushing: boolean;
-  message: string;
-  onToggle: () => void;
-  onCampaignSelect: (campaignId: string) => void;
-  onAdd: () => void;
-};
-
-export function DialerControls({
-  open,
-  campaignId,
-  campaignOptions,
-  isCaller,
-  selectedCount,
-  pushing,
-  message,
-  onToggle,
-  onCampaignSelect,
-  onAdd,
-}: DialerControlsProps) {
-  return (
-    <>
-      <TouchableOpacity style={styles.collapseHeader} onPress={onToggle}>
-        <Text style={styles.collapseTitle}>
-          Add to Dialer{campaignId ? ` · ${campaignId}` : ''}
-          {selectedCount ? ` · ${selectedCount} selected` : ''} {open ? '▲' : '▼'}
-        </Text>
-      </TouchableOpacity>
-      {open ? (
-        <View style={styles.filterCard}>
-          <Text style={styles.filterLabel}>Campaign</Text>
-          {campaignOptions.length === 0 ? (
-            <Text style={styles.dialerHint}>
-              {isCaller
-                ? 'No campaign ID on this login. Ask admin to assign an extension / campaign.'
-                : 'No campaigns available.'}
-            </Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                {campaignOptions.map((campaign, index) => {
-                  const id = campaign.id.trim();
-                  return (
-                    <TouchableOpacity
-                      key={`camp-${index}`}
-                      style={[styles.chip, campaignId === id && styles.chipActive]}
-                      onPress={() => onCampaignSelect(campaignId === id ? '' : id)}
-                    >
-                      <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
-                        {id}
-                        {campaign.name && campaign.name !== id ? ` · ${campaign.name}` : ''}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          )}
-          <Text style={styles.dialerHint}>Tick cards (☐), pick a campaign, then push.</Text>
-          <TouchableOpacity
-            style={[
-              styles.dialerBtn,
-              (pushing || !selectedCount || !campaignId) && styles.btnDisabled,
-            ]}
-            onPress={onAdd}
-            disabled={pushing || !selectedCount || !campaignId}
-          >
-            <Text style={styles.searchBtnText}>
-              {pushing ? 'Adding…' : `Add ${selectedCount || ''} to Dialer`}
-            </Text>
-          </TouchableOpacity>
-          {message ? <Text style={styles.dialerMsg}>{message}</Text> : null}
-        </View>
-      ) : null}
-    </>
   );
 }

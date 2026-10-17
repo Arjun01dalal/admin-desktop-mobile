@@ -11,9 +11,8 @@ import {
   Typography,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { toast } from 'react-toastify';
-import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { AddToC2cCampaignControls } from '@/components/AddToC2cCampaignControls';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
@@ -22,12 +21,8 @@ import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { formatDisplayDate, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { BOT_ID_OPTIONS } from '@/screens/panel/callLogs/constants';
-import { CAMPAIGN_LIST } from '@/screens/panel/newRegisters/campaignList';
 import { asPaged, display, maskMobile, useReportQuery } from '@/screens/panel/shared';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
-import { mapUsersToDialerLeads } from '@/screens/panel/users/toolbarHelpers';
-import type { UserRow } from '@/screens/panel/users/utils';
-
 type BotPerfRow = {
   _id: string;
   name?: string;
@@ -128,7 +123,6 @@ export function BotPerformancePage() {
   const [endDate, setEndDate] = useState(today);
   const [type, setType] = useState<string>('non_performing');
   const [botIds, setBotIds] = useState<string[]>([]);
-  const [campaignId, setCampaignId] = useState('');
   const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
   const [query, setQuery] = useState<QueryState>({
     startDate: today,
@@ -138,7 +132,6 @@ export function BotPerformancePage() {
     filters: EMPTY_FILTERS,
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [pushing, setPushing] = useState(false);
 
   const buildPayload = useCallback(() => {
     const filter: Record<string, unknown> = {};
@@ -223,46 +216,6 @@ export function BotPerformancePage() {
       else next.delete(id);
       return next;
     });
-  };
-
-  const addToDialer = async () => {
-    if (!campaignId) {
-      toast.error('Campaign should not be empty');
-      return;
-    }
-    const selected = rows.filter((r) => selectedIds.has(r._id));
-    if (!selected.length) {
-      toast.error('Select at least one user');
-      return;
-    }
-    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
-    setPushing(true);
-    try {
-      const leads = mapUsersToDialerLeads(
-        selected.map((r): UserRow => ({
-          _id: r._id,
-          name: r.name || r.client_name,
-          mobile: r.mobile || r.phone_number,
-          city: r.city,
-          state: r.state,
-          clientName: r.clientName,
-        })),
-      );
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId: campaignId.trim(),
-        leads,
-        serverId: campaign?.serverId,
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to add to dialer');
-        return;
-      }
-      toast.success(res.message || 'Added to dialer');
-      setSelectedIds(new Set());
-      void load();
-    } finally {
-      setPushing(false);
-    }
   };
 
   const columns = useMemo<CommonTableColumn<BotPerfRow>[]>(
@@ -553,22 +506,6 @@ export function BotPerformancePage() {
               </MenuItem>
             ))}
           </TextField>
-          <TextField
-            select
-            size="small"
-            label="Campaign"
-            fullWidth={false}
-            value={campaignId}
-            onChange={(e) => setCampaignId(e.target.value)}
-            sx={{ ...fieldSx, width: 170 }}
-          >
-            <MenuItem value="">Select</MenuItem>
-            {CAMPAIGN_LIST.map((c) => (
-              <MenuItem key={c.id} value={c.id.trim()}>
-                {c.id.trim()}
-              </MenuItem>
-            ))}
-          </TextField>
           <Button
             variant="contained"
             disabled={loading}
@@ -586,14 +523,10 @@ export function BotPerformancePage() {
           >
             Refresh
           </Button>
-          <Button
-            variant="contained"
-            disabled={pushing || !selectedIds.size}
-            onClick={() => void addToDialer()}
-            sx={{ ...orangeBtnSx, minWidth: 'fit-content' }}
-          >
-            Add to Dialer
-          </Button>
+          <AddToC2cCampaignControls
+            userIds={[...selectedIds]}
+            disabled={loading}
+          />
         </Stack>
       </CollapsibleFilterPanel>
 

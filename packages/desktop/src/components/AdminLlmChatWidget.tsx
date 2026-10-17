@@ -10,8 +10,6 @@ import {
   Dialog,
   DialogContent,
   IconButton,
-  MenuItem,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -29,23 +27,19 @@ import StopIcon from '@mui/icons-material/Stop';
 import AddCommentOutlinedIcon from '@mui/icons-material/AddCommentOutlined';
 import { toast } from 'react-toastify';
 import {
-  CAMPAIGN_LIST,
   LLM_CHAT_HISTORY_KEY,
   LLM_CHAT_OPEN_KEY,
   collectUserIds,
   columnsFromRows,
   formatLlmCell,
-  getListIdForCampaign,
   historyForApi,
-  looksLikeUsersTable,
-  normalizeDialerLeads,
   parseLlmSendResult,
   rowsFromLlmPayload,
   trimLlmChatMessages,
   type LlmChatMessage,
 } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
-import { canUseAdminLlmChat, getSessionUser } from '@/auth/permissions';
+import { canUseAdminLlmChat } from '@/auth/permissions';
 
 function loadStoredMessages(): LlmChatMessage[] {
   try {
@@ -71,143 +65,15 @@ async function blobToBase64(blob: Blob): Promise<string> {
 
 function ResultTable({
   rows,
-  collection,
-  extraIds,
 }: {
   rows: Record<string, unknown>[];
   collection?: string;
   extraIds?: string[];
 }) {
-  const [dialerLoading, setDialerLoading] = useState(false);
-  const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const columns = columnsFromRows(rows);
-  const showAddToDialer = looksLikeUsersTable(rows, collection);
-  const admin = getSessionUser();
-
-  const addToDialer = async () => {
-    if (!selectedCampaignId) {
-      toast.error('Please select a Campaign ID');
-      return;
-    }
-    const userIds = Array.from(new Set([...collectUserIds(rows), ...(extraIds || [])]));
-    if (userIds.length === 0) {
-      toast.error('No user IDs found in this result');
-      return;
-    }
-
-    setDialerLoading(true);
-    try {
-      const res = await secureApi('users.getDialerDataByIds', { userIds });
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to load dialer leads');
-        return;
-      }
-      const leads = normalizeDialerLeads(res.data);
-      if (!leads.length) {
-        toast.error('No dialer leads found for selected users');
-        return;
-      }
-      const campaignMeta = CAMPAIGN_LIST.find(
-        (item) => String(item.id).trim() === selectedCampaignId,
-      );
-      const dialerRes = await secureApi('callLogs.externalDialerBatch', {
-        campaignId: selectedCampaignId,
-        leads,
-        serverId: campaignMeta?.serverId ?? String(admin?.serverId ?? ''),
-        listId: getListIdForCampaign(selectedCampaignId),
-        listName:
-          campaignMeta?.name || `${String(admin?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
-      });
-      if (!dialerRes.ok) {
-        toast.error(dialerRes.message || 'Failed to push to dialer');
-        return;
-      }
-      toast.success(dialerRes.message || `Pushed ${leads.length} leads to dialer`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to push to dialer');
-    } finally {
-      setDialerLoading(false);
-    }
-  };
 
   return (
     <Box sx={{ width: 1 }}>
-      {showAddToDialer && (
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="flex-end"
-          alignItems="center"
-          flexWrap="wrap"
-          sx={{ mb: 1 }}
-        >
-          <Select
-            size="small"
-            displayEmpty
-            value={selectedCampaignId}
-            onChange={(e) => setSelectedCampaignId(String(e.target.value))}
-            disabled={dialerLoading}
-            MenuProps={{
-              PaperProps: {
-                sx: {
-                  bgcolor: '#fff',
-                  color: '#0f172a',
-                  maxHeight: 360,
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
-                  '& .MuiMenuItem-root': {
-                    color: '#0f172a',
-                    fontSize: 13,
-                  },
-                  '& .MuiMenuItem-root.Mui-selected': {
-                    bgcolor: '#e2e8f0',
-                    color: '#0f172a',
-                  },
-                  '& .MuiMenuItem-root:hover': {
-                    bgcolor: '#f1f5f9',
-                  },
-                  '& .MuiMenuItem-root.Mui-selected:hover': {
-                    bgcolor: '#cbd5e1',
-                  },
-                },
-              },
-            }}
-            sx={{
-              minWidth: 220,
-              maxWidth: 320,
-              bgcolor: '#fff',
-              fontSize: 13,
-              color: '#0f172a',
-              '& .MuiSelect-select': { color: '#0f172a' },
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#cbd5e1' },
-              '& .MuiSvgIcon-root': { color: '#0f172a' },
-            }}
-          >
-            <MenuItem value="">
-              <em style={{ color: '#64748b' }}>Select Campaign ID</em>
-            </MenuItem>
-            {CAMPAIGN_LIST.map((item) => (
-              <MenuItem key={item.id} value={String(item.id).trim()}>
-                {String(item.id).trim()} - {item.name}
-              </MenuItem>
-            ))}
-          </Select>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => void addToDialer()}
-            disabled={dialerLoading || !selectedCampaignId}
-            sx={{
-              bgcolor: '#0f172a',
-              color: '#f8fafc',
-              '&:hover': { bgcolor: '#1e293b' },
-              '&.Mui-disabled': { bgcolor: '#94a3b8', color: '#f8fafc' },
-            }}
-          >
-            {dialerLoading ? 'Pushing…' : 'Add to dialer'}
-          </Button>
-        </Stack>
-      )}
       <Box
         sx={{
           maxHeight: 'min(62vh, 640px)',

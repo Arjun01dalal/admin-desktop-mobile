@@ -15,14 +15,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { CAMPAIGN_LIST, type CampaignItem } from '../newRegisters/campaignList';
+import { AddToC2cCampaignControls } from '@/components/AddToC2cCampaignControls';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 
 type CallLogsToolbarProps = {
   title?: string;
   startDate: string;
   endDate: string;
-  campaignId: string;
   itemsPerPage: number;
   total: number;
   loading: boolean;
@@ -30,15 +29,13 @@ type CallLogsToolbarProps = {
   fileRef: Ref<HTMLInputElement>;
   /** Hide upload / pause (callers). */
   isCaller?: boolean;
-  /** Campaign chips/options. Callers get only login-assigned IDs. */
-  campaigns?: CampaignItem[];
+  /** Selected call-log customer ids for C2C push. */
+  c2cUserIds?: string[];
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
-  onCampaignChange: (value: string) => void;
   onItemsPerPageChange: (value: number) => void;
   onApply: () => void;
   onRefresh: () => void;
-  onDialerCall: () => void;
   onUpload: (file?: File | null) => void;
   onPauseOpen: () => void;
 };
@@ -47,21 +44,18 @@ export function CallLogsToolbar({
   title = 'Filters & Actions',
   startDate,
   endDate,
-  campaignId,
   itemsPerPage,
   total,
   loading,
   actionLoading,
   fileRef,
   isCaller = false,
-  campaigns = CAMPAIGN_LIST,
+  c2cUserIds = [],
   onStartDateChange,
   onEndDateChange,
-  onCampaignChange,
   onItemsPerPageChange,
   onApply,
   onRefresh,
-  onDialerCall,
   onUpload,
   onPauseOpen,
 }: CallLogsToolbarProps) {
@@ -223,32 +217,10 @@ export function CallLogsToolbar({
             >
               Apply
             </Button>
-            <Button
-              variant="contained"
-              color="warning"
-              onClick={onDialerCall}
+            <AddToC2cCampaignControls
+              userIds={c2cUserIds}
               disabled={loading || actionLoading}
-              sx={{ flexShrink: 0, fontWeight: 700 }}
-            >
-              Dialer Call
-            </Button>
-            <TextField
-              select
-              label="Campaign List"
-              size="small"
-              value={campaignId}
-              onChange={(e) => onCampaignChange(e.target.value)}
-              sx={{ width: 155, flexShrink: 0 }}
-            >
-              <MenuItem value="">
-                <em>Select campaign</em>
-              </MenuItem>
-              {campaigns.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.id}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
             <TextField
               select
               label="Items Per Page"

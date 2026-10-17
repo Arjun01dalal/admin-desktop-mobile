@@ -66,6 +66,11 @@ export function NewRegistersPage() {
       campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
     [admin, isCaller],
   );
+  /** Login campaign for row Call button (no Campaign List UI). */
+  const callCampaignId = useMemo(() => {
+    if (isCaller && campaignOptions.length === 1) return campaignOptions[0].id.trim();
+    return campaignOptions[0]?.id.trim() ?? '';
+  }, [campaignOptions, isCaller]);
 
   const appOptions = useMemo(() => {
     const allotted = admin?.clientName || admin?.allotedApps;
@@ -78,9 +83,6 @@ export function NewRegistersPage() {
   const [endDate, setEndDate] = useState(todayIST);
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
-  const [campaignName, setCampaignName] = useState(() =>
-    isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
-  );
   const [activeStatus, setActiveStatus] = useState<ActiveStatusFilter>('All');
   const [newRegistration, setNewRegistration] = useState<NewRegistrationFilter>('True');
   const [otherState, setOtherState] = useState(false);
@@ -187,7 +189,7 @@ export function NewRegistersPage() {
   );
   const deferredRows = useDeferredValue(rows);
 
-  const { dialerLoading, addComment, addToDialer, block } = useNewRegistersActions(admin, setRows);
+  const { addComment, block } = useNewRegistersActions(admin, setRows);
 
   const applyFilters = useCallback(() => {
     setPage(1);
@@ -222,7 +224,7 @@ export function NewRegistersPage() {
     onViewComments: openViewComments,
     onViewCallLogs: openViewCallLogs,
     onCallSuccess: () => void load(page),
-    campaignId: campaignName,
+    campaignId: callCampaignId,
   });
 
   const filtersValue = useMemo(
@@ -297,22 +299,18 @@ export function NewRegistersPage() {
             startDate={startDate}
             endDate={endDate}
             itemsPerPage={itemsPerPage}
-            campaignName={campaignName}
-            campaigns={campaignOptions}
             activeStatus={activeStatus}
             newRegistration={newRegistration}
             otherState={otherState}
             nonPerforming={nonPerforming}
             total={total}
             loading={loading}
-            dialerLoading={dialerLoading}
             onStartDateChange={setStartDate}
             onEndDateChange={setEndDate}
             onItemsPerPageChange={(value) => {
               setItemsPerPage(value);
               setPage(1);
             }}
-            onCampaignNameChange={setCampaignName}
             onActiveStatusChange={(v) => {
               setActiveStatus(v);
               setPage(1);
@@ -332,11 +330,7 @@ export function NewRegistersPage() {
             }}
             onApply={applyFilters}
             onRefresh={applyFilters}
-            onAddToDialer={() => {
-              void addToDialer(campaignName, rows).then((ok) => {
-                if (ok) setCampaignName('');
-              });
-            }}
+            c2cUserIds={rows.map((r) => String(r._id || '').trim()).filter(Boolean)}
           />
         </Box>
       </Stack>

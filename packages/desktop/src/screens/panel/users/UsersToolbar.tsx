@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { BOT_ID_OPTIONS } from '@/screens/panel/callLogs/constants';
-import { CAMPAIGN_LIST } from '@/screens/panel/newRegisters/campaignList';
+import { AddToC2cCampaignControls } from '@/components/AddToC2cCampaignControls';
 import { PLAY_IN_OPTIONS, type UserType } from './constants';
 import { USERS_PAGE_SIZE_OPTIONS } from './toolbarHelpers';
 
@@ -64,7 +64,6 @@ export type UsersToolbarProps = {
   clientName: string;
   playedIn: string;
   botId: string;
-  campaignId: string;
   globalCount: number;
   total: number;
   loading?: boolean;
@@ -75,7 +74,6 @@ export type UsersToolbarProps = {
   canRegister?: boolean;
   canAddToBot?: boolean;
   canAddUserData?: boolean;
-  canAddToDialer?: boolean;
   canCreateUser?: boolean;
   canCreateAdmin?: boolean;
   /** Caller panel: hide Unique Users, Global User, Create User / Admin. */
@@ -91,24 +89,19 @@ export type UsersToolbarProps = {
   onClientName: (v: string) => void;
   onPlayedIn: (v: string) => void;
   onBotId: (v: string) => void;
-  onCampaignId: (v: string) => void;
   onRegister: () => void;
   onGlobalUser: () => void;
   onAddToBot: () => void;
   onAddUserData: () => void;
-  onAddToDialer: () => void;
+  c2cUserIds?: string[];
   onCreateUser: () => void;
   onCreateAdmin: () => void;
 };
 
-/** Laxminarayan Users toolbar layout (dates → type → bot/dialer → create). */
+/** Laxminarayan Users toolbar layout (dates → type → bot → create). */
 export function UsersToolbar(props: UsersToolbarProps) {
   // Keep the table prominent on initial load; controls remain one click away.
   const [open, setOpen] = useState(false);
-  const campaignOptions = useMemo(
-    () => CAMPAIGN_LIST.map((c) => ({ value: c.id.trim(), label: c.id.trim() })),
-    [],
-  );
 
   return (
     <Box
@@ -348,23 +341,6 @@ export function UsersToolbar(props: UsersToolbarProps) {
                 ))}
               </TextField>
             )}
-            {!props.isCaller && (
-              <TextField
-                select
-                label="Campaign List"
-                size="small"
-                value={props.campaignId}
-                onChange={(e) => props.onCampaignId(e.target.value)}
-                sx={{ ...fieldSx, minWidth: 160 }}
-              >
-                <MenuItem value="">Campaign List</MenuItem>
-                {campaignOptions.map((c) => (
-                  <MenuItem key={c.value} value={c.value}>
-                    {c.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
             {props.canAddToBot && !props.isCaller && (
               <Button sx={orangeBtnSx} disabled={props.dialerLoading} onClick={props.onAddToBot}>
                 Add to Bot{props.dialerCount != null ? ` (${props.dialerCount})` : ''}
@@ -390,11 +366,10 @@ export function UsersToolbar(props: UsersToolbarProps) {
                 Add User Data
               </Button>
             )}
-            {props.canAddToDialer && !props.isCaller && (
-              <Button sx={orangeBtnSx} disabled={props.dialerLoading} onClick={props.onAddToDialer}>
-                Add to Dialer
-              </Button>
-            )}
+            <AddToC2cCampaignControls
+              userIds={props.c2cUserIds || []}
+              disabled={props.loading || props.dialerLoading}
+            />
             {/* Always show create row like laxminarayan when permitted */}
             {props.canCreateUser && (
               <Button sx={orangeBtnSx} onClick={props.onCreateUser}>

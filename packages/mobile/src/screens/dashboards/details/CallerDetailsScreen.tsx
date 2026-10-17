@@ -23,7 +23,8 @@ import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { display, maskMobile } from '../../../utils/display';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { pickPlayIn } from '../../../dashboards/userRowUtils';
-import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
+import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
+import { singleCallToDialer } from '../../../utils/externalDialer';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CallerDetailsScreen.styles';
@@ -288,7 +289,6 @@ export function CallerDetailsScreen() {
   const [selected, setSelected] = useState<DetailRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [dialerBusyId, setDialerBusyId] = useState<string | null>(null);
-  const [addDialerBusy, setAddDialerBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!empCode) return;
@@ -429,44 +429,6 @@ export function CallerDetailsScreen() {
     [callerDialerIds, extensionIds, user?.name, user?.serverId],
   );
 
-  const addSelectedToDialer = useCallback(async () => {
-    if (!callerDialerIds) {
-      Alert.alert('Dialer', 'Dialer extension / campaign ID not found for this admin');
-      return;
-    }
-    const selectedRows = rows.filter(
-      (row) => row.status === 'Warning' && selectedIds.has(rowId(row)),
-    );
-    const leads = selectedRows
-      .map((row) => ({
-        _id: rowId(row),
-        name: rowName(row),
-        mobile: rowMobile(row),
-        city: String(row.city || ''),
-        state: String(row.state || ''),
-        clientName: String(row.clientName || row.appName || ''),
-      }))
-      .filter((lead) => lead.mobile.replace(/\D/g, ''));
-    if (!leads.length) {
-      Alert.alert('Dialer', 'Leads should not be empty.');
-      return;
-    }
-    setAddDialerBusy(true);
-    try {
-      const res = await addToDialerBatch({
-        campaignId: callerDialerIds.campaignId,
-        serverId: user?.serverId != null ? String(user.serverId) : undefined,
-        leads,
-        listId: callerDialerIds.listId,
-        listName: `${String(user?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
-      });
-      Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
-      if (res.ok) setSelectedIds(new Set());
-    } finally {
-      setAddDialerBusy(false);
-    }
-  }, [callerDialerIds, rows, selectedIds, user?.name, user?.serverId]);
-
   const toggleSelect = useCallback((id: string) => {
     if (!id) return;
     setSelectedIds((prev) => {
@@ -571,24 +533,11 @@ export function CallerDetailsScreen() {
               {allWarningSelected ? 'Clear selection' : 'Select all'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.addDialerBtn,
-              (addDialerBusy || selectedIds.size === 0 || dialerBusyId != null) &&
-                styles.addDialerBtnDisabled,
-            ]}
-            disabled={addDialerBusy || selectedIds.size === 0 || dialerBusyId != null}
-            onPress={() => void addSelectedToDialer()}
-          >
-            <Text style={styles.addDialerBtnText}>
-              {addDialerBusy
-                ? 'Sending…'
-                : selectedIds.size > 0
-                  ? `Add to Dialer (${selectedIds.size})`
-                  : 'Add to Dialer'}
-            </Text>
-          </TouchableOpacity>
         </View>
+      ) : null}
+
+      {tab === 'Warning' && filtered.length > 0 ? (
+        <AddToC2cCampaignPanel userIds={[...selectedIds]} countLabel={selectedIds.size} />
       ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -715,11 +664,11 @@ export function CallerDetailsScreen() {
                       <View style={styles.callBtnRow}>
                         <TouchableOpacity
                           style={[styles.callBtn, sending && styles.callBtnDisabled]}
-                          disabled={sending || addDialerBusy}
+                          disabled={sending}
                           onPress={() => void addSingleToDialer(row)}
                         >
                           <Text style={styles.callBtnText}>
-                            {sending ? 'Sending…' : 'Add to Dialer'}
+                            {sending ? 'Sending…' : 'Call'}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -768,9 +717,9 @@ export function CallerDetailsScreen() {
                         label:
                           dialerBusyId && dialerBusyId === rowId(selected)
                             ? 'Sending…'
-                            : 'Add to Dialer',
+                            : 'Call',
                         tone: 'primary' as const,
-                        disabled: addDialerBusy || Boolean(dialerBusyId),
+                        disabled: Boolean(dialerBusyId),
                         onPress: () => {
                           const row = selected;
                           setSelected(null);

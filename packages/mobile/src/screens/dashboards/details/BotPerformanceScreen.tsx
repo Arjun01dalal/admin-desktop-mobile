@@ -2,7 +2,6 @@
  * Bot Performance — port of desktop BotPerformancePage.
  * Lists caller-user activity (botPerformance.callerUserActivity) with the
  * desktop filter set: date range, type, bot IDs, app, and per-column filters.
- * Desktop-only "Add to Dialer" (external dialer batch) is not ported.
  */
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -24,8 +23,7 @@ import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { CAMPAIGN_LIST } from '../../../utils/campaignList';
-import { addToDialerBatch } from '../../../utils/externalDialer';
+import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
 import { styles } from './BotPerformanceScreen.styles';
 import { display, maskMobile } from '../../../utils/display';
 
@@ -93,12 +91,7 @@ export function BotPerformanceScreen() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<{ row: BotPerfRow; index: number } | null>(null);
 
-  // Add to Dialer (same external dialer API the web panel uses)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [campaignId, setCampaignId] = useState('');
-  const [campaignOpen, setCampaignOpen] = useState(false);
-  const [pushing, setPushing] = useState(false);
-  const [dialerMsg, setDialerMsg] = useState('');
 
   const genRef = React.useRef(0);
   // Text filters are read at load time (like desktop: applied on Apply).
@@ -222,39 +215,6 @@ export function BotPerformanceScreen() {
       return new Set(rows.map((r) => String(r._id)).filter(Boolean));
     });
   }, [rows]);
-
-  const addToDialer = useCallback(async () => {
-    setDialerMsg('');
-    if (!campaignId) {
-      setDialerMsg('Campaign should not be empty');
-      return;
-    }
-    const chosen = rows.filter((r) => selectedIds.has(String(r._id)));
-    if (!chosen.length) {
-      setDialerMsg('Select at least one user');
-      return;
-    }
-    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
-    setPushing(true);
-    try {
-      const res = await addToDialerBatch({
-        campaignId,
-        serverId: campaign?.serverId,
-        leads: chosen.map((r) => ({
-          _id: r._id,
-          name: r.name || r.client_name,
-          mobile: r.mobile || r.phone_number,
-          city: r.city,
-          state: r.state,
-          clientName: r.clientName,
-        })),
-      });
-      setDialerMsg(res.message);
-      if (res.ok) setSelectedIds(new Set());
-    } finally {
-      setPushing(false);
-    }
-  }, [campaignId, rows, selectedIds]);
 
   const columns = useMemo<DataTableColumn<BotPerfRow>[]>(
     () => [
@@ -413,48 +373,7 @@ export function BotPerformanceScreen() {
         </View>
       ) : null}
 
-      {/* Add to Dialer */}
-      <TouchableOpacity style={styles.collapseHeader} onPress={() => setCampaignOpen((o) => !o)}>
-        <Text style={styles.collapseTitle}>
-          Add to Dialer{campaignId ? ` · ${campaignId}` : ''}
-          {selectedIds.size ? ` · ${selectedIds.size} selected` : ''} {campaignOpen ? '▲' : '▼'}
-        </Text>
-      </TouchableOpacity>
-      {campaignOpen && (
-        <View style={styles.filterCard}>
-          <Text style={styles.filterLabel}>Campaign</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {CAMPAIGN_LIST.map((c, ci) => {
-              const id = c.id.trim();
-              return (
-                <TouchableOpacity
-                  key={`camp-${ci}`}
-                  style={[styles.chip, campaignId === id && styles.chipActive]}
-                  onPress={() => setCampaignId(campaignId === id ? '' : id)}
-                >
-                  <Text style={[styles.chipText, campaignId === id && styles.chipTextActive]}>
-                    {id} · {c.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-          <Text style={styles.dialerHint}>Tick cards (☐), pick a campaign, then push.</Text>
-          <TouchableOpacity
-            style={[
-              styles.searchBtn,
-              (pushing || !selectedIds.size || !campaignId) && styles.btnDisabled,
-            ]}
-            onPress={() => void addToDialer()}
-            disabled={pushing || !selectedIds.size || !campaignId}
-          >
-            <Text style={styles.searchBtnText}>
-              {pushing ? 'Adding…' : `Add ${selectedIds.size || ''} to Dialer`}
-            </Text>
-          </TouchableOpacity>
-          {dialerMsg ? <Text style={styles.dialerMsg}>{dialerMsg}</Text> : null}
-        </View>
-      )}
+      <AddToC2cCampaignPanel userIds={[...selectedIds]} countLabel={selectedIds.size} />
 
       {rows.length > 0 ? (
         <View style={styles.selectAllRow}>

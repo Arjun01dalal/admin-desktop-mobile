@@ -259,8 +259,7 @@ export function CallerDetailsPage() {
   const [todayPageSize, setTodayPageSize] = useState(50);
   const [searchName, setSearchName] = useState('');
   const [dialerBusyId, setDialerBusyId] = useState<string | null>(null);
-  const [addDialerBusy, setAddDialerBusy] = useState(false);
-  /** Selected Non Performing row ids for Add Dialer Data (Laxmi checkboxes). */
+  /** Selected Non Performing row ids (checkbox column). */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [altOpen, setAltOpen] = useState(false);
   const [altUser, setAltUser] = useState<DetailRow | null>(null);
@@ -357,57 +356,6 @@ export function CallerDetailsPage() {
   );
 
   /** Laxmi addDialerData — push checked Non Performing customers to dialer. */
-  const addDialerData = useCallback(async () => {
-    const ids = extensionIds(user);
-    const numericCampaignId = ids.find((val) => /^\d+$/.test(val)) || '';
-    if (!numericCampaignId) {
-      toast.error('Dialer extension / campaign ID not found for this admin');
-      return;
-    }
-
-    const selected = rows.filter(
-      (r) => r.status === 'Warning' && selectedIds.has(String(r._id || r.userId || '')),
-    );
-    const leads = selected
-      .map((item) => ({
-        first_name: String(item.name || item.userName || ''),
-        phone_number: String(item.mobile || item.userMobile || ''),
-        city: String(item.city || ''),
-        state: String(item.state || ''),
-        email: String(item.clientName || ''),
-        comments: String(item.clientName || ''),
-        province: String(item._id || ''),
-      }))
-      .filter((l) => l.phone_number.replace(/\D/g, ''));
-
-    if (!leads.length) {
-      toast.error('Leads should not be empty.');
-      return;
-    }
-
-    setAddDialerBusy(true);
-    try {
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId: numericCampaignId,
-        campaign_id: numericCampaignId,
-        listId: `9${numericCampaignId}`,
-        list_id: `9${numericCampaignId}`,
-        listName: `${String(user?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
-        list_name: `${String(user?.name || 'ADMIN').toUpperCase()} BOT CALLING LIST`,
-        leads,
-        serverId: user?.serverId,
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'API request failed');
-        return;
-      }
-      toast.success(res.message || 'Data sent successfully');
-      setSelectedIds(new Set());
-    } finally {
-      setAddDialerBusy(false);
-    }
-  }, [rows, selectedIds, user]);
-
   const rowKey = (r: DetailRow) => String(r._id || r.userId || '');
 
   const toggleSelect = useCallback((id: string, checked: boolean) => {
@@ -816,18 +764,6 @@ export function CallerDetailsPage() {
           )}
           <Button variant="contained" onClick={() => void load()} disabled={loading}>
             Apply
-          </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={() => void addDialerData()}
-            disabled={loading || addDialerBusy || selectedIds.size === 0}
-          >
-            {addDialerBusy
-              ? 'Sending…'
-              : selectedIds.size > 0
-                ? `Add Dialer Data (${selectedIds.size})`
-                : 'Add Dialer Data'}
           </Button>
           {loading && <CircularProgress size={22} />}
         </Stack>

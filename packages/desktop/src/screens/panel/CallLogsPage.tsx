@@ -23,7 +23,6 @@ import { todayIST, getStoredUser } from '@/utils/dates';
 import { CommonTable } from '@/components/CommonTable';
 import { RecordingPlayerDialog } from '@/components/RecordingPlayerDialog';
 import { TablePanel } from '@/components/TablePanel';
-import { campaignsForLoginUser, type CampaignItem } from './newRegisters/campaignList';
 import { COMMENT_FILTER_OPTIONS } from './callLogs/constants';
 import { CallLogsToolbar } from './callLogs/CallLogsToolbar';
 import { BotStatusTable } from './callLogs/BotStatusTable';
@@ -47,18 +46,10 @@ export function CallLogsPage() {
     botNo?: Array<string | number> | string;
   }>();
   const isCaller = isCallLogsCaller(admin);
-  const campaignOptions = useMemo(
-    () =>
-      campaignsForLoginUser(admin as Record<string, unknown> | null, { assignedOnly: isCaller }),
-    [admin, isCaller],
-  );
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [campaignId, setCampaignId] = useState(() =>
-    isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
-  );
 
   const [mobNo, setMobNo] = useState('');
   const [dpId, setDpId] = useState('');
@@ -96,8 +87,6 @@ export function CallLogsPage() {
         endDate={endDate}
         page={page}
         itemsPerPage={itemsPerPage}
-        campaignId={campaignId}
-        campaignOptions={campaignOptions}
         mobNo={mobNo}
         dpId={dpId}
         sid={sid}
@@ -116,7 +105,6 @@ export function CallLogsPage() {
         setEndDate={setEndDate}
         setPage={setPage}
         setItemsPerPage={setItemsPerPage}
-        setCampaignId={setCampaignId}
         setMobNo={setMobNo}
         setDpId={setDpId}
         setSid={setSid}
@@ -146,8 +134,6 @@ type BodyProps = {
   endDate: string;
   page: number;
   itemsPerPage: number;
-  campaignId: string;
-  campaignOptions: CampaignItem[];
   mobNo: string;
   dpId: string;
   sid: string;
@@ -166,7 +152,6 @@ type BodyProps = {
   setEndDate: (v: string) => void;
   setPage: (v: number) => void;
   setItemsPerPage: (v: number) => void;
-  setCampaignId: (v: string) => void;
   setMobNo: (v: string) => void;
   setDpId: (v: string) => void;
   setSid: (v: string) => void;
@@ -183,8 +168,6 @@ function CallLogsPageBody({
   endDate,
   page,
   itemsPerPage,
-  campaignId,
-  campaignOptions,
   mobNo,
   dpId,
   sid,
@@ -203,7 +186,6 @@ function CallLogsPageBody({
   setEndDate,
   setPage,
   setItemsPerPage,
-  setCampaignId,
   setMobNo,
   setDpId,
   setSid,
@@ -229,7 +211,6 @@ function CallLogsPageBody({
     actionLoading,
     summaryData,
     setSummaryData,
-    dialerCall,
     connectDialer,
     endCall,
     submitComment,
@@ -242,7 +223,6 @@ function CallLogsPageBody({
     load,
     getSelectedRows,
     clearSelection,
-    campaignId,
     getDateRange,
     onCommentSaved: patchComment,
   });
@@ -367,24 +347,23 @@ function CallLogsPageBody({
             title="Call Logs"
             startDate={startDate}
             endDate={endDate}
-            campaignId={campaignId}
             itemsPerPage={itemsPerPage}
             total={total}
             loading={loading}
             actionLoading={actionLoading}
             fileRef={fileRef}
             isCaller={isCaller}
-            campaigns={campaignOptions}
             onStartDateChange={setStartDate}
             onEndDateChange={setEndDate}
-            onCampaignChange={setCampaignId}
             onItemsPerPageChange={(value) => {
               setItemsPerPage(value);
               setPage(1);
             }}
             onApply={applyFilters}
             onRefresh={() => void load()}
-            onDialerCall={() => void dialerCall()}
+            c2cUserIds={selectedRows
+              .map((r) => String(r.caller_user_id || '').trim())
+              .filter(Boolean)}
             onUpload={(file) => {
               void onUpload(file).finally(() => {
                 if (fileRef.current) fileRef.current.value = '';

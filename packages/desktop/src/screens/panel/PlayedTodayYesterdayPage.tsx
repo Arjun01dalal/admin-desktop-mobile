@@ -2,7 +2,7 @@
  * Played today / yesterday — port of admin-panel-domains PlayedTodayYesterday.
  * KPI drilldown from Dashboard StatCards → `/played-today-yesterday`.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -17,10 +17,9 @@ import {
   Typography,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { toast } from 'react-toastify';
+import { AddToC2cCampaignControls } from '@/components/AddToC2cCampaignControls';
 import {
   BREAKDOWN_COUNTS,
-  CAMPAIGN_LIST,
   CLIENT_NAMES,
   COUNT_BY_TYPE,
   DEFAULT_PLAYED_PAGE_SIZE,
@@ -40,13 +39,12 @@ import {
   type PlaySummary,
   type PlayType,
 } from '@astro/shared';
-import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { orangeBtnSx, fieldSx } from '@/screens/panel/transactions/shared';
-import { formatDisplayDate, formatDisplayTime, getStoredUser, todayIST } from '@/utils/dates';
+import { formatDisplayDate, formatDisplayTime, todayIST } from '@/utils/dates';
 import { useReportQuery, display, maskMobile } from './shared';
 
 type Row = Record<string, unknown>;
@@ -83,9 +81,7 @@ export function PlayedTodayYesterdayPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state as LocationState) ?? null;
-  const admin = getStoredUser<Record<string, unknown>>();
   const canShowMobile = hasPermission('show_mobile');
-  const canAddToDialer = hasPermission('add_to_dilaler');
 
   const [type, setType] = useState<PlayType>(
     isPlayType(state?.type) ? state.type : 'today_not_yesterday',
@@ -103,9 +99,6 @@ export function PlayedTodayYesterdayPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PLAYED_PAGE_SIZE);
   const [summary, setSummary] = useState<PlaySummary>(emptyPlaySummary);
-  const [campaignId, setCampaignId] = useState('');
-  const [dialerLoading, setDialerLoading] = useState(false);
-
   useEffect(() => {
     if (isPlayType(state?.type) && state.type !== type) {
       setType(state.type);
@@ -161,47 +154,6 @@ export function PlayedTodayYesterdayPage() {
     setPage(1);
     setApplied((prev) => ({ ...prev, date: '' }));
   };
-
-  const handleAddToDialer = useCallback(async () => {
-    if (!campaignId.trim()) {
-      toast.error('Campaign should not be empty');
-      return;
-    }
-    if (!rows.length) {
-      toast.error('No users to add to dialer');
-      return;
-    }
-    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
-    setDialerLoading(true);
-    try {
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId: campaignId.trim(),
-        leads: rows.map((r) => ({
-          first_name: rowDisplayName(r),
-          last_name: '',
-          phone_number: rowMobile(r),
-          city: String(r.city ?? ''),
-          state: String(r.state ?? ''),
-          email: String(r.clientName ?? ''),
-          comments: String(r.clientName ?? ''),
-          province: rowUserId(r),
-        })),
-        serverId: campaign?.serverId,
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Dialer call failed');
-        return;
-      }
-      await secureApi('ops.savePerformanceData', {
-        subAdminId: admin?._id,
-        dialledUserIds: rows.map((r) => rowUserId(r)).filter(Boolean),
-        extensionId: campaignId.trim(),
-      });
-      toast.success(res.message || `Dialer call queued (${rows.length} leads)`);
-    } finally {
-      setDialerLoading(false);
-    }
-  }, [admin?._id, campaignId, rows]);
 
   const columns = useMemo<CommonTableColumn<Row>[]>(
     () => [
@@ -489,31 +441,10 @@ export function PlayedTodayYesterdayPage() {
           <Button onClick={handleSearch} sx={orangeBtnSx}>
             Search
           </Button>
-          {canAddToDialer ? (
-            <>
-              <TextField
-                select
-                label="Campaign List"
-                size="small"
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                sx={{ ...filterFieldSx, width: 180 }}
-              >
-                {CAMPAIGN_LIST.map((c) => (
-                  <MenuItem key={c.id} value={c.id.trim()}>
-                    {c.id.trim()}
-                  </MenuItem>
-                ))}
-              </TextField>
-              {dialerLoading ? (
-                <CircularProgress size={24} />
-              ) : (
-                <Button onClick={() => void handleAddToDialer()} sx={orangeBtnSx}>
-                  Add to dialer
-                </Button>
-              )}
-            </>
-          ) : null}
+          <AddToC2cCampaignControls
+            userIds={rows.map((r) => rowUserId(r)).filter(Boolean)}
+            disabled={loading}
+          />
         </Stack>
       </CollapsibleFilterPanel>
 

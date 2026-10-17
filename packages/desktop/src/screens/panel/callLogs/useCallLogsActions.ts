@@ -7,7 +7,6 @@ import {
   extractDialLeadsFromExcel,
   mapRowToDialSetting,
   toDialerConnectDetails,
-  toDialerLead,
 } from './utils';
 import type {
   CallLogRow,
@@ -32,7 +31,6 @@ type Params = {
   load: () => Promise<void>;
   getSelectedRows: () => CallLogRow[];
   clearSelection: () => void;
-  campaignId: string;
   getDateRange: () => { startDate: string; endDate: string };
   onCommentSaved?: (callSid: string, comments: string, commentedBy?: string) => void;
 };
@@ -42,7 +40,6 @@ export function useCallLogsActions({
   load,
   getSelectedRows,
   clearSelection,
-  campaignId,
   getDateRange,
   onCommentSaved,
 }: Params) {
@@ -76,35 +73,6 @@ export function useCallLogsActions({
     },
     [admin?._id, admin?.name, clearSelection, getSelectedRows, load],
   );
-
-  const dialerCall = useCallback(async () => {
-    if (!campaignId) {
-      toast.error('Campaign Name should not be empty');
-      return;
-    }
-    const selectedRows = getSelectedRows();
-    if (!selectedRows.length) {
-      toast.error('Select at least one row');
-      return;
-    }
-    setActionLoading(true);
-    try {
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId,
-        leads: selectedRows.map(toDialerLead),
-        serverId: admin?.serverId,
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Dialer call failed');
-        return;
-      }
-      toast.success(res.message || 'Dialer call queued');
-      clearSelection();
-      await load();
-    } finally {
-      setActionLoading(false);
-    }
-  }, [admin?.serverId, campaignId, clearSelection, getSelectedRows, load]);
 
   const connectDialer = useCallback(
     async (row: CallLogRow) => {
@@ -321,7 +289,6 @@ export function useCallLogsActions({
     summaryData,
     setSummaryData,
     botCall,
-    dialerCall,
     connectDialer,
     endCall,
     submitComment,

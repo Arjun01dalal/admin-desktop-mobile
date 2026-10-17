@@ -434,14 +434,71 @@ export function extractC2cNextCampaignCall(body: unknown): C2cNextCampaignCall |
 }
 
 export function extractC2cAddCustomersResult(body: unknown): C2cAddCustomersResult {
+  const b = (body && typeof body === 'object' && !Array.isArray(body) ? body : {}) as Record<
+    string,
+    unknown
+  >;
   const payload = (resolvePayload(body) ?? {}) as Record<string, unknown>;
-  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const nested =
+    (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+      ? (payload.data as Record<string, unknown>)
+      : null) ||
+    (b.data && typeof b.data === 'object' && !Array.isArray(b.data)
+      ? (b.data as Record<string, unknown>)
+      : null);
+  const src = { ...nested, ...payload, ...b };
+  const inserted = Number(src.inserted ?? src.added ?? src.count ?? nested?.inserted ?? 0) || 0;
+  const requested = Number(src.requested ?? src.total ?? nested?.requested ?? 0) || 0;
   return {
-    requested: Number(payload.requested ?? 0) || 0,
-    inserted: Number(payload.inserted ?? 0) || 0,
-    skipped: (payload.skipped as C2cAddCustomersResult['skipped']) || {},
-    summary: firstString(b.message, payload.message, typeof payload.summary === 'string' ? payload.summary : ''),
+    requested,
+    inserted,
+    skipped: (src.skipped as C2cAddCustomersResult['skipped']) || {},
+    summary: firstString(
+      b.message,
+      payload.message,
+      nested?.message,
+      typeof src.summary === 'string' ? src.summary : '',
+    ),
   };
+}
+
+/** Human-readable result for POST /campaign/{id}/data (add userIds). */
+export function formatC2cAddCustomersMessage(result: C2cAddCustomersResult): string {
+  if (result.summary?.trim()) return result.summary.trim();
+  const inserted = result.inserted ?? 0;
+  const requested = result.requested ?? 0;
+  const skipped = result.skipped || {};
+  const skipParts: string[] = [];
+  if (skipped.alreadyInCampaign?.count) {
+    skipParts.push(`${skipped.alreadyInCampaign.count} already in campaign`);
+  }
+  if (skipped.inOtherCampaign?.count) {
+    skipParts.push(`${skipped.inOtherCampaign.count} in other campaign`);
+  }
+  if (skipped.blocked?.count) skipParts.push(`${skipped.blocked.count} blocked`);
+  if (skipped.notFound?.count) skipParts.push(`${skipped.notFound.count} not found`);
+  const base =
+    requested > 0
+      ? `Inserted ${inserted} of ${requested}`
+      : inserted > 0
+        ? `Inserted ${inserted} user${inserted === 1 ? '' : 's'} successfully`
+        : skipParts.length
+          ? 'No new users inserted'
+          : 'Users added to C2C campaign successfully';
+  return skipParts.length ? `${base} (${skipParts.join(', ')})` : base;
+}
+
+/** Normalize mongo / row ids for campaign.addData userIds. */
+export function collectC2cUserIds(values: unknown[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const id = String(value ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
 }
 
 export function formatC2cAssignedLabel(assignedTo: unknown): string {

@@ -17,7 +17,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { CAMPAIGN_LIST, type CampaignItem } from './campaignList';
+import { AddToC2cCampaignControls } from '@/components/AddToC2cCampaignControls';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import type { ActiveStatusFilter, NewRegistrationFilter } from './types';
 
@@ -35,27 +35,23 @@ type NewRegistersToolbarProps = {
   startDate: string;
   endDate: string;
   itemsPerPage: number;
-  campaignName: string;
-  /** Callers get only login-assigned campaign IDs. */
-  campaigns?: CampaignItem[];
   activeStatus: ActiveStatusFilter;
   newRegistration: NewRegistrationFilter;
   otherState: boolean;
   nonPerforming: boolean;
   total: number;
   loading: boolean;
-  dialerLoading: boolean;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onItemsPerPageChange: (value: number) => void;
-  onCampaignNameChange: (value: string) => void;
   onActiveStatusChange: (value: ActiveStatusFilter) => void;
   onNewRegistrationChange: (value: NewRegistrationFilter) => void;
   onOtherStateChange: (value: boolean) => void;
   onNonPerformingChange: (value: boolean) => void;
   onApply: () => void;
   onRefresh: () => void;
-  onAddToDialer: () => void;
+  /** Current page user ids for C2C campaign.push */
+  c2cUserIds?: string[];
 };
 
 export function NewRegistersToolbar({
@@ -63,26 +59,22 @@ export function NewRegistersToolbar({
   startDate,
   endDate,
   itemsPerPage,
-  campaignName,
-  campaigns = CAMPAIGN_LIST,
   activeStatus,
   newRegistration,
   otherState,
   nonPerforming,
   total,
   loading,
-  dialerLoading,
   onStartDateChange,
   onEndDateChange,
   onItemsPerPageChange,
-  onCampaignNameChange,
   onActiveStatusChange,
   onNewRegistrationChange,
   onOtherStateChange,
   onNonPerformingChange,
   onApply,
   onRefresh,
-  onAddToDialer,
+  c2cUserIds = [],
 }: NewRegistersToolbarProps) {
   const [open, setOpen] = useState(false);
 
@@ -240,24 +232,6 @@ export function NewRegistersToolbar({
             <TextField
               fullWidth={false}
               select
-              label="Campaign"
-              size="small"
-              value={campaignName}
-              onChange={(e) => onCampaignNameChange(e.target.value)}
-              sx={{ ...fieldSx, width: 150 }}
-            >
-              <MenuItem value="">
-                <em>Select</em>
-              </MenuItem>
-              {campaigns.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.id}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              fullWidth={false}
-              select
               label="Active"
               size="small"
               value={activeStatus}
@@ -316,17 +290,8 @@ export function NewRegistersToolbar({
             >
               Apply
             </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              color="warning"
-              onClick={onAddToDialer}
-              disabled={loading || dialerLoading || !campaignName}
-              sx={{ textTransform: 'none', fontWeight: 600, px: 2, flex: '0 0 auto' }}
-            >
-              Add to Dialer
-            </Button>
-            {(loading || dialerLoading) && <CircularProgress size={20} />}
+            <AddToC2cCampaignControls userIds={c2cUserIds} disabled={loading} />
+            {loading && <CircularProgress size={20} />}
             <Typography
               variant="body2"
               sx={{

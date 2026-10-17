@@ -7,8 +7,7 @@
  * Row actions (from the row detail sheet): Bot Call (callLogs.addToBotDialer),
  * End Call (callLogs.updateCallData), Connect Dialer (singleCallToDialer),
  * View Summary (direct POST to the process-call helper, same endpoint the
- * desktop bridge uses) and opening the recording URL. Add to Dialer sends
- * selected rows to a campaign via addToDialerBatch (desktop Dialer Call).
+ * desktop bridge uses) and opening the recording URL.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -30,8 +29,8 @@ import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { formatDdMmYyyy, todayIST } from '../../../utils/dates';
-import { CAMPAIGN_LIST, campaignsForLoginUser } from '../../../utils/campaignList';
-import { addToDialerBatch, singleCallToDialer } from '../../../utils/externalDialer';
+import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
+import { singleCallToDialer } from '../../../utils/externalDialer';
 import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
@@ -39,7 +38,6 @@ import { RecordingPlayerModal } from '../../../components/RecordingPlayerModal';
 import { CallSummaryModal, CommentModal } from './callLogs/CallLogsPanels';
 import { BotStatusPanel, type ReinitTarget } from './callLogs/BotStatusPanel';
 import {
-  DialerControls,
   PageSizePicker,
   SearchFilters,
   type CallLogTextFilter,
@@ -83,10 +81,6 @@ export function CallLogsScreen() {
   const isCaller = isCallLogsCaller(admin);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
   const assignedBots = useMemo(() => getAssignedBotIds(admin), [admin]);
-  const campaignOptions = useMemo(
-    () => campaignsForLoginUser(admin, { assignedOnly: isCaller }),
-    [admin, isCaller],
-  );
   const { defer } = useDeferredTimeout();
 
   const today = todayIST();
@@ -122,12 +116,6 @@ export function CallLogsScreen() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
 
-  const [campaignId, setCampaignId] = useState(() =>
-    isCaller && campaignOptions.length === 1 ? campaignOptions[0].id.trim() : '',
-  );
-  const [dialerOpen, setDialerOpen] = useState(false);
-  const [pushing, setPushing] = useState(false);
-  const [dialerMsg, setDialerMsg] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Comment modal
@@ -283,34 +271,6 @@ export function CallLogsScreen() {
       return new Set(rows.map(callLogRowId).filter(Boolean));
     });
   }, [rows]);
-
-  const addToDialer = useCallback(async () => {
-    setDialerMsg('');
-    if (!campaignId) {
-      setDialerMsg('Campaign should not be empty');
-      return;
-    }
-    const chosen = rows.filter((r) => selectedIds.has(callLogRowId(r)));
-    if (!chosen.length) {
-      setDialerMsg('Select at least one row');
-      return;
-    }
-    const campaign =
-      campaignOptions.find((c) => c.id.trim() === campaignId.trim()) ??
-      CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
-    setPushing(true);
-    try {
-      const res = await addToDialerBatch({
-        campaignId,
-        serverId: campaign?.serverId ?? (admin as { serverId?: string } | null)?.serverId,
-        leads: chosen.map(toDialerLeadSource),
-      });
-      setDialerMsg(res.message);
-      if (res.ok) setSelectedIds(new Set());
-    } finally {
-      setPushing(false);
-    }
-  }, [admin, campaignId, campaignOptions, rows, selectedIds]);
 
   const connectDialer = useCallback(
     async (row: CallLogRow) => {
@@ -830,17 +790,12 @@ export function CallLogsScreen() {
         }}
       />
 
-      <DialerControls
-        open={dialerOpen}
-        campaignId={campaignId}
-        campaignOptions={campaignOptions}
-        isCaller={isCaller}
-        selectedCount={selectedIds.size}
-        pushing={pushing}
-        message={dialerMsg}
-        onToggle={() => setDialerOpen((open) => !open)}
-        onCampaignSelect={setCampaignId}
-        onAdd={() => void addToDialer()}
+      <AddToC2cCampaignPanel
+        userIds={rows
+          .filter((r) => selectedIds.has(callLogRowId(r)))
+          .map((r) => callLogCustomerId(r))
+          .filter(Boolean)}
+        countLabel={selectedIds.size}
       />
 
       {error ? (

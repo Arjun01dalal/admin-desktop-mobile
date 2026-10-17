@@ -95,7 +95,6 @@ export function UsersPage() {
   const canCreateUser = !isCaller && hasPermission('create_new_user');
   const canCreateAdmin = !isCaller && hasPermission('create_admin_user');
   const canAddToBot = hasPermission('add_to_bot');
-  const canAddToDialer = hasPermission('add_to_dilaler');
   const canAddUserData = hasPermission('show_user_upload_data');
 
   const canViewSubAdmin = hasPermission('View_Subadmin_User');
@@ -224,7 +223,6 @@ export function UsersPage() {
             clientName={query.clientName}
             playedIn={query.playedIn}
             botId={dialer.botId}
-            campaignId={dialer.campaignId}
             globalCount={dialer.globalCount}
             total={query.total}
             loading={query.loading}
@@ -236,7 +234,6 @@ export function UsersPage() {
             canRegister={canRegister}
             canAddToBot={canAddToBot}
             canAddUserData={canAddUserData}
-            canAddToDialer={canAddToDialer}
             canCreateUser={canCreateUser}
             canCreateAdmin={canCreateAdmin}
             isCaller={isCaller}
@@ -272,7 +269,6 @@ export function UsersPage() {
               query.setPage(1);
             }}
             onBotId={dialer.setBotId}
-            onCampaignId={dialer.setCampaignId}
             onRegister={() => setCreateMode('user')}
             onGlobalUser={() => {
               void dialer.loadGlobals().then((count) => {
@@ -281,7 +277,9 @@ export function UsersPage() {
             }}
             onAddToBot={() => void dialer.handleAddToBot()}
             onAddUserData={() => setAddUserDataOpen(true)}
-            onAddToDialer={() => void dialer.handleAddToDialer()}
+            c2cUserIds={(query.dialerData.length ? query.dialerData : query.rows)
+              .map((r) => String(r._id || '').trim())
+              .filter(Boolean)}
             onCreateUser={() => setCreateMode('user')}
             onCreateAdmin={() => setCreateMode('admin')}
           />

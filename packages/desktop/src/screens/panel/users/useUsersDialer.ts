@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { CAMPAIGN_LIST } from '@/screens/panel/newRegisters/campaignList';
 import { pushToBotDialer } from '../shared/pushToBotDialer';
-import { mapUsersToBotSettings, mapUsersToDialerLeads, reasonForUserType } from './toolbarHelpers';
+import { mapUsersToBotSettings, reasonForUserType } from './toolbarHelpers';
 import type { UserType } from './constants';
 import {
   actionForType,
@@ -62,7 +61,6 @@ export function useUsersDialer({
   loadGlobals: loadGlobalsCount,
 }: Params) {
   const [botId, setBotId] = useState('');
-  const [campaignId, setCampaignId] = useState('');
   const [globalCount, setGlobalCount] = useState(0);
   const [dialerLoading, setDialerLoading] = useState(false);
 
@@ -200,39 +198,6 @@ export function useUsersDialer({
     }
   }, [admin?._id, admin?.name, botId, resolveDialerSource, total, userType]);
 
-  const handleAddToDialer = useCallback(async () => {
-    if (!campaignId) {
-      toast.error('Campaign Name should not be empty');
-      return;
-    }
-    setDialerLoading(true);
-    try {
-      const source = await resolveDialerSource();
-      if (!source.length) {
-        toast.error('No users available for dialer');
-        return;
-      }
-      const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId);
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId,
-        leads: mapUsersToDialerLeads(source),
-        serverId: campaign?.serverId,
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Dialer call failed');
-        return;
-      }
-      await secureApi('ops.savePerformanceData', {
-        subAdminId: admin?._id,
-        dialledUserIds: source.map((r) => r._id).filter(Boolean),
-        extensionId: campaignId,
-      });
-      toast.success(res.message || `Dialer call queued (${source.length} leads)`);
-    } finally {
-      setDialerLoading(false);
-    }
-  }, [admin?._id, campaignId, resolveDialerSource]);
-
   useEffect(() => {
     void loadGlobals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,13 +206,10 @@ export function useUsersDialer({
   return {
     botId,
     setBotId,
-    campaignId,
-    setCampaignId,
     globalCount,
     dialerLoading,
     loadGlobals,
     resolveDialerSource,
     handleAddToBot,
-    handleAddToDialer,
   };
 }

@@ -45,8 +45,8 @@ import { DetailFilterBar, type SearchFieldKey } from './dashboards/details/Detai
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
 import { CreateUserScreen } from './CreateUserScreen';
 import { mapUsersToBotSettings } from '../utils/dialerHelpers';
-import { CAMPAIGN_LIST } from '../utils/campaignList';
-import { addToDialerBatch, singleCallToDialer } from '../utils/externalDialer';
+import { AddToC2cCampaignPanel } from '../components/AddToC2cCampaignPanel';
+import { singleCallToDialer } from '../utils/externalDialer';
 import { BlockUserModal } from './users/BlockUserModal';
 import { DumpUserModal } from './users/DumpUserModal';
 import {
@@ -184,14 +184,12 @@ export function UsersScreen() {
     routeParams.startDate,
   ]);
 
-  // Global Add-to-Bot / Add-to-Dialer (desktop UsersToolbar parity).
+  // Global Add-to-Bot (desktop UsersToolbar parity).
   const canAddToBot = !isCaller && hasPermission('add_to_bot');
-  const canAddToDialer = !isCaller && hasPermission('add_to_dilaler');
   /** Laxmi CallingBtn column — hidden only with contact_visibility_none. */
   const showCalling = !hideContact;
   const [dialerOpen, setDialerOpen] = useState(false);
   const [botId, setBotId] = useState('');
-  const [campaignId, setCampaignId] = useState('');
   const [dialerBusy, setDialerBusy] = useState(false);
   const [dialerMsg, setDialerMsg] = useState('');
   const [callBusy, setCallBusy] = useState(false);
@@ -269,45 +267,6 @@ export function UsersScreen() {
       setDialerBusy(false);
     }
   }, [admin, botId, rows, userType]);
-
-  const handleAddToDialer = useCallback(async () => {
-    setDialerMsg('');
-    if (!campaignId) {
-      setDialerMsg('Campaign Name should not be empty');
-      return;
-    }
-    if (!rows.length) {
-      setDialerMsg('No users available for dialer');
-      return;
-    }
-    const campaign = CAMPAIGN_LIST.find((c) => c.id.trim() === campaignId.trim());
-    setDialerBusy(true);
-    try {
-      const res = await addToDialerBatch({
-        campaignId,
-        serverId: campaign?.serverId,
-        leads: rows.map((r) => ({
-          _id: String(r._id || ''),
-          name: r.name,
-          mobile: r.mobile,
-          city: r.city,
-          state: r.state,
-          clientName: r.clientName,
-        })),
-      });
-      if (res.ok) {
-        const adminRec = (admin ?? {}) as Record<string, unknown>;
-        await secureApi('ops.savePerformanceData', {
-          subAdminId: adminRec._id,
-          dialledUserIds: rows.map((r) => r._id).filter(Boolean),
-          extensionId: campaignId,
-        });
-      }
-      setDialerMsg(res.message || (res.ok ? 'Dialer call queued' : 'Dialer call failed'));
-    } finally {
-      setDialerBusy(false);
-    }
-  }, [admin, campaignId, rows]);
 
   const load = useCallback(async () => {
     const gen = ++loadGenRef.current;
@@ -897,82 +856,44 @@ export function UsersScreen() {
         }}
       />
 
-      {canAddToBot || canAddToDialer ? (
+      {canAddToBot ? (
         <View style={styles.dialerCard}>
           <TouchableOpacity style={styles.dialerToggle} onPress={() => setDialerOpen((v) => !v)}>
-            <Text style={styles.dialerToggleText}>
-              Add to Bot / Dialer {dialerOpen ? '▲' : '▼'}
-            </Text>
+            <Text style={styles.dialerToggleText}>Add to Bot {dialerOpen ? '▲' : '▼'}</Text>
           </TouchableOpacity>
           {dialerOpen ? (
             <View style={styles.dialerBody}>
-              {canAddToBot ? (
-                <View style={styles.dialerRow}>
-                  <TextInput
-                    style={styles.dialerInput}
-                    value={botId}
-                    onChangeText={setBotId}
-                    placeholder="Bot ID"
-                    placeholderTextColor={colors.muted}
-                    keyboardType="number-pad"
-                  />
-                  <TouchableOpacity
-                    style={[
-                      styles.dialerBtn,
-                      (dialerBusy || !rows.length) && styles.dialerBtnDisabled,
-                    ]}
-                    onPress={() => void handleAddToBot()}
-                    disabled={dialerBusy || !rows.length}
-                  >
-                    <Text style={styles.dialerBtnText}>
-                      {dialerBusy ? 'Sending…' : `Add to Bot (${rows.length})`}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-              {canAddToDialer ? (
-                <>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.chipRow}
-                  >
-                    {CAMPAIGN_LIST.map((c, ci) => {
-                      const id = c.id.trim();
-                      return (
-                        <TouchableOpacity
-                          key={`camp-${ci}`}
-                          style={[styles.chip, campaignId === id && styles.chipActive]}
-                          onPress={() => setCampaignId(campaignId === id ? '' : id)}
-                        >
-                          <Text
-                            style={[styles.chipText, campaignId === id && styles.chipTextActive]}
-                          >
-                            {c.name} ({id})
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                  <TouchableOpacity
-                    style={[
-                      styles.dialerBtn,
-                      (dialerBusy || !rows.length || !campaignId) && styles.dialerBtnDisabled,
-                    ]}
-                    onPress={() => void handleAddToDialer()}
-                    disabled={dialerBusy || !rows.length || !campaignId}
-                  >
-                    <Text style={styles.dialerBtnText}>
-                      {dialerBusy ? 'Sending…' : `Add to Dialer (${rows.length})`}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              ) : null}
+              <View style={styles.dialerRow}>
+                <TextInput
+                  style={styles.dialerInput}
+                  value={botId}
+                  onChangeText={setBotId}
+                  placeholder="Bot ID"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="number-pad"
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.dialerBtn,
+                    (dialerBusy || !rows.length) && styles.dialerBtnDisabled,
+                  ]}
+                  onPress={() => void handleAddToBot()}
+                  disabled={dialerBusy || !rows.length}
+                >
+                  <Text style={styles.dialerBtnText}>
+                    {dialerBusy ? 'Sending…' : `Add to Bot (${rows.length})`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {dialerMsg ? <Text style={styles.dialerMsg}>{dialerMsg}</Text> : null}
             </View>
           ) : null}
         </View>
       ) : null}
+
+      <AddToC2cCampaignPanel
+        userIds={rows.map((r) => String(r._id || '').trim()).filter(Boolean)}
+      />
 
       {error ? (
         <View style={styles.errorBox}>
@@ -1069,7 +990,7 @@ export function UsersScreen() {
                 ...(showCalling && userType !== 'Sub_Admin' && String(selected.mobile || '').trim()
                   ? [
                       {
-                        label: 'Call (Add to Dialer)',
+                        label: 'Call',
                         tone: 'primary' as const,
                         disabled: callBusy,
                         onPress: () => {
