@@ -22,7 +22,6 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { appCodeForName, kycApprovedRowPatch, kycManualRowPatch, kycRejectedRowPatch } from '@astro/shared';
 import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
@@ -31,7 +30,6 @@ import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
-import { sendKycCallToDialer } from '../../../utils/externalDialer';
 import { styles } from './UsersKycScreen.styles';
 import { display, maskMobile } from '../../../utils/display';
 
@@ -564,38 +562,6 @@ export function UsersKycScreen() {
     })();
   }, [manualTarget, manualForm, updatedBy]);
 
-  // ---- Call via dialer (web panel connectToDialer parity) ----
-  /** Row for which the dialer call was sent; KYC action buttons unlock only for this row. */
-  const [calledId, setCalledId] = useState('');
-
-  const connectToDialer = useCallback((row: KycRow) => {
-    if (!row.mobile) {
-      Alert.alert('No mobile number on file for this user');
-      return;
-    }
-    void (async () => {
-      setBusy(true);
-      try {
-        const result = await sendKycCallToDialer({
-          id: row._id,
-          name: row.name,
-          mobile: row.mobile,
-          clientName: row.clientName,
-        });
-        if (!result.ok) {
-          Alert.alert(result.message);
-          return;
-        }
-        Alert.alert(result.message);
-        setCalledId(row._id ?? '');
-      } catch {
-        Alert.alert('Failed to send call request');
-      } finally {
-        setBusy(false);
-      }
-    })();
-  }, []);
-
   // ---- Verify UPI ----
   const verifyUpi = useCallback((row: KycRow) => {
     if (!row.upiId) {
@@ -664,42 +630,28 @@ export function UsersKycScreen() {
         },
       ];
     }
-    const called = calledId !== '' && calledId === sheetRow._id;
     return [
-      ...(called
-        ? ([
-            {
-              label: 'Approve KYC',
-              tone: 'primary',
-              disabled: busy,
-              onPress: () => openApprove(sheetRow),
-            },
-            {
-              label: 'Reject KYC',
-              tone: 'warning',
-              disabled: busy,
-              onPress: () => openReject(sheetRow),
-            },
-            {
-              label: 'Manual KYC Update',
-              tone: 'default',
-              disabled: busy,
-              onPress: () => openManual(sheetRow),
-            },
-          ] as SheetAction[])
-        : []),
+      {
+        label: 'Approve KYC',
+        tone: 'primary',
+        disabled: busy,
+        onPress: () => openApprove(sheetRow),
+      },
+      {
+        label: 'Reject KYC',
+        tone: 'warning',
+        disabled: busy,
+        onPress: () => openReject(sheetRow),
+      },
+      {
+        label: 'Manual KYC Update',
+        tone: 'default',
+        disabled: busy,
+        onPress: () => openManual(sheetRow),
+      },
       { label: 'Verify UPI', tone: 'default', disabled: busy, onPress: () => verifyUpi(sheetRow) },
     ];
-  }, [
-    sheetRow,
-    nightLocked,
-    busy,
-    calledId,
-    openApprove,
-    openReject,
-    openManual,
-    verifyUpi,
-  ]);
+  }, [sheetRow, nightLocked, busy, openApprove, openReject, openManual, verifyUpi]);
 
   const setA = useCallback(
     (key: keyof ApproveForm) => (v: string) => setApproveForm((prev) => ({ ...prev, [key]: v })),
@@ -721,15 +673,11 @@ export function UsersKycScreen() {
     ({ item: r }: ListRenderItemInfo<KycRow>) => (
       <UsersKycCard
         row={r}
-        called={calledId !== '' && calledId === r._id}
         canShowMobile={canShowMobile}
-        busy={busy}
-        nightLocked={nightLocked}
         onPress={() => setSheetRow(r)}
-        onCall={() => connectToDialer(r)}
       />
     ),
-    [calledId, canShowMobile, busy, nightLocked, connectToDialer],
+    [canShowMobile],
   );
 
   if (!canView) {
@@ -820,7 +768,6 @@ export function UsersKycScreen() {
         emptyMessage="No KYC records found"
         refreshing={loading}
         onRefresh={() => void load()}
-        extraData={calledId}
       />
 
       <RowDetailSheet
@@ -828,11 +775,6 @@ export function UsersKycScreen() {
         title={sheetRow ? display(sheetRow.name) : ''}
         fields={sheetFields}
         actions={sheetActions}
-        note={
-          sheetRow && !(calledId && calledId === sheetRow._id) && !nightLocked
-            ? 'Call the customer from the 📞 icon on the card first to unlock Approve / Reject / Manual.'
-            : undefined
-        }
         imageUri={sheetImage || undefined}
         onClose={() => setSheetRow(null)}
       />
@@ -1091,25 +1033,17 @@ export function UsersKycScreen() {
 
 type UsersKycCardProps = {
   row: KycRow;
-  called: boolean;
   canShowMobile: boolean;
-  busy: boolean;
-  nightLocked: boolean;
   onPress: () => void;
-  onCall: () => void;
 };
 
 const UsersKycCard = memo(function UsersKycCard({
   row: r,
-  called,
   canShowMobile,
-  busy,
-  nightLocked,
   onPress,
-  onCall,
 }: UsersKycCardProps) {
   return (
-    <View style={[styles.card, called && styles.cardCalled]}>
+    <View style={styles.card}>
       <View style={styles.cardTop}>
         <TouchableOpacity style={styles.cardTopMain} activeOpacity={0.75} onPress={onPress}>
           <Text style={styles.cardName} numberOfLines={1}>
@@ -1118,23 +1052,6 @@ const UsersKycCard = memo(function UsersKycCard({
           <View style={[styles.statusPill, { backgroundColor: r.kyc ? '#16a34a' : '#d97706' }]}>
             <Text style={styles.statusPillText}>{r.kyc ? 'Verified' : 'Pending'}</Text>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.callIconBtn,
-            called && styles.callIconBtnActive,
-            (busy || nightLocked) && styles.callIconBtnDisabled,
-          ]}
-          disabled={busy || nightLocked}
-          onPress={onCall}
-          accessibilityLabel="Call Customer"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <MaterialIcons
-            name="phone-in-talk"
-            size={12}
-            color={called ? colors.primaryForeground : colors.primary}
-          />
         </TouchableOpacity>
       </View>
       <TouchableOpacity activeOpacity={0.75} onPress={onPress}>

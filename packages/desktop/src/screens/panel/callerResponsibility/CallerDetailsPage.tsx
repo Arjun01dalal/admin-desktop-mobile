@@ -125,13 +125,6 @@ function unwrapActiveInactive(data: ActiveInactivePayload | null | undefined): {
   };
 }
 
-function extensionIds(admin: StoredCallerUser | null): string[] {
-  const raw = admin?.extensionId;
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
-  if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
-  return [];
-}
-
 function alternateMobileList(value: unknown): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
@@ -258,7 +251,6 @@ export function CallerDetailsPage() {
   const [todayPage, setTodayPage] = useState(1);
   const [todayPageSize, setTodayPageSize] = useState(50);
   const [searchName, setSearchName] = useState('');
-  const [dialerBusyId, setDialerBusyId] = useState<string | null>(null);
   /** Selected Non Performing row ids (checkbox column). */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [altOpen, setAltOpen] = useState(false);
@@ -313,49 +305,6 @@ export function CallerDetailsPage() {
     void load();
   }, [load]);
 
-  const dialerCall = useCallback(
-    async (item: DetailRow) => {
-      const ids = extensionIds(user);
-      const numericCampaignId = ids.find((val) => /^\d+$/.test(val)) || '';
-      if (!numericCampaignId) {
-        toast.error('Dialer extension / campaign ID not found for this admin');
-        return;
-      }
-      const mobile = String(item.mobile || item.userMobile || '');
-      if (!mobile) {
-        toast.error('Mobile number not found');
-        return;
-      }
-      const rowId = String(item._id || item.userId || '');
-      setDialerBusyId(rowId);
-      try {
-        const res = await secureApi('callLogs.externalDialerSingle', {
-          details: {
-            client_name: item.name || item.userName,
-            phone_number: mobile,
-            city: item.city,
-            state: item.state,
-            clientName: item.clientName,
-            app_name: item.clientName,
-            caller_user_id: item._id,
-          },
-          extensionId: ids,
-          adminName: user?.name || 'ADMIN',
-          serverId: user?.serverId,
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'API request failed');
-          return;
-        }
-        toast.success(res.message || 'Data sent successfully');
-      } finally {
-        setDialerBusyId(null);
-      }
-    },
-    [user],
-  );
-
-  /** Laxmi addDialerData — push checked Non Performing customers to dialer. */
   const rowKey = (r: DetailRow) => String(r._id || r.userId || '');
 
   const toggleSelect = useCallback((id: string, checked: boolean) => {
@@ -552,48 +501,26 @@ export function CallerDetailsPage() {
         width: 180,
         render: (r) => {
           const mobile = String(r.mobile || r.userMobile || '');
-          const id = rowKey(r);
-          const busy = dialerBusyId === id;
           return (
-            <Stack spacing={0.5} alignItems="center" sx={{ py: 0.25 }}>
-              <Stack direction="row" spacing={0.5} alignItems="center">
-                {canShowMobile && mobile ? (
-                  <CopyText value={mobile} />
-                ) : (
-                  <Typography variant="body2" sx={{ fontSize: 12 }}>
-                    {maskMobile(mobile, canShowMobile)}
-                  </Typography>
-                )}
-                {canShowMobile && (
-                  <Tooltip title="Add / Remove Alternate Mobile">
-                    <IconButton
-                      size="small"
-                      onClick={() => openAlternateMobile(r)}
-                      sx={{ color: '#1976d2', p: 0.25 }}
-                    >
-                      <AddIcCallIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Stack>
-              <Button
-                size="small"
-                variant="outlined"
-                color="primary"
-                disabled={busy || !mobile}
-                onClick={() => void dialerCall(r)}
-                sx={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  py: 0.15,
-                  px: 1,
-                  minWidth: 0,
-                  lineHeight: 1.4,
-                }}
-              >
-                {busy ? 'Sending…' : 'Dialer Call'}
-              </Button>
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+              {canShowMobile && mobile ? (
+                <CopyText value={mobile} />
+              ) : (
+                <Typography variant="body2" sx={{ fontSize: 12 }}>
+                  {maskMobile(mobile, canShowMobile)}
+                </Typography>
+              )}
+              {canShowMobile && (
+                <Tooltip title="Add / Remove Alternate Mobile">
+                  <IconButton
+                    size="small"
+                    onClick={() => openAlternateMobile(r)}
+                    sx={{ color: '#1976d2', p: 0.25 }}
+                  >
+                    <AddIcCallIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Stack>
           );
         },
@@ -654,8 +581,6 @@ export function CallerDetailsPage() {
     tab,
     todayPage,
     todayPageSize,
-    dialerBusyId,
-    dialerCall,
     allWarningSelected,
     selectedIds,
     filteredAll.length,

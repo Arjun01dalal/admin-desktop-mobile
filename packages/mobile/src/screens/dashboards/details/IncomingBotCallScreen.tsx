@@ -1,7 +1,7 @@
 /**
  * Incoming Bot Call — mobile port of desktop IncomingBotCallPage / Laxmi.
  * List from backend `incomingBot.getAllExotel` (single API). Optional
- * `incomingBot.sync` pulls Exotel into DB. Call → dialer (BOT_INC).
+ * `incomingBot.sync` pulls Exotel into DB.
  * Comments require `doc_id` → `incomingBot.addComment` only.
  * Summary still hits helper.callingbot.live process-call.
  */
@@ -30,7 +30,6 @@ import {
   formatIncomingBotCommentWhen,
   formatIncomingBotSyncToast,
   getIncomingBotCallMobile,
-  INCOMING_BOT_DIALER,
   incomingBotDefaultDateInputValue,
   mapIncomingBotUsersToCalls,
   mergeIncomingBotCallsPreservingComments,
@@ -49,7 +48,6 @@ import {
   isCallerRole,
 } from '../../../auth/permissions';
 import { openPanelTarget } from '../../../navigation/panelDetail';
-import { addToDialerBatch } from '../../../utils/externalDialer';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { RecordingPlayerModal } from '../../../components/RecordingPlayerModal';
 import { SkyTalkEmbed } from '../../../components/SkyTalkEmbed';
@@ -176,7 +174,6 @@ export function IncomingBotCallScreen() {
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
-  const [dialerBusySid, setDialerBusySid] = useState('');
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentInput, setCommentInput] = useState('');
   const [commentDocId, setCommentDocId] = useState('');
@@ -387,39 +384,6 @@ export function IncomingBotCallScreen() {
     [navigation],
   );
 
-  const connectToDialer = useCallback(async (call: IncomingCall) => {
-    const phone = getIncomingBotCallMobile(call);
-    if (!phone) {
-      Alert.alert('Call', 'No phone number for this call');
-      return;
-    }
-    setDialerBusySid(String(call.sid || ''));
-    try {
-      const res = await addToDialerBatch({
-        campaignId: INCOMING_BOT_DIALER.campaignId,
-        serverId: INCOMING_BOT_DIALER.serverId,
-        listId: INCOMING_BOT_DIALER.listId,
-        listName: INCOMING_BOT_DIALER.listName,
-        leads: [
-          {
-            first_name: call.name || '',
-            last_name: '',
-            phone_number: phone,
-            city: call.city ?? '',
-            state: call.state ?? '',
-            email: call.app_name ?? '',
-            comments: call.app_name ?? '',
-            province: call.dp_id || '',
-          },
-        ],
-      });
-      if (!res.ok) Alert.alert('Dialer', res.message || 'Dialer API failed');
-      else Alert.alert('Dialer', res.message || 'Data sent successfully');
-    } finally {
-      setDialerBusySid('');
-    }
-  }, []);
-
   const openAddComment = useCallback(
     (call: IncomingCall) => {
       const docId = String(call.doc_id || '').trim();
@@ -527,17 +491,7 @@ export function IncomingBotCallScreen() {
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
     const row = sheetRow;
-    const phone = getIncomingBotCallMobile(row);
     const actions: SheetAction[] = [
-      {
-        label:
-          dialerBusySid === String(row.sid || '')
-            ? 'Sending to dialer…'
-            : 'Call (send to dialer)',
-        tone: 'primary',
-        disabled: dialerBusySid === String(row.sid || '') || !phone,
-        onPress: () => void connectToDialer(row),
-      },
       {
         label: 'Add Comment',
         tone: 'default',
@@ -575,8 +529,6 @@ export function IncomingBotCallScreen() {
     return actions;
   }, [
     sheetRow,
-    dialerBusySid,
-    connectToDialer,
     openAddComment,
     openViewComments,
     playRecording,
@@ -598,21 +550,12 @@ export function IncomingBotCallScreen() {
         index={index}
         canShowMobile={canShowMobile}
         hidePlayRecording={hidePlayRecording}
-        dialerBusy={dialerBusySid === String(row.sid || '')}
         onPress={() => setSheetRow(row)}
-        onCall={() => void connectToDialer(row)}
         onComment={() => openAddComment(row)}
         onViewComments={() => openViewComments(row)}
       />
     ),
-    [
-      canShowMobile,
-      hidePlayRecording,
-      dialerBusySid,
-      connectToDialer,
-      openAddComment,
-      openViewComments,
-    ],
+    [canShowMobile, hidePlayRecording, openAddComment, openViewComments],
   );
 
   if (showSkyTalk && canShowSkyTalk) {
@@ -750,7 +693,6 @@ export function IncomingBotCallScreen() {
         refreshing={loading}
         onRefresh={() => void load()}
         refreshEnabled={!summaryOpen && !commentOpen && !viewOpen}
-        extraData={dialerBusySid}
       />
 
       <RowDetailSheet
@@ -902,9 +844,7 @@ type IncomingBotCallCardProps = {
   index: number;
   canShowMobile: boolean;
   hidePlayRecording: boolean;
-  dialerBusy: boolean;
   onPress: () => void;
-  onCall: () => void;
   onComment: () => void;
   onViewComments: () => void;
 };
@@ -914,9 +854,7 @@ const IncomingBotCallCard = memo(function IncomingBotCallCard({
   index,
   canShowMobile,
   hidePlayRecording,
-  dialerBusy,
   onPress,
-  onCall,
   onComment,
   onViewComments,
 }: IncomingBotCallCardProps) {
@@ -971,16 +909,6 @@ const IncomingBotCallCard = memo(function IncomingBotCallCard({
         </Text>
       </View>
       <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={[styles.callBtn, (!mobile || dialerBusy) && styles.btnDisabled]}
-          disabled={!mobile || dialerBusy}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onCall();
-          }}
-        >
-          <Text style={styles.callBtnText}>{dialerBusy ? 'Sending…' : 'Call'}</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.commentBtn}
           onPress={(e) => {

@@ -52,7 +52,6 @@ export type UseCallLogsColumnsParams = {
   itemsPerPage: number;
   onEndCall: (row: CallLogRow) => void;
   onViewSummary: (row: CallLogRow) => void;
-  onConnectDialer: (row: CallLogRow) => void;
   onOpenComment: (row: CallLogRow) => void;
   onPlayRecording?: (url: string) => void;
   onOpenUserReport?: (row: CallLogRow) => void;
@@ -63,7 +62,6 @@ export function useCallLogsColumns({
   itemsPerPage,
   onEndCall,
   onViewSummary,
-  onConnectDialer,
   onOpenComment,
   onPlayRecording,
   onOpenUserReport,
@@ -332,15 +330,6 @@ export function useCallLogsColumns({
             ) : null}
             <Button
               size="small"
-              variant="contained"
-              color="warning"
-              sx={actionBtnSx}
-              onClick={() => void onConnectDialer(row)}
-            >
-              Connect Dialer
-            </Button>
-            <Button
-              size="small"
               variant="outlined"
               color="warning"
               sx={actionBtnSx}
@@ -399,7 +388,6 @@ export function useCallLogsColumns({
     isCaller,
     onEndCall,
     onViewSummary,
-    onConnectDialer,
     onOpenComment,
     onPlayRecording,
     onOpenUserReport,

@@ -19,7 +19,7 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import { appCodeForName, resolveCallerDialerIds } from '@astro/shared';
+import { appCodeForName } from '@astro/shared';
 import {
   BALANCE_RANGE_OPTIONS,
   balanceRangeToFilter,
@@ -46,7 +46,6 @@ import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailS
 import { CreateUserScreen } from './CreateUserScreen';
 import { mapUsersToBotSettings } from '../utils/dialerHelpers';
 import { AddToC2cCampaignPanel } from '../components/AddToC2cCampaignPanel';
-import { singleCallToDialer } from '../utils/externalDialer';
 import { BlockUserModal } from './users/BlockUserModal';
 import { DumpUserModal } from './users/DumpUserModal';
 import {
@@ -186,59 +185,10 @@ export function UsersScreen() {
 
   // Global Add-to-Bot (desktop UsersToolbar parity).
   const canAddToBot = !isCaller && hasPermission('add_to_bot');
-  /** Laxmi CallingBtn column — hidden only with contact_visibility_none. */
-  const showCalling = !hideContact;
   const [dialerOpen, setDialerOpen] = useState(false);
   const [botId, setBotId] = useState('');
   const [dialerBusy, setDialerBusy] = useState(false);
   const [dialerMsg, setDialerMsg] = useState('');
-  const [callBusy, setCallBusy] = useState(false);
-
-  const adminRec = useMemo(() => (admin ?? {}) as Record<string, unknown>, [admin]);
-  const extensionIds = useMemo(() => {
-    const raw = adminRec.extensionId;
-    if (Array.isArray(raw)) return raw.map(String);
-    if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
-    return [] as string[];
-  }, [adminRec.extensionId]);
-  const callerDialerIds = useMemo(
-    () => resolveCallerDialerIds(adminRec.extensionId),
-    [adminRec.extensionId],
-  );
-
-  const placeManualCall = useCallback(
-    async (row: Row) => {
-      const mobile = String(row.mobile || '').trim();
-      if (!mobile) {
-        Alert.alert('No mobile number for this user');
-        return;
-      }
-      if (!callerDialerIds) {
-        Alert.alert('Dialer extension / campaign ID not found for this admin');
-        return;
-      }
-      setCallBusy(true);
-      try {
-        const res = await singleCallToDialer({
-          lead: {
-            _id: String(row._id || ''),
-            name: row.name,
-            mobile,
-            city: row.city,
-            state: row.state,
-            clientName: row.clientName,
-          },
-          extensionId: extensionIds,
-          adminName: typeof adminRec.name === 'string' ? adminRec.name : 'ADMIN',
-          serverId: adminRec.serverId,
-        });
-        Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
-      } finally {
-        setCallBusy(false);
-      }
-    },
-    [adminRec, callerDialerIds, extensionIds],
-  );
 
   const handleAddToBot = useCallback(async () => {
     setDialerMsg('');
@@ -701,9 +651,7 @@ export function UsersScreen() {
         hideContact={hideContact}
         canShowMobile={canShowMobile}
         canOpenReport={canOpenReport}
-        showCalling={showCalling}
         showBlockAction={showBlockAction}
-        callBusy={callBusy}
         onOpenSheet={() => setSelected(r)}
         onOpenReport={() =>
           navigation.navigate('/user-report', {
@@ -711,10 +659,6 @@ export function UsersScreen() {
             userName: display(r.name),
           })
         }
-        onCall={() => {
-          setSelected(null);
-          void placeManualCall(r);
-        }}
         onBlock={() => setBlockRow(r)}
       />
     ),
@@ -725,11 +669,8 @@ export function UsersScreen() {
       hideContact,
       canShowMobile,
       canOpenReport,
-      showCalling,
       showBlockAction,
-      callBusy,
       navigation,
-      placeManualCall,
     ],
   );
 
@@ -987,20 +928,6 @@ export function UsersScreen() {
                       },
                     ]
                   : []),
-                ...(showCalling && userType !== 'Sub_Admin' && String(selected.mobile || '').trim()
-                  ? [
-                      {
-                        label: 'Call',
-                        tone: 'primary' as const,
-                        disabled: callBusy,
-                        onPress: () => {
-                          const row = selected;
-                          setSelected(null);
-                          if (row) void placeManualCall(row);
-                        },
-                      },
-                    ]
-                  : []),
                 ...(showBlockAction
                   ? [
                       {
@@ -1073,12 +1000,9 @@ type UserCardProps = {
   hideContact: boolean;
   canShowMobile: boolean;
   canOpenReport: boolean;
-  showCalling: boolean;
   showBlockAction: boolean;
-  callBusy: boolean;
   onOpenSheet: () => void;
   onOpenReport: () => void;
-  onCall: () => void;
   onBlock: () => void;
 };
 
@@ -1091,12 +1015,9 @@ const UserCard = memo(function UserCard({
   hideContact,
   canShowMobile,
   canOpenReport,
-  showCalling,
   showBlockAction,
-  callBusy,
   onOpenSheet,
   onOpenReport,
-  onCall,
   onBlock,
 }: UserCardProps) {
   const blocked = isBlocked(r);
@@ -1161,17 +1082,6 @@ const UserCard = memo(function UserCard({
             </Text>
           </View>
         </View>
-        {showCalling && userType !== 'Sub_Admin' && String(r.mobile || '').trim() ? (
-          <View style={styles.callBtnRow}>
-            <TouchableOpacity
-              style={[styles.callBtn, callBusy && styles.dialerBtnDisabled]}
-              disabled={callBusy}
-              onPress={onCall}
-            >
-              <Text style={styles.callBtnText}>Call</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
       </View>
       <View style={styles.userCardRight}>
         <Text style={styles.userCardBalance}>

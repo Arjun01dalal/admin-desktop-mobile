@@ -34,7 +34,6 @@ import {
   formatIncomingBotCommentWhen,
   formatIncomingBotSyncToast,
   getIncomingBotCallMobile,
-  INCOMING_BOT_DIALER,
   incomingBotDefaultDateInputValue,
   incomingBotMinDateInputValue,
   mapIncomingBotUsersToCalls,
@@ -299,7 +298,6 @@ export function IncomingBotCallPage() {
   const [summaryData, setSummaryData] = useState<CallSummaryData | null>(null);
   const [summaryCall, setSummaryCall] = useState<IncomingCall | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
-  const [dialerLoadingSid, setDialerLoadingSid] = useState('');
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentInput, setCommentInput] = useState('');
   const [commentDocId, setCommentDocId] = useState('');
@@ -459,39 +457,6 @@ export function IncomingBotCallPage() {
     }
   }, []);
 
-  const connectToDialer = useCallback(async (call: IncomingCall) => {
-    const phone = getIncomingBotCallMobile(call);
-    if (!phone) {
-      toast.error('No phone number for this call');
-      return;
-    }
-    setDialerLoadingSid(call.sid);
-    try {
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId: INCOMING_BOT_DIALER.campaignId,
-        serverId: INCOMING_BOT_DIALER.serverId,
-        listId: INCOMING_BOT_DIALER.listId,
-        listName: INCOMING_BOT_DIALER.listName,
-        leads: [
-          {
-            first_name: call.name || '',
-            last_name: '',
-            phone_number: phone,
-            city: call.city ?? '',
-            state: call.state ?? '',
-            email: call.app_name ?? '',
-            comments: call.app_name ?? '',
-            province: call.dp_id || '',
-          },
-        ],
-      });
-      if (!res.ok) toast.error(res.message || 'Dialer API failed');
-      else toast.success(res.message || 'Data sent successfully');
-    } finally {
-      setDialerLoadingSid('');
-    }
-  }, []);
-
   const openAddComment = useCallback((call: IncomingCall) => {
     const docId = String(call.doc_id || '').trim();
     if (!docId) {
@@ -585,27 +550,7 @@ export function IncomingBotCallPage() {
           const mobile = getIncomingBotCallMobile(row);
           const shown =
             row.dp_id && !canShowMobile ? '**********' : display(mobile || row.from);
-          const busy = dialerLoadingSid === row.sid;
-          return (
-            <Stack alignItems="center" spacing={0.75} sx={{ py: 0.5 }}>
-              <Typography fontSize={13}>{shown}</Typography>
-              <Button
-                size="small"
-                variant="contained"
-                disabled={busy || !mobile}
-                onClick={() => void connectToDialer(row)}
-                sx={{
-                  ...orangeBtnSx,
-                  minWidth: 72,
-                  py: 0.25,
-                  px: 1.25,
-                  fontSize: 12,
-                }}
-              >
-                {busy ? 'Sending…' : 'Call'}
-              </Button>
-            </Stack>
-          );
+          return <Typography fontSize={13}>{shown}</Typography>;
         },
       },
       {
@@ -791,8 +736,6 @@ export function IncomingBotCallPage() {
       openUserReport,
       copyDpId,
       canShowMobile,
-      dialerLoadingSid,
-      connectToDialer,
       openAddComment,
       openViewComments,
     ],

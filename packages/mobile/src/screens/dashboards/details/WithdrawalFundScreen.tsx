@@ -15,10 +15,8 @@
  * needs a document picker + sheet parser not available in this app — the
  * upload action and withdrawalFund.sheetComparison are not wired here.
  *
- * Desktop-parity row actions (in the row detail sheet): "Dialer Call" pushes
- * the single entry to the dialer campaign API (ganesha999.com, server picked
- * from the admin's serverId, same as desktop), and "Add Comment" edits the
- * local-only comment field on the row (desktop does not persist it either).
+ * Row detail sheet: "Add Comment" edits the local-only comment field on the row
+ * (desktop does not persist it either).
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -311,7 +309,6 @@ export function WithdrawalFundScreen() {
   const midGenRef = useRef(0);
 
   // Row actions (desktop WithdrawUserDataPage parity): dialer call + local comment.
-  const [dialerBusy, setDialerBusy] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
 
@@ -323,38 +320,6 @@ export function WithdrawalFundScreen() {
   const [chartEmpRows, setChartEmpRows] = useState<ChartCountRow[]>([]);
   const [chartAgentRows, setChartAgentRows] = useState<ChartCountRow[]>([]);
   const chartGenRef = useRef(0);
-
-  /** Push a single entry to the dialer campaign (exact desktop payload). */
-  const dialerCall = useCallback(
-    async (item: WithdrawalDoc) => {
-      setDialerBusy(true);
-      try {
-        const { addToDialerBatch } = await import('../../../utils/externalDialer');
-        const res = await addToDialerBatch({
-          campaignId: 'WDL1',
-          serverId: String(sessionUser?.serverId ?? ''),
-          listId: '990001',
-          listName: 'Withdrawal Campaign1',
-          leads: [
-            {
-              name: String(item?.name || item?.accountHolderName || item?.userName || ''),
-              mobile: String(item?.mobile || item?.userMobile || ''),
-              city: String(item?.city || ''),
-              state: String(item?.state || ''),
-              clientName: String(item?.clientName || ''),
-              _id: String(item?._id || ''),
-            },
-          ],
-        });
-        Alert.alert('Dialer Call', res.message || (res.ok ? 'Data sent successfully' : 'Failed'));
-      } catch {
-        Alert.alert('Dialer Call', 'API request failed');
-      } finally {
-        setDialerBusy(false);
-      }
-    },
-    [sessionUser],
-  );
 
   const saveComment = useCallback(() => {
     const trimmed = commentText.trim();
@@ -613,12 +578,6 @@ export function WithdrawalFundScreen() {
     if (!row) return [];
     return [
       {
-        label: dialerBusy ? 'Sending…' : 'Dialer Call',
-        tone: 'primary',
-        disabled: dialerBusy,
-        onPress: () => void dialerCall(row),
-      },
-      {
         label: 'Add Comment',
         tone: 'default',
         onPress: () => {
@@ -627,7 +586,7 @@ export function WithdrawalFundScreen() {
         },
       },
     ];
-  }, [row, dialerBusy, dialerCall]);
+  }, [row]);
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!row) return [];

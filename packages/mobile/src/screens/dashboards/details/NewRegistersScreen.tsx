@@ -39,7 +39,6 @@ import {
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
-import { singleCallToDialer } from '../../../utils/externalDialer';
 import { getRoleId, getRoleName, hasPermission } from '../../../auth/permissions';
 import { CALLER_ROLE_IDS } from '../../../auth/callerRoles';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
@@ -208,9 +207,6 @@ export function NewRegistersScreen() {
 
   // Stored admin — read once (fresh object each call would retrigger load).
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
-  const [calling, setCalling] = useState(false);
-  const [callMsg, setCallMsg] = useState('');
-
   // Comment / View Comments / View Logs (desktop NewRegisters + Laxmi)
   const [commentUserId, setCommentUserId] = useState('');
   const [commentUserName, setCommentUserName] = useState('');
@@ -342,51 +338,10 @@ export function NewRegistersScreen() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
 
-  // Single Call — direct dial (desktop CallingBtn parity: login campaign + 90<id>).
-  const singleCall = useCallback(
-    async (row: Row) => {
-      setCallMsg('');
-      setCalling(true);
-      try {
-        if (row._id) {
-          const logRes = await secureApi('users.callLogsForNewRegistration', {
-            _id: row._id,
-            who: {
-              userId: admin?._id,
-              userName: admin?.name,
-            },
-          });
-          if (!logRes.ok) {
-            setCallMsg(logRes.message || 'Failed to log call');
-            return;
-          }
-        }
-        const res = await singleCallToDialer({
-          lead: {
-            _id: String(row._id || ''),
-            name: row.name,
-            mobile: row.mobile,
-            city: row.city,
-            state: row.state,
-            clientName: row.clientName,
-          },
-          extensionId: admin?.extensionId as string[] | string | undefined,
-          adminName: typeof admin?.name === 'string' ? admin.name : 'ADMIN',
-          serverId: admin?.serverId,
-        });
-        setCallMsg(res.message);
-      } finally {
-        setCalling(false);
-      }
-    },
-    [admin],
-  );
-
   /** Close row sheet first so native modals do not stack (same as Call Logs). */
   const afterSheetClose = useCallback(
     (fn: () => void) => {
       setSelected(null);
-      setCallMsg('');
       defer(fn, 250);
     },
     [defer],
@@ -863,27 +818,10 @@ export function NewRegistersScreen() {
                   })(),
                   onPress: () => openViewCallLogs(selected),
                 },
-                ...(!hideContact && selected.mobile
-                  ? ([
-                      {
-                        label: calling
-                          ? 'Sending to dialer…'
-                          : callMsg
-                            ? `Call — ${callMsg}`
-                            : 'Call (send to dialer)',
-                        tone: 'primary' as const,
-                        disabled: calling,
-                        onPress: () => void singleCall(selected),
-                      },
-                    ] satisfies SheetAction[])
-                  : []),
               ] satisfies SheetAction[])
             : undefined
         }
-        onClose={() => {
-          setSelected(null);
-          setCallMsg('');
-        }}
+        onClose={() => setSelected(null)}
       />
 
       <Modal

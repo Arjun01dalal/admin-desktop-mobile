@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -13,11 +13,10 @@ import {
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
-import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { hasPermission } from '@/auth/permissions';
-import { formatAmount, formatDisplayDate, formatDisplayTime, getStoredUser } from '@/utils/dates';
+import { formatAmount, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { display } from '@/screens/panel/shared';
 import {
   orangeBtnSx,
@@ -71,7 +70,6 @@ function istDateTime(utcDate?: string): string {
 export function WithdrawUserDataPage() {
   const location = useLocation();
   const state = useMemo(() => (location.state || {}) as LocationState, [location.state]);
-  const admin = getStoredUser<{ serverId?: string | number }>();
   const canShowMobile = hasPermission('show_mobile');
 
   const [commentOpen, setCommentOpen] = useState(false);
@@ -105,38 +103,6 @@ export function WithdrawUserDataPage() {
   const totalAmt = state.totalAmount ?? state.totalApprovedAmount ?? 0;
   const providerLabel = state.mid || state.providerName || state.name || display(state.record?.mid);
 
-  const dialerCall = useCallback(
-    async (item: WithdrawalDoc) => {
-      try {
-        const res = await secureApi('callLogs.externalDialerBatch', {
-          campaignId: 'WDL1',
-          listId: '990001',
-          listName: 'Withdrawal Campaign1',
-          serverId: admin?.serverId,
-          leads: [
-            {
-              first_name: item?.name || item?.accountHolderName || item?.userName,
-              phone_number: item?.mobile || item?.userMobile,
-              city: item?.city,
-              state: item?.state,
-              email: item?.clientName,
-              comments: item?.clientName,
-              province: item?._id,
-            },
-          ],
-        });
-        if (!res.ok) {
-          toast.error(res.message || 'API request failed');
-          return;
-        }
-        toast.success(res.message || 'Data sent successfully');
-      } catch {
-        toast.error('API request failed');
-      }
-    },
-    [admin?.serverId],
-  );
-
   const columns = useMemo<CommonTableColumn<WithdrawalDoc>[]>(
     () => [
       {
@@ -168,19 +134,9 @@ export function WithdrawUserDataPage() {
         label: 'Mobile',
         width: 140,
         render: (r) => (
-          <Stack spacing={0.5} alignItems="center">
-            <Typography variant="body2" sx={{ fontSize: 12 }}>
-              {canShowMobile ? display(r.mobile ?? r.userMobile) : '**********'}
-            </Typography>
-            <Button
-              size="small"
-              variant="contained"
-              sx={{ ...actionBtnSx, fontSize: 10 }}
-              onClick={() => void dialerCall(r)}
-            >
-              Dialer Call
-            </Button>
-          </Stack>
+          <Typography variant="body2" sx={{ fontSize: 12 }}>
+            {canShowMobile ? display(r.mobile ?? r.userMobile) : '**********'}
+          </Typography>
         ),
       },
       {
@@ -299,7 +255,7 @@ export function WithdrawUserDataPage() {
         },
       },
     ],
-    [canShowMobile, dialerCall],
+    [canShowMobile],
   );
 
   return (

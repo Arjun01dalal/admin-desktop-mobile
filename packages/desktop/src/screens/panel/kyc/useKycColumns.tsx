@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Button, Chip, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
 import { type CommonTableColumn } from '@/components/CommonTable';
 import { appCodeForName } from '@/constants/clientNames';
@@ -22,9 +21,6 @@ export type UseKycColumnsParams = {
   setPage: (page: number) => void;
   verifyingId: string | null;
   verifyUpi: (row: KycRow) => void;
-  connectToDialer: (row: KycRow) => void;
-  calledId: string;
-  callingId: string | null;
   openApprove: (row: KycRow) => void;
   openReject: (row: KycRow) => void;
   openManual: (row: KycRow) => void;
@@ -42,9 +38,6 @@ export function useKycColumns({
   setPage,
   verifyingId,
   verifyUpi,
-  connectToDialer,
-  calledId,
-  callingId,
   openApprove,
   openReject,
   openManual,
@@ -187,81 +180,56 @@ export function useKycColumns({
         id: 'actions',
         label: 'Actions',
         width: 280,
-        render: (row) => {
-          const called = calledId !== '' && calledId === row._id;
-          return (
-            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap justifyContent="center">
-              <Button
-                size="small"
-                variant="contained"
-                startIcon={<PhoneInTalkOutlinedIcon sx={{ fontSize: 14 }} />}
-                disabled={isNightLockActive || callingId === row._id}
-                onClick={() => void connectToDialer(row)}
-                sx={{
-                  ...orangeBtnSx,
-                  fontSize: 11,
-                  px: 1,
-                  py: 0.25,
-                  minWidth: 0,
-                  height: 28,
-                  textTransform: 'none',
-                }}
-              >
-                {callingId === row._id ? 'Calling…' : 'Call'}
-              </Button>
-              {called ? (
-                <>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 14 }} />}
-                    disabled={isNightLockActive}
-                    onClick={() => openApprove(row)}
-                    sx={{
-                      ...orangeBtnSx,
-                      fontSize: 11,
-                      px: 1,
-                      py: 0.25,
-                      minWidth: 0,
-                      height: 28,
-                      textTransform: 'none',
-                    }}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="error"
-                    startIcon={<CancelOutlinedIcon sx={{ fontSize: 14 }} />}
-                    disabled={isNightLockActive || rejectSubmitting || manualSubmitting}
-                    onClick={() => void openReject(row)}
-                    sx={{ textTransform: 'none', fontSize: 11, px: 1, py: 0.25, minWidth: 0 }}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    disabled={isNightLockActive || rejectSubmitting || manualSubmitting}
-                    onClick={() => void openManual(row)}
-                    sx={{
-                      textTransform: 'none',
-                      fontSize: 11,
-                      px: 1,
-                      py: 0.25,
-                      minWidth: 0,
-                      borderColor: 'rgba(255,255,255,0.28)',
-                      color: '#e8e8ea',
-                    }}
-                  >
-                    Manual
-                  </Button>
-                </>
-              ) : null}
-            </Stack>
-          );
-        },
+        render: (row) => (
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap justifyContent="center">
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 14 }} />}
+              disabled={isNightLockActive}
+              onClick={() => openApprove(row)}
+              sx={{
+                ...orangeBtnSx,
+                fontSize: 11,
+                px: 1,
+                py: 0.25,
+                minWidth: 0,
+                height: 28,
+                textTransform: 'none',
+              }}
+            >
+              Approve
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              startIcon={<CancelOutlinedIcon sx={{ fontSize: 14 }} />}
+              disabled={isNightLockActive || rejectSubmitting || manualSubmitting}
+              onClick={() => void openReject(row)}
+              sx={{ textTransform: 'none', fontSize: 11, px: 1, py: 0.25, minWidth: 0 }}
+            >
+              Reject
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={isNightLockActive || rejectSubmitting || manualSubmitting}
+              onClick={() => void openManual(row)}
+              sx={{
+                textTransform: 'none',
+                fontSize: 11,
+                px: 1,
+                py: 0.25,
+                minWidth: 0,
+                borderColor: 'rgba(255,255,255,0.28)',
+                color: '#e8e8ea',
+              }}
+            >
+              Manual
+            </Button>
+          </Stack>
+        ),
       },
     ],
     [
@@ -270,9 +238,6 @@ export function useKycColumns({
       pageSize,
       verifyingId,
       verifyUpi,
-      connectToDialer,
-      calledId,
-      callingId,
       openApprove,
       openReject,
       openManual,

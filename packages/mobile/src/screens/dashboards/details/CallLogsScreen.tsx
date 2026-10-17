@@ -5,7 +5,7 @@
  * status chips and comment chips. Non-callers see the bot status table and
  * can add comments (callLogs.updateCallData) by tapping the Comment cell.
  * Row actions (from the row detail sheet): Bot Call (callLogs.addToBotDialer),
- * End Call (callLogs.updateCallData), Connect Dialer (singleCallToDialer),
+ * End Call (callLogs.updateCallData),
  * View Summary (direct POST to the process-call helper, same endpoint the
  * desktop bridge uses) and opening the recording URL.
  */
@@ -30,7 +30,6 @@ import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { formatDdMmYyyy, todayIST } from '../../../utils/dates';
 import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
-import { singleCallToDialer } from '../../../utils/externalDialer';
 import { useDeferredTimeout } from '../../../hooks/useDeferredTimeout';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
@@ -59,7 +58,6 @@ import {
   processCallSummary,
   reinitTargetKey,
   statusColor,
-  toDialerLeadSource,
   toMinSec,
   type CallLogRow,
   type CallSummaryData,
@@ -271,28 +269,6 @@ export function CallLogsScreen() {
       return new Set(rows.map(callLogRowId).filter(Boolean));
     });
   }, [rows]);
-
-  const connectDialer = useCallback(
-    async (row: CallLogRow) => {
-      setActionLoading(true);
-      setActionMsg('');
-      try {
-        const res = await singleCallToDialer({
-          lead: toDialerLeadSource(row),
-          extensionId: (admin as { extensionId?: string[] | string } | null)?.extensionId,
-          adminName:
-            typeof (admin as { name?: string } | null)?.name === 'string'
-              ? String((admin as { name?: string }).name)
-              : 'ADMIN',
-          serverId: (admin as { serverId?: unknown } | null)?.serverId,
-        });
-        setActionMsg(res.message);
-      } finally {
-        setActionLoading(false);
-      }
-    },
-    [admin],
-  );
 
   const pushBotRows = useCallback(
     async (target: CallLogRow[], opts?: { keepSheet?: boolean }) => {
@@ -525,11 +501,6 @@ export function CallLogsScreen() {
           onPress: () => void endCall(row),
         });
       }
-      actions.push({
-        label: actionLoading ? 'Connecting…' : 'Connect Dialer',
-        disabled: actionLoading,
-        onPress: () => void connectDialer(row),
-      });
     }
     if (status === 'completed' && row.recording_url) {
       const summaryLoading = summaryBusyId === callLogRowId(row);
@@ -553,7 +524,6 @@ export function CallLogsScreen() {
     openUserReport,
     openComment,
     endCall,
-    connectDialer,
     openRecording,
     viewSummary,
   ]);

@@ -306,18 +306,6 @@ export function UniqueDepositPendingScreen() {
     }
   }, [inputRow, inputText, inputMode, admin, load, loadSummary]);
 
-  /** Manual Call — open the phone dialer (mobile adaptation of desktop's external dialer). */
-  const openDialer = useCallback((row: UniquePendingRow) => {
-    const rawMobile = row.userMobile || row.mobile;
-    if (!rawMobile) {
-      Alert.alert('No mobile number for this user');
-      return;
-    }
-    void Linking.openURL(`tel:${String(rawMobile).replace(/\D/g, '')}`).catch(() =>
-      Alert.alert('Unable to open the dialer'),
-    );
-  }, []);
-
   const openWhatsApp = useCallback((row: UniquePendingRow) => {
     const rawMobile = row.userMobile || row.mobile;
     if (!rawMobile) {
@@ -413,13 +401,6 @@ export function UniqueDepositPendingScreen() {
     if (canWhatsApp && isPending) {
       acts.push({ label: 'WhatsApp', tone: 'primary', onPress: () => openWhatsApp(sheetRow) });
     }
-    const hasMobile = Boolean(sheetRow.userMobile || sheetRow.mobile);
-    acts.push({
-      label: 'Call',
-      tone: 'default',
-      disabled: !hasMobile || busy,
-      onPress: () => openDialer(sheetRow),
-    });
     if (canChangeStatus) {
       acts.push({
         label: 'Change Status',
@@ -435,7 +416,6 @@ export function UniqueDepositPendingScreen() {
     busy,
     openInput,
     openWhatsApp,
-    openDialer,
     openUserReport,
   ]);
 

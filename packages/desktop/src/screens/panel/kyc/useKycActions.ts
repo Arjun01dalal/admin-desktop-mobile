@@ -339,46 +339,8 @@ export function useKycActions({ patchRow, unlockNightLock }: Params) {
     [manualTarget, manualForm, patchRow],
   );
 
-  // ---- Dialer + UPI verify ----
+  // ---- UPI verify ----
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
-  const [calledId, setCalledId] = useState('');
-  const [callingId, setCallingId] = useState<string | null>(null);
-
-  const connectToDialer = useCallback(async (row: KycRow) => {
-    if (!row.mobile) {
-      toast.error('No mobile number on file for this user');
-      return;
-    }
-    setCallingId(row._id);
-    try {
-      const res = await secureApi('callLogs.externalDialerBatch', {
-        campaignId: 'KYC',
-        listId: '800001',
-        listName: 'KYC UPDATION',
-        serverId: '1',
-        leads: [
-          {
-            first_name: row.name ?? '',
-            last_name: '',
-            phone_number: row.mobile,
-            city: String(row.city ?? ''),
-            state: String(row.state ?? ''),
-            email: row.clientName ?? '',
-            comments: row.clientName ?? '',
-            province: row._id,
-          },
-        ],
-      });
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to send call request');
-        return;
-      }
-      toast.success(res.message || 'Data sent successfully');
-      setCalledId(row._id);
-    } finally {
-      setCallingId(null);
-    }
-  }, []);
 
   const verifyUpi = useCallback(async (row: KycRow) => {
     if (!row.upiId) {
@@ -469,10 +431,7 @@ export function useKycActions({ patchRow, unlockNightLock }: Params) {
     openApprove,
     openReject,
     openManual,
-    connectToDialer,
     verifyUpi,
-    calledId,
-    callingId,
     verifyingId,
     rejectSubmitting,
     manualSubmitting,

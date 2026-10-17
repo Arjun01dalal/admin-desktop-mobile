@@ -23,13 +23,12 @@ import { secureApi } from '../../../api/client';
 import { CALLER_ROLE_IDS, RESP_SHOW_MOBILE, type CallerRow } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
 import { getStoredUser } from '../../../lib/webShim';
-import { singleCallToDialer } from '../../../utils/externalDialer';
 import { colors } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { DetailFilterBar } from './DetailFilterBar';
-import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
+import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CallerDepositListScreen.styles';
 import { display, maskMobile } from '../../../utils/display';
 
@@ -195,7 +194,6 @@ export function CallerDepositListScreen() {
   const [minAmount, setMinAmount] = useState('');
   const [maxAmount, setMaxAmount] = useState('');
   const [selected, setSelected] = useState<{ row: CallerRow; index: number } | null>(null);
-  const [calling, setCalling] = useState(false);
   const [searchNonce, setSearchNonce] = useState(0);
   const textFiltersRef = React.useRef({ name: '', minAmount: '', maxAmount: '' });
   textFiltersRef.current = { name, minAmount, maxAmount };
@@ -214,38 +212,6 @@ export function CallerDepositListScreen() {
   const goBack = useCallback(() => {
     if (navigation.canGoBack()) navigation.goBack();
   }, [navigation]);
-
-  const addToDialer = useCallback(
-    (row: CallerRow) => {
-      const rawMobile = String(row.userMobile || row.mobile || '');
-      if (!rawMobile) {
-        Alert.alert('No mobile number for this user');
-        return;
-      }
-      void (async () => {
-        setCalling(true);
-        try {
-          const res = await singleCallToDialer({
-            lead: {
-              _id: String(row._id || row.userId || ''),
-              name: String(row.userName || row.name || ''),
-              mobile: rawMobile,
-              city: String(row.city || row.userCity || ''),
-              state: String(row.state || row.userState || ''),
-              clientName: String(row.clientName || ''),
-            },
-            extensionId: user?.extensionId,
-            adminName: typeof user?.name === 'string' ? user.name : 'ADMIN',
-            serverId: user?.serverId,
-          });
-          Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
-        } finally {
-          setCalling(false);
-        }
-      })();
-    },
-    [user?.extensionId, user?.name, user?.serverId],
-  );
 
   const rows = useMemo(() => {
     let next: CallerRow[] = pickItems(payload);
@@ -544,40 +510,16 @@ export function CallerDepositListScreen() {
       }
     }
     cols.push(statusCol);
-    if (isUniquePending) {
-      cols.push({
-        key: 'call',
-        label: 'Call',
-        width: 72,
-        render: () => 'Call',
-        onCellPress: (r) => addToDialer(r),
-      });
-    }
     return cols;
-  }, [isWithdrawal, isUniquePending, isCaller, canShowMobile, addToDialer]);
+  }, [isWithdrawal, isUniquePending, isCaller, canShowMobile]);
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!selected) return [];
-    return columns
-      .filter((c) => c.key !== 'call')
-      .map((c) => ({
+    return columns.map((c) => ({
         label: c.label,
         value: c.render(selected.row, selected.index),
       }));
   }, [columns, selected]);
-
-  const sheetActions = useMemo<SheetAction[] | undefined>(() => {
-    if (!selected || !isUniquePending) return undefined;
-    const hasMobile = Boolean(selected.row.userMobile || selected.row.mobile);
-    return [
-      {
-        label: calling ? 'Calling…' : 'Call',
-        tone: 'primary',
-        disabled: !hasMobile || calling,
-        onPress: () => addToDialer(selected.row),
-      },
-    ];
-  }, [selected, isUniquePending, addToDialer, calling]);
 
   if (!list && !empCode) {
     return (
@@ -603,14 +545,11 @@ export function CallerDepositListScreen() {
         row={row}
         index={index}
         isWithdrawal={isWithdrawal}
-        isUniquePending={isUniquePending}
         canShowMobile={!!canShowMobile}
-        calling={calling}
         onOpenSheet={() => setSelected({ row, index })}
-        onCall={() => addToDialer(row)}
       />
     ),
-    [isWithdrawal, isUniquePending, canShowMobile, calling, addToDialer],
+    [isWithdrawal, canShowMobile],
   );
 
   const listHeader = (
@@ -867,7 +806,6 @@ export function CallerDepositListScreen() {
         visible={selected !== null}
         title={selected ? display(selected.row.userName || selected.row.name || 'Details') : ''}
         fields={sheetFields}
-        actions={sheetActions}
         onClose={() => setSelected(null)}
       />
     </View>
@@ -878,22 +816,16 @@ type CallerDepositListCardProps = {
   row: CallerRow;
   index: number;
   isWithdrawal: boolean;
-  isUniquePending: boolean;
   canShowMobile: boolean;
-  calling: boolean;
   onOpenSheet: () => void;
-  onCall: () => void;
 };
 
 const CallerDepositListCard = memo(function CallerDepositListCard({
   row,
   index,
   isWithdrawal,
-  isUniquePending,
   canShowMobile,
-  calling,
   onOpenSheet,
-  onCall,
 }: CallerDepositListCardProps) {
   const userName = display(row.userName || row.name);
   const amount = formatAmount(row.amount || row.Amount);
@@ -908,8 +840,6 @@ const CallerDepositListCard = memo(function CallerDepositListCard({
   const created =
     formatDisplayDate(row.createdOn || row.createdAt || row.created_at) ||
     display(row.createdOn || row.createdAt);
-  const hasMobile = Boolean(row.userMobile || row.mobile);
-
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
       <View style={styles.cardHeader}>
@@ -939,11 +869,6 @@ const CallerDepositListCard = memo(function CallerDepositListCard({
           {created}
         </Text>
       </View>
-      {isUniquePending && hasMobile ? (
-        <TouchableOpacity style={styles.callBtn} onPress={onCall} disabled={calling}>
-          <Text style={styles.callBtnText}>{calling ? 'Calling…' : 'Call'}</Text>
-        </TouchableOpacity>
-      ) : null}
       <Text style={styles.cardHint}>Tap card for all details</Text>
     </TouchableOpacity>
   );

@@ -3,17 +3,8 @@ import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { formatDdMmYyyy } from '@/utils/dates';
 import { pushToBotDialer } from '@/screens/panel/shared/pushToBotDialer';
-import {
-  extractDialLeadsFromExcel,
-  mapRowToDialSetting,
-  toDialerConnectDetails,
-} from './utils';
-import type {
-  CallLogRow,
-  CallLogsListResponse,
-  CallSummaryResponse,
-  DialerConnectDetails,
-} from './types';
+import { extractDialLeadsFromExcel, mapRowToDialSetting } from './utils';
+import type { CallLogRow, CallLogsListResponse, CallSummaryResponse } from './types';
 import { MAX_COMMENT_LENGTH } from './types';
 
 type Admin =
@@ -72,21 +63,6 @@ export function useCallLogsActions({
       }
     },
     [admin?._id, admin?.name, clearSelection, getSelectedRows, load],
-  );
-
-  const connectDialer = useCallback(
-    async (row: CallLogRow) => {
-      const details: DialerConnectDetails = toDialerConnectDetails(row);
-      const res = await secureApi('callLogs.externalDialerSingle', {
-        details,
-        extensionId: admin?.extensionId || [],
-        adminName: admin?.name || 'ADMIN',
-        serverId: admin?.serverId,
-      });
-      if (!res.ok) toast.error(res.message || 'Connect dialer failed');
-      else toast.success(res.message || 'Connected to dialer');
-    },
-    [admin?.extensionId, admin?.name, admin?.serverId],
   );
 
   const endCall = useCallback(
@@ -289,7 +265,6 @@ export function useCallLogsActions({
     summaryData,
     setSummaryData,
     botCall,
-    connectDialer,
     endCall,
     submitComment,
     pauseBotCalls,

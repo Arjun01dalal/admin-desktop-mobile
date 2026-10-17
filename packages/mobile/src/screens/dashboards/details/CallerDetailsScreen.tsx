@@ -5,7 +5,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -14,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { appCodeForName, resolveCallerDialerIds } from '@astro/shared';
+import { appCodeForName } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
@@ -24,7 +23,6 @@ import { display, maskMobile } from '../../../utils/display';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { pickPlayIn } from '../../../dashboards/userRowUtils';
 import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
-import { singleCallToDialer } from '../../../utils/externalDialer';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CallerDetailsScreen.styles';
@@ -91,17 +89,6 @@ function formatDaysAgoLocal(days: number): string {
 
 function rowName(row: DetailRow): string {
   return display(row.name || row.userName);
-}
-
-function rowMobile(row: DetailRow): string {
-  return String(row.mobile || row.userMobile || '').trim();
-}
-
-function extensionIdsOf(user: { extensionId?: unknown } | null): string[] {
-  const raw = user?.extensionId;
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
-  if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
-  return [];
 }
 
 function rowId(row: DetailRow): string {
@@ -255,21 +242,9 @@ export function CallerDetailsScreen() {
       ? (params.activePlayersECS as Record<string, unknown>)
       : {};
 
-  const user = getSessionUser() as {
-    _id?: string;
-    name?: string;
-    extensionId?: unknown;
-    serverId?: unknown;
-  } | null;
+  const user = getSessionUser();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
   const canOpenReport = hasPermission('wallet_history', user);
-  const hideContact = hasPermission('contact_visibility_none', user);
-  const showCalling = !hideContact;
-  const extensionIds = useMemo(() => extensionIdsOf(user), [user]);
-  const callerDialerIds = useMemo(
-    () => resolveCallerDialerIds(user?.extensionId),
-    [user?.extensionId],
-  );
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -288,7 +263,6 @@ export function CallerDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DetailRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const [dialerBusyId, setDialerBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!empCode) return;
@@ -394,40 +368,6 @@ export function CallerDetailsScreen() {
       played: formatPlayed(row),
     });
   };
-
-  const addSingleToDialer = useCallback(
-    async (row: DetailRow) => {
-      const mobile = rowMobile(row);
-      if (!mobile) {
-        Alert.alert('Dialer', 'Mobile number not found');
-        return;
-      }
-      if (!callerDialerIds) {
-        Alert.alert('Dialer', 'Dialer extension / campaign ID not found for this admin');
-        return;
-      }
-      setDialerBusyId(rowId(row) || 'pending');
-      try {
-        const res = await singleCallToDialer({
-          lead: {
-            _id: rowId(row),
-            name: rowName(row),
-            mobile,
-            city: String(row.city || ''),
-            state: String(row.state || ''),
-            clientName: String(row.clientName || row.appName || ''),
-          },
-          extensionId: extensionIds,
-          adminName: user?.name || 'ADMIN',
-          serverId: user?.serverId,
-        });
-        Alert.alert(res.ok ? 'Dialer' : 'Dialer failed', res.message);
-      } finally {
-        setDialerBusyId(null);
-      }
-    },
-    [callerDialerIds, extensionIds, user?.name, user?.serverId],
-  );
 
   const toggleSelect = useCallback((id: string) => {
     if (!id) return;
@@ -567,8 +507,6 @@ export function CallerDetailsScreen() {
               const inactive = status === 'Inactive';
               const id = rowId(row);
               const checked = selectedIds.has(id);
-              const hasMobile = Boolean(rowMobile(row));
-              const sending = Boolean(id) && dialerBusyId === id;
               return (
                 <TouchableOpacity
                   key={`${id || index}-${index}`}
@@ -660,19 +598,6 @@ export function CallerDetailsScreen() {
                         </Text>
                       </View>
                     </View>
-                    {showCalling && hasMobile ? (
-                      <View style={styles.callBtnRow}>
-                        <TouchableOpacity
-                          style={[styles.callBtn, sending && styles.callBtnDisabled]}
-                          disabled={sending}
-                          onPress={() => void addSingleToDialer(row)}
-                        >
-                          <Text style={styles.callBtnText}>
-                            {sending ? 'Sending…' : 'Call'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
                   </View>
                   <View style={styles.userCardRight}>
                     <Text style={styles.userCardBalance} numberOfLines={1}>
@@ -707,23 +632,6 @@ export function CallerDetailsScreen() {
                           const row = selected;
                           setSelected(null);
                           openUserReport(row);
-                        },
-                      },
-                    ]
-                  : []),
-                ...(showCalling && rowMobile(selected)
-                  ? [
-                      {
-                        label:
-                          dialerBusyId && dialerBusyId === rowId(selected)
-                            ? 'Sending…'
-                            : 'Call',
-                        tone: 'primary' as const,
-                        disabled: Boolean(dialerBusyId),
-                        onPress: () => {
-                          const row = selected;
-                          setSelected(null);
-                          void addSingleToDialer(row);
                         },
                       },
                     ]
