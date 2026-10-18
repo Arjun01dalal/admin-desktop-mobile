@@ -26,6 +26,7 @@
     "mobile:start": "npm run start -w @astro/mobile",
     "mobile:typecheck": "npm run typecheck -w @astro/mobile",
     "mobile:lint": "npm run lint -w @astro/mobile",
+    "mobile:test": "npm run test -w @astro/mobile",
     "mobile:build:preview:android": "npm run build:preview:android -w @astro/mobile",
     "mobile:build:preview:ios": "npm run build:preview:ios -w @astro/mobile",
     "mobile:build:production:android": "npm run build:production:android -w @astro/mobile",

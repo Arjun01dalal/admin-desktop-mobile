@@ -2,10 +2,10 @@
 import React from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme';
-import { DetailFilterBar } from '../dashboards/details/DetailFilterBar';
+import { DetailFilterBar } from '../../screens/dashboards/details/DetailFilterBar';
 import { SEARCH_FIELDS, STATUSES } from './constants';
 import { display, type Rec } from './helpers';
-import { styles } from '../WithdrawalScreen.styles';
+import { styles } from './WithdrawalScreen.styles';
 import type { SheetDownloadFilter } from '../../utils/sheetDownloadAudit';
 
 type WithdrawalToolbarProps = {

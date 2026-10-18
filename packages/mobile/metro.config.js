@@ -1,5 +1,6 @@
 // Monorepo-aware Metro config (npm workspaces).
 const { getDefaultConfig } = require('expo/metro-config');
+const fs = require('fs');
 const path = require('path');
 
 const projectRoot = __dirname;
@@ -20,6 +21,7 @@ config.resolver.nodeModulesPaths = [
 // mobile's own copy.
 const forcedRoots = ['react', 'react-dom', 'react-native'];
 const mobileModules = path.join(projectRoot, 'node_modules');
+const srcRoot = path.join(projectRoot, 'src');
 
 const defaultResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
@@ -34,6 +36,29 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       /* fall through to default resolver */
     }
   }
+
+  // Path aliases (tsconfig paths / @features) — backup if Expo experiments miss.
+  let aliased = null;
+  if (moduleName.startsWith('@features/')) {
+    aliased = path.join(srcRoot, 'features', moduleName.slice('@features/'.length));
+  } else if (moduleName.startsWith('@/')) {
+    aliased = path.join(srcRoot, moduleName.slice(2));
+  }
+  if (aliased) {
+    const candidates = [
+      aliased,
+      `${aliased}.tsx`,
+      `${aliased}.ts`,
+      path.join(aliased, 'index.tsx'),
+      path.join(aliased, 'index.ts'),
+    ];
+    for (const filePath of candidates) {
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        return { type: 'sourceFile', filePath };
+      }
+    }
+  }
+
   if (defaultResolveRequest) {
     return defaultResolveRequest(context, moduleName, platform);
   }

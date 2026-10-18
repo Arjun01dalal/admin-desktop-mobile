@@ -1,0 +1,36 @@
+name: Mobile CI
+
+on:
+  push:
+    paths:
+      - 'packages/mobile/**'
+      - 'packages/shared/**'
+      - 'package-lock.json'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    paths:
+      - 'packages/mobile/**'
+      - 'packages/shared/**'
+      - 'package-lock.json'
+      - '.github/workflows/mobile-ci.yml'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Shared typecheck
+        run: npm run shared:typecheck
+      - name: Mobile unit tests
+        run: npm run mobile:test
+      - name: Mobile lint (features architecture)
+        run: npx eslint "packages/mobile/src/features/**/*.{ts,tsx}" "packages/mobile/src/hooks/**/*.{ts,tsx}" "packages/mobile/src/api/**/*.{ts,tsx}" "packages/mobile/src/observability/**/*.{ts,tsx}"

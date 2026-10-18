@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { FlatList, ScrollView, SectionList, Text, TextInput, View } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { hydrateStorage } from './src/lib/webShim';
+import { initSentry } from './src/observability/sentry';
 import { setupSslPinning } from './src/security/sslPins';
 import { applyStoredTheme, colors, watchSystemThemeChanges } from './src/theme';
 
@@ -64,6 +65,7 @@ export default function App() {
         /* storage best-effort — fall back to defaults */
       }
       applyStoredTheme();
+      initSentry();
       if (alive) {
         setBooted(true);
         // System mode: follow OS light/dark changes (requires JS reload).

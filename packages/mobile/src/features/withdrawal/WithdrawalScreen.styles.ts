@@ -1,7 +1,7 @@
 /** Styles for WithdrawalScreen — shared presets from styles/common plus screen-specific keys. */
 import { StyleSheet } from 'react-native';
-import { makeStyles } from '../styles/common';
-import { colors, radius, spacing } from '../theme';
+import { makeStyles } from '../../styles/common';
+import { colors, radius, spacing } from '../../theme';
 
 export const styles = makeStyles({
   root: { flex: 1 },

@@ -14,10 +14,10 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { INDIA_STATES, appCodeForName, asPaged } from '@astro/shared';
+import { INDIA_STATES, appCodeForName } from '@astro/shared';
+import { useDashboardUsersList } from '../../../features/users';
 import { colors, spacing } from '../../../theme';
 import { floorNum } from '../../../dashboards/mergeMetrics';
-import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
 import { todayIST } from '../../../utils/dates';
 import {
@@ -45,26 +45,10 @@ type UserRow = {
   [key: string]: unknown;
 };
 
-type DashboardUsersResponse = {
-  users?: UserRow[];
-  items?: UserRow[];
-  totalBalance?: number;
-  totalBonusBalance?: number;
-  total?: number;
-  totalPages?: number;
-};
-
-const META: Record<
-  Kind,
-  {
-    title: string;
-    action: 'users.getAllBalance' | 'users.getAllBonus' | 'users.registeredUser';
-    decreasing?: boolean;
-  }
-> = {
-  balance: { title: 'Total Users Balance', action: 'users.getAllBalance', decreasing: true },
-  bonus: { title: 'Total Users Bonus Balance', action: 'users.getAllBonus' },
-  registered: { title: 'Total Registered Users App Today', action: 'users.registeredUser' },
+const META: Record<Kind, { title: string }> = {
+  balance: { title: 'Total Users Balance' },
+  bonus: { title: 'Total Users Bonus Balance' },
+  registered: { title: 'Total Registered Users App Today' },
 };
 
 const PAGE_SIZE = 25;
@@ -110,12 +94,31 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
   });
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<UserRow[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalBalance, setTotalBalance] = useState(0);
   const [selected, setSelected] = useState<UserRow | null>(null);
+
+  const {
+    rows,
+    totalPages,
+    totalBalance,
+    loading,
+    refreshing,
+    error,
+    refresh,
+  } = useDashboardUsersList({
+    kind,
+    startDate,
+    endDate,
+    page,
+    pageSize,
+    appClientName,
+    userType,
+    stateFilter,
+    appliedSearch,
+  });
+
+  useEffect(() => {
+    setSelected(null);
+  }, [rows]);
 
   const openUserReport = useCallback(
     (userId?: string, userName?: string) => {
@@ -198,71 +201,6 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
       },
     ];
   }, [selected, canOpenReport, openUserReport]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const filter: Record<string, unknown> = {};
-      if (appClientName) filter.clientName = appClientName;
-      if (stateFilter) filter.state = stateFilter;
-      if (userType === 'Active') filter.active = true;
-      if (userType === 'InActive') filter.inActive = true;
-
-      const searchText = appliedSearch.text.trim();
-      if (searchText) {
-        if (appliedSearch.field === 'balance') {
-          const n = Number(searchText);
-          if (Number.isFinite(n)) filter.balance = n;
-        } else {
-          filter[appliedSearch.field] = searchText;
-        }
-      }
-
-      const payload: Record<string, unknown> = {
-        startDate,
-        endDate,
-        itemsPerPage: pageSize,
-        pageNo: page,
-        filter,
-      };
-      if (meta.decreasing) payload.decreasing = true;
-
-      const res = await secureApi<DashboardUsersResponse | UserRow[]>(meta.action, payload);
-      if (!res.ok) {
-        setError(res.message || 'Failed to load users');
-        setRows([]);
-        return;
-      }
-      const paged = asPaged<UserRow>(res.data);
-      setSelected(null);
-      setRows(paged.rows);
-      setTotalPages(Math.max(1, paged.totalPages || 1));
-
-      const envelope = Array.isArray(res.data) ? {} : (res.data ?? {});
-      const total = Number(
-        envelope.totalBalance ?? envelope.totalBonusBalance ?? envelope.total ?? 0,
-      ) || 0;
-      setTotalBalance(total);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    appClientName,
-    appliedSearch,
-    endDate,
-    meta.action,
-    meta.decreasing,
-    page,
-    pageSize,
-    startDate,
-    stateFilter,
-    userType,
-  ]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const amountLabel = kind === 'bonus' ? 'Bonus' : 'Balance';
 
@@ -404,8 +342,8 @@ export function DashboardUsersListScreen({ kind }: { kind: Kind }) {
         ListHeaderComponent={header}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={() => void load()}
+            refreshing={refreshing}
+            onRefresh={() => void refresh()}
             tintColor={colors.primary}
           />
         }

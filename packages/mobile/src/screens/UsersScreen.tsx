@@ -5,7 +5,7 @@
  * LAXMI_999_Users) with the desktop action + payload mapping, server search,
  * pagination, row detail sheet, OTP-gated block/unblock and Create User.
  */
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -20,12 +20,7 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { appCodeForName } from '@astro/shared';
-import {
-  BALANCE_RANGE_OPTIONS,
-  balanceRangeToFilter,
-  USER_TYPES,
-  type UserType,
-} from '@astro/shared/userTypes';
+import { BALANCE_RANGE_OPTIONS, USER_TYPES, type UserType } from '@astro/shared/userTypes';
 import { colors } from '../theme';
 import { floorNum } from '../dashboards/mergeMetrics';
 import type { DataTableColumn } from '../dashboards/ui/DataTable';
@@ -46,31 +41,22 @@ import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailS
 import { CreateUserScreen } from './CreateUserScreen';
 import { mapUsersToBotSettings } from '../utils/dialerHelpers';
 import { AddToC2cCampaignPanel } from '../components/AddToC2cCampaignPanel';
-import { BlockUserModal } from './users/BlockUserModal';
-import { DumpUserModal } from './users/DumpUserModal';
+import {
+  BlockUserModal,
+  DumpUserModal,
+  useUsersList,
+  usersStyles as styles,
+} from '../features/users';
 import {
   CALLER_HIDDEN,
   PAGE_SIZE,
-  TYPE_ACTION,
   display,
-  filterCallerEmpScope,
   isBlocked,
   maskMobile,
   reasonForUserType,
   searchFieldsFor,
   type Row,
-} from './users/helpers';
-import { styles } from './UsersScreen.styles';
-
-type UsersListResponse = {
-  items?: Row[];
-  users?: Row[];
-  user?: Row[];
-  data?: Row[];
-  totalPages?: number;
-  total?: number;
-  count?: number;
-};
+} from '../features/users/helpers';
 
 type UsersRouteParams = {
   selectActiveCustomers?: boolean;
@@ -129,23 +115,33 @@ export function UsersScreen() {
   });
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Row | null>(null);
   const [blockRow, setBlockRow] = useState<Row | null>(null);
   const [dumpRow, setDumpRow] = useState<Row | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [appVersions, setAppVersions] = useState<Record<string, string>>({});
-  const loadGenRef = useRef(0);
 
-  useEffect(() => {
-    return () => {
-      loadGenRef.current += 1;
-    };
-  }, []);
+  const adminRec = useMemo(() => (admin ?? {}) as Record<string, unknown>, [admin]);
+  const {
+    rows,
+    total,
+    totalPages,
+    loading,
+    refreshing,
+    error,
+    refresh: refreshUsers,
+  } = useUsersList({
+    userType,
+    page,
+    pageSize,
+    dates,
+    appClientName,
+    blockFilter,
+    balanceRange,
+    appliedSearch,
+    isCaller,
+    admin: adminRec,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -218,219 +214,10 @@ export function UsersScreen() {
     }
   }, [admin, botId, rows, userType]);
 
-  const load = useCallback(async () => {
-    const gen = ++loadGenRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const adminRec = (admin ?? {}) as Record<string, unknown>;
-      const loginEmpCode = String(adminRec.empCode || '').trim();
-      const callerEmpScoped = isCaller && userType !== 'Sub_Admin';
-      if (callerEmpScoped && !loginEmpCode) {
-        if (gen !== loadGenRef.current) return;
-        setError('No empCode on this login. Ask admin to assign empCode.');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        return;
-      }
-
-      const filter: Record<string, unknown> = {};
-      if (
-        userType !== 'Sub_Admin' &&
-        userType !== 'LAXMI_999_Users' &&
-        userType !== 'Active_User'
-      ) {
-        filter.uniqueUser = false;
-      }
-      const searchText = appliedSearch.text.trim();
-      const searchingDpId =
-        Boolean(searchText) &&
-        (appliedSearch.field === '_id' ||
-          appliedSearch.field === 'dpId' ||
-          appliedSearch.field === 'dp_id');
-      if (searchText && !(callerEmpScoped && appliedSearch.field === 'empCode')) {
-        // Exact DP ID lookup uses API `_id` (Laxmi inactive-deposit / users parity).
-        const field =
-          appliedSearch.field === 'dpId' || appliedSearch.field === 'dp_id'
-            ? '_id'
-            : appliedSearch.field;
-        if (searchingDpId) {
-          // Drop other filters — state/clientName hide exact matches.
-          for (const key of Object.keys(filter)) {
-            if (key !== 'uniqueUser') delete filter[key];
-          }
-          filter._id = searchText;
-        } else {
-          filter[field] = searchText;
-        }
-      }
-      if (blockFilter && userType === 'User' && !searchingDpId) {
-        filter.blockUser = blockFilter === 'block';
-      }
-      if (
-        balanceRange &&
-        !searchingDpId &&
-        userType !== 'Sub_Admin' &&
-        userType !== 'Non_Performing_Active_User' &&
-        userType !== 'LAXMI_999_Users'
-      ) {
-        Object.assign(filter, balanceRangeToFilter(balanceRange));
-      }
-      // Caller default list = own emp; when searching DP ID / name / etc. omit empCode
-      // so 001 (unassigned) users can be returned, then scoped client-side.
-      const callerSearchingOther =
-        callerEmpScoped &&
-        Boolean(searchText) &&
-        appliedSearch.field !== 'empCode';
-      if (
-        callerEmpScoped &&
-        loginEmpCode &&
-        userType !== 'In_Active_Deposit' &&
-        !callerSearchingOther &&
-        !searchingDpId
-      ) {
-        filter.empCode = loginEmpCode;
-      }
-
-      // Operator scoping (desktop UsersPage): allotted apps + per-app states.
-      // Exact DP ID lookup skips app scope so 001 leads outside appWithState still resolve.
-      const allottedApps = (adminRec.clientName || adminRec.allotedApps) as
-        string | string[] | undefined;
-      const app =
-        userType !== 'User' && allottedApps && !searchingDpId ? { app: allottedApps } : {};
-      let withAppState: Record<string, unknown> = {};
-      const aws = adminRec.appWithState;
-      if (
-        !searchingDpId &&
-        userType !== 'User' &&
-        userType !== 'Sub_Admin' &&
-        aws &&
-        typeof aws === 'object' &&
-        !Array.isArray(aws)
-      ) {
-        const map = aws as Record<string, unknown>;
-        const scoped: Record<string, string[]> = {};
-        if (appClientName && Array.isArray(map[appClientName])) {
-          scoped[appClientName] = [...(map[appClientName] as string[])];
-        } else {
-          for (const [key, states] of Object.entries(map)) {
-            if (Array.isArray(states)) scoped[key] = [...(states as string[])];
-          }
-        }
-        if (Object.keys(scoped).length > 0) withAppState = { appWithState: scoped };
-      }
-
-      if (
-        appClientName &&
-        userType !== 'Sub_Admin' &&
-        userType !== 'LAXMI_999_Users' &&
-        !searchingDpId
-      ) {
-        filter.clientName = appClientName;
-      }
-
-      const datePayload =
-        !searchingDpId && dates ? { startDate: dates.start, endDate: dates.end } : {};
-
-      let payload: Record<string, unknown>;
-      switch (userType) {
-        case 'Sub_Admin':
-          payload = {
-            pageNo: page,
-            itemPerPage: pageSize,
-            ...(Object.keys(filter).length ? { filter } : {}),
-          };
-          break;
-        case 'Non_Performing_User':
-          payload = {
-            pageNo: page,
-            itemPerPage: pageSize,
-            filter,
-            ...datePayload,
-            ...app,
-            ...withAppState,
-          };
-          break;
-        case 'Non_Performing_Active_User':
-          payload = { filter };
-          break;
-        case 'LAXMI_999_Users':
-          payload = { pageNo: page, itemsPerPage: pageSize, filter };
-          break;
-        case 'Active_User':
-          payload = {
-            pageNo: page,
-            itemsPerPage: pageSize,
-            filter,
-            ...(!searchingDpId && dates
-              ? { activeUserStartDate: dates.start, activeUserEndDate: dates.end }
-              : {}),
-            ...app,
-            ...withAppState,
-          };
-          break;
-        default:
-          // User / Todays_Active / In_Active_Deposit
-          payload = {
-            pageNo: page,
-            itemsPerPage: pageSize,
-            filter,
-            ...datePayload,
-            ...(userType === 'User'
-              ? { activeUserStart: '', activeUserEnd: '' }
-              : { ...app, ...withAppState }),
-          };
-      }
-      const res = await secureApi<UsersListResponse | Row[]>(TYPE_ACTION[userType], payload);
-      if (gen !== loadGenRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load users');
-        setRows([]);
-        return;
-      }
-      const raw = Array.isArray(res.data) ? {} : (res.data ?? {});
-      const nested =
-        raw.payload && typeof raw.payload === 'object' && !Array.isArray(raw.payload)
-          ? (raw.payload as Record<string, unknown>)
-          : raw;
-      let list = Array.isArray(res.data)
-        ? res.data
-        : ((nested.items ??
-            nested.users ??
-            nested.user ??
-            nested.data ??
-            raw.items ??
-            raw.users ??
-            raw.user ??
-            raw.data ??
-            []) as Row[]);
-      if (callerEmpScoped && loginEmpCode && !searchingDpId) {
-        list = filterCallerEmpScope(list, loginEmpCode, Boolean(callerSearchingOther));
-      }
-      setSelected(null);
-      setRows(list);
-      setTotalPages(Math.max(1, Number(nested.totalPages ?? raw.totalPages ?? 1) || 1));
-      setTotal(Number(nested.total ?? nested.count ?? raw.total ?? raw.count ?? list.length) || 0);
-    } finally {
-      if (gen === loadGenRef.current) setLoading(false);
-    }
-  }, [
-    admin,
-    appClientName,
-    appliedSearch,
-    balanceRange,
-    blockFilter,
-    dates,
-    isCaller,
-    page,
-    pageSize,
-    userType,
-  ]);
-
+  // Fresh list from API — clear row sheet when data changes.
   useEffect(() => {
-    void load();
-  }, [load]);
+    setSelected(null);
+  }, [rows]);
 
   const columns = useMemo<DataTableColumn<Row>[]>(() => {
     const cols: DataTableColumn<Row>[] = [
@@ -880,8 +667,8 @@ export function UsersScreen() {
         }
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={() => void load()}
+            refreshing={refreshing}
+            onRefresh={() => void refreshUsers()}
             tintColor={colors.primary}
           />
         }
@@ -959,15 +746,17 @@ export function UsersScreen() {
         }
       />
 
-      <BlockUserModal row={blockRow} onClose={() => setBlockRow(null)} onDone={() => void load()} />
+      <BlockUserModal
+        row={blockRow}
+        onClose={() => setBlockRow(null)}
+        onDone={() => void refreshUsers()}
+      />
       <DumpUserModal
         row={dumpRow}
         onClose={() => setDumpRow(null)}
         onDone={(userId) => {
-          // Local remove only — full reload after dump freezes the list.
-          setRows((prev) => prev.filter((r) => r._id !== userId));
-          setTotal((prev) => Math.max(0, prev - 1));
           setSelected((prev) => (prev?._id === userId ? null : prev));
+          void refreshUsers();
         }}
       />
 
@@ -982,7 +771,7 @@ export function UsersScreen() {
           <CreateUserScreen
             onCreated={() => {
               setCreateOpen(false);
-              void load();
+              void refreshUsers();
             }}
           />
         </View>

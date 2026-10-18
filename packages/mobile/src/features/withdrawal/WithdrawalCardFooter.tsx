@@ -14,7 +14,7 @@ import {
   num,
   type Rec,
 } from './helpers';
-import { styles } from '../WithdrawalScreen.styles';
+import { styles } from './WithdrawalScreen.styles';
 
 type WithdrawalCardFooterProps = {
   row: Rec;

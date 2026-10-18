@@ -4,7 +4,6 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   BackHandler,
   Image,
   RefreshControl,
@@ -19,23 +18,18 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../auth/AuthContext';
 import { canAccessNavItem } from '../auth/permissions';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
+import { BalanceStatsRow, useMenuStats } from '../features/menu';
 import {
   groupNavItemsByCategory,
   type NavCategoryGroup,
 } from '../navigation/navCategories';
 import { iconForNavItem } from '../navigation/navItemIcons';
-import { canOpenPanelPath, openPanelTarget } from '../navigation/panelDetail';
 import { NAV_ITEMS, type NavItem } from '../navigation/navItems';
 import { colors } from '../theme';
 import { styles } from './WelcomeScreen.styles';
-import { useMenuStats } from './useMenuStats';
 
 function screenNameFor(item: NavItem): string {
   return item.id;
-}
-
-function formatInr(value: number): string {
-  return `₹${value.toLocaleString('en-IN')}`;
 }
 
 export function WelcomeScreen() {
@@ -43,7 +37,6 @@ export function WelcomeScreen() {
   const navigation = useNavigation();
   const [activeCategory, setActiveCategory] = useState<NavCategoryGroup | null>(null);
   const [menuQuery, setMenuQuery] = useState('');
-  const [pullRefreshing, setPullRefreshing] = useState(false);
 
   const items = useMemo(
     () => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)),
@@ -58,17 +51,8 @@ export function WelcomeScreen() {
     () => items.some((item) => item.id === 'withdrawal'),
     [items],
   );
-  const { stats, loading: statsLoading, refresh } = useMenuStats(canSeeDashboard);
+  const { stats, loading: statsLoading, refreshing, refresh } = useMenuStats(canSeeDashboard);
   const categories = useMemo(() => groupNavItemsByCategory(items), [items]);
-
-  const onPullRefresh = async () => {
-    setPullRefreshing(true);
-    try {
-      if (canSeeDashboard) await refresh();
-    } finally {
-      setPullRefreshing(false);
-    }
-  };
 
   const filteredMenus = useMemo(() => {
     if (!activeCategory) return [];
@@ -119,37 +103,6 @@ export function WelcomeScreen() {
     nav.navigate(screenNameFor(item));
   };
 
-  const canOpenUsersBalance = canOpenPanelPath('/balance-f');
-
-  /** Users Balance · Total → Dashboard · Pending Refund → Pending · Total Refund → Withdrawal */
-  const openStatTile = (key: 'balance' | 'deposit' | 'pending' | 'total') => {
-    const nav = navigation as {
-      navigate: (name: string, params?: Record<string, unknown>) => void;
-    };
-    // Total Users Balance → Users Balance list
-    if (key === 'balance' && canOpenUsersBalance) {
-      openPanelTarget(navigation, { href: '/balance-f' });
-      return;
-    }
-    // Total (Deposits) → Dashboard
-    if (key === 'deposit' && canSeeDashboard) {
-      nav.navigate('dashboard');
-      return;
-    }
-    if (key === 'pending' && canOpenWithdrawal) {
-      nav.navigate('withdrawal', {
-        status: 'Pending',
-        startDate: stats?.asOfDate,
-        endDate: stats?.asOfDate,
-      });
-      return;
-    }
-    // Total Refund → Withdrawal
-    if (key === 'total' && canOpenWithdrawal) {
-      nav.navigate('withdrawal');
-    }
-  };
-
   const hero = (
     <View style={styles.hero}>
       <Image
@@ -162,85 +115,13 @@ export function WelcomeScreen() {
       {user?.name ? <Text style={styles.heroSub}>Hi {user.name}</Text> : null}
 
       {canSeeDashboard ? (
-        <>
-          {stats?.asOfDate ? (
-            <Text style={styles.statsAsOf}>Today · {stats.asOfDate}</Text>
-          ) : null}
-
-          <View style={styles.statsRow}>
-            {(
-              [
-                {
-                  key: 'balance' as const,
-                  label: 'Total Users Balance',
-                  value: stats?.balance,
-                  tappable: canOpenUsersBalance,
-                },
-                {
-                  key: 'deposit' as const,
-                  label: 'Total Deposits',
-                  value: stats?.totalDeposit,
-                  tappable: canSeeDashboard,
-                },
-                {
-                  key: 'pending' as const,
-                  label: 'Pending Withdrawal',
-                  value: stats?.pendingWithdrawal,
-                  tappable: canOpenWithdrawal,
-                },
-                {
-                  key: 'total' as const,
-                  label: 'Total Withdrawal',
-                  value: stats?.totalWithdrawal,
-                  tappable: canOpenWithdrawal,
-                },
-              ] as const
-            ).map((tile) => {
-              const body = (
-                <>
-                  <Text style={styles.statLabel} numberOfLines={2}>
-                    {toDisplayText(tile.label)}
-                  </Text>
-                  {statsLoading && stats == null ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.primary}
-                      style={styles.statSpinner}
-                    />
-                  ) : (
-                    <Text
-                      style={styles.statValue}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
-                    >
-                      {tile.value == null ? '—' : formatInr(tile.value)}
-                    </Text>
-                  )}
-                </>
-              );
-              if (!tile.tappable) {
-                return (
-                  <View key={tile.key} style={styles.statTile}>
-                    {body}
-                  </View>
-                );
-              }
-              return (
-                <TouchableOpacity
-                  key={tile.key}
-                  style={styles.statTile}
-                  onPress={() => openStatTile(tile.key)}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={toDisplayText(tile.label)}
-                >
-                  {body}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </>
+        <BalanceStatsRow
+          stats={stats}
+          loading={statsLoading}
+          canSeeDashboard={canSeeDashboard}
+          canOpenWithdrawal={canOpenWithdrawal}
+          asOfDate={stats?.asOfDate}
+        />
       ) : null}
     </View>
   );
@@ -353,8 +234,8 @@ export function WelcomeScreen() {
           refreshControl={
             canSeeDashboard ? (
               <RefreshControl
-                refreshing={pullRefreshing}
-                onRefresh={() => void onPullRefresh()}
+                refreshing={refreshing}
+                onRefresh={() => void refresh()}
                 tintColor={colors.primary}
               />
             ) : undefined

@@ -1,6 +1,6 @@
 /** Styles for UsersScreen — shared presets from styles/common plus screen-specific keys. */
-import { makeStyles } from '../styles/common';
-import { colors, radius, spacing } from '../theme';
+import { makeStyles } from '../../styles/common';
+import { colors, radius, spacing } from '../../theme';
 
 export const styles = makeStyles({
   headRow: { flexDirection: 'row', alignItems: 'center' },

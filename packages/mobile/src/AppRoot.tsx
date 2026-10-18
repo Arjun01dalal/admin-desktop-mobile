@@ -12,9 +12,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { appQueryClient } from './api/queryClient';
+import { setupQueryLifecycle } from './api/setupQueryLifecycle';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import { ThemeProvider, useTheme } from './features/theme';
 import { AppNavigator } from './navigation/AppNavigator';
+import { ErrorBoundary } from './observability/ErrorBoundary';
 import { AstroLoginScreen } from './screens/AstroLoginScreen';
 import { AstroSiteScreen } from './screens/AstroSiteScreen';
 import { ForgotPasswordScreen } from './screens/ForgotPasswordScreen';
@@ -27,7 +32,7 @@ import { SecurityGate } from './security/SecurityGate';
 import { useLiveLocation } from './security/useLiveLocation';
 import { useNetworkStatus } from './security/useNetworkStatus';
 import { UpdateGate } from './updates/UpdateGate';
-import { colors, isDarkTheme } from './theme';
+import { colors } from './theme';
 import { parseAstroDeepLink } from './utils/astroDeepLink';
 
 type GateScreen = 'splash' | 'astro-login' | 'site' | 'login' | 'panel' | 'forgot' | 'terms';
@@ -184,22 +189,38 @@ function Root() {
   );
 }
 
+function AppRootInner() {
+  const { isDark, colors: themeColors } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: themeColors.background }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <SecurityGate>
+        <AuthProvider>
+          <Root />
+          <OfflineHost />
+          <UpdateGate />
+        </AuthProvider>
+      </SecurityGate>
+    </View>
+  );
+}
+
+function QueryLifecycle() {
+  useEffect(() => setupQueryLifecycle(), []);
+  return null;
+}
+
 export default function AppRoot() {
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <SecurityGate>
-          <AuthProvider>
-            <StatusBar
-              style={isDarkTheme() ? 'light' : 'dark'}
-              backgroundColor={colors.background}
-            />
-            <Root />
-            <OfflineHost />
-            <UpdateGate />
-          </AuthProvider>
-        </SecurityGate>
-      </View>
+      <ErrorBoundary name="app-root">
+        <QueryClientProvider client={appQueryClient}>
+          <QueryLifecycle />
+          <ThemeProvider>
+            <AppRootInner />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

@@ -1,47 +1,22 @@
 /**
- * App theme — dark (default, matches desktop panel) and light palettes.
+ * App theme — dark (default) and light palettes.
  *
- * Screens do `StyleSheet.create` with `colors` at module load, so the active
- * palette must be applied (via `applyStoredTheme`) BEFORE any screen module
- * is imported. App.tsx hydrates storage, applies the theme, then lazily
- * requires the app root. Changing the theme therefore requires a JS reload
- * (the picker in the drawer triggers one automatically).
+ * Prefer `useTheme` / `useStyles` from `@features/theme` for runtime updates.
+ * Legacy screens still bake `colors` into StyleSheet at import time — those
+ * pick up the palette applied via `applyStoredTheme()` before AppRoot loads.
  */
 import { Alert, Appearance, DevSettings, InteractionManager, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { appStorage } from './lib/webShim';
+import { darkColors, lightColors, type ThemeColors } from './themeTokens/palettes';
+import { resolveDark, type ThemeMode } from './themeTokens/resolveDark';
 
-export type ThemeMode = 'dark' | 'light' | 'system';
+export type { ThemeMode, ThemeColors };
+export { darkColors, lightColors, resolveDark };
 
-const darkColors = {
-  background: '#0b0f14',
-  surface: '#121820',
-  surfaceAlt: '#1a2230',
-  border: '#243040',
-  foreground: '#e6edf3',
-  muted: '#8b98a5',
-  primary: '#f5b301',
-  primaryForeground: '#1a1200',
-  destructive: '#ef4444',
-  success: '#22c55e',
-};
-
-const lightColors: typeof darkColors = {
-  background: '#f4f6f9',
-  surface: '#ffffff',
-  surfaceAlt: '#eaeef4',
-  border: '#d5dce6',
-  foreground: '#101828',
-  muted: '#5d6b7d',
-  primary: '#c47f00',
-  primaryForeground: '#ffffff',
-  destructive: '#dc2626',
-  success: '#16a34a',
-};
-
-/** Mutable palette — mutated in place by applyStoredTheme before screens load. */
-export const colors = { ...darkColors };
+/** Mutable palette — mutated by applyStoredTheme / applyThemeMode. */
+export const colors: ThemeColors = { ...darkColors };
 
 let dark = true;
 
@@ -57,9 +32,8 @@ export function getThemeMode(): ThemeMode {
 }
 
 /**
- * Persist the theme choice and resolve only once it is actually written to
- * disk — the caller reloads the JS bundle right after, and a fire-and-forget
- * write can be lost, making the theme "not change".
+ * Persist the theme choice. Resolves after disk write so a subsequent reload
+ * cannot race and lose the preference.
  */
 export async function setThemeMode(mode: ThemeMode): Promise<void> {
   appStorage.setItem(THEME_KEY, mode);
@@ -70,22 +44,20 @@ export async function setThemeMode(mode: ThemeMode): Promise<void> {
   }
 }
 
-function resolveDark(mode: ThemeMode): boolean {
-  if (mode === 'light') return false;
-  if (mode === 'dark') return true;
-  // system — treat null/undefined as dark (matches desktop default)
-  return Appearance.getColorScheme() !== 'light';
+/** Apply a mode to the mutable `colors` export (and dark flag). */
+export function applyThemeMode(mode: ThemeMode): void {
+  dark = resolveDark(mode, Appearance.getColorScheme());
+  Object.assign(colors, dark ? darkColors : lightColors);
 }
 
 /** Resolve + apply the stored mode. Call after hydrateStorage(), before UI loads. */
 export function applyStoredTheme(): void {
-  dark = resolveDark(getThemeMode());
-  Object.assign(colors, dark ? darkColors : lightColors);
+  applyThemeMode(getThemeMode());
 }
 
 /**
- * Safe JS reload after a theme change. Avoids Stallion/native restart in
- * Expo Go / dev (missing module → crash). Production uses Stallion.restart.
+ * Optional full JS reload — only needed for legacy StyleSheets that still bake
+ * colors at module load. Prefer ThemeProvider + useStyles instead.
  */
 export async function reloadAppForTheme(opts?: { silent?: boolean }): Promise<void> {
   if (Platform.OS === 'web') {
@@ -93,7 +65,6 @@ export async function reloadAppForTheme(opts?: { silent?: boolean }): Promise<vo
     return;
   }
 
-  // Let the drawer close / press handlers settle before tearing down JS.
   await new Promise<void>((resolve) => {
     InteractionManager.runAfterInteractions(() => resolve());
   });
@@ -114,23 +85,24 @@ export async function reloadAppForTheme(opts?: { silent?: boolean }): Promise<vo
       return;
     }
   } catch {
-    /* fall through to manual-restart prompt */
+    /* fall through */
   }
 
   if (!opts?.silent) {
-    Alert.alert('Theme saved', 'Close and reopen the app to apply the new theme.');
+    Alert.alert('Theme saved', 'Close and reopen the app to apply the new theme on all screens.');
   }
 }
 
 /**
- * When preference is System, re-apply + reload if the OS color scheme changes
+ * When preference is System, re-apply + reload if the OS scheme changes
  * (StyleSheets bake colors at module load, so a remount alone is not enough).
  */
 export function watchSystemThemeChanges(): () => void {
   const sub = Appearance.addChangeListener(() => {
     if (getThemeMode() !== 'system') return;
-    const nextDark = resolveDark('system');
+    const nextDark = resolveDark('system', Appearance.getColorScheme());
     if (nextDark === dark) return;
+    applyThemeMode('system');
     void reloadAppForTheme({ silent: true });
   });
   return () => sub.remove();

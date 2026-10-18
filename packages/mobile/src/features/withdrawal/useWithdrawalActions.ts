@@ -35,7 +35,7 @@ import {
   requireGeo,
   type Rec,
 } from './helpers';
-import type { SheetAction } from '../dashboards/details/RowDetailSheet';
+import type { SheetAction } from '../../screens/dashboards/details/RowDetailSheet';
 
 type Admin = {
   _id?: string;

@@ -12,7 +12,7 @@ import {
 import { secureApi } from '../../api/client';
 import { getSessionUser } from '../../auth/permissions';
 import { colors } from '../../theme';
-import { styles } from '../UsersScreen.styles';
+import { styles } from './UsersScreen.styles';
 import { display, type Row } from './helpers';
 
 export function DumpUserModal({
@@ -57,7 +57,12 @@ export function DumpUserModal({
         Alert.alert(res.message || 'Failed to dump user');
         return;
       }
-      const dumpedId = row._id;
+      const dumpedId = String(row._id || '').trim();
+      if (!dumpedId) {
+        Alert.alert('Dump succeeded but user id was missing');
+        onClose();
+        return;
+      }
       onClose();
       onDone(dumpedId);
       Alert.alert('User dumped');

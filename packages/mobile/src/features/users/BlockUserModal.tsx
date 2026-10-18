@@ -13,7 +13,7 @@ import { apiOtpFailed } from '@astro/shared/walletOtp';
 import { secureApi } from '../../api/client';
 import { getSessionUser } from '../../auth/permissions';
 import { colors } from '../../theme';
-import { styles } from '../UsersScreen.styles';
+import { styles } from './UsersScreen.styles';
 import { display, isBlocked, resolveBlockOtpMobile, type Row } from './helpers';
 
 export function BlockUserModal({

@@ -1,26 +1,28 @@
 /** State, data loading, and filters for the withdrawal screen. Actions live in useWithdrawalActions. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
+import { useRoute, type RouteProp } from '@react-navigation/native';
 import { appCodeForName } from '@astro/shared';
-import { secureApi } from '../../api/client';
-import { colors } from '../../theme';
+import { queryKeys } from '../../api/queryKeys';
 import { type DataTableColumn } from '../../dashboards/ui/DataTable';
+import { useScreenQuery } from '../../hooks/useScreenQuery';
+import { colors } from '../../theme';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../utils/dates';
 import { shareCsvFile } from '../../utils/shareCsv';
 import type { SheetDownloadFilter } from '../../utils/sheetDownloadAudit';
 import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '../../utils/empCodeNameCache';
+import {
+  fetchWithdrawalList,
+  fetchWithdrawalSummary,
+} from './fetchWithdrawalList';
 import { useWithdrawalActions } from './useWithdrawalActions';
 import {
   checkOf,
   display,
   fmtAmount,
-  listOf,
   num,
-  pagesOf,
   parseSummary,
   sendToBankName,
   statusColor,
-  totalUsersOf,
   type Rec,
   type Summary,
 } from './helpers';
@@ -45,12 +47,6 @@ export function useWithdrawalScreen() {
   const [searchField, setSearchField] = useState('userName');
   const [searchDraft, setSearchDraft] = useState('');
   const [applied, setApplied] = useState({ field: 'userName', text: '' });
-  const [rows, setRows] = useState<Rec[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [summary, setSummary] = useState<Summary>([]);
-  const [msg, setMsg] = useState('');
   const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
     getCachedEmpCodeNameMap(),
   );
@@ -74,15 +70,84 @@ export function useWithdrawalScreen() {
   draftBeneRef.current = draftBeneficiaryAccounts;
   const [totalBeneListOpen, setTotalBeneListOpen] = useState(false);
 
-  const loadRef = useRef<() => void>(() => {});
-  const loadSummaryRef = useRef<() => void>(() => {});
-  const onRefresh = useCallback(() => {
-    loadRef.current();
-    loadSummaryRef.current();
-  }, []);
-
-  const actions = useWithdrawalActions({ onRefresh });
+  const refreshRef = useRef<() => void>(() => {});
+  const actions = useWithdrawalActions({
+    onRefresh: () => refreshRef.current(),
+  });
   const { admin, perms, mids, beneAccOptions } = actions;
+
+  const listParams = useMemo(
+    () => ({
+      page,
+      pageSize,
+      status,
+      applied,
+      startDate: startDate || todayIST(),
+      endDate: endDate || todayIST(),
+      allData,
+      sortChecked,
+      redFlagOnly,
+      bankAmt,
+      midFilter,
+      selectedBeneficiaryAccounts,
+      showAll: perms.showAll,
+      adminName: admin?.name ? String(admin.name) : undefined,
+      app: (admin?.clientName || admin?.allotedApps) as string | string[] | undefined,
+    }),
+    [
+      admin?.allotedApps,
+      admin?.clientName,
+      admin?.name,
+      allData,
+      applied,
+      bankAmt,
+      endDate,
+      midFilter,
+      page,
+      pageSize,
+      perms.showAll,
+      redFlagOnly,
+      selectedBeneficiaryAccounts,
+      sortChecked,
+      startDate,
+      status,
+    ],
+  );
+
+  const summaryParams = useMemo(
+    () => ({
+      allData,
+      startDate: startDate || todayIST(),
+      endDate: endDate || todayIST(),
+    }),
+    [allData, endDate, startDate],
+  );
+
+  const listQuery = useScreenQuery({
+    queryKey: queryKeys.withdrawal.list(listParams),
+    queryFn: () => fetchWithdrawalList(listParams),
+  });
+
+  const summaryQuery = useScreenQuery({
+    queryKey: queryKeys.withdrawal.summary(summaryParams),
+    queryFn: () => fetchWithdrawalSummary(summaryParams),
+  });
+
+  const rows = listQuery.data?.rows ?? [];
+  const totalPages = listQuery.data?.totalPages ?? 1;
+  const totalUsers = listQuery.data?.totalUsers ?? 0;
+  const loading = listQuery.loading || listQuery.refreshing;
+  const msg = listQuery.errorMessage ?? '';
+  const summary: Summary = useMemo(
+    () => (summaryQuery.data != null ? parseSummary(summaryQuery.data) : []),
+    [summaryQuery.data],
+  );
+
+  const onRefresh = useCallback(() => {
+    void listQuery.refresh();
+    void summaryQuery.refresh();
+  }, [listQuery.refresh, summaryQuery.refresh]);
+  refreshRef.current = onRefresh;
 
   useEffect(() => {
     let active = true;
@@ -103,106 +168,6 @@ export function useWithdrawalScreen() {
     [empCodeNameMap],
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setMsg('');
-    try {
-      const filter: Rec = {};
-      if (selectedBeneficiaryAccounts.length > 0) {
-        filter.beneficiaryAccounts = selectedBeneficiaryAccounts;
-        filter.status = 'Pending';
-      } else if (status) {
-        filter.status = status;
-      }
-      const effectiveStatus =
-        selectedBeneficiaryAccounts.length > 0 ? 'Pending' : status;
-      if (effectiveStatus === 'IN PROGRESS' && !perms.showAll && admin?.name) {
-        filter.name = admin.name;
-      }
-      if (applied.text.trim()) filter[applied.field] = applied.text.trim();
-      if (sortChecked) filter.sort = true;
-      if (redFlagOnly) filter.redFlag = true;
-      if (bankAmt.trim()) filter.bankAmt = bankAmt.trim();
-      if (midFilter) filter.mid = midFilter;
-      const payload: Rec = {
-        type: 'withdrawal',
-        itemsPerPage: pageSize,
-        pageNo: page,
-        filter,
-      };
-      if (!allData) {
-        if (startDate && endDate) {
-          payload.startDate = startDate;
-          payload.endDate = endDate;
-        } else {
-          const today = todayIST();
-          payload.startDate = today;
-          payload.endDate = today;
-        }
-      }
-      const app = admin?.clientName || admin?.allotedApps;
-      if (app) payload.app = app;
-      const res = await secureApi('withdrawals.transactions', payload);
-      if (!res.ok) {
-        setMsg(res.message || 'Failed to load refunds');
-        setRows([]);
-        setTotalPages(1);
-        setTotalUsers(0);
-        return;
-      }
-      setRows(listOf(res.data));
-      setTotalPages(pagesOf(res.data));
-      setTotalUsers(totalUsersOf(res.data));
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    admin,
-    status,
-    applied,
-    pageSize,
-    page,
-    startDate,
-    endDate,
-    allData,
-    perms.showAll,
-    sortChecked,
-    redFlagOnly,
-    bankAmt,
-    midFilter,
-    selectedBeneficiaryAccounts,
-  ]);
-
-  const loadSummary = useCallback(async () => {
-    const payload: Rec = {};
-    if (!allData) {
-      if (startDate && endDate) {
-        payload.startDate = startDate;
-        payload.endDate = endDate;
-      } else {
-        const today = todayIST();
-        payload.startDate = today;
-        payload.endDate = today;
-      }
-    }
-    const res = await secureApi('withdrawals.fundRequest', payload);
-    if (res.ok) setSummary(parseSummary(res.data));
-  }, [allData, startDate, endDate]);
-
-  loadRef.current = () => {
-    void load();
-  };
-  loadSummaryRef.current = () => {
-    void loadSummary();
-  };
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-  useEffect(() => {
-    void loadSummary();
-  }, [loadSummary]);
-
   useEffect(() => {
     const hasNav =
       incoming != null &&
@@ -219,13 +184,6 @@ export function useWithdrawalScreen() {
     }
     setPage(1);
   }, [incoming?.endDate, incoming?.startDate, incoming?.status]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-      void loadSummary();
-    }, [load, loadSummary]),
-  );
 
   const shareCsv = useCallback(async (fileName: string, headers: string[], data: string[][]) => {
     const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -510,11 +468,6 @@ export function useWithdrawalScreen() {
     setEndDate(value);
   }, []);
 
-  const refresh = useCallback(() => {
-    void load();
-    void loadSummary();
-  }, [load, loadSummary]);
-
   const openBenePendingPanel = useCallback(() => {
     setDraftBeneficiaryAccounts(selectedBeneficiaryAccounts);
     setBenePendingOpen(true);
@@ -597,7 +550,7 @@ export function useWithdrawalScreen() {
     sheetOtp,
     setSheetOtp,
     sheetAfterOtp,
-    refresh,
+    refresh: onRefresh,
     mids,
     beneAccOptions,
   };

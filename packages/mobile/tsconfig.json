@@ -13,7 +13,17 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@features/*": [
+        "./src/features/*"
+      ]
+    }
   },
   "include": [
     "**/*.ts",
@@ -22,7 +32,12 @@
     "index.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "android",
+    "ios",
+    "build-android",
+    "build-ios",
+    ".metro-tmp"
   ],
   "extends": "expo/tsconfig.base"
 }

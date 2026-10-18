@@ -1,5 +1,5 @@
 /** Static option lists for the Withdrawal screen (desktop WithdrawalPage parity). */
-import type { SearchFieldOption } from '../dashboards/details/DetailFilterBar';
+import type { SearchFieldOption } from '../../screens/dashboards/details/DetailFilterBar';
 
 export const STATUSES = [
   '',

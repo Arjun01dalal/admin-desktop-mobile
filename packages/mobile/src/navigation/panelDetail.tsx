@@ -6,15 +6,14 @@
 import React from 'react';
 import { canAccessNavItem, Permissions, type Permission } from '../auth/permissions';
 import type { AuthUser } from '../types/auth';
+import {
+  mergeTargetParams,
+  type PanelDetailParams,
+  type PanelDetailTarget,
+} from './panelTargetParams';
 
-export type PanelDetailParams = Record<string, unknown>;
-
-export type PanelDetailTarget = {
-  href?: string;
-  state?: Record<string, unknown>;
-  /** Query string, e.g. `?startDate=…&type=falcon`. */
-  search?: string;
-};
+export type { PanelDetailParams, PanelDetailTarget };
+export { mergeTargetParams };
 
 export type PanelDetailRoute = {
   /** Desktop route path — also used as the stack screen name. */
@@ -390,19 +389,6 @@ export function canAccessPanelDetail(path: string, user: AuthUser | null | undef
 /** True when a card target resolves to an implemented mobile detail screen. */
 export function canOpenPanelPath(href?: string): boolean {
   return !!href && ROUTES_BY_PATH.has(href);
-}
-
-/** Merge `search` query params and router `state` into one params object. */
-export function mergeTargetParams(target: PanelDetailTarget): PanelDetailParams {
-  const params: PanelDetailParams = {};
-  if (target.search) {
-    const qs = target.search.startsWith('?') ? target.search.slice(1) : target.search;
-    new URLSearchParams(qs).forEach((value, key) => {
-      params[key] = value;
-    });
-  }
-  if (target.state) Object.assign(params, target.state);
-  return params;
 }
 
 /**

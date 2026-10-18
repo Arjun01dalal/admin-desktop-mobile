@@ -3,7 +3,7 @@
  * (desktop UsersPage parity).
  */
 import { CALLER_HIDDEN_USER_TYPES, type UserType } from '@astro/shared/userTypes';
-import type { SearchFieldOption } from '../dashboards/details/DetailFilterBar';
+import type { SearchFieldOption } from '../../screens/dashboards/details/DetailFilterBar';
 
 export const PAGE_SIZE = 25;
 

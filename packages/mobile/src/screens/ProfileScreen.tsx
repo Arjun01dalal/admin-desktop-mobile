@@ -25,15 +25,8 @@ import { secureApi } from '../api/client';
 import { getRoleOptions } from '../auth/roleSelection';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
 import { useRevealCodes } from '../context/useRevealCodes';
-import {
-  colors,
-  getThemeMode,
-  radius,
-  reloadAppForTheme,
-  setThemeMode,
-  spacing,
-  type ThemeMode,
-} from '../theme';
+import { useTheme } from '../features/theme';
+import { colors, radius, spacing, type ThemeMode } from '../theme';
 import { getAppVersion } from '../utils/appVersion';
 import { styles } from './ProfileScreen.styles';
 import { display } from '../utils/display';
@@ -45,15 +38,11 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
 ];
 
 function ThemePicker() {
-  const [mode, setMode] = useState<ThemeMode>(getThemeMode());
+  const { mode, setMode } = useTheme();
 
   const pick = (next: ThemeMode) => {
     if (next === mode) return;
-    setMode(next);
-    void (async () => {
-      await setThemeMode(next);
-      await reloadAppForTheme();
-    })();
+    void setMode(next);
   };
 
   return (

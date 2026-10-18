@@ -62,5 +62,64 @@ export default tseslint.config(
       'no-control-regex': 'off',
     },
   },
+  // Mobile architecture: features must not import route Screens.
+  {
+    files: ['packages/mobile/src/features/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/screens/*Screen',
+                '**/screens/*Screen.*',
+                '@/screens/*Screen',
+                '@/screens/*Screen.*',
+              ],
+              message:
+                'Features must not import route screens. Keep screens thin; move shared UI into the feature or components/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Prefer feature fetch hooks over calling secureApi from route screens.
+  // Auth / create-user flows are exempt (session bootstrap).
+  {
+    files: ['packages/mobile/src/screens/**/*.{ts,tsx}'],
+    ignores: [
+      'packages/mobile/src/screens/LoginScreen.tsx',
+      'packages/mobile/src/screens/ForgotPasswordScreen.tsx',
+      'packages/mobile/src/screens/AstroLoginScreen.tsx',
+      'packages/mobile/src/screens/CreateUserScreen.tsx',
+      'packages/mobile/src/screens/ProfileScreen.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'warn',
+        {
+          paths: [
+            {
+              name: '../../api/client',
+              message:
+                'Call secureApi from features/*/fetch*.ts + useScreenQuery, not from route screens.',
+            },
+            {
+              name: '../api/client',
+              message:
+                'Call secureApi from features/*/fetch*.ts + useScreenQuery, not from route screens.',
+            },
+            {
+              name: '../../../api/client',
+              message:
+                'Call secureApi from features/*/fetch*.ts + useScreenQuery, not from route screens.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   prettier,
 );

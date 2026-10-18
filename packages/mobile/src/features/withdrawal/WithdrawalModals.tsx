@@ -21,7 +21,7 @@ import {
   sendToBankName,
   type Rec,
 } from './helpers';
-import { styles } from '../WithdrawalScreen.styles';
+import { styles } from './WithdrawalScreen.styles';
 
 type WithdrawalModalsProps = {
   validationRow: Rec | null;

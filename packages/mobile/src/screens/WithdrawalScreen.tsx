@@ -15,21 +15,21 @@ import { colors } from '../theme';
 import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
 import { SheetDownloadOtpModal } from '../components/SheetDownloadOtpModal';
-import { DepositWithdrawalMidModal } from './withdrawal/DepositWithdrawalMidModal';
-import { WithdrawalModals } from './withdrawal/WithdrawalModals';
-import { WithdrawalCardFooter } from './withdrawal/WithdrawalCardFooter';
-import { WithdrawalToolbar } from './withdrawal/WithdrawalToolbar';
-import { TotalBeneListModal } from './withdrawal/TotalBeneListModal';
 import {
+  DepositWithdrawalMidModal,
+  TotalBeneListModal,
+  WithdrawalCardFooter,
+  WithdrawalModals,
+  WithdrawalToolbar,
   display,
   fmtAmount,
   isRedFlag,
   sendToBankName,
   statusBadgeBg,
   type Rec,
-} from './withdrawal/helpers';
-import { styles } from './WithdrawalScreen.styles';
-import { useWithdrawalScreen } from './withdrawal/useWithdrawalScreen';
+  useWithdrawalScreen,
+  withdrawalStyles as styles,
+} from '../features/withdrawal';
 
 const COPYABLE_COLUMN_KEYS = new Set(['sendToBank', 'bank', 'accountNo', 'ifsc']);
 

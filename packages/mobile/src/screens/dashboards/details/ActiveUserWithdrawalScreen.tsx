@@ -44,12 +44,16 @@ import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { DateField } from '../../../components/DateField';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
-import { WithdrawalModals } from '../../withdrawal/WithdrawalModals';
-import { WithdrawalCardFooter } from '../../withdrawal/WithdrawalCardFooter';
-import { useWithdrawalActions } from '../../withdrawal/useWithdrawalActions';
-import { toWithdrawalRec } from '../../withdrawal/toWithdrawalRec';
-import { display, statusBadgeBg, type Rec } from '../../withdrawal/helpers';
-import { styles as wdStyles } from '../../WithdrawalScreen.styles';
+import {
+  WithdrawalCardFooter,
+  WithdrawalModals,
+  display,
+  statusBadgeBg,
+  toWithdrawalRec,
+  useWithdrawalActions,
+  type Rec,
+  withdrawalStyles as wdStyles,
+} from '../../../features/withdrawal';
 import { styles } from './ActiveUserWithdrawalScreen.styles';
 import { maskMobile } from '../../../utils/display';
 
