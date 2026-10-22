@@ -1534,6 +1534,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  'campaign.createLeads': {
+    method: 'POST',
+    path: '/campaign/{campaignId}/leads',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   'campaign.nextCall': {
     method: 'GET',
     path: '/campaign/next-call',

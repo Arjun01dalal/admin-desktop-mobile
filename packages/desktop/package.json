@@ -132,7 +132,8 @@
     "react-router-dom": "^7.18.3",
     "react-toastify": "^10.0.6",
     "tailwind-merge": "^3.6.0",
-    "ws": "^8.21.1"
+    "ws": "^8.21.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@astro/shared": "*",

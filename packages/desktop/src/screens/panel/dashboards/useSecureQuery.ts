@@ -14,12 +14,13 @@ type CacheEntry = {
 };
 
 const queryCache = new Map<string, CacheEntry>();
-const DEFAULT_CACHE_TTL_MS = 30_000;
+/** Always network by default — real-time lists; opt in with cacheTtlMs > 0 only if needed. */
+const DEFAULT_CACHE_TTL_MS = 0;
 
 /**
  * Fetch data for the new dashboard pages through the existing secure IPC bridge.
  * Guards against stale responses when the payload changes rapidly.
- * Soft-caches successful results for short revisit navigation.
+ * No soft-cache by default (always hits the network on mount / payload change).
  */
 export function useSecureQuery<T = unknown>(
   action: SecureAction,

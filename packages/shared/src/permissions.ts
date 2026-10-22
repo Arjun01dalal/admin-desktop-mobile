@@ -128,9 +128,9 @@ export const Permissions = {
   Disable_Withdrawals_Check: 'Disable_Withdrawals_Check',
   change_status: 'change_status',
   show_mobile: 'show_mobile',
-  /** Gtel Calls page (admin-panel-domains GtelCalls). */
   show_gtel_calls: 'show_gtel_calls',
   show_gtel_dashboard: 'show_gtel_dashboard',
+  show_suspicious_call: 'show_suspicious_call',
   show_c2cBtn: 'show_c2cBtn',
   c2c_campaign_data: 'c2c_campaign_data',
   contact_visibility_none: 'contact_visibility_none',
@@ -395,6 +395,12 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'Gtel Dashboard',
     'gtel_dashboard',
     'gtelDashboard',
+  ],
+  show_suspicious_call: [
+    'show_suspicious_call',
+    'Show_Suspicious_Call',
+    'showSuspiciousCall',
+    'suspicious_call',
   ],
   show_c2cBtn: ['show_c2cBtn', 'show_c2c_btn', 'Show_C2C_Btn', 'c2cBtn'],
   c2c_campaign_data: [

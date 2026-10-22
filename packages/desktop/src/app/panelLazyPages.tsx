@@ -47,6 +47,11 @@ const GameUserStatsPage = lazyNamed(
   'GameUserStatsPage',
 );
 const CallLogsPage = lazyNamed(() => import('@/screens/panel/CallLogsPage'), 'CallLogsPage');
+const GtelCallsPage = lazyNamed(() => import('@/screens/panel/GtelCallsPage'), 'GtelCallsPage');
+const GtelCallerDashboardPage = lazyNamed(
+  () => import('@/screens/panel/GtelCallerDashboardPage'),
+  'GtelCallerDashboardPage',
+);
 const DialerPushDataPage = lazyNamed(
   () => import('@/screens/panel/DialerPushDataPage'),
   'DialerPushDataPage',
@@ -392,6 +397,8 @@ export {
   GameActivityDetailsPage,
   GameUserStatsPage,
   CallLogsPage,
+  GtelCallsPage,
+  GtelCallerDashboardPage,
   DialerPushDataPage,
   NewRegistersPage,
   StateWiseRegistrationPage,

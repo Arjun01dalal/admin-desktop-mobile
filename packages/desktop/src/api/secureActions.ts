@@ -344,6 +344,7 @@ export const SECURE_ACTIONS = [
   'campaign.duplicate',
   'campaign.listData',
   'campaign.addData',
+  'campaign.createLeads',
   'campaign.nextCall',
   'dashboard.wco',
   'dashboard.qtech',

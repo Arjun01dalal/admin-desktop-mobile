@@ -21,6 +21,8 @@ import {
   GameActivityDetailsPage,
   GameUserStatsPage,
   CallLogsPage,
+  GtelCallsPage,
+  GtelCallerDashboardPage,
   DialerPushDataPage,
   NewRegistersPage,
   StateWiseRegistrationPage,
@@ -182,6 +184,8 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/game-activity/details" element={<GameActivityDetailsPage />} />
             <Route path="/game-activity/user-stats" element={<GameUserStatsPage />} />
             <Route path="/call-logs" element={<CallLogsPage />} />
+            <Route path="/gtel-calls" element={<GtelCallsPage />} />
+            <Route path="/gtel-caller-dashboard" element={<GtelCallerDashboardPage />} />
             <Route path="/c2c-campaign-data" element={<C2cCampaignDataPage />} />
             <Route path="/dialer-push-data" element={<DialerPushDataPage />} />
             <Route path="/new-registers" element={<NewRegistersPage />} />

@@ -28,12 +28,23 @@ export type C2cCampaign = {
   _id: string;
   campaignName: string;
   isActive: boolean;
+  isLead?: boolean;
   createdBy?: C2cCampaignCreatedBy;
   callers: C2cCampaignCaller[];
   data: C2cCampaignStats;
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type C2cCampaignLeadInput = {
+  mobile: string;
+  name?: string;
+  source?: string;
+};
+
+export function isC2cLeadCampaign(campaign: { isLead?: boolean } | null | undefined): boolean {
+  return campaign?.isLead === true;
+}
 
 export type C2cCustomerStatus = 'pending' | 'assigned' | 'completed' | '';
 
@@ -249,6 +260,8 @@ export function normalizeC2cCampaign(row: unknown): C2cCampaign {
     _id: String(r._id || r.id || ''),
     campaignName: String(r.campaignName || r.name || '').trim(),
     isActive: Boolean(r.isActive ?? r.active ?? false),
+    isLead:
+      r.isLead === true || String(r.type || '').trim().toLowerCase() === 'lead',
     createdBy: normalizeCreatedBy(r.createdBy ?? r.created_by ?? r.creator),
     callers: rawCallers
       .map((c) => {

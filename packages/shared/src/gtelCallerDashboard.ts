@@ -39,6 +39,21 @@ export type GtelCallerDashRow = {
   metrics: GtelCallerDashMetric[];
   /** disposition name → count (admin byDisposition modal). */
   byDisposition: Record<string, number>;
+  campaignActive: string[];
+  campaignInactive: string[];
+  byAllotmentType: Record<string, number>;
+  allottedCx: string[];
+  allottedCxDetails: GtelAllottedCxDetail[];
+};
+
+/** Allotted CX row from caller dashboard (`dp_id` / `name` / `source` / `allotedAt`). */
+export type GtelAllottedCxDetail = {
+  dp_id?: string;
+  name?: string;
+  source?: string;
+  allotedAt?: string;
+  _id?: string;
+  [key: string]: unknown;
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -243,20 +258,98 @@ function countOrValue(raw: unknown, labels: string[]): string | number | undefin
 }
 
 function extractListLabels(value: unknown): string[] {
+  return extractListRecords(value)
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      return String(
+        item.name ||
+          item.campaignName ||
+          item.title ||
+          item.label ||
+          item.dp_id ||
+          item._id ||
+          '',
+      ).trim();
+    })
+    .filter(Boolean);
+}
+
+function looksLikeAllottedCxArray(value: unknown): boolean {
+  if (!Array.isArray(value) || !value.length) return false;
+  return value.some(
+    (item) =>
+      isPlainObject(item) &&
+      (item.dp_id != null ||
+        item.dpId != null ||
+        item.source != null ||
+        item.allotedAt != null ||
+        item.allottedAt != null),
+  );
+}
+
+function extractListRecords(value: unknown): Array<string | GtelAllottedCxDetail> {
   if (value == null) return [];
   if (Array.isArray(value)) {
     return value
       .map((item) => {
-        if (item == null) return '';
-        if (typeof item === 'string' || typeof item === 'number') return String(item).trim();
-        if (isPlainObject(item)) {
-          return String(
-            item.campaignName || item.name || item.title || item.label || item._id || '',
-          ).trim();
+        if (item == null) return null;
+        if (typeof item === 'string' || typeof item === 'number') {
+          const text = String(item).trim();
+          return text || null;
         }
-        return '';
+        if (isPlainObject(item)) {
+          const dpId =
+            item.dp_id != null
+              ? String(item.dp_id)
+              : item.dpId != null
+                ? String(item.dpId)
+                : item._id != null
+                  ? String(item._id)
+                  : undefined;
+          const name = item.name != null ? String(item.name) : undefined;
+          // Prefer allotted-CX shape (dp_id / source / allotedAt).
+          if (
+            item.dp_id != null ||
+            item.dpId != null ||
+            item.source != null ||
+            item.allotedAt != null ||
+            item.allottedAt != null
+          ) {
+            return {
+              ...item,
+              dp_id: dpId,
+              _id: dpId,
+              name,
+              source: item.source != null ? String(item.source) : undefined,
+              allotedAt:
+                item.allotedAt != null
+                  ? String(item.allotedAt)
+                  : item.allottedAt != null
+                    ? String(item.allottedAt)
+                    : undefined,
+            } satisfies GtelAllottedCxDetail;
+          }
+          return {
+            ...item,
+            dp_id: dpId,
+            _id: dpId,
+            name:
+              name ||
+              (item.campaignName != null ? String(item.campaignName) : undefined) ||
+              (item.title != null ? String(item.title) : undefined) ||
+              (item.label != null ? String(item.label) : undefined),
+            source: item.source != null ? String(item.source) : undefined,
+            allotedAt:
+              item.allotedAt != null
+                ? String(item.allotedAt)
+                : item.allottedAt != null
+                  ? String(item.allottedAt)
+                  : undefined,
+          } satisfies GtelAllottedCxDetail;
+        }
+        return null;
       })
-      .filter(Boolean);
+      .filter((item): item is string | GtelAllottedCxDetail => item != null);
   }
   if (typeof value === 'string') {
     const text = value.trim();
@@ -526,6 +619,40 @@ function mapCallerRow(row: Record<string, unknown>): GtelCallerDashRow {
   const metrics: GtelCallerDashMetric[] = [];
   const seen = new Set<string>();
   let byDisposition: Record<string, number> = {};
+  let campaignActive: string[] = [];
+  let campaignInactive: string[] = [];
+  let byAllotmentType: Record<string, number> = {};
+  let allottedCx: string[] = [];
+  let allottedCxDetails: GtelAllottedCxDetail[] = [];
+  const allotmentMetaKeys = new Set([
+    'total',
+    'count',
+    'allotted',
+    'allotment',
+    'allotments',
+    'sum',
+  ]);
+  const allotmentListKeys = new Set([
+    'list',
+    'cx',
+    'cxs',
+    'details',
+    'detail',
+    'customers',
+    'customer',
+    'allottedlist',
+    'allotedlist',
+    'allotedcustomer',
+    'allottedcustomer',
+    'allotedcustomers',
+    'allottedcustomers',
+    'allottedcx',
+    'allotedcx',
+    'names',
+    'items',
+    'players',
+    'records',
+  ]);
   const skipCallFields = new Set([
     'total',
     'calls',
@@ -548,6 +675,8 @@ function mapCallerRow(row: Record<string, unknown>): GtelCallerDashRow {
         groupObj.inactiveList;
       const activeLabels = extractListLabels(activeRaw);
       const inactiveLabels = extractListLabels(inactiveRaw);
+      if (activeLabels.length) campaignActive = activeLabels;
+      if (inactiveLabels.length) campaignInactive = inactiveLabels;
       const activeCount = countOrValue(activeRaw, activeLabels);
       const inactiveCount = countOrValue(inactiveRaw, inactiveLabels);
       if (activeCount != null) pushMetric(metrics, seen, 'campaign', 'active', activeCount);
@@ -574,26 +703,77 @@ function mapCallerRow(row: Record<string, unknown>): GtelCallerDashRow {
 
     if (normGroup === 'allotment' || normGroup === 'allotments' || normGroup === 'allot') {
       let allotmentTotal = 0;
+      const byTypeCandidates = [
+        groupObj.byType,
+        groupObj.by_type,
+        groupObj.types,
+        groupObj.byAllotmentType,
+        groupObj.breakdown,
+        groupObj.counts,
+      ];
+      const byTypeRaw = byTypeCandidates.find(
+        (candidate) => candidate != null && !looksLikeAllottedCxArray(candidate),
+      );
+      if (byTypeRaw != null) {
+        byAllotmentType = { ...byAllotmentType, ...parseByDisposition(byTypeRaw) };
+      }
+
+      const pushAllottedRecords = (fieldVal: unknown) => {
+        const records = extractListRecords(fieldVal);
+        if (!records.length) return;
+        for (const rec of records) {
+          if (typeof rec === 'string') {
+            allottedCx.push(rec);
+            allottedCxDetails.push({ _id: rec, name: rec });
+          } else {
+            allottedCxDetails.push(rec);
+            const label = String(rec.name || rec.dp_id || rec._id || '').trim();
+            if (label) allottedCx.push(label);
+          }
+        }
+        if (!allotmentTotal) allotmentTotal = Math.max(allotmentTotal, records.length);
+      };
+
       for (const [field, fieldVal] of Object.entries(groupObj)) {
         const nf = normalizeKey(field);
+        // CX detail arrays (dp_id/name/source/allotedAt) — even under breakdown/counts.
+        if (looksLikeAllottedCxArray(fieldVal)) {
+          pushAllottedRecords(fieldVal);
+          continue;
+        }
         if (
           ['bytype', 'by_type', 'types', 'byallotmenttype', 'breakdown', 'counts'].includes(nf)
         ) {
-          if (isPlainObject(fieldVal)) {
-            for (const [typeName, count] of Object.entries(fieldVal)) {
-              if (typeof count === 'number' || typeof count === 'string') {
-                pushMetric(metrics, seen, 'allotment', typeName, count);
-              }
-            }
+          continue;
+        }
+        if (allotmentListKeys.has(nf) || Array.isArray(fieldVal)) {
+          pushAllottedRecords(fieldVal);
+          continue;
+        }
+        if (fieldVal == null || fieldVal === '' || typeof fieldVal === 'object') continue;
+        const num = Number(fieldVal);
+        if (!Number.isFinite(num)) {
+          pushMetric(metrics, seen, 'allotment', field, fieldVal);
+          continue;
+        }
+        if (allotmentMetaKeys.has(nf)) {
+          pushMetric(metrics, seen, 'allotment', field, fieldVal);
+          if (nf === 'total' || nf === 'allotted' || nf === 'count') {
+            allotmentTotal = Math.max(allotmentTotal, num);
           }
           continue;
         }
-        if (fieldVal == null || typeof fieldVal === 'object') continue;
-        const num = Number(fieldVal);
-        if (Number.isFinite(num) && (nf === 'total' || nf === 'allotted' || nf === 'count')) {
-          allotmentTotal = Math.max(allotmentTotal, num);
-        }
+        // Remaining numeric fields are allotment types (campaign, manual, …).
+        byAllotmentType[field] = (byAllotmentType[field] || 0) + num;
         pushMetric(metrics, seen, 'allotment', field, fieldVal);
+      }
+
+      for (const [typeName, count] of Object.entries(byAllotmentType)) {
+        pushMetric(metrics, seen, 'allotment', typeName, count);
+      }
+
+      if (!allotmentTotal) {
+        allotmentTotal = Object.values(byAllotmentType).reduce((sum, n) => sum + n, 0);
       }
       if (allotmentTotal && !seen.has('allotment:total')) {
         pushMetric(metrics, seen, 'allotment', 'total', allotmentTotal);
@@ -760,6 +940,17 @@ function mapCallerRow(row: Record<string, unknown>): GtelCallerDashRow {
     }
   }
 
+  // Fallback: derive allotment types from metrics when unknown shape.
+  if (!Object.keys(byAllotmentType).length) {
+    for (const m of metrics) {
+      if (!m.key.startsWith('allotment:')) continue;
+      const field = m.key.slice('allotment:'.length);
+      if (!field || allotmentMetaKeys.has(field)) continue;
+      const n = Number(String(m.value).replace(/,/g, ''));
+      if (Number.isFinite(n)) byAllotmentType[m.label || field] = n;
+    }
+  }
+
   return {
     name,
     empCode,
@@ -768,6 +959,11 @@ function mapCallerRow(row: Record<string, unknown>): GtelCallerDashRow {
     talkTime,
     metrics: sortMetrics(metrics),
     byDisposition,
+    campaignActive,
+    campaignInactive,
+    byAllotmentType,
+    allottedCx: Array.from(new Set(allottedCx)),
+    allottedCxDetails,
   };
 }
 
@@ -1652,4 +1848,54 @@ export function filterGtelCallerDashRowsForHead(
   return rows.filter((row) =>
     matchesGtelCallerHeadAssignment(lookupCallerHead(row, index), loginNames),
   );
+}
+
+export type AssembleGtelCallerDashboardParams = {
+  dashBody: unknown;
+  /** `byRole` from ops.callerAllotmentSubadmins — required when restricting. */
+  allotByRole?: unknown;
+  restrictToAssignedCallers: boolean;
+  roleId: string;
+  userId: string;
+  empCode: string;
+  loginNames: string[];
+};
+
+export type AssembleGtelCallerDashboardResult = {
+  cards: GtelCallerDashCard[];
+  callers: GtelCallerDashRow[];
+  /** Soft empty-state message (not a network failure). */
+  emptyMessage: string | null;
+};
+
+/** Normalize dashboard (+ optional head allotment filter) into UI cards/rows. */
+export function assembleGtelCallerDashboard(
+  params: AssembleGtelCallerDashboardParams,
+): AssembleGtelCallerDashboardResult {
+  const parsed = normalizeGtelCallerDashboard(params.dashBody);
+  let callers = parsed.callers;
+
+  if (params.restrictToAssignedCallers) {
+    const index = buildGtelCallerHeadIndex(params.allotByRole);
+    const matchNames = gtelCallerHeadMatchNames(params.allotByRole, {
+      roleId: params.roleId,
+      userId: params.userId,
+      empCode: params.empCode,
+      loginNames: params.loginNames,
+    });
+    callers = filterGtelCallerDashRowsForHead(parsed.callers, index, matchNames);
+  }
+
+  const cards = params.restrictToAssignedCallers
+    ? buildGtelTotalsCardsFromCallers(callers)
+    : mergeGtelTotalsCards(parsed.cards, callers);
+
+  const emptyMessage =
+    !cards.length && !callers.length
+      ? params.restrictToAssignedCallers
+        ? 'No assigned callers for this head.'
+        : 'No dashboard data for selected filters.'
+      : null;
+
+  return { cards, callers, emptyMessage };
 }

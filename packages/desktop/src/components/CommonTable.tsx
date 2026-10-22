@@ -165,6 +165,17 @@ export type CommonTableColumn<T> = {
   stickyLeft?: boolean | number;
 };
 
+/** Top-level grouped header spanning one or more column ids. */
+export type CommonTableHeaderGroup = {
+  id: string;
+  label: ReactNode;
+  columnIds: string[];
+  bgcolor: string;
+  color?: string;
+  subBgcolor: string;
+  subColor?: string;
+};
+
 export type CommonTableProps<T> = {
   columns: CommonTableColumn<T>[];
   rows: T[];
@@ -201,6 +212,11 @@ export type CommonTableProps<T> = {
    * - `light` / `dark`: force that tone
    */
   tone?: CommonTableTone;
+  /**
+   * Optional two-row grouped headers (e.g. TOTAL CALLS → Answered / Not Answered).
+   * Columns not listed in any group get `rowSpan={2}` on the top row.
+   */
+  headerGroups?: CommonTableHeaderGroup[];
 };
 
 type BodyRowProps<T> = {
@@ -262,8 +278,10 @@ function stickyColSx(
     overflow: 'hidden',
     ...(meta.isLast
       ? {
-          boxShadow: '12px 0 16px -10px rgba(0,0,0,0.9)',
-          borderRight: '1px solid rgba(255,255,255,0.18)',
+          // Soft edge only — avoid heavy black cast that looks like a card shadow.
+          boxShadow: '4px 0 10px -6px rgba(0,0,0,0.22)',
+          borderRight: '1px solid',
+          borderRightColor: 'divider',
         }
       : null),
   };
@@ -379,6 +397,7 @@ export function CommonTable<T>({
   maxHeight = 560,
   estimateRowHeight,
   tone = 'auto',
+  headerGroups,
 }: CommonTableProps<T>) {
   useRevealCodes(); // re-render headers when Reveal codes toggles
   const theme = useTheme();
@@ -481,6 +500,37 @@ export function CommonTable<T>({
   // MUI stickyHeader class uses z-index:2 and fights left-freeze stacking — handle top sticky ourselves when freezing columns.
   const useMuiStickyHeader = (stickyHeader || shouldVirtualize) && !hasStickyLeft;
 
+  const groupedHeader = useMemo(() => {
+    if (!headerGroups?.length) return null;
+    const byId = new Map(columns.map((c) => [c.id, c]));
+    const claimed = new Set<string>();
+    const top: Array<
+      | { kind: 'solo'; col: CommonTableColumn<T> }
+      | { kind: 'group'; group: CommonTableHeaderGroup; members: CommonTableColumn<T>[] }
+    > = [];
+    const sub: Array<{ col: CommonTableColumn<T>; group: CommonTableHeaderGroup }> = [];
+
+    for (const col of columns) {
+      if (claimed.has(col.id)) continue;
+      const group = headerGroups.find((g) => g.columnIds.includes(col.id));
+      if (!group) {
+        top.push({ kind: 'solo', col });
+        claimed.add(col.id);
+        continue;
+      }
+      const members = group.columnIds
+        .map((id) => byId.get(id))
+        .filter((c): c is CommonTableColumn<T> => Boolean(c));
+      if (!members.length || members[0].id !== col.id) continue;
+      top.push({ kind: 'group', group, members });
+      for (const m of members) {
+        claimed.add(m.id);
+        sub.push({ col: m, group });
+      }
+    }
+    return { top, sub };
+  }, [columns, headerGroups]);
+
   const table = (
     <Table
       size={size}
@@ -494,43 +544,156 @@ export function CommonTable<T>({
       }}
     >
       <TableHead>
-        <TableRow ref={headLabelRef}>
-          {columns.map((col) => {
-            const stickyMeta = stickyOffsets.get(col.id);
-            return (
-              <TableCell
-                key={col.id}
-                align={col.align ?? 'center'}
-                width={stickyMeta?.width ?? col.width}
-                data-sticky-left={stickyMeta ? 'true' : undefined}
-                onClick={col.sortable || col.onHeaderClick ? col.onHeaderClick : undefined}
-                sx={
-                  [
-                    headBase,
-                    isSticky && {
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: stickyMeta ? 50 : 40,
-                      bgcolor: stickyHeadBg,
-                    },
-                    stickyColSx(stickyMeta, {
-                      top: isSticky ? 0 : undefined,
-                      zIndex: isSticky ? 50 : 45,
-                      bgcolor: stickyHeadBg,
-                    }),
-                    (col.sortable || col.onHeaderClick) && {
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    },
-                    col.headSx,
-                  ] as SxProps<Theme>
+        {groupedHeader ? (
+          <>
+            <TableRow ref={headLabelRef}>
+              {groupedHeader.top.map((cell) => {
+                if (cell.kind === 'solo') {
+                  const stickyMeta = stickyOffsets.get(cell.col.id);
+                  return (
+                    <TableCell
+                      key={cell.col.id}
+                      align={cell.col.align ?? 'center'}
+                      width={stickyMeta?.width ?? cell.col.width}
+                      rowSpan={2}
+                      data-sticky-left={stickyMeta ? 'true' : undefined}
+                      sx={
+                        [
+                          headBase,
+                          isSticky && {
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: stickyMeta ? 50 : 40,
+                            bgcolor: stickyHeadBg,
+                          },
+                          stickyColSx(stickyMeta, {
+                            top: isSticky ? 0 : undefined,
+                            zIndex: isSticky ? 50 : 45,
+                            bgcolor: stickyHeadBg,
+                          }),
+                          cell.col.headSx,
+                        ] as SxProps<Theme>
+                      }
+                    >
+                      {displayColLabel(cell.col.label)}
+                    </TableCell>
+                  );
                 }
-              >
-                {displayColLabel(col.label)}
-              </TableCell>
-            );
-          })}
-        </TableRow>
+                return (
+                  <TableCell
+                    key={cell.group.id}
+                    align="center"
+                    colSpan={cell.members.length}
+                    sx={
+                      [
+                        headBase,
+                        {
+                          bgcolor: `${cell.group.bgcolor} !important`,
+                          color: `${cell.group.color || '#fff'} !important`,
+                          fontWeight: 800,
+                          letterSpacing: 0.4,
+                          whiteSpace: 'nowrap',
+                          borderRight: '1px solid',
+                          borderColor: 'divider',
+                        },
+                        isSticky && {
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 41,
+                        },
+                      ] as SxProps<Theme>
+                    }
+                  >
+                    {cell.group.label}
+                  </TableCell>
+                );
+              })}
+            </TableRow>
+            <TableRow>
+              {groupedHeader.sub.map(({ col, group }) => {
+                const stickyMeta = stickyOffsets.get(col.id);
+                return (
+                  <TableCell
+                    key={`sub-${col.id}`}
+                    align={col.align ?? 'center'}
+                    width={stickyMeta?.width ?? col.width}
+                    data-sticky-left={stickyMeta ? 'true' : undefined}
+                    onClick={col.sortable || col.onHeaderClick ? col.onHeaderClick : undefined}
+                    sx={
+                      [
+                        headBase,
+                        {
+                          bgcolor: `${group.subBgcolor} !important`,
+                          color: `${group.subColor || (resolvedTone === 'dark' ? '#e2e8f0' : '#0f172a')} !important`,
+                          fontWeight: 700,
+                          fontSize: compact || dense ? 11 : 12,
+                          whiteSpace: 'nowrap',
+                          borderRight: '1px solid',
+                          borderColor: 'divider',
+                        },
+                        isSticky && {
+                          position: 'sticky',
+                          top: labelRowHeight || 32,
+                          zIndex: stickyMeta ? 48 : 38,
+                        },
+                        stickyColSx(stickyMeta, {
+                          top: isSticky ? labelRowHeight || 32 : undefined,
+                          zIndex: isSticky ? 48 : 42,
+                          bgcolor: group.subBgcolor,
+                        }),
+                        (col.sortable || col.onHeaderClick) && {
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        },
+                        col.headSx,
+                      ] as SxProps<Theme>
+                    }
+                  >
+                    {displayColLabel(col.label)}
+                  </TableCell>
+                );
+              })}
+            </TableRow>
+          </>
+        ) : (
+          <TableRow ref={headLabelRef}>
+            {columns.map((col) => {
+              const stickyMeta = stickyOffsets.get(col.id);
+              return (
+                <TableCell
+                  key={col.id}
+                  align={col.align ?? 'center'}
+                  width={stickyMeta?.width ?? col.width}
+                  data-sticky-left={stickyMeta ? 'true' : undefined}
+                  onClick={col.sortable || col.onHeaderClick ? col.onHeaderClick : undefined}
+                  sx={
+                    [
+                      headBase,
+                      isSticky && {
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: stickyMeta ? 50 : 40,
+                        bgcolor: stickyHeadBg,
+                      },
+                      stickyColSx(stickyMeta, {
+                        top: isSticky ? 0 : undefined,
+                        zIndex: isSticky ? 50 : 45,
+                        bgcolor: stickyHeadBg,
+                      }),
+                      (col.sortable || col.onHeaderClick) && {
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      },
+                      col.headSx,
+                    ] as SxProps<Theme>
+                  }
+                >
+                  {displayColLabel(col.label)}
+                </TableCell>
+              );
+            })}
+          </TableRow>
+        )}
         {showFilters && (
           <TableRow>
             {columns.map((col) => {

@@ -217,7 +217,6 @@ export function BonusWalletRequestsPage() {
     unpack,
     autoDeps: [page, itemsPerPage, query],
     errorMessage: 'Failed to load bonus wallet requests',
-    cacheTtlMs: 30_000,
   });
 
   const loadSummary = useCallback(async () => {

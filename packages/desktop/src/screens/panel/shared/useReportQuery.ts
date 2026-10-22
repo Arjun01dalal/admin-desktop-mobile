@@ -21,7 +21,7 @@ type Options<T> = {
   /** Auto-load on mount / when deps change. Default: page only via separate effect. */
   autoDeps?: unknown[];
   errorMessage?: string;
-  /** Soft cache TTL for revisit nav. 0 disables. Default 30s. */
+  /** Soft cache TTL for revisit nav. 0 = always network (default). */
   cacheTtlMs?: number;
 };
 
@@ -33,7 +33,8 @@ type CacheEntry = {
 };
 
 const queryCache = new Map<string, CacheEntry>();
-const DEFAULT_CACHE_TTL_MS = 30_000;
+/** Always network by default — real-time reports. */
+const DEFAULT_CACHE_TTL_MS = 0;
 /** Stable default — a fresh `[]` each render would re-fire the effect forever. */
 const DEFAULT_AUTO_DEPS: unknown[] = [];
 
@@ -55,7 +56,7 @@ function readCache<T>(key: string): CacheEntry | null {
   return hit as CacheEntry & { rows: T[] };
 }
 
-/** Shared list-query hook with stale-request guards + short TTL cache. */
+/** Shared list-query hook with stale-request guards (no cache by default). */
 export function useReportQuery<T>({
   action,
   buildPayload,

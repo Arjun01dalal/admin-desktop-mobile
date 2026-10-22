@@ -91,30 +91,31 @@ export const GTEL_STATUS_FILTER_CARDS: {
   { key: 'pending', label: 'Pending', apiValue: 'PENDING' },
 ];
 
-/** Match a call row to a summary status bucket (status + statusByDialer). */
+/** Match a call row to a summary status bucket (prefer statusByDialer). */
 export function gtelCallMatchesStatus(
   call: GtelCall,
   filter: GtelStatusFilter,
 ): boolean {
   if (!filter) return true;
-  const raw = `${call.statusByDialer || ''} ${call.status || ''}`.toUpperCase();
+  const primary = String(call.statusByDialer || call.status || '')
+    .toUpperCase()
+    .trim();
+  const isNoAnswer =
+    primary.includes('NO ANSWER') ||
+    primary.includes('NOANSWER') ||
+    primary.includes('NO_ANSWER') ||
+    primary === 'NOANSWER';
+  if (filter === 'noAnswer') return isNoAnswer;
   if (filter === 'answered') {
-    return raw.includes('ANSWER') && !raw.includes('NO');
+    return !isNoAnswer && primary.includes('ANSWER');
   }
-  if (filter === 'noAnswer') {
-    return (
-      raw.includes('NO ANSWER') ||
-      raw.includes('NOANSWER') ||
-      raw.includes('NO_ANSWER')
-    );
-  }
-  if (filter === 'failed') return raw.includes('FAIL');
+  if (filter === 'failed') return primary.includes('FAIL');
   if (filter === 'pending') {
     return (
-      raw.includes('PEND') ||
-      raw.includes('RING') ||
-      raw.includes('QUEUE') ||
-      raw.includes('INIT')
+      primary.includes('PEND') ||
+      primary.includes('RING') ||
+      primary.includes('QUEUE') ||
+      primary.includes('INIT')
     );
   }
   return true;
@@ -158,15 +159,26 @@ export type GtelCallsPage = {
 export const DEFAULT_GTEL_PAGE_SIZE = 50;
 export const GTEL_PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200, 250] as const;
 
-/** Admin-panel hard-coded overrides (parity). */
+/**
+ * Legacy admin-panel mobile bypasses (parity with web).
+ * Prefer responsibility flags (`show_mobile` / `show_c2cBtn`). These constants
+ * remain until ops migrates those accounts onto real permissions — do not add more.
+ */
 export const GTEL_SHOW_MOBILE_OVERRIDE = '9676849375';
 export const GTEL_SHOW_C2C_OVERRIDE = '8956381336';
 
-/** Gate: `show_c2cBtn` responsibility or hard-coded override mobile (admin parity). */
-export function canShowGtelC2c(user: PermissionUser | null | undefined): boolean {
+/** Gate: `show_mobile` responsibility or tracked legacy override mobile. */
+export function canShowGtelMobile(user: PermissionUser | null | undefined): boolean {
+  if (hasPermission(Permissions.show_mobile, user ?? null)) return true;
   const mobile = String(user?.mobile || '').trim();
-  if (mobile === GTEL_SHOW_C2C_OVERRIDE) return true;
-  return hasPermission(Permissions.show_c2cBtn, user ?? null);
+  return mobile === GTEL_SHOW_MOBILE_OVERRIDE;
+}
+
+/** Gate: `show_c2cBtn` responsibility or tracked legacy override mobile. */
+export function canShowGtelC2c(user: PermissionUser | null | undefined): boolean {
+  if (hasPermission(Permissions.show_c2cBtn, user ?? null)) return true;
+  const mobile = String(user?.mobile || '').trim();
+  return mobile === GTEL_SHOW_C2C_OVERRIDE;
 }
 
 const GREEN_DISPOSITIONS = new Set([

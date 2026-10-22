@@ -1,33 +1,47 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const sharedSrc = path.resolve(__dirname, '../shared/src');
 const pkg = JSON.parse(
   readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'),
 ) as { version?: string };
 
+/**
+ * Resolve `@astro/shared/<subpath>` to either `shared/src/<subpath>.ts`
+ * or `shared/src/<subpath>/index.ts` (folder packages like opsDashboard).
+ */
+function astroSharedSubpathPlugin(): Plugin {
+  return {
+    name: 'astro-shared-subpath',
+    enforce: 'pre',
+    resolveId(id) {
+      const match = id.match(/^@astro\/shared\/(.+)$/);
+      if (!match) return null;
+      const sub = match[1];
+      const asFile = path.join(sharedSrc, `${sub}.ts`);
+      if (existsSync(asFile)) return asFile;
+      const asIndex = path.join(sharedSrc, sub, 'index.ts');
+      if (existsSync(asIndex)) return asIndex;
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [astroSharedSubpathPlugin(), react()],
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
   },
   resolve: {
-    // More specific aliases MUST come first — otherwise `@astro/shared`
-    // steals `@astro/shared/permissions` (etc.) and resolution fails.
+    // Root package only here — subpaths are handled by astroSharedSubpathPlugin
+    // so both `foo.ts` and `foo/index.ts` resolve correctly.
     alias: [
       {
-        find: /^@astro\/shared\/api$/,
-        replacement: path.join(sharedSrc, 'api/index.ts'),
-      },
-      {
-        find: /^@astro\/shared\/(.+)$/,
-        replacement: path.join(sharedSrc, '$1.ts'),
-      },
-      {
-        find: '@astro/shared',
+        // Exact match only — subpaths go through astroSharedSubpathPlugin.
+        find: /^@astro\/shared$/,
         replacement: path.join(sharedSrc, 'index.ts'),
       },
       {

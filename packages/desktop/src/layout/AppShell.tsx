@@ -178,6 +178,9 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
         '/caller-responsibility/details',
       );
     }
+    if (paths.includes('/gtel-calls')) {
+      paths.push('/gtel-caller-dashboard');
+    }
     if (paths.includes('/game-activity')) {
       paths.push('/game-activity/details');
       paths.push('/game-activity/user-stats');
