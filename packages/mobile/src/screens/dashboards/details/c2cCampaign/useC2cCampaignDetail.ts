@@ -2,20 +2,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
-import {
-  C2C_CAMPAIGN_PAGE_SIZE,
-  buildC2cCampaignDataQuery,
-  extractC2cCampaign,
-  extractC2cCampaignCustomers,
-  type C2cCampaign,
-  type C2cCampaignCustomer,
-  type C2cCustomerStatus,
-} from '@astro/shared';
+import { C2C_CAMPAIGN_PAGE_SIZE, type C2cCustomerStatus } from '@astro/shared';
 
-import type { C2cCampaignFormValues } from './C2cCampaignFormModal';
+import { queryKeys } from '../../../../api/queryKeys';
 import { secureApi } from '../../../../api/client';
+import { useScreenQuery } from '../../../../hooks/useScreenQuery';
+import type { C2cCampaignFormValues } from './C2cCampaignFormModal';
+import {
+  fetchC2cCampaignCustomers,
+  fetchC2cCampaignDetail,
+} from './fetchC2cCampaignDetail';
 import { useC2cCallers } from './useC2cCallers';
-
 
 const EMPTY_FORM: C2cCampaignFormValues = {
   name: '',
@@ -26,12 +23,7 @@ const EMPTY_FORM: C2cCampaignFormValues = {
 export function useC2cCampaignDetail(campaignId: string) {
   const { callers, loadCallers } = useC2cCallers(false);
 
-  const [selected, setSelected] = useState<C2cCampaign | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [customers, setCustomers] = useState<C2cCampaignCustomer[]>([]);
-  const [customerTotal, setCustomerTotal] = useState(0);
   const [customerPage, setCustomerPage] = useState(1);
-  const [customersLoading, setCustomersLoading] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerStatus, setCustomerStatus] = useState<C2cCustomerStatus>('');
   const [customerApplied, setCustomerApplied] = useState({
@@ -43,63 +35,43 @@ export function useC2cCampaignDetail(campaignId: string) {
   const [formValues, setFormValues] = useState<C2cCampaignFormValues>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  const customerTotalPages = Math.max(1, Math.ceil(customerTotal / C2C_CAMPAIGN_PAGE_SIZE));
+  const detailQuery = useScreenQuery({
+    queryKey: queryKeys.c2cCampaigns.detail(campaignId),
+    queryFn: () => fetchC2cCampaignDetail(campaignId),
+    enabled: Boolean(campaignId),
+  });
 
-  const loadCampaign = useCallback(async () => {
-    if (!campaignId) return;
-    setDetailLoading(true);
-    try {
-      const res = await secureApi('campaign.get', { campaignId });
-      if (!res.ok) {
-        Alert.alert('Error', res.message || 'Failed to open campaign');
-        setSelected(null);
-        return;
-      }
-      const parsed = extractC2cCampaign(res.data);
-      setSelected(parsed);
-      if (!parsed) Alert.alert('Error', 'Failed to open campaign');
-    } finally {
-      setDetailLoading(false);
-    }
-  }, [campaignId]);
+  const customerParams = {
+    campaignId,
+    page: customerPage,
+    search: customerApplied.search,
+    status: customerApplied.status,
+  };
+
+  const customersQuery = useScreenQuery({
+    queryKey: queryKeys.c2cCampaigns.customers(customerParams),
+    queryFn: () => fetchC2cCampaignCustomers(customerParams),
+    enabled: Boolean(campaignId),
+  });
+
+  const selected = detailQuery.data ?? null;
+  const customers = customersQuery.data?.items ?? [];
+  const customerTotal = customersQuery.data?.total ?? 0;
+  const customerTotalPages = Math.max(1, Math.ceil(customerTotal / C2C_CAMPAIGN_PAGE_SIZE));
+  const loadCampaign = detailQuery.refresh;
+  const loadCustomers = customersQuery.refresh;
 
   useEffect(() => {
     setCustomerPage(1);
     setCustomerApplied({ search: '', status: '' });
     setCustomerSearch('');
     setCustomerStatus('');
-    void loadCampaign();
-  }, [loadCampaign]);
-
-  const loadCustomers = useCallback(async () => {
-    if (!campaignId) return;
-    setCustomersLoading(true);
-    try {
-      const res = await secureApi('campaign.listData', {
-        campaignId,
-        ...buildC2cCampaignDataQuery({
-          pageNo: customerPage,
-          itemsPerPage: C2C_CAMPAIGN_PAGE_SIZE,
-          search: customerApplied.search || undefined,
-          status: customerApplied.status || undefined,
-        }),
-      });
-      if (!res.ok) {
-        setCustomers([]);
-        setCustomerTotal(0);
-        return;
-      }
-      const { items, total: t } = extractC2cCampaignCustomers(res.data);
-      setCustomers(items);
-      setCustomerTotal(t);
-    } finally {
-      setCustomersLoading(false);
-    }
-  }, [campaignId, customerPage, customerApplied]);
+  }, [campaignId]);
 
   useEffect(() => {
-    void loadCustomers();
-  }, [loadCustomers]);
+    if (!detailQuery.errorMessage) return;
+    Alert.alert('Error', detailQuery.errorMessage);
+  }, [detailQuery.errorMessage]);
 
   const openEdit = useCallback(() => {
     if (!selected) {
@@ -148,13 +120,13 @@ export function useC2cCampaignDetail(campaignId: string) {
 
   return {
     selected,
-    detailLoading,
+    detailLoading: detailQuery.loading || detailQuery.refreshing,
     customers,
     customerTotal,
     customerPage,
     setCustomerPage,
     customerTotalPages,
-    customersLoading,
+    customersLoading: customersQuery.loading || customersQuery.refreshing,
     customerSearch,
     setCustomerSearch,
     customerStatus,

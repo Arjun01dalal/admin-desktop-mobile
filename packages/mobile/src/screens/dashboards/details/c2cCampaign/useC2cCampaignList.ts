@@ -1,16 +1,14 @@
 /** List + create + duplicate state for C2C Campaign Data. */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 
-import {
-  C2C_CAMPAIGN_PAGE_SIZE,
-  buildC2cCampaignListQuery,
-  extractC2cCampaignList,
-  type C2cCampaign,
-} from '@astro/shared';
+import { C2C_CAMPAIGN_PAGE_SIZE, type C2cCampaign } from '@astro/shared';
 
-import type { C2cCampaignFormValues } from './C2cCampaignFormModal';
+import { queryKeys } from '../../../../api/queryKeys';
 import { secureApi } from '../../../../api/client';
+import { useScreenQuery } from '../../../../hooks/useScreenQuery';
+import type { C2cCampaignFormValues } from './C2cCampaignFormModal';
+import { fetchC2cCampaignList } from './fetchC2cCampaignList';
 import { useC2cCallers } from './useC2cCallers';
 
 type ActiveFilter = '' | 'true' | 'false';
@@ -24,12 +22,7 @@ const EMPTY_FORM: C2cCampaignFormValues = {
 export function useC2cCampaignList() {
   const { callers, loadCallers } = useC2cCallers(true);
 
-  const [campaigns, setCampaigns] = useState<C2cCampaign[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const [searchInput, setSearchInput] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('');
   const [applied, setApplied] = useState({ search: '', isActive: '' as ActiveFilter });
@@ -44,46 +37,21 @@ export function useC2cCampaignList() {
   const [dupFormValues, setDupFormValues] = useState<C2cCampaignFormValues>(EMPTY_FORM);
   const [duplicating, setDuplicating] = useState(false);
 
-  const listGen = useRef(0);
+  const listParams = {
+    page,
+    search: applied.search,
+    isActive: applied.isActive,
+  };
+
+  const listQuery = useScreenQuery({
+    queryKey: queryKeys.c2cCampaigns.list(listParams),
+    queryFn: () => fetchC2cCampaignList(listParams),
+  });
+
+  const campaigns = listQuery.data?.items ?? [];
+  const total = listQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / C2C_CAMPAIGN_PAGE_SIZE));
-
-  const loadCampaigns = useCallback(async () => {
-    const gen = ++listGen.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await secureApi(
-        'campaign.list',
-        buildC2cCampaignListQuery({
-          pageNo: page,
-          itemsPerPage: C2C_CAMPAIGN_PAGE_SIZE,
-          search: applied.search || undefined,
-          isActive:
-            applied.isActive === 'true' ? true : applied.isActive === 'false' ? false : '',
-        }),
-      );
-      if (gen !== listGen.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load campaigns');
-        setCampaigns([]);
-        setTotal(0);
-        return;
-      }
-      const { items, total: t } = extractC2cCampaignList(res.data);
-      setCampaigns(items);
-      setTotal(t);
-    } catch (err) {
-      if (gen !== listGen.current) return;
-      setError(err instanceof Error ? err.message : 'Failed to load campaigns');
-      setCampaigns([]);
-    } finally {
-      if (gen === listGen.current) setLoading(false);
-    }
-  }, [page, applied]);
-
-  useEffect(() => {
-    void loadCampaigns();
-  }, [loadCampaigns]);
+  const loadCampaigns = listQuery.refresh;
 
   const openCreate = useCallback(() => {
     setFormValues(EMPTY_FORM);
@@ -216,8 +184,8 @@ export function useC2cCampaignList() {
     page,
     setPage,
     totalPages,
-    loading,
-    error,
+    loading: listQuery.loading || listQuery.refreshing,
+    error: listQuery.errorMessage,
     searchInput,
     setSearchInput,
     activeFilter,

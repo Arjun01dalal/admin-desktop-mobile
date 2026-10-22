@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -14,30 +14,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
-  CALLER_ROLE_IDS,
-  EMPCODE_LIST_FILTER_ROLE_ID,
-  buildGtelCallerHeadIndex,
-  filterGtelCallerDashRowsForHead,
   gtelCallerDashStatTone,
-  gtelCallerHeadMatchNames,
-  buildGtelTotalsCardsFromCallers,
-  isGtelCallerHeadDashboardRole,
-  mergeGtelTotalsCards,
-  normalizeGtelCallerDashboard,
-  type GtelCallerDashCard,
   type GtelCallerDashRow,
   type GtelCallerDashTone,
 } from '@astro/shared';
-import { hasPermission, isCallerRole } from '../../../auth/permissions';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { styles, TONE_STYLES } from './CallerDashboardScreen.styles';
 import { CallerDashboardCharts } from './CallerDashboardCharts';
 import { PlaceholderScreen } from '../../PlaceholderScreen';
-import { getStoredUser } from '../../../lib/webShim';
 import { DetailFilterBar } from './DetailFilterBar';
 import { colors, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
-import { secureApi } from '../../../api/client';
+import { useGtelCallerDashboard } from './callerDashboard/useGtelCallerDashboard';
 
 
 
@@ -164,133 +152,28 @@ export function CallerDashboardScreen() {
   }>();
   const params = (useRoute().params ?? {}) as Record<string, unknown>;
   const insets = useSafeAreaInsets();
-  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
-  const canAccess = hasPermission('show_gtel_dashboard', admin);
-  const loginEmpCode = String(admin?.empCode || '').trim();
-  const loginUserId = String(admin?._id || '').trim();
-  const roleId = String(admin?.Role_ID || '');
-  const isCallerNew = roleId === EMPCODE_LIST_FILTER_ROLE_ID;
-  const isCaller = CALLER_ROLE_IDS.has(roleId) || isCallerRole(admin);
-  /** CALLER_HEAD roles only see callers assigned to them in Caller Allotment. */
-  const restrictToAssignedCallers = isGtelCallerHeadDashboardRole(roleId);
-  /** Match admin CallerDashboardPage — lock callers to their own empCode. */
-  const lockEmpCode = (isCaller || isCallerNew) && Boolean(loginEmpCode);
 
   const initialFrom = typeof params.from === 'string' && params.from ? params.from : todayIST();
   const initialTo = typeof params.to === 'string' && params.to ? params.to : todayIST();
-  const initialEmp =
-    lockEmpCode && loginEmpCode
-      ? loginEmpCode
-      : typeof params.empCode === 'string'
-        ? params.empCode
-        : '';
+  const routeEmp = typeof params.empCode === 'string' ? params.empCode : '';
 
   const [draftFrom, setDraftFrom] = useState(initialFrom);
   const [draftTo, setDraftTo] = useState(initialTo);
-  const [draftEmp, setDraftEmp] = useState(initialEmp);
+  const [draftEmp, setDraftEmp] = useState(routeEmp);
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
-  const [empCode, setEmpCode] = useState(initialEmp);
-  const [cards, setCards] = useState<GtelCallerDashCard[]>([]);
-  const [callers, setCallers] = useState<GtelCallerDashRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [empCode, setEmpCode] = useState(routeEmp);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [dispRow, setDispRow] = useState<GtelCallerDashRow | null>(null);
-  const genRef = useRef(0);
+
+  const { canAccess, lockEmpCode, loginEmpCode, cards, callers, loading, error, refresh } =
+    useGtelCallerDashboard({ from, to, empCode });
 
   useEffect(() => {
     if (!lockEmpCode || !loginEmpCode) return;
     setDraftEmp(loginEmpCode);
     setEmpCode(loginEmpCode);
   }, [lockEmpCode, loginEmpCode]);
-
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const payload: Record<string, unknown> = {};
-      if (from.trim()) payload.from = from.trim();
-      if (to.trim()) payload.to = to.trim();
-      const code = lockEmpCode ? loginEmpCode : empCode.trim();
-      if (code) payload.empCode = code;
-
-      const dashPromise = secureApi('gtel.callerDashboard', payload);
-      const allotPromise = restrictToAssignedCallers
-        ? secureApi('ops.callerAllotmentSubadmins', { filter: {} })
-        : Promise.resolve(null);
-
-      const [res, allotRes] = await Promise.all([dashPromise, allotPromise]);
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load caller dashboard');
-        setCards([]);
-        setCallers([]);
-        return;
-      }
-      const parsed = normalizeGtelCallerDashboard(res.data);
-      let nextCallers = parsed.callers;
-
-      if (restrictToAssignedCallers) {
-        if (!allotRes?.ok) {
-          setError(allotRes?.message || 'Failed to load caller allotment');
-          setCards([]);
-          setCallers([]);
-          return;
-        }
-        const byRole =
-          allotRes.data && typeof allotRes.data === 'object'
-            ? (allotRes.data as { byRole?: unknown }).byRole
-            : null;
-        const index = buildGtelCallerHeadIndex(byRole);
-        const loginNames = [
-          admin?.name,
-          admin?.realName,
-          admin?.chatName,
-        ].map((n) => String(n || '').trim());
-        const matchNames = gtelCallerHeadMatchNames(byRole, {
-          roleId,
-          userId: loginUserId,
-          empCode: loginEmpCode,
-          loginNames,
-        });
-        nextCallers = filterGtelCallerDashRowsForHead(parsed.callers, index, matchNames);
-      }
-
-      // CALLER_HEAD → recount from assigned rows; otherwise fill any Totals
-      // the API envelope dropped (mobile decrypt often loses the totals block).
-      const nextCards = restrictToAssignedCallers
-        ? buildGtelTotalsCardsFromCallers(nextCallers)
-        : mergeGtelTotalsCards(parsed.cards, nextCallers);
-
-      setCards(nextCards);
-      setCallers(nextCallers);
-      if (!nextCards.length && !nextCallers.length) {
-        setError(
-          restrictToAssignedCallers
-            ? 'No assigned callers for this head.'
-            : 'No dashboard data for selected filters.',
-        );
-      }
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
-  }, [
-    admin,
-    empCode,
-    from,
-    lockEmpCode,
-    loginEmpCode,
-    loginUserId,
-    restrictToAssignedCallers,
-    roleId,
-    to,
-  ]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const handleApply = useCallback(() => {
     setFrom(draftFrom);
@@ -423,7 +306,7 @@ export function CallerDashboardScreen() {
         loading={loading}
         emptyMessage="No callers found"
         refreshing={loading}
-        onRefresh={() => void load()}
+        onRefresh={() => void refresh()}
       />
 
       <Modal

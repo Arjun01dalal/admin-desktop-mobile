@@ -104,6 +104,8 @@ export function GtelCallsScreen() {
               g.setPage(1);
             }}
             error={g.error}
+            emptyHint={g.emptyHint}
+            listNote={g.listNote}
             setPicker={g.setPicker}
           />
         }
@@ -128,7 +130,15 @@ export function GtelCallsScreen() {
           </View>
         }
         loading={g.loading}
-        emptyMessage={g.statusFilter ? 'No calls for this status' : 'No calls found'}
+        emptyMessage={
+          g.error
+            ? g.error
+            : g.emptyHint
+              ? g.emptyHint
+              : g.statusFilter
+                ? 'No calls for this status'
+                : 'No calls found'
+        }
         refreshing={g.loading}
         onRefresh={g.refresh}
       />

@@ -1,5 +1,5 @@
 /** Data + actions for Gtel Calls (menu + Dashboard→Calls modes). */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,12 +7,9 @@ import {
   CALLER_ROLE_IDS,
   DEFAULT_GTEL_PAGE_SIZE,
   EMPCODE_LIST_FILTER_ROLE_ID,
-  buildGtelCallsQuery,
   buildGtelCxSummaryCounts,
-  buildGtelSummaryCards,
   emptyGtelFilters,
   extractGtelCallById,
-  extractGtelCallsFromCallerDashboard,
   extractGtelDispositions,
   extractGtelExtensions,
   formatGtelDuration,
@@ -22,13 +19,12 @@ import {
   getGtelPlayedVerticals,
   getGtelUsername,
   getNumericExtension,
-  GTEL_SHOW_MOBILE_OVERRIDE,
   GTEL_STATUS_FILTER_CARDS,
+  canShowGtelMobile,
   gtelCallMatchesStatus,
   gtelSummaryCountForStatus,
   isGtelFlaggedCall,
   maskGtelPhone,
-  normalizeGtelCallsPage,
   pickGtelRecordingUrl,
   sanitizeGtelPhone,
   type GtelCall,
@@ -36,12 +32,15 @@ import {
   type GtelStatusFilter,
   type GtelSummaryCard,
 } from '@astro/shared';
+import { queryKeys } from '../../../../api/queryKeys';
 import { secureApi } from '../../../../api/client';
 import { hasPermission, isCallerRole } from '../../../../auth/permissions';
 import { canShowGtelC2c, type GtelC2cTarget } from '../../../../components/GtelClick2CallModal';
+import { useScreenQuery } from '../../../../hooks/useScreenQuery';
 import { getStoredUser } from '../../../../lib/webShim';
 import { spacing } from '../../../../theme';
 import { todayIST } from '../../../../utils/dates';
+import { fetchGtelCallerCallsCapped, fetchGtelCallsPage } from './fetchGtelCalls';
 import { type CxQuickFilter, formatGtelTs } from './format';
 
 export function useGtelCalls() {
@@ -50,9 +49,7 @@ export function useGtelCalls() {
   const insets = useSafeAreaInsets();
   const sheetBottomPad = Math.max(insets.bottom, spacing(3)) + spacing(2);
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
-  const loginMobile = String(admin?.mobile || '').trim();
-  const canShowMobile =
-    loginMobile === GTEL_SHOW_MOBILE_OVERRIDE || hasPermission('show_mobile', admin);
+  const canShowMobile = canShowGtelMobile(admin);
   const canShowC2c = canShowGtelC2c(admin);
   const canShowGtelDashboard = hasPermission('show_gtel_dashboard', admin);
   const loginEmpCode = String(admin?.empCode || '').trim();
@@ -86,19 +83,15 @@ export function useGtelCalls() {
   }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_GTEL_PAGE_SIZE);
-  const [rows, setRows] = useState<GtelCall[]>([]);
-  /** Full list when opened from Dashboard→Calls (client pagination). */
-  const [allCalls, setAllCalls] = useState<GtelCall[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [summaryCards, setSummaryCards] = useState<GtelSummaryCard[]>([]);
-  const [summaryRaw, setSummaryRaw] = useState<Record<string, unknown> | null>(null);
-  /** Client-side status chip filter. */
+  /** Baseline KPI summary (menu mode) — keep while statusByDialer chip is active. */
+  const [baselineSummary, setBaselineSummary] = useState<{
+    raw: Record<string, unknown> | null;
+    cards: GtelSummaryCard[];
+  }>({ raw: null, cards: [] });
+  /** Menu: server statusByDialer. Dashboard→Calls: client filter on capped set. */
   const [statusFilter, setStatusFilter] = useState<GtelStatusFilter>('');
   /** Dashboard → Calls: Exch / Casino / SM / Flagged quick filter. */
   const [cxQuickFilter, setCxQuickFilter] = useState<CxQuickFilter>('all');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [dispositions, setDispositions] = useState<string[]>([]);
   const [extensions, setExtensions] = useState<string[]>([]);
@@ -121,7 +114,104 @@ export function useGtelCalls() {
   const [manualUsersOpen, setManualUsersOpen] = useState(false);
   const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
   const [callStartOpen, setCallStartOpen] = useState(false);
-  const genRef = useRef(0);
+
+  const cappedParams = useMemo(
+    () => ({
+      empCode: shouldLockEmpCode ? loginEmpCode : (routeEmp || applied.empCode).trim(),
+      from: (routeFrom || applied.from).trim(),
+      to: (routeTo || applied.to).trim(),
+      canShowMobile,
+      shouldLockEmpCode,
+      loginEmpCode,
+      isCaller,
+      loginExtensionId,
+    }),
+    [
+      applied.empCode,
+      applied.from,
+      applied.to,
+      canShowMobile,
+      isCaller,
+      loginEmpCode,
+      loginExtensionId,
+      routeEmp,
+      routeFrom,
+      routeTo,
+      shouldLockEmpCode,
+    ],
+  );
+
+  const pageParams = useMemo(
+    () => ({
+      page,
+      pageSize,
+      filters: applied,
+      statusFilter,
+      canShowMobile,
+      shouldLockEmpCode,
+      loginEmpCode,
+      isCaller,
+      loginExtensionId,
+    }),
+    [
+      applied,
+      canShowMobile,
+      isCaller,
+      loginEmpCode,
+      loginExtensionId,
+      page,
+      pageSize,
+      shouldLockEmpCode,
+      statusFilter,
+    ],
+  );
+
+  const cappedMissingEmp = hideHeroActions && !cappedParams.empCode;
+
+  const cappedQuery = useScreenQuery({
+    queryKey: queryKeys.gtelCalls.callerCapped(cappedParams),
+    queryFn: () => fetchGtelCallerCallsCapped(cappedParams),
+    enabled: hideHeroActions && !cappedMissingEmp,
+  });
+
+  const pageQuery = useScreenQuery({
+    queryKey: queryKeys.gtelCalls.page(pageParams),
+    queryFn: () => fetchGtelCallsPage(pageParams),
+    enabled: !hideHeroActions,
+  });
+
+  const allCalls = hideHeroActions ? (cappedQuery.data?.calls ?? []) : [];
+  const rows = hideHeroActions ? [] : (pageQuery.data?.rows ?? []);
+  const total = hideHeroActions
+    ? (cappedQuery.data?.calls.length ?? 0)
+    : (pageQuery.data?.total ?? 0);
+  const totalPages = hideHeroActions ? 1 : (pageQuery.data?.totalPages ?? 1);
+  const summaryRaw = hideHeroActions ? null : baselineSummary.raw;
+  const summaryCards = hideHeroActions
+    ? (cappedQuery.data?.summaryCards ?? [])
+    : baselineSummary.cards;
+  const loading = hideHeroActions
+    ? !cappedMissingEmp && (cappedQuery.loading || cappedQuery.refreshing)
+    : pageQuery.loading || pageQuery.refreshing;
+  const error = cappedMissingEmp
+    ? 'Employee code is required to load caller calls.'
+    : hideHeroActions
+      ? cappedQuery.errorMessage
+      : pageQuery.errorMessage;
+  const emptyHint = useMemo(() => {
+    if (loading || error) return null;
+    if (hideHeroActions) {
+      return allCalls.length ? null : 'No calls found for this caller in the selected date range.';
+    }
+    if (!rows.length && total === 0) return 'No Gtel calls for the selected filters.';
+    return null;
+  }, [allCalls.length, error, hideHeroActions, loading, rows.length, total]);
+  const listNote = useMemo(() => {
+    if (!hideHeroActions || !cappedQuery.data?.truncated) return null;
+    const shown = cappedQuery.data.calls.length;
+    const available = cappedQuery.data.totalAvailable;
+    return `Showing first ${shown.toLocaleString('en-IN')} of ${available.toLocaleString('en-IN')} calls`;
+  }, [cappedQuery.data, hideHeroActions]);
 
   useEffect(() => {
     if (!shouldLockEmpCode || !loginEmpCode) return;
@@ -171,142 +261,23 @@ export function useGtelCalls() {
     };
   }, [hideHeroActions]);
 
-  /** Dashboard→Calls: GET /dialer/caller-dashboard?includeCalls=true (admin parity). */
-  const loadDashboardCalls = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      // Prefer route params (Caller Dashboard → Calls), then applied filters.
-      const empCodeFilter = shouldLockEmpCode
-        ? loginEmpCode
-        : (routeEmp || applied.empCode).trim();
-      const fromFilter = (routeFrom || applied.from).trim();
-      const toFilter = (routeTo || applied.to).trim();
-      if (!empCodeFilter) {
-        setAllCalls([]);
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        setError('Employee code is required to load caller calls.');
-        return;
-      }
-      const dashPayload: Record<string, unknown> = {
-        // Admin sends string "true" — keep the same query shape.
-        includeCalls: 'true',
-        empCode: empCodeFilter,
-      };
-      if (fromFilter) dashPayload.from = fromFilter;
-      if (toFilter) dashPayload.to = toFilter;
-      const dashRes = await secureApi('gtel.callerDashboard', dashPayload);
-      if (gen !== genRef.current) return;
-      if (!dashRes.ok) {
-        setError(dashRes.message || 'Failed to fetch calls');
-        setAllCalls([]);
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        setSummaryCards([]);
-        setSummaryRaw(null);
-        return;
-      }
-      const embedded = extractGtelCallsFromCallerDashboard(
-        dashRes.data,
-        empCodeFilter,
-      ) as GtelCall[];
-      const dashBody =
-        dashRes.data && typeof dashRes.data === 'object'
-          ? (dashRes.data as Record<string, unknown>)
-          : null;
-      const summary =
-        (dashBody?.summary as Record<string, unknown> | null) ||
-        (dashBody?.Summary as Record<string, unknown> | null) ||
-        null;
-      setAllCalls(embedded);
-      setTotal(embedded.length);
-      setSummaryRaw(summary);
-      setSummaryCards(buildGtelSummaryCards(summary, embedded, embedded.length));
-      setCxQuickFilter('all');
-      setStatusFilter('');
-      setPage(1);
-      if (!embedded.length) {
-        setError('No calls found for this caller in the selected date range.');
-      }
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
-  }, [
-    applied.empCode,
-    applied.from,
-    applied.to,
-    loginEmpCode,
-    routeEmp,
-    routeFrom,
-    routeTo,
-    shouldLockEmpCode,
-  ]);
-
-  /** Menu Gtel Calls: server pagination. */
-  const loadServerPage = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const empCodeFilter = shouldLockEmpCode ? loginEmpCode : applied.empCode.trim();
-      const res = await secureApi(
-        'gtel.calls',
-        buildGtelCallsQuery({
-          pageNo: page,
-          itemsPerPage: pageSize,
-          filters: { ...applied, status: '' },
-          canShowMobile,
-          shouldLockEmpCode,
-          loginEmpCode,
-          isCaller,
-          loginExtensionId,
-        }),
-      );
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to fetch calls');
-        setRows([]);
-        setAllCalls([]);
-        setTotal(0);
-        setTotalPages(1);
-        setSummaryCards([]);
-        setSummaryRaw(null);
-        return;
-      }
-      const parsed = normalizeGtelCallsPage(res.data, pageSize, empCodeFilter || undefined);
-      setAllCalls([]);
-      setRows(parsed.rows);
-      setTotal(parsed.total);
-      setTotalPages(parsed.totalPages);
-      setSummaryRaw(parsed.summary);
-      setSummaryCards(buildGtelSummaryCards(parsed.summary, parsed.rows, parsed.total));
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
-  }, [
-    applied,
-    canShowMobile,
-    isCaller,
-    loginEmpCode,
-    loginExtensionId,
-    page,
-    pageSize,
-    shouldLockEmpCode,
-  ]);
+  useEffect(() => {
+    if (hideHeroActions || statusFilter || !pageQuery.data) return;
+    setBaselineSummary({
+      raw: pageQuery.data.summary,
+      cards: pageQuery.data.summaryCards,
+    });
+  }, [hideHeroActions, pageQuery.data, statusFilter]);
 
   useEffect(() => {
-    if (!hideHeroActions) return;
-    void loadDashboardCalls();
-  }, [hideHeroActions, loadDashboardCalls]);
+    if (!hideHeroActions || !cappedQuery.dataUpdatedAt) return;
+    setCxQuickFilter('all');
+    setStatusFilter('');
+    setPage(1);
+  }, [cappedQuery.dataUpdatedAt, hideHeroActions]);
 
-  useEffect(() => {
-    if (hideHeroActions) return;
-    void loadServerPage();
-  }, [hideHeroActions, loadServerPage]);
+  const loadCallerCallsCapped = cappedQuery.refresh;
+  const loadServerPage = pageQuery.refresh;
 
   const handleSearch = () => {
     const next = shouldLockEmpCode
@@ -348,12 +319,12 @@ export function useGtelCalls() {
   );
 
   const filteredSource = useMemo(() => {
-    const source = hideHeroActions ? allCalls : rows;
-    return source.filter((r) => {
+    if (!hideHeroActions) return rows; // status applied via statusByDialer
+    return allCalls.filter((r) => {
       if (statusFilter && !gtelCallMatchesStatus(r, statusFilter)) return false;
-      if (hideHeroActions && cxQuickFilter === 'flagged') {
+      if (cxQuickFilter === 'flagged') {
         if (!isGtelFlaggedCall(r)) return false;
-      } else if (hideHeroActions && cxQuickFilter !== 'all') {
+      } else if (cxQuickFilter !== 'all') {
         if (!getGtelPlayedVerticals(r).includes(cxQuickFilter)) return false;
       }
       return true;
@@ -366,11 +337,7 @@ export function useGtelCalls() {
     return filteredSource.slice(start, start + pageSize);
   }, [filteredSource, hideHeroActions, page, pageSize]);
 
-  const pagerTotal = hideHeroActions
-    ? filteredSource.length
-    : statusFilter
-      ? filteredSource.length
-      : total;
+  const pagerTotal = hideHeroActions ? filteredSource.length : total;
   const pagerPages = hideHeroActions
     ? Math.max(1, Math.ceil(filteredSource.length / pageSize) || 1)
     : Math.max(1, totalPages);
@@ -580,9 +547,9 @@ export function useGtelCalls() {
   }, [canShowMobile, canShowPersonalConnect, canShowRecording, details]);
 
   const refresh = useCallback(() => {
-    if (hideHeroActions) void loadDashboardCalls();
+    if (hideHeroActions) void loadCallerCallsCapped();
     else void loadServerPage();
-  }, [hideHeroActions, loadDashboardCalls, loadServerPage]);
+  }, [hideHeroActions, loadCallerCallsCapped, loadServerPage]);
 
   return {
     navigation,
@@ -612,6 +579,8 @@ export function useGtelCalls() {
     setCxQuickFilter,
     loading,
     error,
+    emptyHint,
+    listNote,
     filtersExpanded,
     setFiltersExpanded,
     dispositions,
@@ -647,7 +616,7 @@ export function useGtelCalls() {
     handleSearch,
     handleReset,
     toggleStatusFilter,
-    loadDashboardCalls,
+    loadCallerCallsCapped,
     loadServerPage,
     refresh,
     openDetails,

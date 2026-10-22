@@ -147,6 +147,19 @@ export const styles = makeStyles({
     fontSize: 11,
     fontWeight: '600',
   },
+  errorBox: {
+    marginTop: spacing(1.5),
+    padding: spacing(2),
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  errorText: {
+    color: colors.destructive,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   listCount: {
     marginTop: spacing(2),
     marginBottom: spacing(2),

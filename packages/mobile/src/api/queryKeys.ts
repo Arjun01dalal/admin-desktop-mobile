@@ -18,4 +18,20 @@ export const queryKeys = {
     list: (params: unknown) => ['withdrawal', 'list', params] as const,
     summary: (params: unknown) => ['withdrawal', 'summary', params] as const,
   },
+  gtelCalls: {
+    all: ['gtelCalls'] as const,
+    page: (params: unknown) => ['gtelCalls', 'page', params] as const,
+    callerCapped: (params: unknown) => ['gtelCalls', 'callerCapped', params] as const,
+  },
+  gtelCallerDashboard: {
+    all: ['gtelCallerDashboard'] as const,
+    page: (params: unknown) => ['gtelCallerDashboard', 'page', params] as const,
+  },
+
+  c2cCampaigns: {
+    all: ['c2cCampaigns'] as const,
+    list: (params: unknown) => ['c2cCampaigns', 'list', params] as const,
+    detail: (campaignId: string) => ['c2cCampaigns', 'detail', campaignId] as const,
+    customers: (params: unknown) => ['c2cCampaigns', 'customers', params] as const,
+  },
 };

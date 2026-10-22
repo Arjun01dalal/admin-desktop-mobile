@@ -261,6 +261,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'campaign.duplicate': {"method":"POST","path":"/campaign/{campaignId}/duplicate","encryptRequest":false,"decryptResponse":true},
   'campaign.listData': {"method":"GET","path":"/campaign/{campaignId}/data","encryptRequest":false,"decryptResponse":true},
   'campaign.addData': {"method":"POST","path":"/campaign/{campaignId}/data","encryptRequest":false,"decryptResponse":true},
+  'campaign.createLeads': {"method":"POST","path":"/campaign/{campaignId}/leads","encryptRequest":false,"decryptResponse":true},
   'campaign.nextCall': {"method":"GET","path":"/campaign/next-call","encryptRequest":false,"decryptResponse":true},
   'dashboard.wco': {"method":"POST","path":"/User/wco","encryptRequest":true,"decryptResponse":true},
   'dashboard.qtech': {"method":"POST","path":"/Qtech/store-bet-All","encryptRequest":false,"decryptResponse":false,"keepDataEnvelope":true},

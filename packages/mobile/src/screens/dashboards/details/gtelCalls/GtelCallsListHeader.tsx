@@ -53,6 +53,8 @@ type Props = {
   pageSize: number;
   setPageSize: (n: number) => void;
   error: string | null;
+  emptyHint: string | null;
+  listNote: string | null;
   setPicker: (v: null | 'extension' | 'disposition') => void;
 };
 
@@ -64,7 +66,7 @@ export function GtelCallsListHeader(p: Props) {
     cxCounts, cxQuickFilter, setCxQuickFilter, setPage, filteredSourceLen, allCallsLen,
     statusFilter, setStatusFilter, statusCards, toggleStatusFilter, total,
     filtersExpanded, setFiltersExpanded, loading, handleSearch, handleReset,
-    pageSize, setPageSize, error, setPicker,
+    pageSize, setPageSize, error, emptyHint, listNote, setPicker,
   } = p;
 
   return (
@@ -301,9 +303,15 @@ export function GtelCallsListHeader(p: Props) {
         </TouchableOpacity>
       </DetailFilterBar>
 
+      {listNote ? <Text style={styles.filterHint}>{listNote}</Text> : null}
       {error ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+      {!error && emptyHint ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.filterHint}>{emptyHint}</Text>
         </View>
       ) : null}
     </>
