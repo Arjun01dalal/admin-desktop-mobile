@@ -386,9 +386,13 @@ export function canAccessPanelDetail(path: string, user: AuthUser | null | undef
   return canAccessNavItem({ id: `detail:${path}`, permission }, user);
 }
 
-/** True when a card target resolves to an implemented mobile detail screen. */
-export function canOpenPanelPath(href?: string): boolean {
-  return !!href && ROUTES_BY_PATH.has(href);
+/**
+ * True when a card target resolves to an implemented mobile detail screen
+ * the user is allowed to open (route + responsibility).
+ */
+export function canOpenPanelPath(href?: string, user?: AuthUser | null): boolean {
+  if (!href || !ROUTES_BY_PATH.has(href)) return false;
+  return canAccessPanelDetail(href, user ?? null);
 }
 
 /**

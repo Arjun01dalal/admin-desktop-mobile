@@ -24,7 +24,10 @@ export function getBackPath(pathname: string): string | null {
     pathname === '/masterLiveMatchTotal' ||
     pathname === '/bothLiveMatchTotal' ||
     pathname === '/bothMasterAddPage' ||
-    pathname === '/masterDashboard'
+    pathname === '/masterDashboard' ||
+    pathname === '/played-today-yesterday' ||
+    pathname === '/todays-active' ||
+    pathname === '/new-registers'
   ) {
     return '/dashboard';
   }

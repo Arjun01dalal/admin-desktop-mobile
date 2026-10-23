@@ -16,6 +16,7 @@ import {
   extractC2cCampaignList,
   type C2cCampaign,
 } from '@astro/shared';
+import { canPushToC2cCampaign } from '../auth/permissions';
 import { secureApi } from '../api/client';
 import { colors, radius, spacing } from '../theme';
 import { makeStyles } from '../styles/common';
@@ -30,6 +31,7 @@ type Props = {
 };
 
 export function AddToC2cCampaignPanel({ userIds, countLabel, disabled }: Props) {
+  const allowed = canPushToC2cCampaign();
   const [open, setOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<C2cCampaign[]>([]);
   const [loadingList, setLoadingList] = useState(false);
@@ -40,6 +42,7 @@ export function AddToC2cCampaignPanel({ userIds, countLabel, disabled }: Props) 
   const [messageOk, setMessageOk] = useState(false);
 
   const loadCampaigns = useCallback(async () => {
+    if (!allowed) return;
     setLoadingList(true);
     setListError(null);
     try {
@@ -64,11 +67,11 @@ export function AddToC2cCampaignPanel({ userIds, countLabel, disabled }: Props) 
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [allowed]);
 
   useEffect(() => {
-    if (open) void loadCampaigns();
-  }, [open, loadCampaigns]);
+    if (allowed && open) void loadCampaigns();
+  }, [allowed, open, loadCampaigns]);
 
   const count = countLabel ?? userIds.length;
   const selected = campaigns.find((c) => c._id === campaignId);
@@ -87,6 +90,8 @@ export function AddToC2cCampaignPanel({ userIds, countLabel, disabled }: Props) 
       setPushing(false);
     }
   };
+
+  if (!allowed) return null;
 
   return (
     <View style={styles.wrap}>

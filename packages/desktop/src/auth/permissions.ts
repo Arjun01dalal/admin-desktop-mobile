@@ -15,6 +15,7 @@ import {
   canAccessDashboard as sharedCanAccessDashboard,
   canAccessNavItem as sharedCanAccessNavItem,
   canEditMidLimits as sharedCanEditMidLimits,
+  canPushToC2cCampaign as sharedCanPushToC2cCampaign,
   canShowMyCoinHistory as sharedCanShowMyCoinHistory,
   canShowSos as sharedCanShowSos,
   canViewMidLimits as sharedCanViewMidLimits,
@@ -125,6 +126,10 @@ export function canViewMidLimits(user: StoredUser | null = getSessionUser()): bo
 
 export function canEditMidLimits(user: StoredUser | null = getSessionUser()): boolean {
   return sharedCanEditMidLimits(user);
+}
+
+export function canPushToC2cCampaign(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanPushToC2cCampaign(user);
 }
 
 export function canShowSos(user: StoredUser | null = getSessionUser()): boolean {

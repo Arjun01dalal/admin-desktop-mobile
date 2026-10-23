@@ -164,6 +164,7 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
         '/masterDashboard',
         '/game-activity',
         '/todays-active',
+        '/played-today-yesterday',
         '/new-registers',
         '/liveMatchTotal',
         '/masterLiveMatchTotal',

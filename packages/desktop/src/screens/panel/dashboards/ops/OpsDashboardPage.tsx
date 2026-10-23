@@ -182,7 +182,7 @@ export function OpsDashboardPage({ mode }: Props) {
             />
           ) : null}
 
-          {/* Admin Dashboard: Restricted Gateway (hidden on VIP / fairbetsOnly). */}
+          {/* After KPIs so gateway UI / modal never sits above clickable StatCards. */}
           {mode !== 'vip' ? <RestrictedGatewaysPanel /> : null}
 
           <Box sx={{ position: 'relative' }}>

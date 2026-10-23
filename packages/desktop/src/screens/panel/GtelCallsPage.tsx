@@ -8,6 +8,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -33,7 +34,6 @@ import {
   DEFAULT_GTEL_PAGE_SIZE,
   GTEL_PAGE_SIZE_OPTIONS,
   GTEL_STATUS_FILTER_CARDS,
-  createGtelCallId,
   emptyGtelFilters,
   extractGtelDispositions,
   extractGtelExtensions,
@@ -54,7 +54,6 @@ import {
   maskGtelPhone,
   pickGtelRecordingUrl,
   pickGtelTranscription,
-  sanitizeGtelPhone,
   type GtelCall,
   type GtelFilters,
 } from '@astro/shared';
@@ -83,15 +82,14 @@ import {
 } from '@/screens/panel/gtel/styles';
 import { PanelAccessDenied } from '@/components/PanelAccessDenied';
 import { useGtelAuth } from '@/screens/panel/gtel/useGtelAuth';
+import { useGtelClickToCall } from '@/screens/panel/gtel/useGtelClickToCall';
 import { useGtelCallsListQuery } from '@/screens/panel/gtel/useGtelCallsListQuery';
 
 export function GtelCallsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const {
-    admin,
     canShowMobile,
-    canShowC2c,
     canShowGtelCalls,
     canShowGtelDashboard,
     canShowSuspiciousCall,
@@ -257,40 +255,9 @@ export function GtelCallsPage() {
   );
 
   const reload = listQuery.refetch;
-
-  const startC2c = useCallback(
-    async (phoneRaw: string, userId?: string) => {
-      const phone = sanitizeGtelPhone(phoneRaw);
-      if (!phone) {
-        toast.error('Phone number is required');
-        return;
-      }
-      if (!loginExtensionId) {
-        toast.error('Extension not found for your account');
-        return;
-      }
-      try {
-        const callId = createGtelCallId();
-        const res = await secureApi('gtel.clickToCall', {
-          callId,
-          phoneNumber: phone,
-          extension: loginExtensionId,
-          userId: userId || '',
-          subAdminId: String(admin?._id || ''),
-          source: 'Manual',
-        });
-        if (!res.ok || res.success === false) {
-          toast.error(res.message || 'Call could not be initiated');
-          return;
-        }
-        toast.success('Call initiated');
-        void reload();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Call failed');
-      }
-    },
-    [admin?._id, loginExtensionId, reload],
-  );
+  const { canShowC2c, startC2c, isCalling } = useGtelClickToCall({
+    onSuccess: () => void reload(),
+  });
 
   const openUserReport = useCallback(
     (call: GtelCall) => {
@@ -427,20 +394,27 @@ export function GtelCallsPage() {
             </Typography>
             {canShowC2c && row.phoneNumber ? (
               <Tooltip title="C2C Call">
-                <IconButton
-                  size="small"
-                  aria-label="C2C Call"
-                  sx={gtelIconBtnSx}
-                  onClick={() => {
-                    const dpi = getGtelDpiId(row);
-                    void startC2c(
-                      String(row.phoneNumber || ''),
-                      dpi !== '—' ? dpi : undefined,
-                    );
-                  }}
-                >
-                  <PhoneInTalkOutlinedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label="C2C Call"
+                    disabled={isCalling(String(row.phoneNumber || ''))}
+                    sx={gtelIconBtnSx}
+                    onClick={() => {
+                      const dpi = getGtelDpiId(row);
+                      void startC2c(
+                        String(row.phoneNumber || ''),
+                        dpi !== '—' ? dpi : undefined,
+                      );
+                    }}
+                  >
+                    {isCalling(String(row.phoneNumber || '')) ? (
+                      <CircularProgress size={14} color="inherit" />
+                    ) : (
+                      <PhoneInTalkOutlinedIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
+                </span>
               </Tooltip>
             ) : null}
           </Stack>
@@ -543,6 +517,7 @@ export function GtelCallsPage() {
       canShowMobile,
       canShowRecording,
       canShowSuspiciousCall,
+      isCalling,
       openDetails,
       openRecording,
       openUserReport,

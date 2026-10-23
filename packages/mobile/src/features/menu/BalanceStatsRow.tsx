@@ -4,6 +4,7 @@
 import React, { useCallback } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../auth/AuthContext';
 import { toDisplayText } from '../../dashboards/jyotish/jyotishMapping';
 import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
 import type { ThemeColors } from '../../themeTokens/palettes';
@@ -76,9 +77,10 @@ export function BalanceStatsRow({
   asOfDate,
 }: Props) {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const styles = useStyles(createBalanceStyles);
 
-  const canOpenUsersBalance = canOpenPanelPath('/balance-f');
+  const canOpenUsersBalance = canOpenPanelPath('/balance-f', user);
 
   const onPress = useCallback(
     (key: BalanceStatKey) => {

@@ -20,6 +20,7 @@ import { ProviderCard } from '../../dashboards/ui/ProviderCard';
 import { RestrictedGatewaysPanel } from '../../dashboards/ui/RestrictedGatewaysPanel';
 import { todayIST } from '../../utils/dates';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../auth/AuthContext';
 import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
 import { styles } from './OpsDashboardScreen.styles';
 
@@ -40,6 +41,7 @@ const TITLES: Record<DashboardMode, { title: string; description: string }> = {
 
 export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
   const meta = TITLES[mode];
+  const { user } = useAuth();
   const navigation = useNavigation<{
     navigate: (name: string, params?: Record<string, unknown>) => void;
   }>();
@@ -237,11 +239,11 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
             />
           ) : null}
 
-          {mode !== 'vip' ? <RestrictedGatewaysPanel /> : null}
-
           <KpiGrid
             items={kpiItems}
-            isItemTappable={(item) => canOpenPanelPath(item.href) || item.href === '/withdrawal'}
+            isItemTappable={(item) =>
+              canOpenPanelPath(item.href, user) || item.href === '/withdrawal'
+            }
             onItemPress={(item) => {
               if (item.href === '/withdrawal') {
                 const state = item.state;
@@ -256,12 +258,14 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
             }}
           />
 
+          {mode !== 'vip' ? <RestrictedGatewaysPanel /> : null}
+
           {visibleCards.map((card) => (
             <ProviderCard
               key={card.id}
               card={card}
               onPress={
-                canOpenPanelPath(card.href)
+                canOpenPanelPath(card.href, user)
                   ? () =>
                       openPanelTarget(navigation, {
                         href: card.href,

@@ -24,6 +24,7 @@ import {
   PLAY_TYPE_LABELS,
   appCodeForName,
   buildPlayedTodayYesterdayPayload,
+  canShowGtelC2c,
   emptyPlaySummary,
   isPlayType,
   normalizePlayedTodayYesterday,
@@ -37,9 +38,14 @@ import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { hasPermission } from '../../../auth/permissions';
+import { getStoredUser } from '../../../lib/webShim';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { display, maskMobile } from '../../../utils/display';
 import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
+import {
+  GtelClick2CallModal,
+  type GtelC2cTarget,
+} from '../../../components/GtelClick2CallModal';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './PlayedTodayYesterdayScreen.styles';
@@ -73,6 +79,9 @@ export function PlayedTodayYesterdayScreen() {
   const initialDate = typeof params.date === 'string' && params.date ? params.date : todayIST();
 
   const canShowMobile = hasPermission('show_mobile');
+  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
+  const canShowC2c = canShowGtelC2c(admin);
+  const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
 
   const [type, setType] = useState<PlayType>(initialType);
   const [draftDate, setDraftDate] = useState(initialDate);
@@ -230,11 +239,13 @@ export function PlayedTodayYesterdayScreen() {
         page={page}
         pageSize={pageSize}
         canShowMobile={!!canShowMobile}
+        canShowC2c={canShowC2c}
         onOpenSheet={() => setSelected(row)}
         onOpenReport={(id, name) => openUserReport(id, name)}
+        onC2cCall={(target) => setC2cTarget(target)}
       />
     ),
-    [page, pageSize, canShowMobile, openUserReport],
+    [page, pageSize, canShowMobile, canShowC2c, openUserReport],
   );
 
   const listHeader = (
@@ -287,9 +298,11 @@ export function PlayedTodayYesterdayScreen() {
 
       <View style={styles.metaRow}>
         {PLAY_SUMMARY_META.map(({ key, label }) => (
-          <Text key={key} style={styles.metaText}>
-            {label}: <Text style={styles.metaBold}>{formatCell(summary[key])}</Text>
-          </Text>
+          <View key={key} style={styles.metaChip}>
+            <Text style={styles.metaText}>
+              {label}: <Text style={styles.metaBold}>{formatCell(summary[key])}</Text>
+            </Text>
+          </View>
         ))}
       </View>
 
@@ -429,6 +442,12 @@ export function PlayedTodayYesterdayScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <GtelClick2CallModal
+        target={c2cTarget}
+        onClose={() => setC2cTarget(null)}
+        canShowMobile={!!canShowMobile}
+      />
     </View>
   );
 }
@@ -439,8 +458,10 @@ type PlayedTodayYesterdayCardProps = {
   page: number;
   pageSize: number;
   canShowMobile: boolean;
+  canShowC2c: boolean;
   onOpenSheet: () => void;
   onOpenReport: (id: string, name: string) => void;
+  onC2cCall: (target: GtelC2cTarget) => void;
 };
 
 const PlayedTodayYesterdayCard = memo(function PlayedTodayYesterdayCard({
@@ -449,8 +470,10 @@ const PlayedTodayYesterdayCard = memo(function PlayedTodayYesterdayCard({
   page,
   pageSize,
   canShowMobile,
+  canShowC2c,
   onOpenSheet,
   onOpenReport,
+  onC2cCall,
 }: PlayedTodayYesterdayCardProps) {
   const id = rowUserId(row);
   const name = rowDisplayName(row);
@@ -480,7 +503,26 @@ const PlayedTodayYesterdayCard = memo(function PlayedTodayYesterdayCard({
       </View>
       <View style={styles.cardRow}>
         <Text style={styles.cardLabel}>Mobile</Text>
-        <Text style={styles.cardValue}>{maskMobile(mobile, canShowMobile)}</Text>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Text style={styles.cardValue}>{maskMobile(mobile, canShowMobile)}</Text>
+          {canShowC2c && mobile ? (
+            <TouchableOpacity
+              style={styles.c2cBtn}
+              onPress={() =>
+                onC2cCall({
+                  phoneNumber: String(mobile),
+                  userId: id,
+                  userName: name,
+                  appName: String(row.clientName || row.appName || ''),
+                  lastActivity: String(row.activeUser || ''),
+                  source: 'Manual',
+                })
+              }
+            >
+              <Text style={styles.c2cBtnText}>C2C CALL</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
       <View style={styles.cardRow}>
         <Text style={styles.cardLabel}>App</Text>

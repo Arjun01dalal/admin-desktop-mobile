@@ -13,9 +13,11 @@ import {
 } from 'react-native';
 
 import {
+  buildRestrictedGatewaysSetPayload,
   dedupeGatewayNames,
   extractDepositGatewayOptions,
   extractRestrictedGatewayNames,
+  mergeGatewayOptions,
 } from '@astro/shared';
 
 import { styles } from './RestrictedGatewaysPanel.styles';
@@ -59,15 +61,6 @@ export function RestrictedGatewaysPanel() {
     void loadAllowed();
   }, [loadAllowed]);
 
-  const mergeOptions = useCallback((options: string[], selected: string[]) => {
-    const optionSet = new Set(options.map((n) => n.toLowerCase()));
-    const merged = [...options];
-    selected.forEach((name) => {
-      if (!optionSet.has(name.toLowerCase())) merged.unshift(name);
-    });
-    return merged;
-  }, []);
-
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -86,7 +79,7 @@ export function RestrictedGatewaysPanel() {
           const selected = extractRestrictedGatewayNames(res.data);
           setSelectedNames(selected);
           setSavedNames(selected);
-          setGatewayOptions((prev) => mergeOptions(prev, selected));
+          setGatewayOptions((prev) => mergeGatewayOptions(prev, selected));
           setAllowedNames(selected);
         }
       } catch (e) {
@@ -101,7 +94,7 @@ export function RestrictedGatewaysPanel() {
         if (res.ok) {
           const options = extractDepositGatewayOptions(res.data);
           setSelectedNames((selected) => {
-            setGatewayOptions(mergeOptions(options, selected));
+            setGatewayOptions(mergeGatewayOptions(options, selected));
             return selected;
           });
         }
@@ -113,7 +106,7 @@ export function RestrictedGatewaysPanel() {
     return () => {
       cancelled = true;
     };
-  }, [mergeOptions, open]);
+  }, [open]);
 
   const toggleName = (name: string) => {
     setSelectedNames((prev) => {
@@ -124,27 +117,24 @@ export function RestrictedGatewaysPanel() {
   };
 
   const handleSave = async () => {
-    const names = selectedNames.map((n) => n.trim()).filter(Boolean);
-    if (!names.length) {
+    const payload = buildRestrictedGatewaysSetPayload(selectedNames, {
+      userId: String(admin?._id || ''),
+      userName: String(admin?.name || 'Admin'),
+    });
+    if (!payload.names.length) {
       setErr('Select at least one gateway');
       return;
     }
     setSaving(true);
     setErr('');
     try {
-      const res = await secureApi('restrictedGateways.set', {
-        names,
-        updatedBy: {
-          userId: String(admin?._id || '').trim(),
-          userName: String(admin?.name || 'Admin').trim(),
-        },
-      });
+      const res = await secureApi('restrictedGateways.set', payload);
       if (!res.ok) {
         setErr(res.message || 'Failed to save');
         return;
       }
-      setSavedNames(names);
-      setAllowedNames(names);
+      setSavedNames(payload.names);
+      setAllowedNames(payload.names);
       setOpen(false);
     } finally {
       setSaving(false);
@@ -185,90 +175,100 @@ export function RestrictedGatewaysPanel() {
         )}
       </View>
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={() => !saving && setOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Restricted Gateway</Text>
-            {modalLoading ? (
-              <ActivityIndicator style={{ marginVertical: 24 }} color={colors.primary} />
-            ) : (
-              <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
-                <Text style={styles.sectionLabel}>Currently allowed (GET)</Text>
-                <View style={styles.chips}>
-                  {savedNames.length ? (
-                    savedNames.map((name) => (
-                      <View key={name} style={styles.chip}>
-                        <Text style={styles.chipText}>{name}</Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.empty}>No gateways saved yet.</Text>
-                  )}
-                </View>
+      {open ? (
+        <Modal
+          visible
+          animationType="slide"
+          transparent
+          onRequestClose={() => !saving && setOpen(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>Restricted Gateway</Text>
+              {modalLoading ? (
+                <ActivityIndicator style={{ marginVertical: 24 }} color={colors.primary} />
+              ) : (
+                <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+                  <Text style={styles.sectionLabel}>Currently allowed (GET)</Text>
+                  <View style={styles.chips}>
+                    {savedNames.length ? (
+                      savedNames.map((name) => (
+                        <View key={name} style={styles.chip}>
+                          <Text style={styles.chipText}>{name}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={styles.empty}>No gateways saved yet.</Text>
+                    )}
+                  </View>
 
-                <Text style={[styles.sectionLabel, { marginTop: 12 }]}>
-                  Edit selection{optionsLoading ? ' · loading providers…' : ''}
-                </Text>
-                <TextInput
-                  style={styles.search}
-                  value={filterText}
-                  onChangeText={setFilterText}
-                  placeholder="Search deposit gateway"
-                  placeholderTextColor={colors.muted}
-                />
-                <View style={styles.chips}>
-                  {selectedNames.map((name) => (
-                    <TouchableOpacity
-                      key={`sel-${name}`}
-                      style={[styles.chip, styles.chipSelected]}
-                      onPress={() => toggleName(name)}
-                    >
-                      <Text style={styles.chipText}>{name} ×</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={styles.optionList}>
-                  {filteredOptions.map((name) => {
-                    const selected = selectedNames.some((n) => n.toLowerCase() === name.toLowerCase());
-                    return (
+                  <Text style={[styles.sectionLabel, { marginTop: 12 }]}>
+                    Edit selection{optionsLoading ? ' · loading providers…' : ''}
+                  </Text>
+                  <TextInput
+                    style={styles.search}
+                    value={filterText}
+                    onChangeText={setFilterText}
+                    placeholder="Search deposit gateway"
+                    placeholderTextColor={colors.muted}
+                  />
+                  <View style={styles.chips}>
+                    {selectedNames.map((name) => (
                       <TouchableOpacity
-                        key={name}
-                        style={[styles.optionRow, selected && styles.optionRowOn]}
+                        key={`sel-${name}`}
+                        style={[styles.chip, styles.chipSelected]}
                         onPress={() => toggleName(name)}
                       >
-                        <Text style={styles.optionText}>
-                          {selected ? '✓ ' : ''}
-                          {name}
-                        </Text>
+                        <Text style={styles.chipText}>{name} ×</Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <Text style={styles.meta}>
-                  Editing: {selectedNames.length} selected · {gatewayOptions.length} provider options
-                </Text>
-                {err ? <Text style={styles.error}>{err}</Text> : null}
-              </ScrollView>
-            )}
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                disabled={saving}
-                onPress={() => setOpen(false)}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.saveBtn, (saving || modalLoading) && { opacity: 0.6 }]}
-                disabled={saving || modalLoading}
-                onPress={() => void handleSave()}
-              >
-                <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text>
-              </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={styles.optionList}>
+                    {filteredOptions.map((name) => {
+                      const selected = selectedNames.some(
+                        (n) => n.toLowerCase() === name.toLowerCase(),
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={name}
+                          style={[styles.optionRow, selected && styles.optionRowOn]}
+                          onPress={() => toggleName(name)}
+                        >
+                          <Text style={styles.optionText}>
+                            {selected ? '✓ ' : ''}
+                            {name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.meta}>
+                    Editing: {selectedNames.length} selected · {gatewayOptions.length} provider
+                    options
+                  </Text>
+                  {err ? <Text style={styles.error}>{err}</Text> : null}
+                </ScrollView>
+              )}
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  disabled={saving}
+                  onPress={() => setOpen(false)}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveBtn, (saving || modalLoading) && { opacity: 0.6 }]}
+                  disabled={saving || modalLoading}
+                  onPress={() => void handleSave()}
+                >
+                  <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      ) : null}
     </>
   );
 }

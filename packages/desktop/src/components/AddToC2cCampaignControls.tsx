@@ -18,6 +18,7 @@ import {
   extractC2cCampaignList,
   type C2cCampaign,
 } from '@astro/shared';
+import { canPushToC2cCampaign } from '@/auth/permissions';
 import { pushUserIdsToC2cCampaign } from '@/utils/c2cCampaignPush';
 import { secureApi } from '@/api/secureClient';
 
@@ -26,9 +27,17 @@ type Props = {
   disabled?: boolean;
   /** Compact inline toolbar layout (default). */
   sx?: object;
+  /** Primary push button label (admin: "Push to C2C"). */
+  pushLabel?: string;
 };
 
-export function AddToC2cCampaignControls({ userIds, disabled, sx }: Props) {
+export function AddToC2cCampaignControls({
+  userIds,
+  disabled,
+  sx,
+  pushLabel = 'Add to C2C',
+}: Props) {
+  const allowed = canPushToC2cCampaign();
   const [campaigns, setCampaigns] = useState<C2cCampaign[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [campaignId, setCampaignId] = useState('');
@@ -37,6 +46,7 @@ export function AddToC2cCampaignControls({ userIds, disabled, sx }: Props) {
   const [messageOk, setMessageOk] = useState(false);
 
   const loadCampaigns = useCallback(async () => {
+    if (!allowed) return;
     setLoadingList(true);
     try {
       const res = await secureApi(
@@ -58,11 +68,12 @@ export function AddToC2cCampaignControls({ userIds, disabled, sx }: Props) {
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [allowed]);
 
   useEffect(() => {
+    if (!allowed) return;
     void loadCampaigns();
-  }, [loadCampaigns]);
+  }, [allowed, loadCampaigns]);
 
   const onPush = async () => {
     setMessage('');
@@ -79,6 +90,8 @@ export function AddToC2cCampaignControls({ userIds, disabled, sx }: Props) {
       setPushing(false);
     }
   };
+
+  if (!allowed) return null;
 
   return (
     <Box
@@ -117,7 +130,7 @@ export function AddToC2cCampaignControls({ userIds, disabled, sx }: Props) {
         onClick={() => void onPush()}
         sx={{ textTransform: 'none', fontWeight: 700, flexShrink: 0 }}
       >
-        {pushing ? 'Pushing…' : `Add to C2C (${userIds.length})`}
+        {pushing ? 'Pushing…' : `${pushLabel}${userIds.length ? ` (${userIds.length})` : ''}`}
       </Button>
       {loadingList || pushing ? <CircularProgress size={18} /> : null}
       {message ? (

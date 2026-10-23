@@ -381,6 +381,10 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'Dialer_Push_Data',
     'Dialer Push Data',
     'dialerPushData',
+    // admin-panel: show_c2c_data_upload
+    'show_c2c_data_upload',
+    'Show_C2C_Data_Upload',
+    'showC2cDataUpload',
   ],
   show_gtel_calls: [
     'show_gtel_calls',
@@ -408,6 +412,17 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'C2C_Campaign_Data',
     'C2C Campaign Data',
     'c2cCampaignData',
+    'show_c2c_data_upload',
+    'Show_C2C_Data_Upload',
+    'showC2cDataUpload',
+  ],
+  /** Backend typo key — also accept admin `add_to_dialer`. */
+  add_to_dilaler: [
+    'add_to_dilaler',
+    'add_to_dialer',
+    'Add_To_Dialer',
+    'Add To Dialer',
+    'addToDialer',
   ],
   update_ludo_bets: ['update_ludo_bets', 'Update_Ludo_Bets', 'update_ludo_bet', 'Update Ludo Bets'],
   show_wining_btn: [
@@ -603,6 +618,19 @@ export function canEditMidLimits(user: PermissionUser | null = null): boolean {
   if (hasPermission(Permissions.Edit_MID_Limits, user)) return true;
   if (hasPermission(Permissions.Add_PayIn_Account, user)) return true;
   return false;
+}
+
+/**
+ * Push selected users into a C2C campaign (admin: add_to_dialer | show_c2c_data_upload).
+ * Matches backend typo `add_to_dilaler` and dialer / C2C campaign responsibilities.
+ */
+export function canPushToC2cCampaign(user: PermissionUser | null | undefined): boolean {
+  if (!user) return false;
+  return (
+    hasPermission(Permissions.add_to_dilaler, user) ||
+    hasPermission(Permissions.dialer_push_data, user) ||
+    hasPermission(Permissions.c2c_campaign_data, user)
+  );
 }
 
 /** True for plain Caller roles (not Caller Head). */

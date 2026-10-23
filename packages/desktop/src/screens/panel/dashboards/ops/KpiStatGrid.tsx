@@ -1,5 +1,5 @@
-import { Box, Paper, Typography } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { Box, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 
 import { isNegativeMetricValue } from '@astro/shared/opsDashboard';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
@@ -8,14 +8,29 @@ import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from './jyotishMapping';
 import type { KpiItem } from './types';
 
-
 type Props = {
   items: KpiItem[];
 };
 
+const tileSx = {
+  p: 2,
+  bgcolor: 'background.paper',
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 2,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 1,
+  width: '100%',
+  textAlign: 'left' as const,
+  textDecoration: 'none',
+  color: 'inherit',
+  boxSizing: 'border-box' as const,
+};
+
 /** KPI tile grid — main Dashboard metrics; VIP/Combined show Panchang & Gochar. */
 export function KpiStatGrid({ items }: Props) {
-  const navigate = useNavigate();
   useRevealCodes();
   if (items.length === 0) return null;
 
@@ -36,31 +51,18 @@ export function KpiStatGrid({ items }: Props) {
     >
       {items.map((item) => {
         const clickable = Boolean(item.href);
-        return (
-          <Paper
-            key={item.id}
-            onClick={clickable ? () => navigate(item.href!, { state: item.state }) : undefined}
-            sx={{
-              p: 2,
-              bgcolor: 'background.paper',
-              cursor: clickable ? 'pointer' : 'default',
-              border: '1px solid',
-              borderColor: 'divider',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 1,
-              '&:hover': clickable ? { borderColor: 'warning.main' } : undefined,
-            }}
-          >
+        const body = (
+          <>
             <Box sx={{ minWidth: 0 }}>
               <Typography
                 variant={item.headingOnly ? 'subtitle1' : 'caption'}
-                color={item.headingOnly ? 'warning.main' : 'text.secondary'}
+                color={item.headingOnly || clickable ? 'warning.main' : 'text.secondary'}
                 fontWeight={800}
                 sx={{
                   textTransform: item.headingOnly ? 'none' : 'uppercase',
                   letterSpacing: item.headingOnly ? 0 : 0.4,
+                  textDecoration: clickable && !item.headingOnly ? 'underline' : 'none',
+                  textUnderlineOffset: 2,
                 }}
               >
                 {toDisplayText(item.label)}
@@ -93,7 +95,31 @@ export function KpiStatGrid({ items }: Props) {
                 <ShoppingCartIcon sx={{ color: '#111', fontSize: 18 }} />
               </Box>
             )}
-          </Paper>
+          </>
+        );
+
+        if (clickable && item.href) {
+          return (
+            <Box
+              key={item.id}
+              component={RouterLink}
+              to={item.href}
+              state={item.state}
+              sx={{
+                ...tileSx,
+                cursor: 'pointer',
+                '&:hover': { borderColor: 'warning.main' },
+              }}
+            >
+              {body}
+            </Box>
+          );
+        }
+
+        return (
+          <Box key={item.id} sx={tileSx}>
+            {body}
+          </Box>
         );
       })}
     </Box>

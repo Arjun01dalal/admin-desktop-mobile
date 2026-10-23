@@ -1,16 +1,18 @@
 /**
  * Edit Restricted Gateway — parity with admin WhatsAppOnlyGatewaysModal.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 
 import { orangeBtnSx } from '@/screens/panel/transactions/shared';
 import { secureApi } from '@/api/secureClient';
 import { getStoredUser } from '@/utils/dates';
 import {
+  buildRestrictedGatewaysSetPayload,
   dedupeGatewayNames,
   extractDepositGatewayOptions,
   extractRestrictedGatewayNames,
+  mergeGatewayOptions,
 } from '@astro/shared';
 import {
   Autocomplete,
@@ -45,15 +47,6 @@ export function RestrictedGatewaysModal({ open, onClose, onAllowedChange }: Prop
   const onAllowedChangeRef = useRef(onAllowedChange);
   onAllowedChangeRef.current = onAllowedChange;
 
-  const mergeOptions = useCallback((options: string[], selected: string[]) => {
-    const optionSet = new Set(options.map((n) => n.toLowerCase()));
-    const merged = [...options];
-    selected.forEach((name) => {
-      if (!optionSet.has(name.toLowerCase())) merged.unshift(name);
-    });
-    return merged;
-  }, []);
-
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -72,7 +65,7 @@ export function RestrictedGatewaysModal({ open, onClose, onAllowedChange }: Prop
           const selected = extractRestrictedGatewayNames(res.data);
           setSelectedNames(selected);
           setSavedNames(selected);
-          setGatewayOptions((prev) => mergeOptions(prev, selected));
+          setGatewayOptions((prev) => mergeGatewayOptions(prev, selected));
           onAllowedChangeRef.current?.(selected);
         }
       } catch (err) {
@@ -93,7 +86,7 @@ export function RestrictedGatewaysModal({ open, onClose, onAllowedChange }: Prop
         } else {
           const options = extractDepositGatewayOptions(res.data);
           setSelectedNames((selected) => {
-            setGatewayOptions(mergeOptions(options, selected));
+            setGatewayOptions(mergeGatewayOptions(options, selected));
             return selected;
           });
         }
@@ -110,7 +103,7 @@ export function RestrictedGatewaysModal({ open, onClose, onAllowedChange }: Prop
     return () => {
       cancelled = true;
     };
-  }, [mergeOptions, open]);
+  }, [open]);
 
   const handleSave = async () => {
     const names = selectedNames.map((n) => n.trim()).filter(Boolean);
@@ -120,19 +113,21 @@ export function RestrictedGatewaysModal({ open, onClose, onAllowedChange }: Prop
     }
     setSaving(true);
     try {
-      const res = await secureApi('restrictedGateways.set', {
-        names,
-        updatedBy: {
-          userId: String(user?._id || '').trim(),
-          userName: String(user?.name || 'Admin').trim(),
-        },
+      const payload = buildRestrictedGatewaysSetPayload(names, {
+        userId: String(user?._id || ''),
+        userName: String(user?.name || 'Admin'),
       });
+      if (!payload.names.length) {
+        toast.error('Select at least one gateway');
+        return;
+      }
+      const res = await secureApi('restrictedGateways.set', payload);
       if (!res.ok) {
         toast.error(res.message || 'Failed to save');
         return;
       }
-      setSavedNames(names);
-      onAllowedChangeRef.current?.(names);
+      setSavedNames(payload.names);
+      onAllowedChangeRef.current?.(payload.names);
       toast.success('Restricted gateways saved');
       onClose();
     } finally {

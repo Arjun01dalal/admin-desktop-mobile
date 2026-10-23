@@ -88,3 +88,32 @@ export function extractDepositGatewayOptions(body: unknown): string[] {
       : [];
   return dedupeGatewayNames(providers);
 }
+
+/** Merge deposit-provider options with currently selected names (selected first if missing). */
+export function mergeGatewayOptions(options: string[], selected: string[]): string[] {
+  const optionSet = new Set(options.map((n) => n.toLowerCase()));
+  const merged = [...options];
+  selected.forEach((name) => {
+    if (!optionSet.has(name.toLowerCase())) merged.unshift(name);
+  });
+  return merged;
+}
+
+export type RestrictedGatewayUpdatedBy = {
+  userId: string;
+  userName: string;
+};
+
+/** POST body for `restrictedGateways.set`. */
+export function buildRestrictedGatewaysSetPayload(
+  names: string[],
+  updatedBy: RestrictedGatewayUpdatedBy,
+): { names: string[]; updatedBy: RestrictedGatewayUpdatedBy } {
+  return {
+    names: dedupeGatewayNames(names.map((n) => n.trim()).filter(Boolean)),
+    updatedBy: {
+      userId: String(updatedBy.userId || '').trim(),
+      userName: String(updatedBy.userName || 'Admin').trim() || 'Admin',
+    },
+  };
+}

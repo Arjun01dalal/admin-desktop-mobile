@@ -55,7 +55,7 @@ type Props = {
   pageSize?: number;
   onPageSizeChange?: (v: number) => void;
   /** Override default PAGE_SIZE_OPTIONS when provided. */
-  pageSizeOptions?: number[];
+  pageSizeOptions?: readonly number[];
   /** Per-screen search field set (defaults to SEARCH_FIELDS). */
   searchFields?: readonly SearchFieldOption[];
   /** When provided, renders the search row (field chips + text input + Search). */

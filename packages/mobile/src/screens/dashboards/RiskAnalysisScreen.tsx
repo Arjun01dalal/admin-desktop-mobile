@@ -18,6 +18,7 @@ import { useRiskDashboardData, type RiskFilters } from '../../dashboards/useRisk
 import { FilterBar } from '../../dashboards/ui/FilterBar';
 import { KpiGrid } from '../../dashboards/ui/KpiGrid';
 import { ProviderCard } from '../../dashboards/ui/ProviderCard';
+import { useAuth } from '../../auth/AuthContext';
 import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
 import { todayIST } from '../../utils/dates';
 import { styles } from './RiskAnalysisScreen.styles';
@@ -27,6 +28,7 @@ function row(label: string, value: unknown) {
 }
 
 export function RiskAnalysisScreen() {
+  const { user } = useAuth();
   const navigation = useNavigation<{
     navigate: (name: string, params?: Record<string, unknown>) => void;
   }>();
@@ -191,7 +193,7 @@ export function RiskAnalysisScreen() {
 
       <KpiGrid
         items={navCards}
-        isItemTappable={(item) => canOpenPanelPath(item.href)}
+        isItemTappable={(item) => canOpenPanelPath(item.href, user)}
         onItemPress={(item) => openPanelTarget(navigation, { href: item.href, state: item.state })}
       />
 
@@ -200,7 +202,7 @@ export function RiskAnalysisScreen() {
           key={card.id}
           card={card}
           onPress={
-            canOpenPanelPath(card.href)
+            canOpenPanelPath(card.href, user)
               ? () =>
                   openPanelTarget(navigation, {
                     href: card.href,
