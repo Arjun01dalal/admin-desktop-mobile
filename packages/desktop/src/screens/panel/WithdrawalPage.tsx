@@ -112,6 +112,7 @@ export function WithdrawalPage() {
   const [draftBeneficiaryAccounts, setDraftBeneficiaryAccounts] = useState<string[]>([]);
   const [beneSelectOpen, setBeneSelectOpen] = useState(false);
   const [redFlagOnly, setRedFlagOnly] = useState(false);
+  const [uniqueOnly, setUniqueOnly] = useState(false);
   const draftBeneRef = useRef<string[]>([]);
   draftBeneRef.current = draftBeneficiaryAccounts;
   const [summary, setSummary] = useState<WithdrawalSummary>(emptyWithdrawalSummary);
@@ -133,7 +134,10 @@ export function WithdrawalPage() {
     if (f.empCode.trim()) filter.empCode = f.empCode.trim();
     if (f.mobile.trim()) filter.mobile = f.mobile.trim();
     if (f.amount.trim()) filter.amount = f.amount.trim();
-    if (selectedBeneficiaryAccounts.length > 0) {
+    if (uniqueOnly) {
+      filter.status = 'Pending';
+      filter.isUnique = true;
+    } else if (selectedBeneficiaryAccounts.length > 0) {
       filter.beneficiaryAccounts = selectedBeneficiaryAccounts;
       filter.status = 'Pending';
     } else if (f.status) {
@@ -150,8 +154,11 @@ export function WithdrawalPage() {
     if (f.playedGames) filter.playedGames = f.playedGames;
     if (redFlagOnly) filter.redFlag = true;
 
-    const effectiveStatus =
-      selectedBeneficiaryAccounts.length > 0 ? 'Pending' : f.status;
+    const effectiveStatus = uniqueOnly
+      ? 'Pending'
+      : selectedBeneficiaryAccounts.length > 0
+        ? 'Pending'
+        : f.status;
     if (effectiveStatus === 'IN PROGRESS' && !showAllInProgress && admin?.name) {
       filter.name = admin.name;
     }
@@ -179,6 +186,7 @@ export function WithdrawalPage() {
     admin?.allotedApps,
     selectedBeneficiaryAccounts,
     redFlagOnly,
+    uniqueOnly,
   ]);
 
   const unpack = useCallback((res: { data?: unknown }) => asPaged<WithdrawalRow>(res.data), []);
@@ -187,7 +195,7 @@ export function WithdrawalPage() {
     action: 'withdrawals.transactions',
     buildPayload,
     unpack,
-    autoDeps: [page, itemsPerPage, query, selectedBeneficiaryAccounts, redFlagOnly],
+    autoDeps: [page, itemsPerPage, query, selectedBeneficiaryAccounts, redFlagOnly, uniqueOnly],
     errorMessage: 'Failed to load withdrawals',
     cacheTtlMs: 0,
   });
@@ -288,6 +296,7 @@ export function WithdrawalPage() {
     setDraftBeneficiaryAccounts([]);
     setBeneSelectOpen(false);
     setRedFlagOnly(false);
+    setUniqueOnly(false);
     setQuery({ startDate: '', endDate: '', allData: false, filters: EMPTY_FILTERS });
     setPage(1);
   }, []);
@@ -730,6 +739,20 @@ export function WithdrawalPage() {
                   />
                 }
                 label="Red Flag"
+                sx={{ ml: 0.5, '& .MuiFormControlLabel-label': { fontSize: 13, fontWeight: 600 } }}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={uniqueOnly}
+                    onChange={(e) => {
+                      setUniqueOnly(e.target.checked);
+                      setPage(1);
+                    }}
+                  />
+                }
+                label="Unique"
                 sx={{ ml: 0.5, '& .MuiFormControlLabel-label': { fontSize: 13, fontWeight: 600 } }}
               />
             </Stack>

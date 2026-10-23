@@ -59,6 +59,7 @@ export function useWithdrawalScreen() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [sortChecked, setSortChecked] = useState(false);
   const [redFlagOnly, setRedFlagOnly] = useState(false);
+  const [uniqueOnly, setUniqueOnly] = useState(false);
   const [bankAmtDraft, setBankAmtDraft] = useState('');
   const [bankAmt, setBankAmt] = useState('');
   const [midFilter, setMidFilter] = useState('');
@@ -87,6 +88,7 @@ export function useWithdrawalScreen() {
       allData,
       sortChecked,
       redFlagOnly,
+      uniqueOnly,
       bankAmt,
       midFilter,
       selectedBeneficiaryAccounts,
@@ -111,6 +113,7 @@ export function useWithdrawalScreen() {
       sortChecked,
       startDate,
       status,
+      uniqueOnly,
     ],
   );
 
@@ -446,6 +449,7 @@ export function useWithdrawalScreen() {
     setApplied({ field: 'userName', text: '' });
     setSortChecked(false);
     setRedFlagOnly(false);
+    setUniqueOnly(false);
     setBankAmtDraft('');
     setBankAmt('');
     setMidFilter('');
@@ -513,6 +517,8 @@ export function useWithdrawalScreen() {
     setSortChecked,
     redFlagOnly,
     setRedFlagOnly,
+    uniqueOnly,
+    setUniqueOnly,
     bankAmtDraft,
     setBankAmtDraft,
     bankAmt,

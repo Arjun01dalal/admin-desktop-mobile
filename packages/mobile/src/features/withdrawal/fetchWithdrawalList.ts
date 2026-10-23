@@ -19,6 +19,7 @@ export type WithdrawalListParams = {
   allData: boolean;
   sortChecked: boolean;
   redFlagOnly: boolean;
+  uniqueOnly: boolean;
   bankAmt: string;
   midFilter: string;
   selectedBeneficiaryAccounts: string[];
@@ -37,14 +38,20 @@ export async function fetchWithdrawalList(
   params: WithdrawalListParams,
 ): Promise<WithdrawalListResult> {
   const filter: Rec = {};
-  if (params.selectedBeneficiaryAccounts.length > 0) {
+  if (params.uniqueOnly) {
+    filter.status = 'Pending';
+    filter.isUnique = true;
+  } else if (params.selectedBeneficiaryAccounts.length > 0) {
     filter.beneficiaryAccounts = params.selectedBeneficiaryAccounts;
     filter.status = 'Pending';
   } else if (params.status) {
     filter.status = params.status;
   }
-  const effectiveStatus =
-    params.selectedBeneficiaryAccounts.length > 0 ? 'Pending' : params.status;
+  const effectiveStatus = params.uniqueOnly
+    ? 'Pending'
+    : params.selectedBeneficiaryAccounts.length > 0
+      ? 'Pending'
+      : params.status;
   if (effectiveStatus === 'IN PROGRESS' && !params.showAll && params.adminName) {
     filter.name = params.adminName;
   }

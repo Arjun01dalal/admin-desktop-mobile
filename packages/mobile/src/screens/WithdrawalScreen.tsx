@@ -158,6 +158,8 @@ export function WithdrawalScreen() {
     setSortChecked,
     redFlagOnly,
     setRedFlagOnly,
+    uniqueOnly,
+    setUniqueOnly,
     bankAmtDraft,
     setBankAmtDraft,
     bankAmt,
@@ -264,6 +266,8 @@ export function WithdrawalScreen() {
         setSortChecked={setSortChecked}
         redFlagOnly={redFlagOnly}
         setRedFlagOnly={setRedFlagOnly}
+        uniqueOnly={uniqueOnly}
+        setUniqueOnly={setUniqueOnly}
         bankAmtDraft={bankAmtDraft}
         setBankAmtDraft={setBankAmtDraft}
         bankAmt={bankAmt}

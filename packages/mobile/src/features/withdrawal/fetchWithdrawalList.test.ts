@@ -34,6 +34,7 @@ const baseParams = {
   allData: false,
   sortChecked: false,
   redFlagOnly: false,
+  uniqueOnly: false,
   bankAmt: '',
   midFilter: '',
   selectedBeneficiaryAccounts: [] as string[],
@@ -75,5 +76,16 @@ describe('fetchWithdrawalList', () => {
   it('throws on API failure', async () => {
     mockedApi.mockResolvedValue({ ok: false, message: 'Denied' });
     await expect(fetchWithdrawalList(baseParams)).rejects.toThrow('Denied');
+  });
+
+  it('sends status Pending and isUnique when uniqueOnly', async () => {
+    mockedApi.mockResolvedValue({ ok: true, data: { data: [], totalPages: 1, totalUsers: 0 } });
+    await fetchWithdrawalList({ ...baseParams, uniqueOnly: true, status: 'Approved' });
+    expect(mockedApi).toHaveBeenCalledWith(
+      'withdrawals.transactions',
+      expect.objectContaining({
+        filter: expect.objectContaining({ status: 'Pending', isUnique: true }),
+      }),
+    );
   });
 });
