@@ -4,7 +4,7 @@
  * KPI visibility, and provider card subset.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { CLIENT_NAMES } from '@astro/shared';
 import { colors } from '../../theme';
 import { buildKpiItems } from '../../dashboards/buildKpiItems';
@@ -17,6 +17,7 @@ import { FilterBar } from '../../dashboards/ui/FilterBar';
 import { KpiGrid } from '../../dashboards/ui/KpiGrid';
 import { LudoDetailsModal, type LudoModalAction } from '../../dashboards/ui/LudoDetailsModal';
 import { ProviderCard } from '../../dashboards/ui/ProviderCard';
+import { RestrictedGatewaysPanel } from '../../dashboards/ui/RestrictedGatewaysPanel';
 import { todayIST } from '../../utils/dates';
 import { useNavigation } from '@react-navigation/native';
 import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
@@ -222,64 +223,75 @@ export function OpsDashboardScreen({ mode }: { mode: DashboardMode }) {
         </View>
       ) : null}
 
-      {mode === 'main' ? (
-        <ActiveExchangePanel
-          activeExchangeName={activeExchangeName}
-          onUpdated={() => void reloadActiveExchange()}
-        />
-      ) : null}
+      {loading && !bundle ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading dashboard…</Text>
+        </View>
+      ) : (
+        <>
+          {mode === 'main' ? (
+            <ActiveExchangePanel
+              activeExchangeName={activeExchangeName}
+              onUpdated={() => void reloadActiveExchange()}
+            />
+          ) : null}
 
-      <KpiGrid
-        items={kpiItems}
-        isItemTappable={(item) => canOpenPanelPath(item.href) || item.href === '/withdrawal'}
-        onItemPress={(item) => {
-          if (item.href === '/withdrawal') {
-            const state = item.state;
-            navigation.navigate('withdrawal', {
-              status: typeof state?.status === 'string' ? state.status : '',
-              startDate: typeof state?.startDate === 'string' ? state.startDate : undefined,
-              endDate: typeof state?.endDate === 'string' ? state.endDate : undefined,
-            });
-            return;
-          }
-          openPanelTarget(navigation, { href: item.href, state: item.state });
-        }}
-      />
+          {mode !== 'vip' ? <RestrictedGatewaysPanel /> : null}
 
-      {visibleCards.map((card) => (
-        <ProviderCard
-          key={card.id}
-          card={card}
-          onPress={
-            canOpenPanelPath(card.href)
-              ? () =>
-                  openPanelTarget(navigation, {
-                    href: card.href,
-                    state: card.state,
-                    search: card.search,
-                  })
-              : undefined
-          }
-          onActiveCustomersPress={
-            card.activeCustomerKey
-              ? () =>
-                  openPanelTarget(navigation, {
-                    href: '/activeUserData',
-                    state: {
-                      startDate: card.state?.startDate || applied.startDate,
-                      endDate: card.state?.endDate || applied.endDate,
-                      customerKey: card.activeCustomerKey,
-                      appClientName: card.state?.appClientName || applied.appClientName || '',
-                    },
-                  })
-              : undefined
-          }
-        />
-      ))}
+          <KpiGrid
+            items={kpiItems}
+            isItemTappable={(item) => canOpenPanelPath(item.href) || item.href === '/withdrawal'}
+            onItemPress={(item) => {
+              if (item.href === '/withdrawal') {
+                const state = item.state;
+                navigation.navigate('withdrawal', {
+                  status: typeof state?.status === 'string' ? state.status : '',
+                  startDate: typeof state?.startDate === 'string' ? state.startDate : undefined,
+                  endDate: typeof state?.endDate === 'string' ? state.endDate : undefined,
+                });
+                return;
+              }
+              openPanelTarget(navigation, { href: item.href, state: item.state });
+            }}
+          />
 
-      {!loading && bundle && visibleCards.length === 0 ? (
-        <Text style={styles.empty}>No providers match the current filter.</Text>
-      ) : null}
+          {visibleCards.map((card) => (
+            <ProviderCard
+              key={card.id}
+              card={card}
+              onPress={
+                canOpenPanelPath(card.href)
+                  ? () =>
+                      openPanelTarget(navigation, {
+                        href: card.href,
+                        state: card.state,
+                        search: card.search,
+                      })
+                  : undefined
+              }
+              onActiveCustomersPress={
+                card.activeCustomerKey
+                  ? () =>
+                      openPanelTarget(navigation, {
+                        href: '/activeUserData',
+                        state: {
+                          startDate: card.state?.startDate || applied.startDate,
+                          endDate: card.state?.endDate || applied.endDate,
+                          customerKey: card.activeCustomerKey,
+                          appClientName: card.state?.appClientName || applied.appClientName || '',
+                        },
+                      })
+                  : undefined
+              }
+            />
+          ))}
+
+          {!loading && bundle && visibleCards.length === 0 ? (
+            <Text style={styles.empty}>No providers match the current filter.</Text>
+          ) : null}
+        </>
+      )}
 
       <LudoDetailsModal
         open={ludoModalOpen}

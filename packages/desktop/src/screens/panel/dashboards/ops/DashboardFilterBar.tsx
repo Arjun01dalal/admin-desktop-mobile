@@ -46,7 +46,11 @@ export function DashboardFilterBar({
 }: Props) {
   useRevealCodes();
   return (
-    <CollapsibleFilterPanel title={title} summary={summary}>
+    <CollapsibleFilterPanel
+      title={title}
+      summary={summary}
+      headerActions={loading ? <CircularProgress size={18} sx={{ mr: 0.5 }} /> : null}
+    >
       <Stack
         direction="row"
         spacing={1.5}

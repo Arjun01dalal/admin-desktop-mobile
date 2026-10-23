@@ -18,4 +18,15 @@ export const styles = makeStyles({
     marginBottom: spacing(3),
   },
   empty: { color: colors.muted, textAlign: 'center', marginTop: spacing(6) },
+  loadingBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing(10),
+    gap: spacing(3),
+  },
+  loadingText: {
+    color: colors.muted,
+    fontSize: 14,
+    marginTop: spacing(2),
+  },
 });

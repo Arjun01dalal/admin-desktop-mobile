@@ -774,6 +774,19 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  // Restricted Gateway (admin WhatsAppOnlyGateways)
+  'restrictedGateways.get': {
+    method: 'POST',
+    path: '/payinAccounts/whatsapp-only-gateways/get',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'restrictedGateways.set': {
+    method: 'POST',
+    path: '/payinAccounts/whatsapp-only-gateways/set',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'midLimits.get': {
     method: 'POST',
     path: '/payinAccounts/mid-limits/get',

@@ -1,9 +1,11 @@
 /** Responsive KPI tile grid — mirrors desktop KpiStatGrid (2 cols on phones). */
 import React from 'react';
 import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+
+import { isNegativeMetricValue } from '@astro/shared/opsDashboard';
 import { toDisplayText } from '../jyotish/jyotishMapping';
-import type { KpiItem } from '../types';
 import { styles } from './KpiGrid.styles';
+import type { KpiItem } from '../types';
 
 function formatValue(item: KpiItem): string {
   if (typeof item.value === 'number') {
@@ -37,7 +39,16 @@ export function KpiGrid({
             <Text style={[styles.label, tappable && styles.labelLink]} numberOfLines={2}>
               {label}
             </Text>
-            {!item.headingOnly && <Text style={styles.value}>{formatValue(item)}</Text>}
+            {!item.headingOnly && (
+              <Text
+                style={[
+                  styles.value,
+                  isNegativeMetricValue(item.value) && styles.valueNegative,
+                ]}
+              >
+                {formatValue(item)}
+              </Text>
+            )}
           </>
         );
         const tileStyle = [

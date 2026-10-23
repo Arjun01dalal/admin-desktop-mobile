@@ -1,6 +1,7 @@
 /** Provider metric card — mirrors desktop ProviderMetricCard. */
 import React from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { isNegativeMetricValue } from '@astro/shared/opsDashboard';
 import { colors } from '../../theme';
 import { toDisplayText } from '../jyotish/jyotishMapping';
 import type { ProviderCardModel } from '../types';
@@ -26,18 +27,14 @@ export function ProviderCard({
   /** Laxmi ActiveUserData deep-link from player count. */
   onActiveCustomersPress?: () => void;
 }) {
-  const Wrapper: React.ElementType = onPress ? TouchableOpacity : View;
   const activeLabel = card.activeCustomerLabel || 'Active Customer';
   const useLudoTable =
     Boolean(card.selectStatsMap) &&
     Boolean(card.selectOptions?.length) &&
     Boolean(card.onSelectChange);
 
-  return (
-    <Wrapper
-      style={styles.card}
-      {...(onPress ? { onPress, activeOpacity: 0.75, accessibilityRole: 'button' as const } : {})}
-    >
+  const body = (
+    <>
       <View style={styles.headerRow}>
         <Text style={styles.title}>{toDisplayText(card.title)}</Text>
         {onPress ? <Text style={styles.chevron}>›</Text> : null}
@@ -89,37 +86,45 @@ export function ProviderCard({
       <View style={styles.rows}>
         {card.rows.map((r, i) => {
           const ggr = isGgrLabel(r.label) && typeof r.value === 'number';
-          const RowWrapper: React.ElementType = r.onPress ? TouchableOpacity : View;
-          return (
-            <RowWrapper
-              key={`${r.label}-${i}`}
-              style={[styles.row, i < card.rows.length - 1 && styles.rowBorder]}
-              {...(r.onPress
-                ? {
-                    onPress: r.onPress,
-                    activeOpacity: 0.7,
-                    accessibilityRole: 'button' as const,
-                  }
-                : {})}
-            >
+          const negative = isNegativeMetricValue(r.value);
+          const rowInner = (
+            <>
               <Text style={styles.rowLabel}>{toDisplayText(r.label)}</Text>
               <Text
                 style={[
                   styles.rowValue,
-                  typeof r.value === 'number' && r.value < 0 && styles.negative,
-                  ggr && (r.value as number) < 0 && styles.negative,
-                  ggr && (r.value as number) >= 0 && styles.ggrPos,
+                  negative && styles.negative,
+                  ggr && !negative && styles.ggrPos,
                   ggr && styles.ggrUnderline,
                 ]}
               >
                 {formatValue(r.value)}
               </Text>
-            </RowWrapper>
+            </>
+          );
+          const rowStyle = [styles.row, i < card.rows.length - 1 && styles.rowBorder];
+          if (r.onPress) {
+            return (
+              <TouchableOpacity
+                key={`${r.label}-${i}`}
+                style={rowStyle}
+                onPress={r.onPress}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+              >
+                {rowInner}
+              </TouchableOpacity>
+            );
+          }
+          return (
+            <View key={`${r.label}-${i}`} style={rowStyle}>
+              {rowInner}
+            </View>
           );
         })}
       </View>
 
-      {card.actions && card.actions.length > 0 && (
+      {card.actions && card.actions.length > 0 ? (
         <View style={styles.actionsRow}>
           {card.actions.map((action, ai) => (
             <TouchableOpacity key={`action-${ai}-${action.label}`} onPress={action.onClick}>
@@ -127,8 +132,22 @@ export function ProviderCard({
             </TouchableOpacity>
           ))}
         </View>
-      )}
-    </Wrapper>
+      ) : null}
+    </>
   );
-}
 
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={onPress}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+      >
+        {body}
+      </TouchableOpacity>
+    );
+  }
+
+  return <View style={styles.card}>{body}</View>;
+}

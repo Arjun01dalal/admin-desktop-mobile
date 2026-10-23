@@ -27,7 +27,7 @@ async function fetchAction(
 
 export function useOpsDashboardData(mode: DashboardMode, filters: DashboardFilters) {
   const [bundle, setBundle] = useState<OpsDashboardBundle | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const genRef = useRef(0);
   const ludoGenRef = useRef(0);

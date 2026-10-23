@@ -136,6 +136,8 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'depositProviders.updateGatewayAmt': {"method":"POST","path":"/payinAccounts/updateGatewayAmt","encryptRequest":true,"decryptResponse":true},
   'depositProviders.updateOrder': {"method":"POST","path":"/payinAccounts/update-order","encryptRequest":true,"decryptResponse":true},
   'depositProviders.cloneIntentPay': {"method":"POST","path":"/payinAccounts/clone-intent-pay","encryptRequest":true,"decryptResponse":true},
+  'restrictedGateways.get': {"method":"POST","path":"/payinAccounts/whatsapp-only-gateways/get","encryptRequest":true,"decryptResponse":true},
+  'restrictedGateways.set': {"method":"POST","path":"/payinAccounts/whatsapp-only-gateways/set","encryptRequest":true,"decryptResponse":true},
   'midLimits.get': {"method":"POST","path":"/payinAccounts/mid-limits/get","encryptRequest":true,"decryptResponse":true},
   'midLimits.upsert': {"method":"POST","path":"/payinAccounts/mid-limits/upsert","encryptRequest":true,"decryptResponse":true},
   'midLimits.getRecipients': {"method":"POST","path":"/payinAccounts/mid-limit-alerts/get-recipients","encryptRequest":true,"decryptResponse":true},

@@ -44,6 +44,18 @@ export function floorNum(value: unknown): number {
   return Math.floor(toNum(value));
 }
 
+/** True when a dashboard metric should render in red (negative). */
+export function isNegativeMetricValue(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value) && value < 0;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[₹,\s]/g, '').trim();
+    if (!cleaned || cleaned === '-' || cleaned === '—') return false;
+    const n = Number(cleaned);
+    return Number.isFinite(n) && n < 0;
+  }
+  return false;
+}
+
 /** Sum numeric keys across two plain objects (Combined mergeObjects). */
 export function mergeNumericObjects(
   a: Record<string, unknown> | null | undefined,

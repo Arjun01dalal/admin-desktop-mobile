@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Box } from '@mui/material';
+import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { todayIST } from '@/utils/dates';
 import { ActiveExchangePanel } from './ActiveExchangePanel';
@@ -11,6 +11,7 @@ import { DashboardFilterBar } from './DashboardFilterBar';
 import { KpiStatGrid } from './KpiStatGrid';
 import { LudoDetailsModal, type LudoModalAction } from './LudoDetailsModal';
 import { ProviderCardGrid } from './ProviderCardGrid';
+import { RestrictedGatewaysPanel } from './RestrictedGatewaysPanel';
 import type { DashboardMode } from './types';
 import { useDashboardFilters } from './useDashboardFilters';
 import { useOpsDashboardData } from './useOpsDashboardData';
@@ -153,16 +154,62 @@ export function OpsDashboardPage({ mode }: Props) {
         </Alert>
       )}
 
-      <KpiStatGrid items={kpiItems} />
+      {loading && !bundle ? (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.5,
+            py: 8,
+            minHeight: 280,
+          }}
+        >
+          <CircularProgress size={36} />
+          <Typography variant="body2" color="text.secondary">
+            Loading dashboard…
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          <KpiStatGrid items={kpiItems} />
 
-      {mode === 'main' ? (
-        <ActiveExchangePanel
-          activeExchangeName={activeExchangeName}
-          onUpdated={() => void reloadActiveExchange()}
-        />
-      ) : null}
+          {mode === 'main' ? (
+            <ActiveExchangePanel
+              activeExchangeName={activeExchangeName}
+              onUpdated={() => void reloadActiveExchange()}
+            />
+          ) : null}
 
-      <ProviderCardGrid cards={providerCards} filterBy={filters.filterBy} />
+          {/* Admin Dashboard: Restricted Gateway (hidden on VIP / fairbetsOnly). */}
+          {mode !== 'vip' ? <RestrictedGatewaysPanel /> : null}
+
+          <Box sx={{ position: 'relative' }}>
+            {loading ? (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 2,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'center',
+                  pt: 4,
+                  bgcolor: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(0,0,0,0.45)'
+                      : 'rgba(255,255,255,0.6)',
+                  borderRadius: 2,
+                }}
+              >
+                <CircularProgress size={32} />
+              </Box>
+            ) : null}
+            <ProviderCardGrid cards={providerCards} filterBy={filters.filterBy} />
+          </Box>
+        </>
+      )}
 
       <LudoDetailsModal
         open={ludoModalOpen}

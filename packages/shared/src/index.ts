@@ -47,5 +47,6 @@ export * from './gtelCalls';
 export * from './gtelCallerDashboard';
 export * from './c2cCampaign';
 export * from './opsDashboard';
+export * from './restrictedGateways';
 export * from './display';
 

@@ -1,9 +1,13 @@
 import { Box, Paper, Typography } from '@mui/material';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { useNavigate } from 'react-router-dom';
-import type { KpiItem } from './types';
-import { toDisplayText } from './jyotishMapping';
+
+import { isNegativeMetricValue } from '@astro/shared/opsDashboard';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { useRevealCodes } from '@/context/useRevealCodes';
+
+import { toDisplayText } from './jyotishMapping';
+import type { KpiItem } from './types';
+
 
 type Props = {
   items: KpiItem[];
@@ -66,6 +70,7 @@ export function KpiStatGrid({ items }: Props) {
                   variant="h6"
                   fontWeight={800}
                   mt={0.5}
+                  color={isNegativeMetricValue(item.value) ? 'error.main' : 'inherit'}
                   sx={{ fontVariantNumeric: 'tabular-nums' }}
                 >
                   {item.prefix}

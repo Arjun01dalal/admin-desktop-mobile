@@ -1,5 +1,6 @@
 import { Box, Link, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { isNegativeMetricValue } from '@astro/shared/opsDashboard';
 import type { ProviderCardModel } from './types';
 import { floorNum } from './mergeMetrics';
 import { metricJyotishLabel, toDisplayText } from './constants';
@@ -161,11 +162,11 @@ export function ProviderMetricCard({ card, onClick }: Props) {
               variant="body2"
               fontWeight={800}
               color={
-                row.label.toLowerCase().includes('ggr') && typeof row.value === 'number'
-                  ? row.value < 0
-                    ? 'error.main'
-                    : 'success.main'
-                  : 'warning.main'
+                isNegativeMetricValue(row.value)
+                  ? 'error.main'
+                  : row.label.toLowerCase().includes('ggr') && typeof row.value === 'number'
+                    ? 'success.main'
+                    : 'warning.main'
               }
               sx={{
                 fontVariantNumeric: 'tabular-nums',

@@ -132,6 +132,8 @@ export const SECURE_ACTIONS = [
   'depositProviders.updateGatewayAmt',
   'depositProviders.updateOrder',
   'depositProviders.cloneIntentPay',
+  'restrictedGateways.get',
+  'restrictedGateways.set',
   'midLimits.get',
   'midLimits.upsert',
   'midLimits.getRecipients',
