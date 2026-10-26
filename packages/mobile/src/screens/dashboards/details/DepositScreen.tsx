@@ -34,11 +34,19 @@ import {
   isUpiGateway,
   settleReasonOptions,
   parseDistinctMidOptions,
+  sanitizeGtelPhone,
 } from '@astro/shared';
 import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
+import {
+  canShowGtelC2c,
+  GtelClick2CallModal,
+  type GtelC2cTarget,
+} from '../../../components/GtelClick2CallModal';
+import { GtelC2cCallButton } from '../../../components/GtelC2cCallButton';
+import { DateField } from '../../../components/DateField';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { display, maskMobile } from '../../../utils/display';
 import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '../../../utils/empCodeNameCache';
@@ -47,7 +55,6 @@ import { openPanelTarget } from '../../../navigation/panelDetail';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { SlipOcrWebView, extractUtrFromText } from './utrOcr';
-import { DateField } from '../../../components/DateField';
 import { styles } from './DepositScreen.styles';
 
 type CheckPerson = { name?: string; city?: string; state?: string; date?: string };
@@ -170,6 +177,20 @@ export function DepositScreen() {
   const canPencil = hasPermission('Deposit_Pensil');
   // Read once — getSessionUser returns a fresh object each call.
   const admin = useMemo(() => getSessionUser() as { _id?: string; name?: string } | null, []);
+  const canShowC2c = canShowGtelC2c(admin);
+  const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
+
+  const openC2cCall = useCallback((row: DepositRow) => {
+    const mobile = String(row.userMobile || row.mobile || '');
+    if (!sanitizeGtelPhone(mobile)) return;
+    setC2cTarget({
+      phoneNumber: mobile,
+      userId: String(row.userId || row._id || ''),
+      userName: String(row.userName || ''),
+      appName: String(row.clientName || ''),
+      source: 'Manual',
+    });
+  }, []);
 
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
@@ -596,13 +617,23 @@ export function DepositScreen() {
 
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
-    const acts: SheetAction[] = [
-      {
-        label: 'User Details',
+    const acts: SheetAction[] = [];
+    if (canShowC2c && sanitizeGtelPhone(String(sheetRow.userMobile || sheetRow.mobile || ''))) {
+      acts.push({
+        label: 'C2C Call',
         tone: 'primary',
-        onPress: () => openUserDetails(sheetRow),
-      },
-    ];
+        onPress: () => {
+          const row = sheetRow;
+          setSheetRow(null);
+          openC2cCall(row);
+        },
+      });
+    }
+    acts.push({
+      label: 'User Details',
+      tone: 'primary',
+      onPress: () => openUserDetails(sheetRow),
+    });
     const pending = String(sheetRow.status || '').toLowerCase() === 'pending';
     if (canShowCheckAction(sheetRow, canPencil)) {
       if (!sheetRow.checkBy) {
@@ -655,6 +686,8 @@ export function DepositScreen() {
     sheetRow,
     openSettle,
     openUserDetails,
+    openC2cCall,
+    canShowC2c,
     canPencil,
     checkingId,
     markChecked,
@@ -705,6 +738,7 @@ export function DepositScreen() {
         row={r}
         canPencil={canPencil}
         canShowMobile={canShowMobile}
+        canShowC2c={canShowC2c}
         checkingId={checkingId}
         empCodeName={(() => {
           const code = String(r.empCode || '').trim();
@@ -714,15 +748,18 @@ export function DepositScreen() {
         onApprove={() => openSettle(r)}
         onSecondary={() => openSecondary(r)}
         onCheck={(check) => void markChecked(r, check)}
+        onC2cCall={() => openC2cCall(r)}
       />
     ),
     [
       canPencil,
       canShowMobile,
+      canShowC2c,
       checkingId,
       empCodeNameMap,
       openSettle,
       openSecondary,
+      openC2cCall,
       markChecked,
     ],
   );
@@ -838,6 +875,12 @@ export function DepositScreen() {
         actions={sheetActions}
         footer={sheetChatFooter}
         onClose={() => setSheetRow(null)}
+      />
+
+      <GtelClick2CallModal
+        target={c2cTarget}
+        onClose={() => setC2cTarget(null)}
+        canShowMobile={!!canShowMobile}
       />
 
       {/* Manual Settle modal */}
@@ -1062,24 +1105,28 @@ type DepositCardProps = {
   row: DepositRow;
   canPencil: boolean;
   canShowMobile: boolean;
+  canShowC2c: boolean;
   checkingId: string;
   empCodeName: string;
   onOpenSheet: () => void;
   onApprove: () => void;
   onSecondary: () => void;
   onCheck: (check: 'first' | 'second') => void;
+  onC2cCall: () => void;
 };
 
 const DepositCard = memo(function DepositCard({
   row: r,
   canPencil,
   canShowMobile,
+  canShowC2c,
   checkingId,
   empCodeName,
   onOpenSheet,
   onApprove,
   onSecondary,
   onCheck,
+  onC2cCall,
 }: DepositCardProps) {
   const pending = String(r.status || '').toLowerCase() === 'pending';
   const canApprove = canEditDeposit(r, canPencil);
@@ -1132,6 +1179,11 @@ const DepositCard = memo(function DepositCard({
           <Text style={styles.cardValue} numberOfLines={1}>
             {maskMobile(r.userMobile || r.mobile, canShowMobile)}
           </Text>
+          {canShowC2c && sanitizeGtelPhone(String(r.userMobile || r.mobile || '')) ? (
+            <View style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+              <GtelC2cCallButton onPress={onC2cCall} />
+            </View>
+          ) : null}
         </View>
         <View style={styles.cardCell}>
           <Text style={styles.cardLabel}>App</Text>

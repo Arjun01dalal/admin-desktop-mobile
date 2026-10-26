@@ -13,16 +13,22 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { appCodeForName } from '@astro/shared';
+import { appCodeForName, sanitizeGtelPhone } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { RESP_SHOW_MOBILE } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
+import {
+  canShowGtelC2c,
+  GtelClick2CallModal,
+  type GtelC2cTarget,
+} from '../../../components/GtelClick2CallModal';
+import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
+import { getStoredUser } from '../../../lib/webShim';
 import { colors } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
 import { display, maskMobile } from '../../../utils/display';
 import { type DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { pickPlayIn } from '../../../dashboards/userRowUtils';
-import { AddToC2cCampaignPanel } from '../../../components/AddToC2cCampaignPanel';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CallerDetailsScreen.styles';
@@ -243,8 +249,10 @@ export function CallerDetailsScreen() {
       : {};
 
   const user = getSessionUser();
+  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
   const canOpenReport = hasPermission('wallet_history', user);
+  const canShowC2c = canShowGtelC2c(admin);
 
   const [draftStart, setDraftStart] = useState(todayIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());
@@ -261,6 +269,7 @@ export function CallerDetailsScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
   const [selected, setSelected] = useState<DetailRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
@@ -368,6 +377,19 @@ export function CallerDetailsScreen() {
       played: formatPlayed(row),
     });
   };
+
+  const openC2cCall = useCallback((row: DetailRow) => {
+    const mobile = String(row.mobile || row.userMobile || '');
+    if (!sanitizeGtelPhone(mobile)) return;
+    setC2cTarget({
+      phoneNumber: mobile,
+      userId: rowId(row) || undefined,
+      userName: rowName(row),
+      appName: String(row.clientName || row.appName || ''),
+      lastActivity: String(row.activeUser || row.lastActivity || ''),
+      source: 'Manual',
+    });
+  }, []);
 
   const toggleSelect = useCallback((id: string) => {
     if (!id) return;
@@ -604,6 +626,15 @@ export function CallerDetailsScreen() {
                       {rowCreated(row)}
                     </Text>
                     <Text style={styles.userCardIdx}>#{index + 1}</Text>
+                    {canShowC2c && sanitizeGtelPhone(String(row.mobile || row.userMobile || '')) ? (
+                      <TouchableOpacity
+                        style={styles.callBtn}
+                        onPress={() => openC2cCall(row)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <Text style={styles.callBtnText}>Call</Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 </TouchableOpacity>
               );
@@ -623,6 +654,20 @@ export function CallerDetailsScreen() {
         actions={
           selected
             ? [
+                ...(canShowC2c &&
+                sanitizeGtelPhone(String(selected.mobile || selected.userMobile || ''))
+                  ? [
+                      {
+                        label: 'C2C Call',
+                        tone: 'primary' as const,
+                        onPress: () => {
+                          const row = selected;
+                          setSelected(null);
+                          openC2cCall(row);
+                        },
+                      },
+                    ]
+                  : []),
                 ...(canOpenReport && rowId(selected)
                   ? [
                       {
@@ -639,6 +684,12 @@ export function CallerDetailsScreen() {
               ]
             : undefined
         }
+      />
+
+      <GtelClick2CallModal
+        target={c2cTarget}
+        onClose={() => setC2cTarget(null)}
+        canShowMobile={!!canShowMobile}
       />
     </ScrollView>
   );

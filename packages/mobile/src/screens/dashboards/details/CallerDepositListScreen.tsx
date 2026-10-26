@@ -18,10 +18,16 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { appCodeForName, CLIENT_NAMES } from '@astro/shared';
+import { appCodeForName, CLIENT_NAMES, sanitizeGtelPhone } from '@astro/shared';
 import { secureApi } from '../../../api/client';
 import { CALLER_ROLE_IDS, RESP_SHOW_MOBILE, type CallerRow } from '../../../auth/callerRoles';
 import { getSessionUser, hasPermission } from '../../../auth/permissions';
+import {
+  canShowGtelC2c,
+  GtelClick2CallModal,
+  type GtelC2cTarget,
+} from '../../../components/GtelClick2CallModal';
+import { GtelC2cCallButton } from '../../../components/GtelC2cCallButton';
 import { getStoredUser } from '../../../lib/webShim';
 import { colors } from '../../../theme';
 import { formatDisplayDate, todayIST } from '../../../utils/dates';
@@ -31,6 +37,12 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './RowDetailSheet';
 import { styles } from './CallerDepositListScreen.styles';
 import { display, maskMobile } from '../../../utils/display';
+
+function rowMobile(row: CallerRow, isWithdrawal: boolean): string {
+  return String(
+    isWithdrawal ? row.mobile || row.userMobile : row.userMobile || row.mobile || '',
+  ).trim();
+}
 
 type ListParams = {
   list?: CallerRow;
@@ -169,6 +181,23 @@ export function CallerDepositListScreen() {
   }>();
   const isCaller = CALLER_ROLE_IDS.has(String(user?.Role_ID || ''));
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, getSessionUser());
+  const canShowC2c = canShowGtelC2c(user);
+  const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
+
+  const openC2cCall = useCallback(
+    (row: CallerRow) => {
+      const mobile = rowMobile(row, isWithdrawal);
+      if (!sanitizeGtelPhone(mobile)) return;
+      setC2cTarget({
+        phoneNumber: mobile,
+        userId: String(row._id || row.userId || row.dp_id || ''),
+        userName: String(row.userName || row.name || ''),
+        appName: String(row.clientName || ''),
+        source: 'Manual',
+      });
+    },
+    [isWithdrawal],
+  );
 
   const appOptions = useMemo(() => {
     const allotted = user?.clientName || user?.allotedApps;
@@ -546,10 +575,12 @@ export function CallerDepositListScreen() {
         index={index}
         isWithdrawal={isWithdrawal}
         canShowMobile={!!canShowMobile}
+        canShowC2c={canShowC2c}
         onOpenSheet={() => setSelected({ row, index })}
+        onC2cCall={() => openC2cCall(row)}
       />
     ),
-    [isWithdrawal, canShowMobile],
+    [isWithdrawal, canShowMobile, canShowC2c, openC2cCall],
   );
 
   const listHeader = (
@@ -807,6 +838,29 @@ export function CallerDepositListScreen() {
         title={selected ? display(selected.row.userName || selected.row.name || 'Details') : ''}
         fields={sheetFields}
         onClose={() => setSelected(null)}
+        actions={
+          selected &&
+          canShowC2c &&
+          sanitizeGtelPhone(rowMobile(selected.row, isWithdrawal))
+            ? [
+                {
+                  label: 'C2C Call',
+                  tone: 'primary' as const,
+                  onPress: () => {
+                    const row = selected.row;
+                    setSelected(null);
+                    openC2cCall(row);
+                  },
+                },
+              ]
+            : undefined
+        }
+      />
+
+      <GtelClick2CallModal
+        target={c2cTarget}
+        onClose={() => setC2cTarget(null)}
+        canShowMobile={!!canShowMobile}
       />
     </View>
   );
@@ -817,7 +871,9 @@ type CallerDepositListCardProps = {
   index: number;
   isWithdrawal: boolean;
   canShowMobile: boolean;
+  canShowC2c: boolean;
   onOpenSheet: () => void;
+  onC2cCall: () => void;
 };
 
 const CallerDepositListCard = memo(function CallerDepositListCard({
@@ -825,7 +881,9 @@ const CallerDepositListCard = memo(function CallerDepositListCard({
   index,
   isWithdrawal,
   canShowMobile,
+  canShowC2c,
   onOpenSheet,
+  onC2cCall,
 }: CallerDepositListCardProps) {
   const userName = display(row.userName || row.name);
   const amount = formatAmount(row.amount || row.Amount);
@@ -833,10 +891,8 @@ const CallerDepositListCard = memo(function CallerDepositListCard({
   const app = display(
     appCodeForName(row.clientName || row.appName || row.app_name || row.AppName || row.subDomain),
   );
-  const mobileVal = maskMobile(
-    isWithdrawal ? row.mobile || row.userMobile : row.userMobile || row.mobile,
-    canShowMobile,
-  );
+  const rawMobile = rowMobile(row, isWithdrawal);
+  const mobileVal = maskMobile(rawMobile, canShowMobile);
   const created =
     formatDisplayDate(row.createdOn || row.createdAt || row.created_at) ||
     display(row.createdOn || row.createdAt);
@@ -862,9 +918,16 @@ const CallerDepositListCard = memo(function CallerDepositListCard({
         </Text>
       </View>
       <View style={styles.cardSplitRow}>
-        <Text style={styles.cardSplitLeft} numberOfLines={1}>
-          Mobile: {mobileVal}
-        </Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.cardSplitLeft} numberOfLines={1}>
+            Mobile: {mobileVal}
+          </Text>
+          {canShowC2c && sanitizeGtelPhone(rawMobile) ? (
+            <View style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+              <GtelC2cCallButton onPress={onC2cCall} />
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.cardSplitRight} numberOfLines={1}>
           {created}
         </Text>

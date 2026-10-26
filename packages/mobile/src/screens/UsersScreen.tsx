@@ -35,7 +35,7 @@ import {
 import { secureApi } from '../api/client';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getSessionUser, hasPermission, isCallerRole } from '../auth/permissions';
-import { formatDisplayDate, formatDisplayTime, todayIST } from '../utils/dates';
+import { formatDisplayDate, formatDisplayTime } from '../utils/dates';
 import { DetailFilterBar, type SearchFieldKey } from './dashboards/details/DetailFilterBar';
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
 import { CreateUserScreen } from './CreateUserScreen';
@@ -90,17 +90,21 @@ export function UsersScreen() {
   const [userType, setUserType] = useState<UserType>(() =>
     routeParams.selectActiveCustomers && !isCaller ? 'Todays_Active' : 'User',
   );
-  const [draftStart, setDraftStart] = useState(
-    () => (routeParams.selectActiveCustomers && routeParams.startDate) || todayIST(),
+  const [draftStart, setDraftStart] = useState(() =>
+    routeParams.selectActiveCustomers && routeParams.startDate
+      ? String(routeParams.startDate)
+      : '',
   );
-  const [draftEnd, setDraftEnd] = useState(
-    () => (routeParams.selectActiveCustomers && routeParams.endDate) || todayIST(),
+  const [draftEnd, setDraftEnd] = useState(() =>
+    routeParams.selectActiveCustomers && routeParams.endDate
+      ? String(routeParams.endDate)
+      : '',
   );
   const [dates, setDates] = useState<{ start: string; end: string } | null>(() =>
-    routeParams.selectActiveCustomers
+    routeParams.selectActiveCustomers && routeParams.startDate && routeParams.endDate
       ? {
-          start: String(routeParams.startDate || todayIST()),
-          end: String(routeParams.endDate || todayIST()),
+          start: String(routeParams.startDate),
+          end: String(routeParams.endDate),
         }
       : null,
   );
@@ -166,11 +170,11 @@ export function UsersScreen() {
   useEffect(() => {
     if (!routeParams.selectActiveCustomers || isCaller) return;
     setUserType('Todays_Active');
-    const start = String(routeParams.startDate || todayIST());
-    const end = String(routeParams.endDate || todayIST());
+    const start = String(routeParams.startDate || '').trim();
+    const end = String(routeParams.endDate || '').trim();
     setDraftStart(start);
     setDraftEnd(end);
-    setDates({ start, end });
+    setDates(start && end ? { start, end } : null);
     setPage(1);
   }, [
     isCaller,

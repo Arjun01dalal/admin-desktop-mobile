@@ -15,26 +15,27 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { hasPermission } from '@/auth/permissions';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import { formatAmount, formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
-import { maskMobile } from '@/screens/panel/shared';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
 import type { UserRow } from '@/screens/panel/users/utils';
-import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
+import { type CallerRow } from './constants';
 import { roleFlags, type StoredCallerUser } from './utils';
 
-function toCallingItem(row: CallerRow): UserRow {
+function toCallingItem(row: CallerRow, preferMobileFirst = false): UserRow {
+  const a = String(row.userMobile || '').trim();
+  const b = String(row.mobile || '').trim();
+  const mobile = preferMobileFirst ? b || a : a || b;
   return {
-    _id: String(row._id || row.userId || ''),
+    _id: String(row._id || row.userId || row.dp_id || ''),
     name: String(row.userName || row.name || ''),
     userName: String(row.userName || row.name || ''),
-    mobile: String(row.userMobile || row.mobile || ''),
-    userMobile: String(row.userMobile || row.mobile || ''),
+    mobile,
+    userMobile: mobile,
     clientName: String(row.clientName || ''),
     state: String(row.userState || row.state || ''),
     city: String(row.userCity || row.city || ''),
@@ -211,7 +212,6 @@ export function CallerDepositListPage() {
     StoredCallerUser & { clientName?: string | string[]; allotedApps?: string | string[] }
   >();
   const { isCaller } = roleFlags(user?.Role_ID);
-  const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
   const appOptions = useMemo(() => {
     const allotted = user?.clientName || user?.allotedApps;
     if (Array.isArray(allotted) && allotted.length) return allotted.map(String);
@@ -393,24 +393,27 @@ export function CallerDepositListPage() {
     const mobile = col(
       'mobile',
       'Mobile No',
-      (r) => {
-        // admin-panel CallerDepositList: unique pending shows CallingBtn in Mobile column
-        if (isUniquePending) {
-          return (
-            <CallingBtn
-              item={toCallingItem(r)}
-              campaignName="CALLER UNIQUE PENDING"
-              reasonList="Caller Unique Pending"
-              hideBotCall
-            />
-          );
-        }
-        return maskMobile(
-          isWithdrawal ? r.mobile || r.userMobile : r.userMobile || r.mobile,
-          canShowMobile,
-        );
-      },
-      isUniquePending ? { width: 180, cellSx: { whiteSpace: 'normal' } } : undefined,
+      (r) => (
+        <CallingBtn
+          item={toCallingItem(r, isWithdrawal)}
+          campaignName={
+            isWithdrawal
+              ? 'CALLER WITHDRAWAL'
+              : isUniquePending
+                ? 'CALLER UNIQUE PENDING'
+                : 'CALLER DEPOSIT'
+          }
+          reasonList={
+            isWithdrawal
+              ? 'Caller Withdrawal'
+              : isUniquePending
+                ? 'Caller Unique Pending'
+                : 'Caller Deposit'
+          }
+          hideBotCall
+        />
+      ),
+      { width: 180, cellSx: { whiteSpace: 'normal' } },
     );
     const created = col('created', 'Created At', (r) => {
       const raw = r.createdOn || r.createdAt || r.created_at;
@@ -490,7 +493,7 @@ export function CallerDepositListPage() {
 
     cols.push(status);
     return cols;
-  }, [isWithdrawal, isUniquePending, isCaller, canShowMobile, page, itemsPerPage]);
+  }, [isWithdrawal, isUniquePending, isCaller, page, itemsPerPage]);
 
   if (!list && !empCode) {
     return (

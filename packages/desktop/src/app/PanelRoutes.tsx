@@ -23,7 +23,6 @@ import {
   CallLogsPage,
   GtelCallsPage,
   GtelCallerDashboardPage,
-  DialerPushDataPage,
   NewRegistersPage,
   StateWiseRegistrationPage,
   CoinRemovalPage,
@@ -187,7 +186,6 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/gtel-calls" element={<GtelCallsPage />} />
             <Route path="/gtel-caller-dashboard" element={<GtelCallerDashboardPage />} />
             <Route path="/c2c-campaign-data" element={<C2cCampaignDataPage />} />
-            <Route path="/dialer-push-data" element={<DialerPushDataPage />} />
             <Route path="/new-registers" element={<NewRegistersPage />} />
             <Route path="/register-user-report" element={<StateWiseRegistrationPage />} />
             <Route path="/login-report" element={<LoginReportPage />} />

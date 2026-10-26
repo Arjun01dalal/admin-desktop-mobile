@@ -112,7 +112,7 @@ export function useUsersQuery({
   const [dialerData, setDialerData] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const { next, isCurrent, begin, end } = useRequestGeneration();
+  const { next, isCurrent, begin, end, isInFlight } = useRequestGeneration();
 
   const deferredRows = useDeferredValue(rows);
   const isClientPagedType = userType === 'Non_Performing_Active_User';
@@ -157,7 +157,9 @@ export function useUsersQuery({
       begin();
       setLoading(true);
       try {
-        if (isCaller && userType !== 'Sub_Admin' && !trimCode(loginEmpCode)) {
+        // In_Active_Deposit is app/state scoped (not empCode) — match laxminarayan.
+        const skipCallerEmpScope = userType === 'In_Active_Deposit' || userType === 'Sub_Admin';
+        if (isCaller && !skipCallerEmpScope && !trimCode(loginEmpCode)) {
           toast.error('No empCode on this login. Ask admin to assign empCode.');
           setRows([]);
           setTotal(0);
@@ -253,7 +255,7 @@ export function useUsersQuery({
           } else {
             list = filterListByLoginEmpCode(list, loginEmpCode);
           }
-        } else if (isCaller && userType !== 'Sub_Admin') {
+        } else if (isCaller && !skipCallerEmpScope) {
           list = list.filter((row) => empCodesEqual(row.empCode, loginEmpCode));
         } else if (isNonPerfActive && !loginEmpCode && trimmedEmp) {
           // Admin without login empCode: API may ignore filter — match client-side
@@ -272,7 +274,9 @@ export function useUsersQuery({
         setTotal(Number(parsed.total) || list.length);
       } finally {
         end();
-        if (isCurrent(gen)) setLoading(false);
+        // Stale gens must not leave the spinner stuck when a newer load was cancelled
+        // or the in-flight count already drained (StrictMode / dep churn).
+        if (isCurrent(gen) || !isInFlight()) setLoading(false);
       }
     },
     [
@@ -285,6 +289,7 @@ export function useUsersQuery({
       end,
       endDate,
       isCurrent,
+      isInFlight,
       itemsPerPage,
       loginEmpCode,
       isCaller,

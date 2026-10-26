@@ -71,7 +71,6 @@ export type UsersToolbarProps = {
   /** Loaded rows that will be pushed (current page until full fetch). */
   dialerCount?: number;
   showDates?: boolean;
-  canRegister?: boolean;
   canAddToBot?: boolean;
   canAddUserData?: boolean;
   canCreateUser?: boolean;
@@ -89,7 +88,6 @@ export type UsersToolbarProps = {
   onClientName: (v: string) => void;
   onPlayedIn: (v: string) => void;
   onBotId: (v: string) => void;
-  onRegister: () => void;
   onGlobalUser: () => void;
   onAddToBot: () => void;
   onAddUserData: () => void;
@@ -302,7 +300,10 @@ export function UsersToolbar(props: UsersToolbarProps) {
             useFlexGap
             sx={{ py: 0.25 }}
           >
-            {!props.isCaller && props.userType !== 'Active_User' && (
+            {!props.isCaller &&
+              props.userType !== 'Active_User' &&
+              props.userType !== 'In_Active_Deposit' &&
+              props.userType !== 'LAXMI_999_Users' && (
               <FormControlLabel
                 control={
                   <Checkbox
@@ -314,11 +315,6 @@ export function UsersToolbar(props: UsersToolbarProps) {
                 label="Unique Users"
               />
             )}
-            {props.canRegister && (
-              <Button sx={orangeBtnSx} onClick={props.onRegister}>
-                Register
-              </Button>
-            )}
             {!props.isCaller && (
               <Button sx={orangeBtnSx} onClick={props.onGlobalUser}>
                 Global User : {props.globalCount}
@@ -327,13 +323,16 @@ export function UsersToolbar(props: UsersToolbarProps) {
             {!props.isCaller && (
               <TextField
                 select
-                label="Select Bot ID"
+                label="Bot ID"
                 size="small"
                 value={props.botId}
                 onChange={(e) => props.onBotId(e.target.value)}
-                sx={fieldSx}
+                sx={{ width: 96, minWidth: 96, flex: '0 0 96px' }}
+                SelectProps={{ displayEmpty: true }}
               >
-                <MenuItem value="">Select Bot ID</MenuItem>
+                <MenuItem value="">
+                  <em>—</em>
+                </MenuItem>
                 {BOT_ID_OPTIONS.map((id) => (
                   <MenuItem key={id} value={id}>
                     {id}
@@ -346,31 +345,6 @@ export function UsersToolbar(props: UsersToolbarProps) {
                 Add to Bot{props.dialerCount != null ? ` (${props.dialerCount})` : ''}
               </Button>
             )}
-          </Stack>
-
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-            useFlexGap
-            sx={{
-              pt: 1.25,
-              mt: 0.25,
-              borderTop: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            {props.canAddUserData && (
-              <Button sx={orangeBtnSx} onClick={props.onAddUserData}>
-                Add User Data
-              </Button>
-            )}
-            <AddToC2cCampaignControls
-              userIds={props.c2cUserIds || []}
-              disabled={props.loading || props.dialerLoading}
-            />
-            {/* Always show create row like laxminarayan when permitted */}
             {props.canCreateUser && (
               <Button sx={orangeBtnSx} onClick={props.onCreateUser}>
                 Create New User
@@ -381,6 +355,15 @@ export function UsersToolbar(props: UsersToolbarProps) {
                 Create Admin User
               </Button>
             )}
+            {props.canAddUserData && (
+              <Button sx={orangeBtnSx} onClick={props.onAddUserData}>
+                Add User Data
+              </Button>
+            )}
+            <AddToC2cCampaignControls
+              userIds={props.c2cUserIds || []}
+              disabled={props.loading || props.dialerLoading}
+            />
             <Typography
               variant="body2"
               sx={{

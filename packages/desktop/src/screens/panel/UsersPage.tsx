@@ -90,7 +90,6 @@ export function UsersPage() {
   const showMobileColumn = !hideContact;
   const showDates =
     hasPermission('user_table') || hasPermission('View_Users') || hasPermission('All_user_table');
-  const canRegister = !isCaller && hasPermission('Register_New_User');
   // Match admin-panel: create_new_user / create_admin_user are separate roles
   const canCreateUser = !isCaller && hasPermission('create_new_user');
   const canCreateAdmin = !isCaller && hasPermission('create_admin_user');
@@ -231,7 +230,6 @@ export function UsersPage() {
               query.total || (query.dialerData.length ? query.dialerData.length : query.rows.length)
             }
             showDates={showDates}
-            canRegister={canRegister}
             canAddToBot={canAddToBot}
             canAddUserData={canAddUserData}
             canCreateUser={canCreateUser}
@@ -269,7 +267,6 @@ export function UsersPage() {
               query.setPage(1);
             }}
             onBotId={dialer.setBotId}
-            onRegister={() => setCreateMode('user')}
             onGlobalUser={() => {
               void dialer.loadGlobals().then((count) => {
                 toast.info(`Global users: ${count}`);

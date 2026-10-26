@@ -4,13 +4,20 @@
  * The screen owns only composition. Data loading, filters, permissions, and
  * action workflows live in useWithdrawalScreen.
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { sanitizeGtelPhone } from '@astro/shared';
 import {
   resolveWithdrawalReportUserId,
   showWithdrawalMidReport,
 } from '@astro/shared/depositWithdrawalReport';
+import {
+  canShowGtelC2c,
+  GtelClick2CallModal,
+  type GtelC2cTarget,
+} from '../components/GtelClick2CallModal';
+import { getStoredUser } from '../lib/webShim';
 import { colors } from '../theme';
 import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
 import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
@@ -76,6 +83,22 @@ function buildWithdrawalSheetFields(
 
 export function WithdrawalScreen() {
   const model = useWithdrawalScreen();
+  const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
+  const canShowC2c = canShowGtelC2c(admin);
+  const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
+
+  const openC2cCall = useCallback((row: Rec) => {
+    const mobile = String(row.userMobile ?? row.mobile ?? '');
+    if (!sanitizeGtelPhone(mobile)) return;
+    setC2cTarget({
+      phoneNumber: mobile,
+      userId: String(row.dp_id || row.userId || ''),
+      userName: String(row.accountHolderName ?? row.userName ?? ''),
+      appName: String(row.clientName || ''),
+      source: 'Manual',
+    });
+  }, []);
+
   const {
     rows,
     summary,
@@ -398,6 +421,8 @@ export function WithdrawalScreen() {
             actionBusy={actionBusy}
             addBeneBusy={addBeneBusy}
             canAddBeneficiary={perms.actions}
+            canShowC2c={canShowC2c}
+            onC2cCall={openC2cCall}
             onBotReport={openBotReport}
             onAddBeneficiary={openAddBene}
             onCheck={doCheck}
@@ -410,8 +435,34 @@ export function WithdrawalScreen() {
         title={selected ? display(selected.accountHolderName ?? selected.userName) : ''}
         fields={buildWithdrawalSheetFields(selected, columns)}
         onClose={() => (actionBusy ? undefined : setSelected(null))}
-        actions={selected ? sheetActions(selected) : undefined}
+        actions={
+          selected
+            ? [
+                ...(canShowC2c &&
+                sanitizeGtelPhone(String(selected.userMobile ?? selected.mobile ?? ''))
+                  ? [
+                      {
+                        label: 'C2C Call',
+                        tone: 'primary' as const,
+                        onPress: () => {
+                          const row = selected;
+                          setSelected(null);
+                          openC2cCall(row);
+                        },
+                      },
+                    ]
+                  : []),
+                ...sheetActions(selected),
+              ]
+            : undefined
+        }
         note={actionBusy ? 'Working…' : undefined}
+      />
+
+      <GtelClick2CallModal
+        target={c2cTarget}
+        onClose={() => setC2cTarget(null)}
+        canShowMobile={perms.showMobile}
       />
 
       <DepositWithdrawalMidModal

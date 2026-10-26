@@ -21,12 +21,16 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcCallIcon from '@mui/icons-material/AddIcCall';
+import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import { toast } from 'react-toastify';
+import { sanitizeGtelPhone } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
 import { appCodeForName } from '@/constants/clientNames';
 import { CopyText, CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
+import { useGtelClickToCall } from '@/screens/panel/gtel/useGtelClickToCall';
+import { gtelIconBtnSx } from '@/screens/panel/gtel/styles';
 import { formatMaskedAmount, formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
 import { maskMobile } from '@/screens/panel/shared';
@@ -234,6 +238,7 @@ export function CallerDetailsPage() {
   const user = getStoredUser<StoredCallerUser>();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, user);
   const canOpenUserReport = hasPermission('wallet_history', user);
+  const { canShowC2c, startC2c, isCalling } = useGtelClickToCall();
 
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
@@ -498,29 +503,62 @@ export function CallerDetailsPage() {
       {
         id: 'mobile',
         label: 'Mobile',
-        width: 180,
+        width: 210,
         render: (r) => {
           const mobile = String(r.mobile || r.userMobile || '');
+          const id = String(r._id || r.userId || '');
+          const phone = sanitizeGtelPhone(mobile);
+          const calling = isCalling(mobile);
           return (
-            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-              {canShowMobile && mobile ? (
-                <CopyText value={mobile} />
-              ) : (
-                <Typography variant="body2" sx={{ fontSize: 12 }}>
-                  {maskMobile(mobile, canShowMobile)}
-                </Typography>
-              )}
-              {canShowMobile && (
-                <Tooltip title="Add / Remove Alternate Mobile">
-                  <IconButton
-                    size="small"
-                    onClick={() => openAlternateMobile(r)}
-                    sx={{ color: '#1976d2', p: 0.25 }}
-                  >
-                    <AddIcCallIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
+            <Stack
+              direction="row"
+              spacing={1.5}
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ width: '100%', minWidth: 0 }}
+            >
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+                {canShowMobile && mobile ? (
+                  <CopyText value={mobile} />
+                ) : (
+                  <Typography variant="body2" sx={{ fontSize: 12 }}>
+                    {maskMobile(mobile, canShowMobile)}
+                  </Typography>
+                )}
+                {canShowMobile && (
+                  <Tooltip title="Add / Remove Alternate Mobile">
+                    <IconButton
+                      size="small"
+                      onClick={() => openAlternateMobile(r)}
+                      sx={{ color: '#1976d2', p: 0.25 }}
+                    >
+                      <AddIcCallIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
+              {canShowC2c && phone ? (
+                <Tooltip title="C2C Call">
+                  <span style={{ flexShrink: 0, marginLeft: 'auto' }}>
+                    <IconButton
+                      size="small"
+                      aria-label="C2C Call"
+                      disabled={calling}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void startC2c(mobile, id || undefined);
+                      }}
+                      sx={gtelIconBtnSx}
+                    >
+                      {calling ? (
+                        <CircularProgress size={14} color="inherit" />
+                      ) : (
+                        <PhoneInTalkOutlinedIcon sx={{ fontSize: 16 }} />
+                      )}
+                    </IconButton>
+                  </span>
                 </Tooltip>
-              )}
+              ) : null}
             </Stack>
           );
         },
@@ -576,7 +614,10 @@ export function CallerDetailsPage() {
     return cols;
   }, [
     canShowMobile,
+    canShowC2c,
     canOpenUserReport,
+    isCalling,
+    startC2c,
     navigate,
     tab,
     todayPage,

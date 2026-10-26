@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   IconButton,
   Stack,
   TextField,
@@ -18,13 +19,16 @@ import EditIcon from '@mui/icons-material/Edit';
 import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import { toast } from 'react-toastify';
+import { buildDepositWhatsAppMessage, sanitizeGtelPhone } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { useGtelClickToCall } from '@/screens/panel/gtel/useGtelClickToCall';
+import { gtelIconBtnSx } from '@/screens/panel/gtel/styles';
 import { copyToClipboard } from '@/utils/clipboard';
 import { formatDisplayDate, formatDisplayTime } from '@/utils/dates';
-import { buildDepositWhatsAppMessage } from '@astro/shared';
 import { display } from '@/screens/panel/shared';
 
 export type DepositRow = {
@@ -168,7 +172,11 @@ export const MobileCell = memo(function MobileCell({
   canWhatsApp,
   compact,
 }: MobileCellProps) {
+  const { canShowC2c, startC2c, isCalling } = useGtelClickToCall();
   const mobile = String(row.userMobile || row.mobile || '');
+  const userId = String(row.userId || row._id || '');
+  const phone = sanitizeGtelPhone(mobile);
+  const calling = isCalling(mobile);
   const pending = String(row.status || '').toLowerCase() === 'pending';
 
   if (!mobile) return <>—</>;
@@ -221,28 +229,63 @@ export const MobileCell = memo(function MobileCell({
     ) : null;
 
   const number = (
-    <Stack direction="row" alignItems="center" spacing={0.25} sx={{ minWidth: 0 }}>
-      <Typography
-        sx={{
-          fontSize: compact && pending ? 11.5 : 12,
-          fontWeight: 600,
-          lineHeight: 1.05,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {mobile}
-      </Typography>
-      <IconButton
-        size="small"
-        onClick={() => {
-          void copyToClipboard(mobile).then((ok) => {
-            if (ok) toast.success(`${mobile} Copied`);
-          });
-        }}
-        sx={{ p: compact ? 0.05 : 0.25 }}
-      >
-        <ContentCopyIcon sx={{ fontSize: compact ? 12 : 15 }} />
-      </IconButton>
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="space-between"
+      spacing={1.5}
+      sx={{ width: '100%', minWidth: 0 }}
+    >
+      <Stack direction="row" alignItems="center" spacing={0.25} sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+        <Typography
+          sx={{
+            fontSize: compact && pending ? 11.5 : 12,
+            fontWeight: 600,
+            lineHeight: 1.05,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {mobile}
+        </Typography>
+        <IconButton
+          size="small"
+          onClick={() => {
+            void copyToClipboard(mobile).then((ok) => {
+              if (ok) toast.success(`${mobile} Copied`);
+            });
+          }}
+          sx={{ p: compact ? 0.05 : 0.25 }}
+        >
+          <ContentCopyIcon sx={{ fontSize: compact ? 12 : 15 }} />
+        </IconButton>
+      </Stack>
+      {canShowC2c && phone ? (
+        <Tooltip title="C2C Call">
+          <span style={{ flexShrink: 0, marginLeft: 'auto' }}>
+            <IconButton
+              size="small"
+              aria-label="C2C Call"
+              disabled={calling}
+              onClick={(e) => {
+                e.stopPropagation();
+                void startC2c(mobile, userId || undefined);
+              }}
+              sx={{
+                ...gtelIconBtnSx,
+                width: compact ? 26 : 28,
+                height: compact ? 26 : 28,
+                p: 0.35,
+              }}
+            >
+              {calling ? (
+                <CircularProgress size={12} color="inherit" />
+              ) : (
+                <PhoneInTalkOutlinedIcon sx={{ fontSize: compact ? 13 : 14 }} />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
+      ) : null}
     </Stack>
   );
 

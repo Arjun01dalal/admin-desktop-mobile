@@ -25,7 +25,13 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { appCodeForName, asPaged, buildDepositWhatsAppMessage, unpackPayload } from '@astro/shared';
+import {
+  appCodeForName,
+  asPaged,
+  buildDepositWhatsAppMessage,
+  sanitizeGtelPhone,
+  unpackPayload,
+} from '@astro/shared';
 import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
@@ -34,13 +40,19 @@ import {
   getSessionUser,
   hasPermission,
 } from '../../../auth/permissions';
+import {
+  canShowGtelC2c,
+  GtelClick2CallModal,
+  type GtelC2cTarget,
+} from '../../../components/GtelClick2CallModal';
+import { GtelC2cCallButton } from '../../../components/GtelC2cCallButton';
+import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
 import { formatDisplayDate, formatDisplayTime, todayIST } from '../../../utils/dates';
 import { display, maskMobile } from '../../../utils/display';
 import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '../../../utils/empCodeNameCache';
+import { shareCsvFile } from '../../../utils/shareCsv';
 import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
-import { SheetDownloadOtpModal } from '../../../components/SheetDownloadOtpModal';
-import { shareCsvFile } from '../../../utils/shareCsv';
 import { styles } from './UniqueDepositPendingScreen.styles';
 
 type UniquePendingRow = {
@@ -115,9 +127,23 @@ export function UniqueDepositPendingScreen() {
   const canWhatsApp = hasPermission('whatsapp_icon');
   const canShowMobile = hasPermission('show_mobile');
   const canShowEmpCode = canShowUniqueDepositEmpCode(admin);
+  const canShowC2c = canShowGtelC2c(admin);
+  const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
   const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
     getCachedEmpCodeNameMap(),
   );
+
+  const openC2cCall = useCallback((row: UniquePendingRow) => {
+    const mobile = rowMobile(row);
+    if (!sanitizeGtelPhone(mobile)) return;
+    setC2cTarget({
+      phoneNumber: mobile,
+      userId: String(row.userId || row._id || ''),
+      userName: String(row.userName || ''),
+      appName: String(row.clientName || ''),
+      source: 'Manual',
+    });
+  }, []);
 
   const [draftStart, setDraftStart] = useState(todayIST);
   const [draftEnd, setDraftEnd] = useState(todayIST);
@@ -383,6 +409,17 @@ export function UniqueDepositPendingScreen() {
   const sheetActions = useMemo<SheetAction[]>(() => {
     if (!sheetRow) return [];
     const acts: SheetAction[] = [];
+    if (canShowC2c && sanitizeGtelPhone(rowMobile(sheetRow))) {
+      acts.push({
+        label: 'C2C Call',
+        tone: 'primary',
+        onPress: () => {
+          const row = sheetRow;
+          setSheetRow(null);
+          openC2cCall(row);
+        },
+      });
+    }
     if (sheetRow.userId) {
       acts.push({
         label: 'User Report',
@@ -411,12 +448,14 @@ export function UniqueDepositPendingScreen() {
     return acts;
   }, [
     sheetRow,
+    canShowC2c,
     canWhatsApp,
     canChangeStatus,
     busy,
     openInput,
     openWhatsApp,
     openUserReport,
+    openC2cCall,
   ]);
 
   const keyExtractor = useCallback(
@@ -433,13 +472,15 @@ export function UniqueDepositPendingScreen() {
         page={page}
         pageSize={pageSize}
         canShowMobile={canShowMobile}
+        canShowC2c={canShowC2c}
         canShowEmpCode={canShowEmpCode}
         empCodeLabel={canShowEmpCode ? formatEmpCode(row) : ''}
         onOpenSheet={() => setSheetRow(row)}
         onOpenReport={() => openUserReport(row)}
+        onC2cCall={() => openC2cCall(row)}
       />
     ),
-    [page, pageSize, canShowMobile, canShowEmpCode, formatEmpCode, openUserReport],
+    [page, pageSize, canShowMobile, canShowC2c, canShowEmpCode, formatEmpCode, openUserReport, openC2cCall],
   );
 
   const listHeader = (
@@ -542,6 +583,12 @@ export function UniqueDepositPendingScreen() {
         onClose={() => setSheetRow(null)}
       />
 
+      <GtelClick2CallModal
+        target={c2cTarget}
+        onClose={() => setC2cTarget(null)}
+        canShowMobile={!!canShowMobile}
+      />
+
       {/* Comment / Change-status input modal */}
       <Modal
         visible={inputOpen}
@@ -604,10 +651,12 @@ type UniquePendingCardProps = {
   page: number;
   pageSize: number;
   canShowMobile: boolean;
+  canShowC2c: boolean;
   canShowEmpCode: boolean;
   empCodeLabel: string;
   onOpenSheet: () => void;
   onOpenReport: () => void;
+  onC2cCall: () => void;
 };
 
 const UniquePendingCard = memo(function UniquePendingCard({
@@ -616,10 +665,12 @@ const UniquePendingCard = memo(function UniquePendingCard({
   page,
   pageSize,
   canShowMobile,
+  canShowC2c,
   canShowEmpCode,
   empCodeLabel,
   onOpenSheet,
   onOpenReport,
+  onC2cCall,
 }: UniquePendingCardProps) {
   const badge = statusBadge(row.status);
   return (
@@ -642,9 +693,16 @@ const UniquePendingCard = memo(function UniquePendingCard({
 
       <View style={styles.cardRow}>
         <Text style={styles.cardLabel}>Mobile</Text>
-        <Text style={styles.cardValue} numberOfLines={1}>
-          {maskMobile(rowMobile(row), canShowMobile)}
-        </Text>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Text style={styles.cardValue} numberOfLines={1}>
+            {maskMobile(rowMobile(row), canShowMobile)}
+          </Text>
+          {canShowC2c && sanitizeGtelPhone(rowMobile(row)) ? (
+            <View style={{ marginTop: 6 }}>
+              <GtelC2cCallButton onPress={onC2cCall} />
+            </View>
+          ) : null}
+        </View>
       </View>
       <View style={styles.cardRow}>
         <Text style={styles.cardLabel}>Amount</Text>

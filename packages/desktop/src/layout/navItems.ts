@@ -115,13 +115,6 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/c2c-campaign-data',
     permission: Permissions.c2c_campaign_data,
   },
-  {
-    id: 'dialerPushData',
-    category: 'Caller & Dialer',
-    label: 'Dialer Push Data',
-    path: '/dialer-push-data',
-    permission: Permissions.dialer_push_data,
-  },
   // Always listed (laxminarayan App route has no Responsibility gate).
   {
     id: 'botPerformance',

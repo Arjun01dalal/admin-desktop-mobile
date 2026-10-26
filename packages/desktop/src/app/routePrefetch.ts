@@ -44,7 +44,6 @@ const LOADERS: Record<string, Loader> = {
   '/call-logs': () => import('@/screens/panel/CallLogsPage'),
   '/gtel-calls': () => import('@/screens/panel/GtelCallsPage'),
   '/gtel-caller-dashboard': () => import('@/screens/panel/GtelCallerDashboardPage'),
-  '/dialer-push-data': () => import('@/screens/panel/DialerPushDataPage'),
   '/new-registers': () => import('@/screens/panel/NewRegistersPage'),
   '/register-user-report': () => import('@/screens/panel/StateWiseRegistrationPage'),
   '/login-report': () => import('@/screens/panel/LoginReportPage'),

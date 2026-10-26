@@ -1,5 +1,5 @@
 import type { SecureAction } from '@/api/secureActions';
-import { asList, asPaged, display } from '@/screens/panel/shared';
+import { asList, display } from '@/screens/panel/shared';
 import { dateTime, formatDisplayDate, formatDisplayTime } from '@/utils/dates';
 import { DEFAULT_EMP_CODE, type UserType } from './constants';
 
@@ -306,9 +306,9 @@ export function buildUserFilter(
     return filter;
   }
 
-  // In_Active_Deposit: no played / blockUser / empCode (API rejects unknown keys)
+  // In_Active_Deposit: no uniqueUser / played / blockUser / empCode (API rejects them)
   if (type === 'In_Active_Deposit') {
-    const filter: Record<string, unknown> = { uniqueUser };
+    const filter: Record<string, unknown> = {};
     if (filters.name.trim()) filter.name = filters.name.trim();
     if (filters.dpId.trim()) filter._id = filters.dpId.trim();
     if (filters.mobile.trim()) filter.mobile = filters.mobile.trim();
@@ -390,16 +390,25 @@ export function buildPayloadForType(
     startDate && endDate
       ? { startDate: dateTime(startDate), endDate: dateTime(endDate) }
       : ({} as Record<string, string>);
-  const app = allottedApps ? { app: allottedApps } : {};
+
+  // Only attach when non-empty — empty `app: []` / `appWithState: {}` rejected by some APIs.
+  const hasAppValue =
+    typeof allottedApps === 'string'
+      ? allottedApps.trim().length > 0
+      : Array.isArray(allottedApps) && allottedApps.length > 0;
+  const app = hasAppValue ? { app: allottedApps } : {};
 
   // Match Users.tsx: build appWithState from login user, optionally scoped to selected app.
   const stateWiseFilter: Record<string, string[]> = {};
   if (appWithState && typeof appWithState === 'object') {
     if (selectedClientName && Array.isArray(appWithState[selectedClientName])) {
-      stateWiseFilter[selectedClientName] = [...appWithState[selectedClientName]];
+      const states = appWithState[selectedClientName].filter(Boolean);
+      if (states.length > 0) stateWiseFilter[selectedClientName] = states;
     } else {
       Object.entries(appWithState).forEach(([key, states]) => {
-        if (Array.isArray(states)) stateWiseFilter[key] = [...states];
+        if (!Array.isArray(states)) return;
+        const cleaned = states.filter(Boolean);
+        if (cleaned.length > 0) stateWiseFilter[key] = cleaned;
       });
     }
   }
@@ -449,15 +458,18 @@ export function buildPayloadForType(
         ...app,
         ...withAppState,
       };
-    case 'In_Active_Deposit':
+    case 'In_Active_Deposit': {
+      // No uniqueUser (API rejects). Cap page size. Dates only when both set — no today default.
+      const perPage = Math.min(Math.max(1, Number(itemsPerPage) || 10), 100);
       return {
         pageNo,
-        itemsPerPage,
+        itemsPerPage: perPage,
         filter,
         ...dates,
         ...app,
         ...withAppState,
       };
+    }
     case 'Non_Performing_Active_User':
       return { filter };
     case 'LAXMI_999_Users':
@@ -515,49 +527,9 @@ export function unpackUsers(data: unknown) {
   };
 }
 
-export function unpackByType(type: UserType, data: unknown) {
-  if (type === 'Todays_Active') {
-    const raw = data as
-      | {
-          user?: UserRow[];
-          users?: UserRow[];
-          items?: UserRow[];
-          totalPages?: number;
-          count?: number;
-          total?: number;
-          payload?: {
-            user?: UserRow[];
-            users?: UserRow[];
-            items?: UserRow[];
-            count?: number;
-            total?: number;
-            totalPages?: number;
-          };
-        }
-      | undefined;
-    const nested = raw?.payload && typeof raw.payload === 'object' ? raw.payload : raw;
-    const rows =
-      (Array.isArray(nested?.user) && nested.user) ||
-      (Array.isArray(nested?.users) && nested.users) ||
-      (Array.isArray(nested?.items) && nested.items) ||
-      (Array.isArray(raw?.user) && raw.user) ||
-      [];
-    return {
-      rows,
-      totalPages: Math.max(1, Number(nested?.totalPages ?? raw?.totalPages ?? 1) || 1),
-      total: Number(nested?.count ?? nested?.total ?? raw?.count ?? raw?.total ?? rows.length) || 0,
-    };
-  }
-  if (
-    type === 'Active_User' ||
-    type === 'Non_Performing_User' ||
-    type === 'In_Active_Deposit' ||
-    type === 'Non_Performing_Active_User' ||
-    type === 'LAXMI_999_Users' ||
-    type === 'Sub_Admin'
-  ) {
-    return asPaged<UserRow>(data);
-  }
+export function unpackByType(_type: UserType, data: unknown) {
+  // Active / Todays / Non-Performing / Inactive Deposit / LAXMI / etc. return
+  // `user` | `users` | `items` interchangeably — unpackUsers accepts all three.
   return unpackUsers(data);
 }
 

@@ -1159,6 +1159,7 @@ module.exports = {
     path: '/transaction/inactive-customer-deposit',
     encryptRequest: true,
     decryptResponse: true,
+    timeout: 180000,
   },
   'users.nonPerformingActive': {
     method: 'POST',

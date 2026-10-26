@@ -52,10 +52,6 @@ const GtelCallerDashboardPage = lazyNamed(
   () => import('@/screens/panel/GtelCallerDashboardPage'),
   'GtelCallerDashboardPage',
 );
-const DialerPushDataPage = lazyNamed(
-  () => import('@/screens/panel/DialerPushDataPage'),
-  'DialerPushDataPage',
-);
 const NewRegistersPage = lazyNamed(
   () => import('@/screens/panel/NewRegistersPage'),
   'NewRegistersPage',
@@ -399,7 +395,6 @@ export {
   CallLogsPage,
   GtelCallsPage,
   GtelCallerDashboardPage,
-  DialerPushDataPage,
   NewRegistersPage,
   StateWiseRegistrationPage,
   CoinRemovalPage,

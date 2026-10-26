@@ -2,6 +2,8 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { sanitizeGtelPhone } from '@astro/shared';
+import { GtelC2cCallButton } from '../../components/GtelC2cCallButton';
 import { colors } from '../../theme';
 import { formatDisplayDate, formatDisplayTime } from '../../utils/dates';
 import { BOT_CHECK_HIDDEN_STATUSES } from './constants';
@@ -23,6 +25,8 @@ type WithdrawalCardFooterProps = {
   actionBusy: boolean;
   addBeneBusy: boolean;
   canAddBeneficiary: boolean;
+  canShowC2c?: boolean;
+  onC2cCall?: (row: Rec) => void;
   onBotReport: (row: Rec) => void;
   onAddBeneficiary: (row: Rec) => Promise<void>;
   onCheck: (row: Rec, side: 'first' | 'second', value: boolean) => Promise<void>;
@@ -35,11 +39,15 @@ export function WithdrawalCardFooter({
   actionBusy,
   addBeneBusy,
   canAddBeneficiary,
+  canShowC2c,
+  onC2cCall,
   onBotReport,
   onAddBeneficiary,
   onCheck,
 }: WithdrawalCardFooterProps) {
   if (bulkMode) return null;
+  const mobile = String(r.userMobile ?? r.mobile ?? '');
+  const showC2c = Boolean(canShowC2c && onC2cCall && sanitizeGtelPhone(mobile));
   const checksAllowed = checksAllowedFor(r, checksDisabled);
   const checkFirst = checkOf(r, 'checkBy');
   const checkSecond = checkOf(r, 'crossCheckBy');
@@ -57,6 +65,11 @@ export function WithdrawalCardFooter({
   const botOk = botPassed >= 13;
   return (
     <View style={styles.checkBlock}>
+      {showC2c ? (
+        <View style={{ marginBottom: 8, alignSelf: 'flex-start' }}>
+          <GtelC2cCallButton onPress={() => onC2cCall?.(r)} />
+        </View>
+      ) : null}
       <View style={styles.metaPanel}>
         <View style={styles.metaCols}>
           <View style={[styles.metaCol, styles.metaColFirst, styles.metaColCenter]}>

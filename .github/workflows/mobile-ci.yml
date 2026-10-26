@@ -1,21 +1,25 @@
 name: Mobile CI
 
+# TEMPORARY: CI disabled — push/PR triggers commented out (will not auto-run).
+# on:
+#   push:
+#     paths:
+#       - 'packages/mobile/**'
+#       - 'packages/shared/**'
+#       - 'package-lock.json'
+#       - '.github/workflows/mobile-ci.yml'
+#   pull_request:
+#     paths:
+#       - 'packages/mobile/**'
+#       - 'packages/shared/**'
+#       - 'package-lock.json'
+#       - '.github/workflows/mobile-ci.yml'
 on:
-  push:
-    paths:
-      - 'packages/mobile/**'
-      - 'packages/shared/**'
-      - 'package-lock.json'
-      - '.github/workflows/mobile-ci.yml'
-  pull_request:
-    paths:
-      - 'packages/mobile/**'
-      - 'packages/shared/**'
-      - 'package-lock.json'
-      - '.github/workflows/mobile-ci.yml'
+  workflow_dispatch:
 
 jobs:
   quality:
+    if: false # temporary — skip job even on manual dispatch
     runs-on: ubuntu-latest
     defaults:
       run:

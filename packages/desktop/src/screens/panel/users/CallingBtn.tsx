@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { Button, Stack, Typography } from '@mui/material';
+import { Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined';
 import { toast } from 'react-toastify';
+import { sanitizeGtelPhone } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import { hasPermission } from '@/auth/permissions';
+import { useGtelClickToCall } from '@/screens/panel/gtel/useGtelClickToCall';
+import { gtelIconBtnSx } from '@/screens/panel/gtel/styles';
 import { getStoredUser } from '@/utils/dates';
 import { RESP_SHOW_MOBILE } from '@/screens/panel/callerResponsibility/constants';
 import { buildBotDialoutSetting } from './toolbarHelpers';
@@ -28,9 +32,8 @@ type CallingBtnProps = {
 };
 
 /**
- * Mobile number + optional Bot Call — ported from laxminarayan CallingBtn.
+ * Mobile number + Gtel C2C icon + optional Bot Call — ported from laxminarayan CallingBtn.
  * Number visible only when `show_mobile` responsibility is present.
- * Manual Dialer "Call" was removed; use C2C push instead.
  */
 export function CallingBtn({
   item,
@@ -40,9 +43,13 @@ export function CallingBtn({
 }: CallingBtnProps) {
   const admin = getStoredUser<CallingAdmin>();
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE);
+  const { canShowC2c, startC2c, isCalling } = useGtelClickToCall();
   const [busy, setBusy] = useState(false);
 
   const mobile = String(item.mobile || item.userMobile || '');
+  const userId = String(item._id || item.userId || '');
+  const phone = sanitizeGtelPhone(mobile);
+  const calling = isCalling(mobile);
 
   /** Bot Call — POST /SubAdmin/add-to-dialer (laxminarayan initiateBotCall). */
   const initiateBotCall = async () => {
@@ -64,13 +71,52 @@ export function CallingBtn({
   };
 
   return (
-    <Stack alignItems="center" spacing={0.5} sx={{ py: 0.25, maxWidth: '100%' }}>
-      <Typography
-        component="span"
-        sx={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, color: 'text.primary' }}
+    <Stack alignItems="stretch" spacing={0.5} sx={{ py: 0.25, width: '100%', maxWidth: '100%' }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        spacing={1.5}
+        sx={{ width: '100%', minWidth: 0 }}
       >
-        {canShowMobile ? mobile || '—' : mobile ? '**********' : '—'}
-      </Typography>
+        <Typography
+          component="span"
+          sx={{
+            fontSize: 11,
+            fontWeight: 600,
+            lineHeight: 1.2,
+            color: 'text.primary',
+            flex: 1,
+            minWidth: 0,
+            textAlign: 'left',
+            pr: 1,
+          }}
+        >
+          {canShowMobile ? mobile || '—' : mobile ? '**********' : '—'}
+        </Typography>
+        {canShowC2c && phone ? (
+          <Tooltip title="C2C Call">
+            <span style={{ flexShrink: 0, marginLeft: 'auto' }}>
+              <IconButton
+                size="small"
+                aria-label="C2C Call"
+                disabled={calling}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void startC2c(mobile, userId || undefined);
+                }}
+                sx={{ ...gtelIconBtnSx, width: 28, height: 28, p: 0.35 }}
+              >
+                {calling ? (
+                  <CircularProgress size={12} color="inherit" />
+                ) : (
+                  <PhoneInTalkOutlinedIcon sx={{ fontSize: 14 }} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        ) : null}
+      </Stack>
       {!hideBotCall ? (
         <Button
           size="small"
