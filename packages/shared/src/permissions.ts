@@ -178,6 +178,14 @@ export const Permissions = {
   caller_leaderboard_tab: 'caller_leaderboard_tab',
   /** Backend typo — must match Responsibilities string */
   state_wise_registartion: 'state_wise_registartion',
+  /** Daily Account Report page — bank → MID → allotment → daily open/close. */
+  daily_account_report: 'daily_account_report',
+  /** Daily Account Report — create/edit bank accounts section. */
+  allow_bank_creation: 'allow_bank_creation',
+  /** Daily Account Report — create/edit MID mapping section. */
+  allow_mid_mapping: 'allow_mid_mapping',
+  /** Daily Account Report — allot/reassign/revoke MID section. */
+  allow_mid_allotment: 'allow_mid_allotment',
 } as const;
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions];
@@ -621,6 +629,39 @@ export function canEditMidLimits(user: PermissionUser | null = null): boolean {
 }
 
 /**
+ * Daily Account Report — nav/page visibility. Matches admin-panel-domains:
+ * the page shows for the base permission OR any section permission (members
+ * entering open/close for their allotted phones only need page access).
+ */
+export function canAccessDailyAccountReport(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  if (isFullAccessNavRole(user, storage)) return true;
+  return (
+    hasPermission(Permissions.daily_account_report, user) ||
+    hasPermission(Permissions.allow_bank_creation, user) ||
+    hasPermission(Permissions.allow_mid_mapping, user) ||
+    hasPermission(Permissions.allow_mid_allotment, user)
+  );
+}
+
+/** Daily Account Report — Bank accounts section (create/view ledger accounts). */
+export function canManageDarBankAccounts(user: PermissionUser | null = null): boolean {
+  return hasPermission(Permissions.allow_bank_creation, user);
+}
+
+/** Daily Account Report — MID mapping section. */
+export function canManageDarMids(user: PermissionUser | null = null): boolean {
+  return hasPermission(Permissions.allow_mid_mapping, user);
+}
+
+/** Daily Account Report — MID allotment section (allot/reassign/revoke). */
+export function canManageDarAllotments(user: PermissionUser | null = null): boolean {
+  return hasPermission(Permissions.allow_mid_allotment, user);
+}
+
+/**
  * Push selected users into a C2C campaign (admin: add_to_dialer | show_c2c_data_upload).
  * Matches backend typo `add_to_dilaler` and dialer / C2C campaign responsibilities.
  */
@@ -681,6 +722,10 @@ export function canAccessNavItem(
 
   if (item.id === 'midLimits') {
     return canViewMidLimits(user, storage);
+  }
+
+  if (item.id === 'dailyAccountReport') {
+    return canAccessDailyAccountReport(user, storage);
   }
 
   if (item.id === 'dashboard' || item.id === 'vipDashboard' || item.id === 'combinedDashboard') {

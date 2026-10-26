@@ -14,6 +14,10 @@ import {
   buildSosEnablePayload as sharedBuildSosEnablePayload,
   canAccessDashboard as sharedCanAccessDashboard,
   canAccessNavItem as sharedCanAccessNavItem,
+  canAccessDailyAccountReport as sharedCanAccessDailyAccountReport,
+  canManageDarBankAccounts as sharedCanManageDarBankAccounts,
+  canManageDarMids as sharedCanManageDarMids,
+  canManageDarAllotments as sharedCanManageDarAllotments,
   canEditMidLimits as sharedCanEditMidLimits,
   canPushToC2cCampaign as sharedCanPushToC2cCampaign,
   canShowMyCoinHistory as sharedCanShowMyCoinHistory,
@@ -126,6 +130,22 @@ export function canViewMidLimits(user: StoredUser | null = getSessionUser()): bo
 
 export function canEditMidLimits(user: StoredUser | null = getSessionUser()): boolean {
   return sharedCanEditMidLimits(user);
+}
+
+export function canAccessDailyAccountReport(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanAccessDailyAccountReport(user, storage);
+}
+
+export function canManageDarBankAccounts(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanManageDarBankAccounts(user);
+}
+
+export function canManageDarMids(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanManageDarMids(user);
+}
+
+export function canManageDarAllotments(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanManageDarAllotments(user);
 }
 
 export function canPushToC2cCampaign(user: StoredUser | null = getSessionUser()): boolean {

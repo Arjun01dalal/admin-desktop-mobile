@@ -319,6 +319,13 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_MID_Limits,
   },
   {
+    id: 'dailyAccountReport',
+    category: 'Payments & Funds',
+    label: 'Daily Account Report',
+    path: '/daily-account-report',
+    permission: Permissions.daily_account_report,
+  },
+  {
     id: 'depositConfig',
     category: 'Payments & Funds',
     label: 'Deposit Config',

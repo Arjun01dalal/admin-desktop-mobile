@@ -43,7 +43,8 @@
     "./withdrawalFund": "./src/withdrawalFund.ts",
     "./finalBook": "./src/finalBook.ts",
     "./fundsRequest": "./src/fundsRequest.ts",
-    "./opsDashboard": "./src/opsDashboard/index.ts"
+    "./opsDashboard": "./src/opsDashboard/index.ts",
+    "./dailyAccountReport": "./src/dailyAccountReport.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

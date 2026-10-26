@@ -46,6 +46,7 @@ import {
   InstantDepositProvidersPage,
   DepositProvidersPage,
   MidLimitsPage,
+  DailyAccountReportPage,
   DepositConfigPage,
   WithdrawalProvidersPage,
   BotDataPage,
@@ -219,6 +220,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/instant-provider" element={<InstantDepositProvidersPage />} />
             <Route path="/pay-g-mid" element={<DepositProvidersPage />} />
             <Route path="/mid-limits" element={<MidLimitsPage />} />
+            <Route path="/daily-account-report" element={<DailyAccountReportPage />} />
             <Route path="/deposit-config" element={<DepositConfigPage />} />
             <Route path="/payout-accounts" element={<WithdrawalProvidersPage />} />
             <Route path="/botData" element={<BotDataPage />} />

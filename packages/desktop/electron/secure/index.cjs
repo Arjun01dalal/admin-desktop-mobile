@@ -700,6 +700,241 @@ async function uploadLlmVoice(payload = {}, token = null) {
   }
 }
 
+const MAX_BALANCE_IMAGE_BYTES = 10 * 1024 * 1024;
+/** Reject oversized base64 before allocating a Buffer (~10MB binary → 4/3 chars). */
+const MAX_BALANCE_IMAGE_BASE64_CHARS = Math.ceil((MAX_BALANCE_IMAGE_BYTES * 4) / 3) + 64;
+const BALANCE_IMAGE_MIME_TO_EXT = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
+/** Sniff real image type from magic bytes — do not trust renderer-declared mime alone. */
+function sniffBalanceImageMime(buffer) {
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return 'image/jpeg';
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+  return null;
+}
+
+/** Decode a renderer `image` base64 string (plain or `data:...;base64,` prefixed) into a Buffer. */
+function decodeBalanceImage(imageBase64, imageMime) {
+  if (imageBase64 == null || typeof imageBase64 !== 'string') {
+    return { ok: false, message: 'Image data is empty' };
+  }
+  const claimedMime = String(imageMime || '').trim();
+  if (claimedMime && !BALANCE_IMAGE_MIME_TO_EXT[claimedMime]) {
+    return { ok: false, message: 'Image must be jpeg, png, or webp' };
+  }
+  const raw = imageBase64.includes(',') ? imageBase64.split(',').pop() || '' : imageBase64;
+  if (!raw || raw.length > MAX_BALANCE_IMAGE_BASE64_CHARS) {
+    return {
+      ok: false,
+      message: raw ? 'Image must be 10MB or less' : 'Image data is empty',
+    };
+  }
+  // Reject obvious non-base64 early to avoid huge Buffer allocations from garbage.
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(raw.slice(0, 256))) {
+    return { ok: false, message: 'Image data is invalid' };
+  }
+  let buffer;
+  try {
+    buffer = Buffer.from(raw, 'base64');
+  } catch {
+    return { ok: false, message: 'Image data is invalid' };
+  }
+  if (!buffer.length) {
+    return { ok: false, message: 'Image data is empty' };
+  }
+  if (buffer.length > MAX_BALANCE_IMAGE_BYTES) {
+    return { ok: false, message: 'Image must be 10MB or less' };
+  }
+  const sniffed = sniffBalanceImageMime(buffer);
+  if (!sniffed) {
+    return { ok: false, message: 'Image must be jpeg, png, or webp' };
+  }
+  // If renderer claimed a mime, it must match the sniffed type.
+  if (claimedMime && claimedMime !== sniffed) {
+    return { ok: false, message: 'Image type does not match file contents' };
+  }
+  return { ok: true, buffer, mime: sniffed, ext: BALANCE_IMAGE_MIME_TO_EXT[sniffed] };
+}
+
+/** Unwrap a Daily Account Report response — mirrors the generic registry decrypt/unwrap step. */
+function unwrapDarResponse(responseData) {
+  let data = responseData;
+  if (data?.data != null && typeof data.data === 'string') {
+    try {
+      data = { ...data, data: decrypt(data.data) };
+    } catch {
+      /* backend returned a plain (non-encrypted) string body — keep as-is */
+    }
+  }
+  const payloadOut = data?.data?.payload ?? data?.data ?? data?.payload ?? data;
+  return {
+    ok: true,
+    success: data?.success !== false,
+    message: typeof data?.message === 'string' ? data.message : undefined,
+    data: payloadOut,
+  };
+}
+
+/**
+ * Daily Account Report — open/close balance create (idempotent per MID+date+type).
+ * Renderer sends `image` as base64 (+ `imageMime`) when a screenshot is attached;
+ * main builds multipart FormData so the upload never needs a public URL.
+ */
+function clampDarActor(userId, userName) {
+  return {
+    userId: String(userId || '').slice(0, 64),
+    userName: String(userName || '').slice(0, 120),
+  };
+}
+
+async function upsertDailyAccountBalance(payload = {}, token = null) {
+  const { midId, type, amount, date, remark, image, imageMime, userId, userName } = payload;
+  const mid = String(midId || '').trim();
+  if (!mid) return { ok: false, message: 'MID is required' };
+  if (type !== 'open' && type !== 'close') {
+    return { ok: false, message: 'Balance type must be open or close' };
+  }
+  const amountNum = Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum < 0) {
+    return { ok: false, message: 'Enter a valid amount' };
+  }
+  const actor = clampDarActor(userId, userName);
+  const safeDate = date ? String(date).slice(0, 32) : '';
+  const safeRemark = remark ? String(remark).slice(0, 500) : '';
+
+  try {
+    let response;
+    if (image) {
+      const decoded = decodeBalanceImage(image, imageMime);
+      if (!decoded.ok) return { ok: false, message: decoded.message };
+
+      const form = new FormData();
+      form.append('image', new Blob([decoded.buffer], { type: decoded.mime }), `balance.${decoded.ext}`);
+      form.append('midId', mid);
+      form.append('type', type);
+      form.append('amount', String(amountNum));
+      if (safeDate) form.append('date', safeDate);
+      if (safeRemark) form.append('remark', safeRemark);
+      form.append('userId', actor.userId);
+      form.append('userName', actor.userName);
+
+      response = await apiClient('dailyAccountReport.balances.upsert').post(
+        '/midAllotmentDailyBalances',
+        form,
+        {
+          headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          maxBodyLength: MAX_BALANCE_IMAGE_BYTES + 256 * 1024,
+        },
+      );
+    } else {
+      response = await apiClient('dailyAccountReport.balances.upsert').post(
+        '/midAllotmentDailyBalances',
+        {
+          midId: mid,
+          type,
+          amount: amountNum,
+          ...(safeDate ? { date: safeDate } : {}),
+          ...(safeRemark ? { remark: safeRemark } : {}),
+          updatedBy: actor,
+          userId: actor.userId,
+          userName: actor.userName,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+    }
+
+    return unwrapDarResponse(response.data);
+  } catch (error) {
+    return {
+      ok: false,
+      message: error?.response?.data?.message || error?.message || 'Failed to save balance',
+      status: error?.response?.status,
+    };
+  }
+}
+
+/** Daily Account Report — correct an existing open/close balance row (always multipart; image optional). */
+async function correctDailyAccountBalance(payload = {}, token = null) {
+  const { _id, amount, remark, image, imageMime, userId, userName } = payload;
+  const id = String(_id || '').trim();
+  if (!id) return { ok: false, message: 'Balance id is required' };
+  const amountNum = Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum < 0) {
+    return { ok: false, message: 'Enter a valid amount' };
+  }
+  const safeRemark = String(remark || '').trim().slice(0, 500);
+  if (!safeRemark) {
+    return { ok: false, message: 'Remark is required for correction' };
+  }
+  const actor = clampDarActor(userId, userName);
+
+  try {
+    const form = new FormData();
+    form.append('_id', id);
+    form.append('amount', String(amountNum));
+    form.append('remark', safeRemark);
+    form.append('userId', actor.userId);
+    form.append('userName', actor.userName);
+
+    if (image) {
+      const decoded = decodeBalanceImage(image, imageMime);
+      if (!decoded.ok) return { ok: false, message: decoded.message };
+      form.append('image', new Blob([decoded.buffer], { type: decoded.mime }), `balance.${decoded.ext}`);
+    }
+
+    const response = await apiClient('dailyAccountReport.balances.correct').post(
+      '/midAllotmentDailyBalances/update',
+      form,
+      {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        maxBodyLength: MAX_BALANCE_IMAGE_BYTES + 256 * 1024,
+      },
+    );
+
+    return unwrapDarResponse(response.data);
+  } catch (error) {
+    return {
+      ok: false,
+      message: error?.response?.data?.message || error?.message || 'Failed to correct balance',
+      status: error?.response?.status,
+    };
+  }
+}
+
 /**
  * @param {string} action - registry key
  * @param {object} payload
@@ -760,6 +995,12 @@ async function execute(action, payload = {}, token = null) {
     }
     if (action === 'llmChat.sendVoice') {
       return uploadLlmVoice(safePayload, safeToken);
+    }
+    if (action === 'dailyAccountReport.balances.upsert') {
+      return upsertDailyAccountBalance(safePayload, safeToken);
+    }
+    if (action === 'dailyAccountReport.balances.correct') {
+      return correctDailyAccountBalance(safePayload, safeToken);
     }
     return { ok: false, message: `Unhandled local action: ${action}` };
   }

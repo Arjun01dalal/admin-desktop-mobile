@@ -811,6 +811,96 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'dailyAccountReport.bankAccounts.list': {
+    method: 'GET',
+    path: '/bankAccounts',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.bankAccounts.create': {
+    method: 'POST',
+    path: '/bankAccounts',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.bankAccounts.update': {
+    method: 'POST',
+    path: '/bankAccounts/update',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.mids.list': {
+    method: 'GET',
+    path: '/mids',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.mids.create': {
+    method: 'POST',
+    path: '/mids',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.mids.update': {
+    method: 'POST',
+    path: '/mids/update',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.allotments.create': {
+    method: 'POST',
+    path: '/midAllotments',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.allotments.reassign': {
+    method: 'POST',
+    path: '/midAllotments/reassign',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.allotments.revoke': {
+    method: 'POST',
+    path: '/midAllotments/revoke',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.allotments.active': {
+    method: 'GET',
+    path: '/midAllotments/active',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.allotments.history': {
+    method: 'GET',
+    path: '/midAllotments',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.balances.daySheet': {
+    method: 'GET',
+    path: '/midAllotmentDailyBalances/day-sheet',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.balances.list': {
+    method: 'GET',
+    path: '/midAllotmentDailyBalances',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.balances.getById': {
+    method: 'GET',
+    path: '/midAllotmentDailyBalances/{id}',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'dailyAccountReport.balances.upsert': {
+    type: 'local',
+  },
+  'dailyAccountReport.balances.correct': {
+    type: 'local',
+  },
   // Deposit Config
   'depositConfig.getAll': {
     method: 'POST',

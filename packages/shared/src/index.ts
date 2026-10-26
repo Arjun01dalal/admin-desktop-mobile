@@ -49,4 +49,5 @@ export * from './c2cCampaign';
 export * from './opsDashboard';
 export * from './restrictedGateways';
 export * from './display';
+export * from './dailyAccountReport';
 

@@ -1,0 +1,979 @@
+/**
+ * Daily Account Report — layout + MUI overrides.
+ * Tokens react to <html data-color-mode="dark|light">.
+ */
+
+.dar-page,
+.MuiDialog-paper.dar-dialog {
+  --dar-ink: #111111;
+  --dar-muted: #666666;
+  --dar-line: #e7e2da;
+  --dar-surface: #ffffff;
+  --dar-soft: #fff8ee;
+  --dar-head-bg: #fff6ea;
+  --dar-accent: #f1a144;
+  --dar-accent-deep: #e8952f;
+  --dar-accent-dark: #9a5410;
+  --dar-accent-border: #d8892a;
+  --dar-ok: #0a7a4c;
+  --dar-ok-bg: #e6f7ee;
+  --dar-ok-border: #b7ebc8;
+  --dar-off-bg: #f3f0ea;
+  --dar-off-ink: #7a6554;
+  --dar-row-alt: #fffaf2;
+  --dar-row-hover: #fff6e9;
+  --dar-page-bg: linear-gradient(180deg, #fffdf9 0%, #f7f8f9 100%);
+  --dar-chip-bg: rgba(255, 255, 255, 0.85);
+  --dar-chip-border: #efd7b4;
+}
+
+.dar-page {
+  padding: 0 14px 20px;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--dar-ink);
+  font-size: 13px;
+  background: var(--dar-page-bg);
+  min-height: 100%;
+}
+
+html[data-color-mode='dark'] .dar-page,
+html[data-color-mode='dark'] .MuiDialog-paper.dar-dialog {
+  --dar-ink: #eef0f3;
+  --dar-muted: #a9adb6;
+  --dar-line: rgba(255, 255, 255, 0.12);
+  --dar-surface: #1b1d22;
+  --dar-soft: #241d12;
+  --dar-head-bg: #262019;
+  --dar-accent: #f1a144;
+  --dar-accent-deep: #e8952f;
+  --dar-accent-dark: #ffc98a;
+  --dar-accent-border: #a9661e;
+  --dar-ok: #58d79a;
+  --dar-ok-bg: rgba(10, 122, 76, 0.18);
+  --dar-ok-border: rgba(88, 215, 154, 0.35);
+  --dar-off-bg: rgba(255, 255, 255, 0.06);
+  --dar-off-ink: #b7a994;
+  --dar-row-alt: rgba(255, 255, 255, 0.025);
+  --dar-row-hover: rgba(241, 161, 68, 0.1);
+  --dar-page-bg: radial-gradient(900px 220px at 0% 0%, rgba(241, 161, 68, 0.07), transparent 55%),
+    #15161a;
+  --dar-chip-bg: rgba(255, 255, 255, 0.06);
+  --dar-chip-border: rgba(241, 161, 68, 0.3);
+}
+
+/* —— Hero —— */
+.dar-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 2px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--dar-chip-border);
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--dar-head-bg) 0%, var(--dar-soft) 100%);
+}
+
+.dar-hero__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--dar-ink);
+  line-height: 1.2;
+}
+
+.dar-hero__sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dar-muted);
+}
+
+.dar-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dar-hero__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--dar-chip-border);
+  background: var(--dar-chip-bg);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dar-muted);
+}
+
+.dar-hero__chip-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+/* —— Quick cards (one grid cell each) —— */
+.dar-quick-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .dar-quick-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dar-quick-card-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dar-quick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--dar-line);
+  background: var(--dar-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dar-quick-card:hover {
+  border-color: var(--dar-chip-border);
+  background: var(--dar-soft);
+}
+
+.dar-quick-card__title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+.dar-quick-card__meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dar-muted);
+  line-height: 1.35;
+}
+
+.dar-quick-card__btn {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--dar-accent);
+  color: #111;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+/* —— Panel —— */
+.dar-panel {
+  background: var(--dar-surface);
+  border: 1px solid var(--dar-line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.dar-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, var(--dar-head-bg), var(--dar-soft));
+  border-bottom: 1px solid var(--dar-line);
+}
+
+.dar-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dar-step {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--dar-accent);
+  color: #111;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.dar-panel__heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+.dar-panel__sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dar-muted);
+}
+
+/* —— Buttons / pills —— */
+.dar-btn.MuiButton-root {
+  text-transform: none !important;
+  border-radius: 6px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+  min-height: 30px !important;
+  padding: 4px 14px !important;
+  font-size: 12px !important;
+  background: var(--dar-accent) !important;
+  color: #111 !important;
+  border: 1px solid var(--dar-accent-border) !important;
+}
+
+.dar-btn.MuiButton-root:hover {
+  background: var(--dar-accent-deep) !important;
+}
+
+.dar-btn--ghost.MuiButton-root {
+  background: var(--dar-surface) !important;
+  color: var(--dar-ink) !important;
+  border: 1px solid var(--dar-line) !important;
+}
+
+.dar-btn--ghost.MuiButton-root:hover {
+  background: var(--dar-soft) !important;
+}
+
+.dar-btn--dialog.MuiButton-root {
+  min-height: 38px !important;
+  padding: 6px 18px !important;
+  font-size: 14px !important;
+}
+
+.dar-link.MuiButton-root {
+  text-transform: none !important;
+  min-height: 0 !important;
+  padding: 2px 6px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--dar-accent) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.dar-link.MuiButton-root:hover {
+  background: rgba(241, 161, 68, 0.12) !important;
+}
+
+.dar-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--dar-line);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.dar-pill.is-on {
+  background: var(--dar-ok-bg);
+  color: var(--dar-ok);
+  border-color: var(--dar-ok-border);
+}
+
+.dar-pill.is-off {
+  background: var(--dar-off-bg);
+  color: var(--dar-off-ink);
+  border-color: var(--dar-line);
+}
+
+.dar-pill.is-soft {
+  background: var(--dar-soft);
+  color: var(--dar-accent-dark);
+  border-color: var(--dar-chip-border);
+}
+
+/* —— Toolbar (critical: MUI width) —— */
+.dar-toolbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--dar-line);
+  background: var(--dar-surface);
+}
+
+.dar-toolbar--modal {
+  border-radius: 0;
+  padding: 16px 24px !important;
+  gap: 10px !important;
+}
+
+.dar-balance-toolbar {
+  margin: 12px 0 8px;
+  padding: 0 14px 8px !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+.dar-balance-toolbar__meta {
+  align-self: center;
+  margin-left: auto;
+  padding-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dar-muted);
+  white-space: nowrap;
+}
+
+.dar-grow {
+  flex: 1 1 200px;
+  min-width: 200px;
+}
+
+.dar-select {
+  flex: 0 0 132px;
+  width: 132px !important;
+  min-width: 120px !important;
+  max-width: 160px !important;
+}
+
+.dar-date {
+  flex: 0 0 168px;
+  width: 168px !important;
+  min-width: 168px !important;
+  max-width: 168px !important;
+}
+
+.dar-mid-filter {
+  flex: 0 0 200px;
+  width: 200px !important;
+  min-width: 160px !important;
+  max-width: 240px !important;
+}
+
+.dar-toolbar .MuiFormControl-root:not(.dar-date):not(.dar-mid-filter):not(.dar-select):not(.dar-grow),
+.dar-balance-toolbar .MuiFormControl-root:not(.dar-date):not(.dar-mid-filter):not(.dar-select):not(.dar-grow) {
+  width: auto !important;
+}
+
+.dar-toolbar .dar-date.MuiFormControl-root,
+.dar-balance-toolbar .dar-date.MuiFormControl-root {
+  flex: 0 0 168px !important;
+  width: 168px !important;
+  min-width: 168px !important;
+  max-width: 168px !important;
+}
+
+.dar-toolbar .dar-mid-filter.MuiFormControl-root,
+.dar-balance-toolbar .dar-mid-filter.MuiFormControl-root {
+  flex: 0 0 200px !important;
+  width: 200px !important;
+  min-width: 160px !important;
+  max-width: 240px !important;
+}
+
+.dar-toolbar .dar-select.MuiFormControl-root {
+  flex: 0 0 132px !important;
+  width: 132px !important;
+  min-width: 120px !important;
+  max-width: 160px !important;
+}
+
+.dar-toolbar .dar-grow.MuiFormControl-root {
+  flex: 1 1 200px !important;
+  width: auto !important;
+  min-width: 200px !important;
+  max-width: none !important;
+}
+
+.dar-toolbar .MuiOutlinedInput-root,
+.dar-balance-toolbar .MuiOutlinedInput-root {
+  min-height: 40px;
+  border-radius: 8px;
+  background: var(--dar-surface);
+  font-size: 13px;
+}
+
+.dar-toolbar .MuiInputBase-input,
+.dar-balance-toolbar .MuiInputBase-input {
+  color: var(--dar-ink);
+}
+
+.dar-toolbar .MuiSelect-select,
+.dar-balance-toolbar .MuiSelect-select {
+  display: flex !important;
+  align-items: center;
+  min-height: 1.4375em !important;
+}
+
+/* —— Dialog —— */
+.MuiDialog-root:has(.dar-dialog) .MuiBackdrop-root,
+.dar-dialog-backdrop {
+  background-color: rgba(10, 12, 16, 0.62) !important;
+}
+
+.MuiDialog-paper.dar-dialog {
+  border-radius: 14px !important;
+  border: 1px solid var(--dar-line);
+  width: 100% !important;
+  max-width: 820px !important;
+  background: var(--dar-surface) !important;
+  color: var(--dar-ink);
+  opacity: 1 !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45) !important;
+}
+
+.MuiDialog-paper.dar-dialog.dar-dialog--wide {
+  max-width: 1080px !important;
+  width: calc(100% - 48px) !important;
+}
+
+.MuiDialog-paper.dar-dialog.dar-dialog--list {
+  max-width: 1120px !important;
+}
+
+.dar-dialog__title {
+  padding: 22px 28px 14px !important;
+  border-bottom: 1px solid var(--dar-line);
+  margin-bottom: 0;
+}
+
+.dar-dialog__title-strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+.dar-dialog__title-span {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dar-muted);
+  line-height: 1.45;
+}
+
+.dar-dialog__actions {
+  padding: 14px 28px 22px !important;
+  gap: 12px;
+  border-top: 1px solid var(--dar-line);
+  margin-top: 4px;
+}
+
+.dar-tabs {
+  border-bottom: 1px solid var(--dar-line);
+  background: var(--dar-surface);
+  padding: 0 16px;
+}
+
+.dar-modal-list {
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column;
+  background: var(--dar-surface);
+}
+
+.dar-form {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 20px;
+  padding: 22px 28px 12px !important;
+}
+
+.dar-form .span-2,
+.dar-form .span-2.MuiFormControl-root {
+  grid-column: 1 / -1;
+}
+
+.dar-form .MuiOutlinedInput-root {
+  border-radius: 8px;
+  font-size: 14px;
+  min-height: 46px;
+}
+
+/* —— Modal / list tables —— */
+.dar-table-wrap {
+  padding: 0;
+  overflow: auto;
+  max-height: 280px;
+}
+
+.dar-table-wrap--modal {
+  margin: 16px 24px 0;
+  border: 1px solid var(--dar-line);
+  border-radius: 10px;
+  background: var(--dar-surface);
+  overflow: auto;
+  max-height: min(48vh, 420px);
+}
+
+.dar-table-wrap .table.table-view,
+.dar-table {
+  margin: 0;
+  width: 100%;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.dar-table-wrap .table.table-view > thead,
+.dar-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.dar-th,
+.dar-table-wrap .table-view tr th {
+  border: 1px solid var(--dar-accent-border) !important;
+  color: #111 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  padding: 6px 8px !important;
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: left;
+  background: var(--dar-accent) !important;
+}
+
+.dar-td,
+.dar-table-wrap .table-view tr td {
+  border: 1px solid var(--dar-line) !important;
+  padding: 6px 8px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--dar-ink) !important;
+  vertical-align: middle !important;
+  text-align: left;
+  white-space: nowrap;
+  background: var(--dar-surface) !important;
+  line-height: 1.3;
+}
+
+.dar-table-wrap .table-view tbody tr:hover td,
+.dar-table tbody tr:hover .dar-td {
+  background: var(--dar-row-hover) !important;
+}
+
+.dar-col-action {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center !important;
+}
+
+.dar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.dar-name {
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+.dar-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dar-muted {
+  color: var(--dar-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dar-modal-list > .dar-pager {
+  margin: 14px 24px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--dar-line);
+  border-radius: 10px;
+  background: var(--dar-head-bg);
+}
+
+.dar-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  color: var(--dar-ink);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--dar-head-bg);
+  border-top: 1px solid var(--dar-line);
+}
+
+.dar-pager__count {
+  color: var(--dar-muted);
+  white-space: nowrap;
+}
+
+.dar-pager__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.dar-pager__page {
+  min-width: 44px;
+  text-align: center;
+}
+
+/* —— Balance table (full-bleed header) —— */
+.dar-balance-table-wrap {
+  margin: 0 14px 14px;
+  width: calc(100% - 28px);
+  box-sizing: border-box;
+  border: 1px solid var(--dar-line);
+  border-radius: 10px;
+  overflow: auto;
+  background: var(--dar-surface);
+  max-height: min(56vh, 560px);
+  scrollbar-gutter: stable;
+}
+
+.dar-balance-table {
+  width: 100%;
+  min-width: 920px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.dar-balance-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.dar-balance-th {
+  padding: 11px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #111;
+  text-align: center;
+  white-space: nowrap;
+  background: var(--dar-accent);
+  border-bottom: 1px solid var(--dar-accent-border);
+  box-sizing: border-box;
+}
+
+.dar-balance-th:first-child {
+  border-top-left-radius: 9px;
+}
+
+.dar-balance-th:last-child {
+  border-top-right-radius: 9px;
+}
+
+.dar-balance-td {
+  padding: 12px 10px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--dar-ink);
+  text-align: center;
+  border-bottom: 1px solid var(--dar-line);
+  vertical-align: middle;
+  background: var(--dar-surface);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.dar-balance-table col.dar-col-sr {
+  width: 64px;
+}
+.dar-balance-table col.dar-col-mid {
+  width: 12%;
+}
+.dar-balance-table col.dar-col-sub {
+  width: 22%;
+}
+.dar-balance-table col.dar-col-date {
+  width: 110px;
+}
+.dar-balance-table col.dar-col-open,
+.dar-balance-table col.dar-col-close {
+  width: 12%;
+}
+.dar-balance-table col.dar-col-status {
+  width: 120px;
+}
+.dar-balance-table col.dar-col-action {
+  width: 100px;
+}
+
+.dar-balance-table tbody tr:last-child .dar-balance-td {
+  border-bottom: none;
+}
+
+.dar-balance-table tbody tr:hover .dar-balance-td {
+  background: var(--dar-row-hover);
+}
+
+.dar-sr-no {
+  color: var(--dar-muted);
+}
+
+.dar-subadmin-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dar-subadmin-details__name {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--dar-ink);
+}
+
+.dar-subadmin-details__id {
+  font-size: 11px !important;
+  color: var(--dar-muted);
+  word-break: break-all;
+  white-space: normal;
+  line-height: 1.25;
+  max-width: 100%;
+}
+
+.dar-balance-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dar-balance-amount {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.dar-info-btn.MuiIconButton-root {
+  padding: 2px !important;
+  color: var(--dar-accent-dark) !important;
+  font-size: 16px !important;
+}
+
+.dar-info-btn.MuiIconButton-root:hover {
+  color: var(--dar-ink) !important;
+  background: var(--dar-soft) !important;
+}
+
+.dar-virtual-spacer td {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* —— Empty / loader / detail —— */
+.dar-empty {
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.dar-empty__title {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+.dar-empty__sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--dar-muted);
+}
+
+.dar-loader {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.dar-file-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dar-muted);
+}
+
+.dar-file-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dar-ink);
+}
+
+.dar-img-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dar-accent);
+}
+
+.dar-detail-content {
+  padding: 16px 24px !important;
+}
+
+.dar-detail-card {
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--dar-line);
+  background: var(--dar-surface);
+}
+
+.dar-detail-card__hero {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--dar-line);
+  background: var(--dar-head-bg);
+}
+
+.dar-detail-card__hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dar-detail-card__eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dar-muted);
+}
+
+.dar-detail-card__hero-title {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+.dar-detail-card__amount {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dar-detail-card__amount-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dar-muted);
+}
+
+.dar-detail-card__amount-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--dar-ink);
+}
+
+.dar-detail-card__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.dar-detail-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dar-detail-card__field--full {
+  grid-column: 1 / -1;
+}
+
+.dar-detail-card__field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dar-muted);
+}
+
+.dar-detail-card__field-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dar-ink);
+}
+
+.dar-detail-card__field-id {
+  font-size: 11px;
+  color: var(--dar-muted);
+}
+
+.dar-detail-card__image {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--dar-line);
+}
+
+.dar-detail-card__image-img {
+  display: block;
+  width: 100%;
+  max-height: 192px;
+  object-fit: contain;
+  background: var(--dar-off-bg);
+}
+
+.dar-detail-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--dar-line);
+  background: var(--dar-soft);
+  font-size: 11px;
+  color: var(--dar-muted);
+}
+
+.dar-detail-card__footer-id {
+  font-size: 12px;
+  color: var(--dar-ink);
+}
