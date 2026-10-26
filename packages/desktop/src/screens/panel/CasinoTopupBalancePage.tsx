@@ -30,17 +30,23 @@ import {
   emptyRemainingForm,
   emptyRemainingFormErrors,
   emptyRemainingSummary,
+  emptyUpdateHistorySummary,
   buildRemainingSubmitPayload,
   formatMoney,
+  formatUpdateHistoryCell,
+  istDateYmd,
+  labelizeHistoryKey,
   mergeRemainingAfterSubmit,
   parseBothProviders,
   parseQtechRemaining,
+  parseUpdateHistoryResponse,
   remainingRowCode,
   remainingRowConsumed,
   remainingRowGgrInr,
   remainingRowGgrUsd,
   remainingRowLabel,
   toApiDateTime,
+  updateHistoryColumnKeys,
   type FormState,
   type ProviderKey,
   type ProviderState,
@@ -49,6 +55,8 @@ import {
   type RemainingFormErrors,
   type RemainingFormState,
   type TopupRecord,
+  type UpdateHistoryRow,
+  type UpdateHistorySummary,
 } from '@/screens/panel/casinoTopup/helpers';
 import { useRevealCodes } from '@/context/useRevealCodes';
 import { toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
@@ -68,25 +76,57 @@ const emptyProviders = (): Record<ProviderKey, ProviderState> => ({
   betconstruct: { records: [], balance: null, currency: 'USD', loading: false },
 });
 
-function MetricCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
+function MetricCard({
+  label,
+  value,
+  accent,
+  snug,
+}: {
+  label: string;
+  value: string;
+  accent?: string;
+  /** Compact chip that doesn’t stretch full row width. */
+  snug?: boolean;
+}) {
   return (
-    <Paper
-      elevation={0}
+    <Box
       sx={{
-        p: 1.5,
-        height: '100%',
-        bgcolor: '#121218',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 1.5,
+        ...(snug
+          ? { flex: '0 1 auto', minWidth: 110, maxWidth: 180 }
+          : { height: '100%', minWidth: 0 }),
+        px: 1.25,
+        py: 0.75,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.2,
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'action.hover',
+        overflow: 'hidden',
       }}
     >
-      <Typography color="text.secondary" fontSize={12}>
+      <Typography
+        color="text.secondary"
+        fontSize={10}
+        fontWeight={600}
+        sx={{ letterSpacing: 0.02, lineHeight: 1.15 }}
+      >
         {label}
       </Typography>
-      <Typography fontWeight={700} fontSize={20} sx={{ mt: 0.5, color: accent || 'text.primary' }}>
+      <Typography
+        fontWeight={700}
+        fontSize={value.length > 14 ? 12 : 13}
+        lineHeight={1.2}
+        sx={{
+          color: accent || 'text.primary',
+          wordBreak: 'break-word',
+          overflowWrap: 'anywhere',
+        }}
+      >
         {value}
       </Typography>
-    </Paper>
+    </Box>
   );
 }
 
@@ -115,6 +155,14 @@ export function CasinoTopupBalancePage() {
   const [remainingFormErrors, setRemainingFormErrors] =
     useState<RemainingFormErrors>(emptyRemainingFormErrors);
   const [remainingSubmitting, setRemainingSubmitting] = useState(false);
+  const [historyRange, setHistoryRange] = useState({
+    startDate: istDateYmd(true),
+    endDate: istDateYmd(),
+  });
+  const [updateHistory, setUpdateHistory] = useState<UpdateHistoryRow[]>([]);
+  const [updateHistorySummary, setUpdateHistorySummary] =
+    useState<UpdateHistorySummary>(emptyUpdateHistorySummary);
+  const [updateHistoryLoading, setUpdateHistoryLoading] = useState(false);
 
   const loadBalances = useCallback(async () => {
     setPageLoading(true);
@@ -166,13 +214,48 @@ export function CasinoTopupBalancePage() {
     }
   }, []);
 
+  const loadUpdateHistory = useCallback(
+    async (startDate = historyRange.startDate, endDate = historyRange.endDate) => {
+      if (!startDate || !endDate) {
+        toast.error('Please select start and end date');
+        return;
+      }
+      setUpdateHistoryLoading(true);
+      try {
+        const res = await secureApi('casinoTopup.updateHistory', { startDate, endDate });
+        if (!res.ok) {
+          toast.error(res.message || 'Failed to load Qtech update history');
+          setUpdateHistory([]);
+          setUpdateHistorySummary(emptyUpdateHistorySummary());
+          return;
+        }
+        const parsed = parseUpdateHistoryResponse(res.data);
+        setUpdateHistory(parsed.rows);
+        setUpdateHistorySummary(parsed.summary);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to load Qtech update history');
+        setUpdateHistory([]);
+        setUpdateHistorySummary(emptyUpdateHistorySummary());
+      } finally {
+        setUpdateHistoryLoading(false);
+      }
+    },
+    [historyRange.endDate, historyRange.startDate],
+  );
+
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadBalances(), loadQtechRemaining()]);
-  }, [loadBalances, loadQtechRemaining]);
+    await Promise.all([
+      loadBalances(),
+      loadQtechRemaining(),
+      loadUpdateHistory(historyRange.startDate, historyRange.endDate),
+    ]);
+  }, [historyRange.endDate, historyRange.startDate, loadBalances, loadQtechRemaining, loadUpdateHistory]);
 
   useEffect(() => {
     if (canView) void refreshAll();
-  }, [canView, refreshAll]);
+    // Initial load only — date-range reloads via Load / Refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canView]);
 
   const openAddPopup = () => {
     setAddOpen(true);
@@ -327,6 +410,31 @@ export function CasinoTopupBalancePage() {
     [remainingTab],
   );
 
+  const updateHistoryKeys = useMemo(
+    () =>
+      updateHistoryColumnKeys(updateHistory).length
+        ? updateHistoryColumnKeys(updateHistory)
+        : ['amount', 'currency', 'toppedUpAtIst', 'updatedBy'],
+    [updateHistory],
+  );
+
+  const updateHistoryColumns = useMemo<CommonTableColumn<UpdateHistoryRow>[]>(
+    () => [
+      {
+        id: '#',
+        label: '#',
+        width: 56,
+        render: (_row, index) => index + 1,
+      },
+      ...updateHistoryKeys.map((key) => ({
+        id: key,
+        label: labelizeHistoryKey(key),
+        render: (row: UpdateHistoryRow) => formatUpdateHistoryCell(row[key]),
+      })),
+    ],
+    [updateHistoryKeys],
+  );
+
   const remainingRows =
     remainingTab === 'provider' ? qtechRemaining.byProvider : qtechRemaining.byGame;
 
@@ -360,19 +468,126 @@ export function CasinoTopupBalancePage() {
         </Typography>
         <Button
           startIcon={
-            pageLoading || qtechRemainingLoading ? (
+            pageLoading || qtechRemainingLoading || updateHistoryLoading ? (
               <CircularProgress size={16} color="inherit" />
             ) : (
               <RefreshIcon />
             )
           }
           onClick={() => void refreshAll()}
-          disabled={pageLoading || qtechRemainingLoading || submitting}
+          disabled={pageLoading || qtechRemainingLoading || updateHistoryLoading || submitting}
           sx={orangeBtnSx}
         >
           Refresh
         </Button>
       </Stack>
+
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          mb: 2,
+          bgcolor: 'background.paper',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 2,
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          mb={2}
+          gap={1.5}
+          flexWrap="wrap"
+        >
+          <Typography fontWeight={700} fontSize={18}>
+            Qtech Update History
+          </Typography>
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            alignItems="center"
+            flexWrap="nowrap"
+            sx={{ ml: 'auto' }}
+          >
+            <TextField
+              label="Start Date"
+              type="date"
+              size="small"
+              fullWidth={false}
+              value={historyRange.startDate}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: 168, minWidth: 168, flex: '0 0 168px' }}
+              onChange={(e) =>
+                setHistoryRange((prev) => ({ ...prev, startDate: e.target.value }))
+              }
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              size="small"
+              fullWidth={false}
+              value={historyRange.endDate}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: 168, minWidth: 168, flex: '0 0 168px' }}
+              onChange={(e) =>
+                setHistoryRange((prev) => ({ ...prev, endDate: e.target.value }))
+              }
+            />
+            <Button
+              onClick={() => void loadUpdateHistory()}
+              disabled={updateHistoryLoading}
+              sx={{ ...orangeBtnSx, flexShrink: 0 }}
+            >
+              {updateHistoryLoading ? <CircularProgress size={16} color="inherit" /> : 'Load'}
+            </Button>
+          </Stack>
+        </Stack>
+
+        <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} mb={1.5}>
+          <MetricCard snug label="Start Date" value={updateHistorySummary.startDate || '—'} />
+          <MetricCard snug label="End Date" value={updateHistorySummary.endDate || '—'} />
+          <MetricCard
+            snug
+            label="Top-up Count"
+            value={
+              updateHistorySummary.topupCount != null
+                ? String(updateHistorySummary.topupCount)
+                : '—'
+            }
+            accent="#60a5fa"
+          />
+          <MetricCard
+            snug
+            label="Top-up Total Amount"
+            value={
+              updateHistorySummary.topupTotalAmount != null
+                ? `${formatMoney(updateHistorySummary.topupTotalAmount)}${
+                    updateHistorySummary.currency
+                      ? ` ${updateHistorySummary.currency}`
+                      : ''
+                  }`
+                : '—'
+            }
+            accent="#2dd4bf"
+          />
+          <MetricCard snug label="Currency" value={updateHistorySummary.currency || '—'} />
+        </Stack>
+
+        {/* No TablePanel here — it fills remaining viewport and leaves a huge empty gap. */}
+        <CommonTable
+          columns={updateHistoryColumns}
+          rows={updateHistory}
+          getRowKey={(row, i) => String(row._id || i)}
+          loading={updateHistoryLoading && updateHistory.length === 0}
+          emptyMessage="No update history found"
+          stickyHeader
+          dense
+          minWidth={720}
+          maxHeight={320}
+        />
+      </Paper>
 
       <Paper
         elevation={0}

@@ -1,6 +1,6 @@
 /**
- * Casino Top-up Balance — Qtech remaining balance (new API) + Qtech history.
- * Mirrors desktop CasinoTopupBalancePage.
+ * Casino Top-up Balance — update history + remaining balance + Qtech history.
+ * Mirrors desktop CasinoTopupBalancePage / admin-panel CasinoTopupBalance.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -25,18 +25,26 @@ import {
   type QtechRemainingSummary,
   type RemainingFormState,
   type RemainingFormErrors,
+  type UpdateHistoryRow,
+  type UpdateHistorySummary,
   emptyRemainingSummary,
   emptyRemainingForm,
   emptyRemainingFormErrors,
+  emptyUpdateHistorySummary,
   buildRemainingSubmitPayload,
   formatMoney,
+  formatUpdateHistoryCell,
+  istDateYmd,
+  labelizeHistoryKey,
   parseQtechRemaining,
+  parseUpdateHistoryResponse,
   mergeRemainingAfterSubmit,
   remainingRowLabel,
   remainingRowCode,
   remainingRowGgrUsd,
   remainingRowGgrInr,
   remainingRowConsumed,
+  updateHistoryColumnKeys,
 } from '@astro/shared/casinoTopup';
 import { styles } from './CasinoTopupBalanceScreen.styles';
 import { display } from '../../../utils/display';
@@ -258,6 +266,14 @@ export function CasinoTopupBalanceScreen() {
     useState<RemainingFormErrors>(emptyRemainingFormErrors);
   const [remainingSubmitting, setRemainingSubmitting] = useState(false);
   const [remainingMsg, setRemainingMsg] = useState('');
+  const [historyRange, setHistoryRange] = useState({
+    startDate: istDateYmd(true),
+    endDate: istDateYmd(),
+  });
+  const [updateHistory, setUpdateHistory] = useState<UpdateHistoryRow[]>([]);
+  const [updateHistorySummary, setUpdateHistorySummary] =
+    useState<UpdateHistorySummary>(emptyUpdateHistorySummary);
+  const [updateHistoryLoading, setUpdateHistoryLoading] = useState(false);
   const genRef = useRef(0);
 
   const loadBalances = useCallback(async () => {
@@ -301,13 +317,47 @@ export function CasinoTopupBalanceScreen() {
     }
   }, []);
 
+  const loadUpdateHistory = useCallback(
+    async (startDate = historyRange.startDate, endDate = historyRange.endDate) => {
+      if (!startDate || !endDate) {
+        setError((prev) => prev || 'Please select start and end date');
+        return;
+      }
+      setUpdateHistoryLoading(true);
+      try {
+        const res = await secureApi<unknown>('casinoTopup.updateHistory', {
+          startDate,
+          endDate,
+        });
+        if (!res.ok) {
+          setUpdateHistory([]);
+          setUpdateHistorySummary(emptyUpdateHistorySummary());
+          setError((prev) => prev || res.message || 'Failed to load Qtech update history');
+          return;
+        }
+        const parsed = parseUpdateHistoryResponse(res.data);
+        setUpdateHistory(parsed.rows);
+        setUpdateHistorySummary(parsed.summary);
+      } finally {
+        setUpdateHistoryLoading(false);
+      }
+    },
+    [historyRange.endDate, historyRange.startDate],
+  );
+
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadBalances(), loadRemaining()]);
-  }, [loadBalances, loadRemaining]);
+    await Promise.all([
+      loadBalances(),
+      loadRemaining(),
+      loadUpdateHistory(historyRange.startDate, historyRange.endDate),
+    ]);
+  }, [historyRange.endDate, historyRange.startDate, loadBalances, loadRemaining, loadUpdateHistory]);
 
   useEffect(() => {
     if (canView) void refreshAll();
-  }, [canView, refreshAll]);
+    // Initial load only — date-range reloads via Load / pull-to-refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canView]);
 
   const switchRemainingTab = useCallback((tab: 'provider' | 'game') => {
     setRemainingTab((prev) => (prev === tab ? prev : tab));
@@ -416,6 +466,11 @@ export function CasinoTopupBalanceScreen() {
   }, [amount, currency, dateTime, note, loadBalances, loadRemaining]);
 
   const remainingRows = remainingTab === 'provider' ? remaining.byProvider : remaining.byGame;
+  const derivedUpdateKeys = updateHistoryColumnKeys(updateHistory);
+  const updateHistoryKeys =
+    derivedUpdateKeys.length > 0
+      ? derivedUpdateKeys
+      : ['amount', 'currency', 'toppedUpAtIst', 'updatedBy'];
 
   if (!canView) {
     return (
@@ -439,7 +494,7 @@ export function CasinoTopupBalanceScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
-          refreshing={loading || remainingLoading}
+          refreshing={loading || remainingLoading || updateHistoryLoading}
           onRefresh={() => void refreshAll()}
           tintColor={colors.primary}
         />
@@ -452,6 +507,90 @@ export function CasinoTopupBalanceScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Qtech Update History</Text>
+            <Text style={styles.sectionSub}>Date range (IST)</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionsRow}>
+          <TextInput
+            style={[styles.chip, { minWidth: 140, color: colors.foreground }]}
+            value={historyRange.startDate}
+            placeholder="Start YYYY-MM-DD"
+            placeholderTextColor={colors.muted}
+            onChangeText={(value) =>
+              setHistoryRange((prev) => ({ ...prev, startDate: value.trim() }))
+            }
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={[styles.chip, { minWidth: 140, color: colors.foreground }]}
+            value={historyRange.endDate}
+            placeholder="End YYYY-MM-DD"
+            placeholderTextColor={colors.muted}
+            onChangeText={(value) =>
+              setHistoryRange((prev) => ({ ...prev, endDate: value.trim() }))
+            }
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => void loadUpdateHistory()}
+            disabled={updateHistoryLoading}
+          >
+            <Text style={styles.actionBtnText}>{updateHistoryLoading ? '…' : 'Load'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.metricsGrid}>
+          <MetricChip label="Start Date" value={updateHistorySummary.startDate || '—'} />
+          <MetricChip label="End Date" value={updateHistorySummary.endDate || '—'} />
+          <MetricChip
+            label="Top-up Count"
+            value={
+              updateHistorySummary.topupCount != null
+                ? String(updateHistorySummary.topupCount)
+                : '—'
+            }
+            accent="#60a5fa"
+          />
+          <MetricChip
+            label="Top-up Total Amount"
+            value={
+              updateHistorySummary.topupTotalAmount != null
+                ? `${formatMoney(updateHistorySummary.topupTotalAmount)} ${
+                    updateHistorySummary.currency || ''
+                  }`.trim()
+                : '—'
+            }
+            accent="#2dd4bf"
+          />
+          <MetricChip label="Currency" value={updateHistorySummary.currency || '—'} />
+        </View>
+
+        {updateHistoryLoading && updateHistory.length === 0 ? (
+          <Text style={styles.mutedText}>Loading update history…</Text>
+        ) : updateHistory.length === 0 ? (
+          <Text style={styles.mutedText}>No update history found</Text>
+        ) : (
+          <View style={styles.list}>
+            {updateHistory.map((item, index) => (
+              <View key={String(item._id || index)} style={styles.card}>
+                <Text style={styles.metricValue}>#{index + 1}</Text>
+                {updateHistoryKeys.map((key) => (
+                  <Text key={key} style={styles.cardNote}>
+                    {labelizeHistoryKey(key)}: {formatUpdateHistoryCell(item[key])}
+                  </Text>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>

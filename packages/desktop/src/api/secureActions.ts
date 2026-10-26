@@ -464,6 +464,7 @@ export const SECURE_ACTIONS = [
   'funds.midGroupsWhatsappRemove',
   'casinoTopup.get',
   'casinoTopup.qtechRemaining',
+  'casinoTopup.updateHistory',
   'casinoTopup.addQtech',
   'casinoTopup.addBetconstruct',
   'whatsapp.getChatList',

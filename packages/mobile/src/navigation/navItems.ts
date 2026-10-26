@@ -116,13 +116,6 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/c2c-campaign-data',
     permission: Permissions.c2c_campaign_data,
   },
-  {
-    id: 'dialerPushData',
-    category: 'Caller & Dialer',
-    label: 'Dialer Push Data',
-    path: '/dialer-push-data',
-    permission: Permissions.dialer_push_data,
-  },
   // Always listed (laxminarayan App route has no Responsibility gate).
   {
     id: 'botPerformance',
@@ -325,6 +318,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'MID Limits',
     path: '/mid-limits',
     permission: Permissions.View_MID_Limits,
+  },
+  {
+    id: 'dailyAccountReport',
+    category: 'Payments & Funds',
+    label: 'Daily Account Report',
+    path: '/daily-account-report',
+    permission: Permissions.daily_account_report,
   },
   {
     id: 'depositConfig',

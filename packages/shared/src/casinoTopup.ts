@@ -289,3 +289,188 @@ export function remainingRowConsumed(item: RemainingBreakdownRow): string {
     toNumber(item.consumedUsd) ?? toNumber(item.betAmount) ?? toNumber(item.turnover),
   );
 }
+
+/* —— Qtech update history (/change-percentage/qtech-topped-up-balance/update-history) —— */
+
+export type UpdateHistorySummary = {
+  startDate: string;
+  endDate: string;
+  topupCount: number | null;
+  topupTotalAmount: number | null;
+  currency: string;
+};
+
+export type UpdateHistoryRow = Record<string, unknown> & {
+  _id?: string;
+  amount?: number;
+  currency?: string;
+  toppedUpAtIst?: string;
+  note?: string;
+  updatedBy?: unknown;
+};
+
+const HISTORY_LIST_KEYS = [
+  'history',
+  'records',
+  'updates',
+  'list',
+  'rows',
+  'items',
+  'data',
+] as const;
+
+/** IST calendar date as `YYYY-MM-DD` (optional month start). */
+export function istDateYmd(startOfMonth = false, now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || '01';
+  if (startOfMonth) return `${get('year')}-${get('month')}-01`;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+export function emptyUpdateHistorySummary(): UpdateHistorySummary {
+  return {
+    startDate: '',
+    endDate: '',
+    topupCount: null,
+    topupTotalAmount: null,
+    currency: '',
+  };
+}
+
+export function extractUpdateHistoryList(payload: unknown): UpdateHistoryRow[] {
+  if (Array.isArray(payload)) return payload as UpdateHistoryRow[];
+  if (!payload || typeof payload !== 'object') return [];
+  const obj = payload as Record<string, unknown>;
+  for (const key of HISTORY_LIST_KEYS) {
+    if (Array.isArray(obj[key])) return obj[key] as UpdateHistoryRow[];
+  }
+  if (obj.data && typeof obj.data === 'object') {
+    return extractUpdateHistoryList(obj.data);
+  }
+  if (obj.payload && typeof obj.payload === 'object') {
+    return extractUpdateHistoryList(obj.payload);
+  }
+  return [];
+}
+
+function readUpdateSummaryFromNode(node: unknown): UpdateHistorySummary | null {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return null;
+  const item = node as Record<string, unknown>;
+  if (
+    item.topupCount == null &&
+    item.topupTotalAmount == null &&
+    !item.startDate &&
+    !item.endDate &&
+    !item.currency
+  ) {
+    return null;
+  }
+  return {
+    startDate: String(item.startDate || ''),
+    endDate: String(item.endDate || ''),
+    topupCount: toNumber(item.topupCount),
+    topupTotalAmount: toNumber(item.topupTotalAmount),
+    currency: String(item.currency || ''),
+  };
+}
+
+export function parseUpdateHistorySummary(payload: unknown): UpdateHistorySummary {
+  const nodes: unknown[] = [
+    payload,
+    payload && typeof payload === 'object' ? (payload as Record<string, unknown>).payload : null,
+    payload && typeof payload === 'object' ? (payload as Record<string, unknown>).data : null,
+    payload && typeof payload === 'object'
+      ? ((payload as Record<string, unknown>).data as Record<string, unknown> | undefined)?.payload
+      : null,
+    payload && typeof payload === 'object'
+      ? ((payload as Record<string, unknown>).payload as Record<string, unknown> | undefined)?.data
+      : null,
+    payload && typeof payload === 'object' ? (payload as Record<string, unknown>).result : null,
+  ];
+
+  const candidates: UpdateHistorySummary[] = [];
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+    const obj = node as Record<string, unknown>;
+    const fromNested = readUpdateSummaryFromNode(obj.topupSummary);
+    if (fromNested) candidates.push(fromNested);
+    const fromSelf = readUpdateSummaryFromNode(obj);
+    if (fromSelf) candidates.push(fromSelf);
+  }
+
+  const match =
+    candidates.find((item) => item.topupCount != null || item.topupTotalAmount != null) ||
+    candidates[0];
+  return match || emptyUpdateHistorySummary();
+}
+
+export function parseUpdateHistoryResponse(decrypted: unknown): {
+  rows: UpdateHistoryRow[];
+  summary: UpdateHistorySummary;
+} {
+  const root = resolveRootPayload(decrypted) ?? decrypted;
+  const fromRoot = parseUpdateHistorySummary(root);
+  const fromBody = parseUpdateHistorySummary(decrypted);
+  const summary =
+    fromBody.topupCount != null || fromBody.topupTotalAmount != null ? fromBody : fromRoot;
+  return {
+    rows: extractUpdateHistoryList(root),
+    summary,
+  };
+}
+
+export function formatUpdateHistoryCell(value: unknown): string {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'number') return value.toLocaleString();
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const name = obj.name || obj.realName || obj.chatName;
+    if (name) return String(name);
+    if (obj._id) return String(obj._id);
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '—';
+    }
+  }
+  return String(value);
+}
+
+export function updateHistoryColumnKeys(rows: UpdateHistoryRow[]): string[] {
+  const keys = new Set<string>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    for (const key of Object.keys(row)) {
+      if (key !== '__v') keys.add(key);
+    }
+  }
+  const preferred = [
+    'amount',
+    'currency',
+    'toppedUpAtIst',
+    'date',
+    'time',
+    'updatedBy',
+    'note',
+    'startDate',
+    'endDate',
+    'createdAt',
+  ];
+  const ordered = preferred.filter((key) => keys.has(key));
+  for (const key of keys) {
+    if (!ordered.includes(key) && key !== '_id') ordered.push(key);
+  }
+  return ordered;
+}
+
+export function labelizeHistoryKey(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}

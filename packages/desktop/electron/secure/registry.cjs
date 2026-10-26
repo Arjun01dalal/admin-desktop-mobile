@@ -2836,6 +2836,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  'casinoTopup.updateHistory': {
+    method: 'POST',
+    path: '/change-percentage/qtech-topped-up-balance/update-history',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'casinoTopup.addQtech': {
     method: 'POST',
     path: '/change-percentage/qtech-topped-up-balance/add',

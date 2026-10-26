@@ -30,6 +30,7 @@ export const ApiActions = {
   casinoTopup: {
     get: 'casinoTopup.get',
     qtechRemaining: 'casinoTopup.qtechRemaining',
+    updateHistory: 'casinoTopup.updateHistory',
     addQtech: 'casinoTopup.addQtech',
     addBetconstruct: 'casinoTopup.addBetconstruct',
   },
