@@ -59,10 +59,10 @@ export function UserNameMidReportCell({
   return (
     <Box
       sx={{
-        display: 'inline-flex',
+        display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 0.5,
+        justifyContent: midReportVisible ? 'space-between' : 'center',
+        gap: 0.75,
         width: '100%',
         maxWidth: '100%',
         minWidth: 0,
@@ -95,12 +95,12 @@ export function UserNameMidReportCell({
           fontSize: 12,
           fontWeight: 700,
           lineHeight: 1.25,
+          flex: midReportVisible ? '1 1 auto' : '0 1 auto',
           minWidth: 0,
-          maxWidth: midReportVisible ? 'calc(100% - 26px)' : '100%',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
-          textAlign: 'center',
+          textAlign: midReportVisible ? 'left' : 'center',
         }}
       >
         {label}
@@ -116,6 +116,7 @@ export function UserNameMidReportCell({
             }}
             sx={{
               flexShrink: 0,
+              ml: 'auto',
               color: '#ff9f0a',
               width: 22,
               height: 22,

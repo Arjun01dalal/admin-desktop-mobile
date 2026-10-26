@@ -16,7 +16,7 @@ import { parseDistinctMidOptions } from '@astro/shared';
 import { secureApi } from '../../api/client';
 import { getSessionUser, hasPermission, Permissions } from '../../auth/permissions';
 import { useDeferredTimeout } from '../../hooks/useDeferredTimeout';
-import { BOT_CHECK_HIDDEN_STATUSES, GATEWAY_OPTIONS } from './constants';
+import { BOT_CHECK_HIDDEN_STATUSES, EXTRA_MID, GATEWAY_OPTIONS } from './constants';
 import {
   bothChecksOk,
   buildUpiPayUrl,
@@ -118,12 +118,16 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
         secureApi('withdrawals.payoutAccounts', {}),
       ]);
       if (midRes.ok) {
+        const fromApi = parseDistinctMidOptions(midRes.data).map((mid) => ({
+          label: mid,
+          mid,
+          gateway: '',
+        }));
+        const hasCash = fromApi.some((m) => m.mid === EXTRA_MID);
         setMids(
-          parseDistinctMidOptions(midRes.data).map((mid) => ({
-            label: mid,
-            mid,
-            gateway: '',
-          })),
+          hasCash
+            ? fromApi
+            : [{ label: EXTRA_MID, mid: EXTRA_MID, gateway: '' }, ...fromApi],
         );
       }
       if (gwRes.ok) {

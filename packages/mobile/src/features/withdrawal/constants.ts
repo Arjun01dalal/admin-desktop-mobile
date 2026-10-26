@@ -26,8 +26,11 @@ export const SEARCH_FIELDS: readonly SearchFieldOption[] = [
 
 export const BOT_CHECK_HIDDEN_STATUSES = new Set(['Cancel', 'Rejected', 'Reverse', 'Failed']);
 
+export const EXTRA_MID = 'CashDeposit';
+
 /** Desktop parity: fixed gateway list used in the Manual Approved / QR popups. */
 export const GATEWAY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'Manual', label: 'Manual' },
   { value: 'bramhadev', label: 'Bramhadev' },
   { value: 'jk Bank', label: 'J&K Bank' },
   { value: 'personal', label: 'Personal' },

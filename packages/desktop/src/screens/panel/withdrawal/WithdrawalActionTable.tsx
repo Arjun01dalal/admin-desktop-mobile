@@ -41,6 +41,7 @@ import {
 import {
   orderIdOf,
   midLabel,
+  withExtraMids,
   extractBeneficiaryAccounts,
   bothChecksOk,
   isTerminal,
@@ -163,7 +164,7 @@ export function WithdrawalActionTable({
       secureApi('withdrawals.payoutAccounts', {}),
       secureApi('withdrawals.availableBanks', {}),
     ]);
-    if (midRes.ok) setMids(asList<MidOption>(midRes.data));
+    if (midRes.ok) setMids(withExtraMids(asList<MidOption>(midRes.data)));
     if (gwRes.ok) {
       const list = asList<{ name?: string }>(gwRes.data);
       setGateways(
@@ -781,6 +782,8 @@ export function WithdrawalActionTable({
         stickyHeader
         dense
         virtualize
+        // Bene select + Add Bene make rows ~2× dense estimate; low estimate clips the last row.
+        estimateRowHeight={104}
         minWidth={3000}
         maxHeight="100%"
         getRowSx={getRowSx}

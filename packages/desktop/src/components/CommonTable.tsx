@@ -487,13 +487,17 @@ export function CommonTable<T>({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
     overscan: isWindowsUi ? 6 : 12,
+    paddingEnd: shouldVirtualize ? 28 : 0,
     measureElement: measureRows ? (el) => el.getBoundingClientRect().height : undefined,
   });
 
   const virtualItems = shouldVirtualize ? virtualizer.getVirtualItems() : [];
   const paddingTop = virtualItems.length ? (virtualItems[0]?.start ?? 0) : 0;
   const paddingBottom = virtualItems.length
-    ? virtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0)
+    ? Math.max(
+        0,
+        virtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0),
+      )
     : 0;
 
   const hasStickyLeft = stickyOffsets.size > 0;

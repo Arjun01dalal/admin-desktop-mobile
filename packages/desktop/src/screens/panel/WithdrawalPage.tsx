@@ -388,6 +388,7 @@ export function WithdrawalPage() {
         onChange={onDraftChange(key)}
         onSearch={() => commitQuery()}
         placeholder={placeholder}
+        size="comfortable"
       />
     ),
     [draft, onDraftChange, commitQuery],
@@ -821,6 +822,7 @@ export function WithdrawalPage() {
       </Stack>
 
       <TablePanel
+        bottomGap={20}
         footer={
           <>
             <Typography variant="body2" color="text.secondary">

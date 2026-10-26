@@ -127,6 +127,7 @@ export const ACTION_STATUSES = [
 export const TERMINAL_STATUSES = new Set(['Approved', 'Rejected', 'Reverse', 'Cancel', 'Failed']);
 
 export const MANUAL_GATEWAYS = [
+  'Manual',
   'bramhadev',
   'jk Bank',
   'personal',
@@ -143,6 +144,9 @@ export const MANUAL_GATEWAYS = [
   'rpf',
   'shyam-trading',
 ] as const;
+
+/** Always offered in Gateway/MID pickers (admin-panel-domains Withdrawal.tsx). */
+export const EXTRA_MID = 'CashDeposit';
 
 /** Flat summary from `/SubAdmin/fund-request` → `payload.WithdrawalData`. */
 export type WithdrawalSummary = {

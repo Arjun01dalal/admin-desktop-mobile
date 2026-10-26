@@ -3,13 +3,23 @@ import {
   Box,
   Button,
   Checkbox,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
+import type { SvgIconComponent } from '@mui/icons-material';
 import FlagIcon from '@mui/icons-material/Flag';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import LockOpenOutlinedIcon from '@mui/icons-material/LockOpenOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import TouchAppOutlinedIcon from '@mui/icons-material/TouchAppOutlined';
+import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
+import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import { type CommonTableColumn } from '@/components/CommonTable';
 import { appCodeForName } from '@/constants/clientNames';
 import {
@@ -20,10 +30,7 @@ import {
 import { display } from '@/screens/panel/shared';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
 import type { UserRow } from '@/screens/panel/users/utils';
-import {
-  actionBtnSx,
-  filterSelectSx,
-} from '@/screens/panel/transactions/shared';
+import { actionBtnSx, filterSelectSx } from '@/screens/panel/transactions/shared';
 import {
   type WithdrawalRow,
   type ValidationItem,
@@ -50,6 +57,44 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 const BOT_CHECK_HIDDEN_STATUSES = new Set(['Cancel', 'Rejected', 'Reverse', 'Failed']);
+
+/** Soft tint + saturated glyph — readable on dark table rows. */
+type ActionTone = { fg: string; bg: string; border: string; hover: string };
+
+const ACTION_TONES: Record<string, ActionTone> = {
+  unlock: { fg: '#f0b429', bg: 'rgba(240,180,41,0.16)', border: 'rgba(240,180,41,0.45)', hover: 'rgba(240,180,41,0.28)' },
+  lock: { fg: '#f0b429', bg: 'rgba(240,180,41,0.16)', border: 'rgba(240,180,41,0.45)', hover: 'rgba(240,180,41,0.28)' },
+  approve: { fg: '#3dd68c', bg: 'rgba(61,214,140,0.16)', border: 'rgba(61,214,140,0.45)', hover: 'rgba(61,214,140,0.28)' },
+  manual: { fg: '#5b9fff', bg: 'rgba(91,159,255,0.16)', border: 'rgba(91,159,255,0.45)', hover: 'rgba(91,159,255,0.28)' },
+  qr: { fg: '#c084fc', bg: 'rgba(192,132,252,0.16)', border: 'rgba(192,132,252,0.45)', hover: 'rgba(192,132,252,0.28)' },
+  hold: { fg: '#fb923c', bg: 'rgba(251,146,60,0.16)', border: 'rgba(251,146,60,0.45)', hover: 'rgba(251,146,60,0.28)' },
+  reject: { fg: '#f87171', bg: 'rgba(248,113,113,0.16)', border: 'rgba(248,113,113,0.45)', hover: 'rgba(248,113,113,0.28)' },
+  reverse: { fg: '#94a3b8', bg: 'rgba(148,163,184,0.16)', border: 'rgba(148,163,184,0.45)', hover: 'rgba(148,163,184,0.28)' },
+};
+
+function actionIconSx(tone: ActionTone) {
+  return {
+    width: 30,
+    height: 30,
+    borderRadius: 1.25,
+    p: 0.5,
+    color: tone.fg,
+    bgcolor: tone.bg,
+    border: '1px solid',
+    borderColor: tone.border,
+    boxShadow: 'none',
+    '&:hover': {
+      bgcolor: tone.hover,
+      borderColor: tone.fg,
+      color: tone.fg,
+    },
+    '&.Mui-disabled': {
+      color: 'rgba(148,163,184,0.45)',
+      bgcolor: 'rgba(148,163,184,0.08)',
+      borderColor: 'rgba(148,163,184,0.2)',
+    },
+  };
+}
 
 export type WithdrawalColumnFilterSlots = Partial<
   Record<
@@ -178,7 +223,7 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
       {
         id: 'userName',
         label: 'User Name',
-        width: 148,
+        width: 168,
         stickyLeft: true,
         cellSx: { py: '6px !important', px: 0.75 },
         filter: ctx.filterOf('userName'),
@@ -326,7 +371,7 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
             <Stack
               spacing={0.75}
               alignItems="stretch"
-              sx={{ width: '100%', maxWidth: 165, mx: 'auto' }}
+              sx={{ width: '100%', maxWidth: '100%' }}
             >
               <BeneficiarySelect
                 beneficiaryAccounts={list}
@@ -336,7 +381,7 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
                 <Button
                   size="small"
                   variant="contained"
-                  sx={{ ...actionBtnSx, fontSize: 10 }}
+                  sx={{ ...actionBtnSx, fontSize: 10, alignSelf: 'flex-end' }}
                   onClick={() => {
                     ctx.setBeneRow(row);
                     ctx.setBeneOpen(true);
@@ -555,13 +600,15 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
       cols.push({
         id: 'actions',
         label: 'Actions',
-        width: 240,
+        width: 200,
         render: (row) => {
           const orderId = orderIdOf(row);
           const busy = ctx.busyId === orderId;
           const buttons: {
             key: string;
-            label: string;
+            title: string;
+            Icon: SvgIconComponent;
+            tone: ActionTone;
             onClick: () => void;
             disabled?: boolean;
           }[] = [];
@@ -570,14 +617,18 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
             if (canUnlockRow(row)) {
               buttons.push({
                 key: 'unlock',
-                label: 'Unlock',
+                title: 'Unlock',
+                Icon: LockOpenOutlinedIcon,
+                tone: ACTION_TONES.unlock,
                 onClick: () => void ctx.handleUnlock(row),
                 disabled: busy,
               });
             } else if (canLockRow(row)) {
               buttons.push({
                 key: 'lock',
-                label: 'Lock',
+                title: 'Lock',
+                Icon: LockOutlinedIcon,
+                tone: ACTION_TONES.lock,
                 onClick: () => void ctx.handleLock(row),
                 disabled: busy,
               });
@@ -585,27 +636,51 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
           }
           if (ctx.canAct && canShowApproveAction(row)) {
             buttons.push(
-              { key: 'approve', label: 'Approve', onClick: () => ctx.openAction(row, 'Approved') },
+              {
+                key: 'approve',
+                title: 'Approve',
+                Icon: CheckCircleOutlineIcon,
+                tone: ACTION_TONES.approve,
+                onClick: () => ctx.openAction(row, 'Approved'),
+              },
               {
                 key: 'manual',
-                label: 'Manual',
+                title: 'Manual',
+                Icon: TouchAppOutlinedIcon,
+                tone: ACTION_TONES.manual,
                 onClick: () => ctx.openAction(row, 'Manual Approved'),
               },
-              { key: 'qr', label: 'QR Code', onClick: () => ctx.openQrApprove(row) },
-              { key: 'hold', label: 'On Hold', onClick: () => ctx.openAction(row, 'on hold') },
+              {
+                key: 'qr',
+                title: 'QR Code',
+                Icon: QrCode2OutlinedIcon,
+                tone: ACTION_TONES.qr,
+                onClick: () => ctx.openQrApprove(row),
+              },
+              {
+                key: 'hold',
+                title: 'On Hold',
+                Icon: PauseCircleOutlineIcon,
+                tone: ACTION_TONES.hold,
+                onClick: () => ctx.openAction(row, 'on hold'),
+              },
             );
           }
           if (ctx.canReject && canRejectRow(row)) {
             buttons.push({
               key: 'reject',
-              label: 'Reject',
+              title: 'Reject',
+              Icon: HighlightOffOutlinedIcon,
+              tone: ACTION_TONES.reject,
               onClick: () => ctx.openAction(row, 'Rejected'),
             });
           }
           if (ctx.canReverse && row.status !== 'Cancel') {
             buttons.push({
               key: 'reverse',
-              label: 'Reverse',
+              title: 'Reverse',
+              Icon: UndoOutlinedIcon,
+              tone: ACTION_TONES.reverse,
               onClick: () => ctx.openAction(row, 'Reverse'),
             });
           }
@@ -616,19 +691,22 @@ export function useWithdrawalColumns(ctx: WithdrawalColumnCtx) {
               flexWrap="wrap"
               gap={0.5}
               justifyContent="center"
-              sx={{ maxWidth: 230 }}
+              sx={{ maxWidth: 190 }}
             >
               {buttons.map((b) => (
-                <Button
-                  key={b.key}
-                  size="small"
-                  variant="contained"
-                  disabled={b.disabled}
-                  onClick={b.onClick}
-                  sx={actionBtnSx}
-                >
-                  {b.label}
-                </Button>
+                <Tooltip key={b.key} title={b.title} arrow>
+                  <span>
+                    <IconButton
+                      size="small"
+                      aria-label={b.title}
+                      disabled={b.disabled}
+                      onClick={b.onClick}
+                      sx={actionIconSx(b.tone)}
+                    >
+                      <b.Icon sx={{ fontSize: 17, color: 'inherit' }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               ))}
             </Stack>
           );

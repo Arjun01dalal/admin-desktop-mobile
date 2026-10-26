@@ -1,5 +1,5 @@
 import type { WithdrawalRow } from './types';
-import { TERMINAL_STATUSES } from './types';
+import { EXTRA_MID, TERMINAL_STATUSES } from './types';
 
 export function orderIdOf(row: WithdrawalRow): string {
   return String(row.orderId || row.order_id || row.transactionId || row._id || '');
@@ -16,7 +16,18 @@ export function midLabel(m: {
   name?: string;
   mid?: string | number;
 }): string {
-  return `${m.paymentGatewayName || m.name || '—'} - ${m.mid ?? ''}`;
+  const mid = String(m.mid ?? '').trim();
+  if (mid === EXTRA_MID) return EXTRA_MID;
+  const gw = String(m.paymentGatewayName || m.name || '').trim();
+  if (gw && mid && gw !== mid) return `${gw} - ${mid}`;
+  return mid || gw || '—';
+}
+
+/** Prepend CashDeposit mid option (admin-panel-domains Withdrawal.tsx). */
+export function withExtraMids<T extends { mid?: string | number }>(mids: T[]): T[] {
+  const has = mids.some((m) => String(m.mid ?? '').trim() === EXTRA_MID);
+  if (has) return mids;
+  return [{ mid: EXTRA_MID } as T, ...mids];
 }
 
 export function extractBeneficiaryAccounts(row: WithdrawalRow): string[] {
