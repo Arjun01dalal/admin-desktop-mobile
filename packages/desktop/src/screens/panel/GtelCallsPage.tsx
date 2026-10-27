@@ -69,6 +69,7 @@ import {
   getGtelBalance,
   getGtelCallbackDue,
   getGtelNote,
+  pickGtelCallField,
 } from '@/screens/panel/gtel/helpers';
 import { GtelHeroActions } from '@/screens/panel/gtel/GtelHeroActions';
 import { GtelKpiCards } from '@/screens/panel/gtel/GtelKpiCards';
@@ -90,6 +91,7 @@ export function GtelCallsPage() {
   const [searchParams] = useSearchParams();
   const {
     canShowMobile,
+    canShowC2c: authCanShowC2c,
     canShowGtelCalls,
     canShowGtelDashboard,
     canShowSuspiciousCall,
@@ -255,9 +257,10 @@ export function GtelCallsPage() {
   );
 
   const reload = listQuery.refetch;
-  const { canShowC2c, startC2c, isCalling } = useGtelClickToCall({
+  const { canShowC2c: sessionCanShowC2c, startC2c, isCalling } = useGtelClickToCall({
     onSuccess: () => void reload(),
   });
+  const canShowC2c = authCanShowC2c || sessionCanShowC2c;
 
   const openUserReport = useCallback(
     (call: GtelCall) => {
@@ -402,10 +405,31 @@ export function GtelCallsPage() {
                     sx={gtelIconBtnSx}
                     onClick={() => {
                       const dpi = getGtelDpiId(row);
-                      void startC2c(
-                        String(row.phoneNumber || ''),
-                        dpi !== '—' ? dpi : undefined,
-                      );
+                      const name = getGtelUsername(row);
+                      const app = getGtelAppName(row);
+                      const activity = getGtelLastActivityRaw(row);
+                      const bal = pickGtelCallField(row, [
+                        'balance',
+                        'Balance',
+                        'walletBalance',
+                        'wallet_balance',
+                      ]);
+                      const bonus = pickGtelCallField(row, [
+                        'bonusBalance',
+                        'bonus_balance',
+                        'bonusWalletBalance',
+                        'bonus_wallet_balance',
+                      ]);
+                      void startC2c({
+                        phoneNumber: String(row.phoneNumber || ''),
+                        userId: dpi !== '—' ? dpi : undefined,
+                        userName: name === '—' ? '' : name,
+                        appName: app === '—' ? '' : app,
+                        lastActivity: activity === '—' ? '' : activity,
+                        balance: bal === '—' ? undefined : bal,
+                        bonusBalance: bonus === '—' ? undefined : bonus,
+                        source: 'Manual',
+                      });
                     }}
                   >
                     {isCalling(String(row.phoneNumber || '')) ? (
@@ -565,23 +589,25 @@ export function GtelCallsPage() {
           </Typography>
         </Box>
         {!hideHeroActions ? (
-          <GtelHeroActions
-            showDashboard={canShowGtelDashboard}
-            showCall={canShowC2c}
-            onDashboard={() =>
-              navigate(
-                buildGtelCallerDashQuery({
-                  from: applied.from || draft.from,
-                  to: applied.to || draft.to,
-                  empCode: shouldLockEmpCode
-                    ? loginEmpCode
-                    : applied.empCode || draft.empCode,
-                }),
-              )
-            }
-            onCall={() => openManualCall('call')}
-            onCallStart={() => openManualCall('callStart')}
-          />
+          <Box sx={{ flexShrink: 0 }}>
+            <GtelHeroActions
+              showDashboard={canShowGtelDashboard}
+              showCall={canShowC2c}
+              onDashboard={() =>
+                navigate(
+                  buildGtelCallerDashQuery({
+                    from: applied.from || draft.from,
+                    to: applied.to || draft.to,
+                    empCode: shouldLockEmpCode
+                      ? loginEmpCode
+                      : applied.empCode || draft.empCode,
+                  }),
+                )
+              }
+              onCall={() => openManualCall('call')}
+              onCallStart={() => openManualCall('callStart')}
+            />
+          </Box>
         ) : (
           <Button variant="outlined" size="small" onClick={() => navigate(-1)}>
             ‹ Dashboard

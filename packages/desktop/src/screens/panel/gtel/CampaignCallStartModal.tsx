@@ -1,31 +1,35 @@
-import { useCallback, useEffect, useState } from 'react';
+/**
+ * Campaign Call Start — bottom-right dock (Active Call parity).
+ * Preview next lead → Call → shell Active Call dock (hangup → disposition/note/callback).
+ */
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'react-toastify';
-
-import { orangeBtnSx } from '@/screens/panel/transactions/shared';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import { formatDisplayDate } from '@/utils/dates';
-import CloseIcon from '@mui/icons-material/Close';
 import CallIcon from '@mui/icons-material/Call';
-import { secureApi } from '@/api/secureClient';
+import CloseIcon from '@mui/icons-material/Close';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {
-  createGtelCallId,
+  Box,
+  CircularProgress,
+  IconButton,
+  Paper,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import {
   extractC2cNextCampaignCall,
+  formatGtelBalanceDisplay,
+  isNegativeGtelBalance,
   maskGtelPhone,
   type C2cNextCampaignCall,
 } from '@astro/shared';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Typography,
-} from '@mui/material';
-
+import { secureApi } from '@/api/secureClient';
+import { formatDisplayDate } from '@/utils/dates';
+import { UserReportModal } from '@/screens/panel/userReport/UserReportModal';
+import { useGtelAuth } from './useGtelAuth';
+import { useGtelCallSession } from './GtelCallSession';
+import { GtelBusyDock } from './GtelBusyDock';
+import { GTEL_Z } from './gtelOverlayZIndex';
 
 type Props = {
   open: boolean;
@@ -34,16 +38,38 @@ type Props = {
   onCalled?: () => void;
 };
 
+function pickSnapBalance(
+  next: C2cNextCampaignCall | null,
+  keys: string[],
+): string | number | undefined {
+  const raw = next?.raw;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const row = raw as Record<string, unknown>;
+  const snap =
+    (row.snapshot as Record<string, unknown> | undefined) ||
+    (row.userSnapshot as Record<string, unknown> | undefined) ||
+    (row.user as Record<string, unknown> | undefined) ||
+    row;
+  for (const key of keys) {
+    const v = snap[key] ?? row[key];
+    if (v != null && String(v).trim() !== '') return v as string | number;
+  }
+  return undefined;
+}
+
 export function CampaignCallStartModal({
   open,
   onClose,
   canShowMobile,
   onCalled,
 }: Props) {
+  const { canShowC2c } = useGtelAuth();
+  const { startC2c, callingPhone } = useGtelCallSession();
   const [loading, setLoading] = useState(false);
   const [calling, setCalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [next, setNext] = useState<C2cNextCampaignCall | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const loadNext = useCallback(async () => {
     setLoading(true);
@@ -73,33 +99,55 @@ export function CampaignCallStartModal({
       setNext(null);
       setError(null);
       setCalling(false);
+      setReportOpen(false);
       return;
     }
     void loadNext();
   }, [open, loadNext]);
+
+  const busyByActiveCall = Boolean(callingPhone);
 
   const startDial = async () => {
     if (!next?.phoneNumber || !next.campaignDataId) {
       toast.error('No campaign lead to dial');
       return;
     }
+    if (!canShowC2c) {
+      toast.error('C2C not available for your account');
+      return;
+    }
     setCalling(true);
     try {
-      const callId = createGtelCallId();
-      const res = await secureApi('gtel.clickToCall', {
-        callId,
-        phoneNumber: next.phoneNumber,
-        campaignDataId: next.campaignDataId,
-        source: 'Campaign',
-        userId: next.userId || '',
-      });
-      if (!res.ok || res.success === false) {
-        toast.error(res.message || 'Call could not be initiated');
-        return;
-      }
-      toast.success('Campaign call initiated');
-      onCalled?.();
-      void loadNext();
+      const balance = pickSnapBalance(next, [
+        'balance',
+        'walletBalance',
+        'wallet_balance',
+      ]);
+      const bonusBalance = pickSnapBalance(next, [
+        'bonusBalance',
+        'bonusWalletBalance',
+        'bonus_balance',
+      ]);
+      const ok = startC2c(
+        {
+          phoneNumber: next.phoneNumber,
+          campaignDataId: next.campaignDataId,
+          userId: next.userId || '',
+          userName: next.name || '',
+          appName: next.appName || '',
+          lastActivity: next.lastActivity || '',
+          balance,
+          bonusBalance,
+          source: 'Campaign',
+        },
+        undefined,
+        () => {
+          onCalled?.();
+          void loadNext();
+        },
+      );
+      if (!ok) toast.error('Call could not be initiated');
+      else onClose();
     } finally {
       setCalling(false);
     }
@@ -111,111 +159,216 @@ export function CampaignCallStartModal({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pr: 6, fontWeight: 800 }}>
-        Campaign Call Start
-        <IconButton
-          aria-label="Close"
-          size="small"
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-        >
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Next assigned lead from active C2C campaigns
-        </Typography>
+  const phoneDisplay = next
+    ? maskGtelPhone(next.phoneNumber, canShowMobile)
+    : '—';
+  const cxName = String(next?.name || '').trim() || '—';
+  const dpId = String(next?.userId || '').trim();
+  const balanceRaw = pickSnapBalance(next, ['balance', 'walletBalance', 'wallet_balance']);
+  const bonusRaw = pickSnapBalance(next, [
+    'bonusBalance',
+    'bonusWalletBalance',
+    'bonus_balance',
+  ]);
 
-        {loading ? (
-          <Box sx={{ display: 'grid', placeItems: 'center', py: 4 }}>
-            <CircularProgress size={28} />
+  const metaRow = (
+    label: string,
+    value: ReactNode,
+    opts?: { danger?: boolean; onClick?: () => void },
+  ) => (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography fontSize={9} color="text.secondary" fontWeight={700} letterSpacing={0.3}>
+        {label}
+      </Typography>
+      <Typography
+        fontSize={11}
+        fontWeight={700}
+        noWrap
+        onClick={opts?.onClick}
+        sx={{
+          color: opts?.danger
+            ? 'error.main'
+            : opts?.onClick
+              ? 'primary.main'
+              : 'text.primary',
+          cursor: opts?.onClick ? 'pointer' : 'default',
+          textDecoration: opts?.onClick ? 'underline' : 'none',
+          wordBreak: 'break-all',
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+
+  if (!open) return null;
+
+  if (busyByActiveCall) {
+    return (
+      <GtelBusyDock
+        title="Call Start paused"
+        phoneMasked={callingPhone}
+        onClose={onClose}
+      />
+    );
+  }
+
+  return (
+    <>
+      <Paper
+        elevation={8}
+        sx={{
+          position: 'fixed',
+          right: 16,
+          bottom: 16,
+          zIndex: GTEL_Z.dock,
+          width: 300,
+          maxWidth: 'calc(100vw - 32px)',
+          borderRadius: 2.5,
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          overflow: 'hidden',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{
+            px: 1.25,
+            py: 1,
+            bgcolor: (t) =>
+              t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              flexShrink: 0,
+              borderRadius: '50%',
+              bgcolor: '#f59e0b',
+              boxShadow: '0 0 0 3px #f59e0b33',
+            }}
+          />
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography fontWeight={800} fontSize={12} noWrap>
+              Call Start
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', lineHeight: 1.2 }}
+              noWrap
+            >
+              {loading ? 'Loading next lead…' : next ? phoneDisplay : error || 'No lead'}
+            </Typography>
           </Box>
+
+          {loading ? <CircularProgress size={16} sx={{ mx: 0.5 }} /> : null}
+
+          {next?.authUrl ? (
+            <Tooltip title="Auth URL">
+              <IconButton size="small" onClick={openAuth}>
+                <OpenInNewIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : null}
+
+          <Tooltip title={calling ? 'Calling…' : 'Call'}>
+            <span>
+              <IconButton
+                size="small"
+                color="primary"
+                disabled={!next?.phoneNumber || loading || calling || !canShowC2c}
+                onClick={() => void startDial()}
+                sx={{
+                  bgcolor: 'primary.main',
+                  color: '#000',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                  '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
+                }}
+              >
+                {calling ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <CallIcon fontSize="small" />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+
+          <IconButton size="small" onClick={onClose} disabled={calling}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+
+        {loading && !next ? (
+          <Stack alignItems="center" py={2.5}>
+            <CircularProgress size={22} />
+          </Stack>
         ) : null}
 
         {!loading && next ? (
           <Box
             sx={{
-              p: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'action.hover',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 0.75,
+              px: 1.25,
+              pt: 1,
+              pb: 1.25,
             }}
           >
-            <Typography fontWeight={800} fontSize={16} sx={{ mb: 0.5 }}>
-              {next.name || '—'}
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 0.5 }}>
-              {maskGtelPhone(next.phoneNumber, canShowMobile)}
-              {next.appName ? ` · ${next.appName}` : ''}
-            </Typography>
-            {next.userId ? (
-              <Typography variant="caption" color="text.secondary" display="block">
-                User: {next.userId}
-              </Typography>
-            ) : null}
-            {next.lastActivity ? (
-              <Typography variant="caption" color="text.secondary" display="block">
-                Last activity: {formatDisplayDate(next.lastActivity) || next.lastActivity}
-              </Typography>
-            ) : null}
-            {next.campaignDataId ? (
-              <Typography variant="caption" color="text.secondary" display="block">
-                Campaign data: {next.campaignDataId}
-              </Typography>
+            {metaRow(
+              'DP ID',
+              dpId || '—',
+              dpId ? { onClick: () => setReportOpen(true) } : undefined,
+            )}
+            {metaRow('CX Name', cxName)}
+            {metaRow('Balance', formatGtelBalanceDisplay(balanceRaw), {
+              danger: isNegativeGtelBalance(balanceRaw),
+            })}
+            {metaRow('Bonus Balance', formatGtelBalanceDisplay(bonusRaw), {
+              danger: isNegativeGtelBalance(bonusRaw),
+            })}
+            {next.appName ? (
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                <Typography fontSize={9} color="text.secondary" fontWeight={700}>
+                  App · Last activity
+                </Typography>
+                <Typography fontSize={11} fontWeight={600} noWrap>
+                  {next.appName}
+                  {next.lastActivity
+                    ? ` · ${formatDisplayDate(next.lastActivity) || next.lastActivity}`
+                    : ''}
+                </Typography>
+              </Box>
             ) : null}
           </Box>
         ) : null}
 
         {!loading && !next ? (
-          <Typography color="text.secondary" sx={{ py: 2 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', px: 1.25, py: 1.5 }}
+          >
             {error || 'No calls in queue'}
           </Typography>
         ) : null}
+      </Paper>
 
-        {error && next ? (
-          <Typography color="error" variant="body2" sx={{ mt: 1.5 }}>
-            {error}
-          </Typography>
-        ) : null}
-      </DialogContent>
-      <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1, flexWrap: 'wrap' }}>
-        <Button onClick={onClose} sx={{ textTransform: 'none', fontWeight: 700 }}>
-          Close
-        </Button>
-        <Button
-          startIcon={<RefreshIcon />}
-          onClick={() => void loadNext()}
-          disabled={loading || calling}
-          sx={{ textTransform: 'none', fontWeight: 700 }}
-        >
-          Refresh
-        </Button>
-        {next?.authUrl ? (
-          <Button
-            startIcon={<OpenInNewIcon />}
-            onClick={openAuth}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Auth URL
-          </Button>
-        ) : null}
-        <Box sx={{ flex: 1 }} />
-        <Button
-          variant="contained"
-          startIcon={
-            calling ? <CircularProgress size={14} color="inherit" /> : <CallIcon />
-          }
-          disabled={!next?.phoneNumber || loading || calling}
-          onClick={() => void startDial()}
-          sx={orangeBtnSx}
-        >
-          {calling ? 'Calling…' : 'Call'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      <UserReportModal
+        open={reportOpen && Boolean(dpId)}
+        userId={dpId}
+        userName={cxName !== '—' ? cxName : dpId}
+        onClose={() => setReportOpen(false)}
+      />
+    </>
   );
 }

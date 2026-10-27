@@ -1566,6 +1566,13 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  // Path uses original call; body.callId is the new dialer id (admin Click2CallBtn).
+  'gtel.redial': {
+    method: 'POST',
+    path: '/dialer/call/{originalCallId}/redial',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
   'gtel.hangup': {
     method: 'POST',
     path: '/dialer/hangup',

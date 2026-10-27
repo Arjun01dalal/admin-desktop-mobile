@@ -180,7 +180,13 @@ export default function MidPanel({ updatedBy, bankVersion, onCountChange, onSave
         await updateMid({ ...body, _id: form._id, status: form.status || 'active' });
         toast.success('MID updated');
       } else {
-        await createMid(omitEmpty({ ...body, mid: form.mid.trim() }));
+        await createMid(
+          omitEmpty({
+            ...body,
+            mid: form.mid.trim(),
+            status: form.status || 'active',
+          }),
+        );
         toast.success('MID created');
       }
       onSaved?.();

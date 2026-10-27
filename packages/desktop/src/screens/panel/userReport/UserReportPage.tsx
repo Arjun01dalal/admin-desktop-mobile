@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -8,12 +8,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   ListSubheader,
   MenuItem,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
 import { getSessionUser, hasPermission } from '@/auth/permissions';
@@ -160,13 +162,26 @@ function TabBody({
   }
 }
 
+export type UserReportPageProps = {
+  /** When set (e.g. modal embed), skip route params. */
+  userId?: string;
+  userName?: string;
+  /** Render inside a dialog — no AppShell BackRowActions, local close. */
+  embedded?: boolean;
+  onClose?: () => void;
+};
+
 /** User Report hub — opened from Users name click (wallet_history). */
-export function UserReportPage() {
+export function UserReportPage({
+  userId: userIdProp,
+  userName: userNameProp,
+  embedded = false,
+  onClose,
+}: UserReportPageProps = {}) {
   useRevealCodes();
-  const { userId = '', userName = '' } = useParams<{
-    userId: string;
-    userName: string;
-  }>();
+  const params = useParams<{ userId: string; userName: string }>();
+  const userId = String(userIdProp || params.userId || '').trim();
+  const userName = String(userNameProp || params.userName || '').trim();
   const navigate = useNavigate();
   const canOpen = hasPermission('wallet_history');
   const [showCoinsTab, setShowCoinsTab] = useState(() => canShowCoinsTab());
@@ -245,13 +260,21 @@ export function UserReportPage() {
     }
   }, [userId]);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!canOpen) {
+      if (embedded) {
+        toast.error('No permission to open user report');
+        onCloseRef.current?.();
+        return;
+      }
       navigate('/users', { replace: true });
       return;
     }
     void loadEncrypted();
-  }, [canOpen, loadEncrypted, navigate]);
+  }, [canOpen, embedded, loadEncrypted, navigate]);
 
   // Laxmi: Coins / Add Bonus visibility from User.data.showCoinButton | showRemoveCoin.
   // Refresh flags from get-subadmin so OTP/login payload gaps don't hide the tabs.
@@ -449,24 +472,77 @@ export function UserReportPage() {
   if (!canOpen) return null;
 
   return (
-    <Box sx={{ bgcolor: '#f4f6f8', minHeight: '100%', p: { xs: 0.5, md: 0.75 } }}>
-      {/* Renders beside AppShell Back button (same row, right side). */}
-      <BackRowActions>{sectionSelect}</BackRowActions>
-
-      <Typography
-        sx={{
-          fontSize: 12,
-          color: 'rgba(0,0,0,0.55)',
-          mb: 0.75,
-          px: 0.25,
-        }}
-      >
-        <Box component="span" sx={{ opacity: 0.7 }}>
-          User :{' '}
+    <Box
+      sx={{
+        bgcolor: '#f4f6f8',
+        minHeight: embedded ? 0 : '100%',
+        height: embedded ? '100%' : undefined,
+        overflow: embedded ? 'auto' : undefined,
+        p: { xs: 0.5, md: 0.75 },
+      }}
+    >
+      {embedded ? (
+        <Box
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 5,
+            bgcolor: '#fff',
+            borderBottom: '1px solid #e5e7eb',
+            px: 1.5,
+            pt: 1.25,
+            pb: 1,
+            mb: 1,
+          }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography fontWeight={800} fontSize={15} noWrap sx={{ color: '#111' }}>
+                User Report
+                {decodedName ? ` · ${decodedName}` : ''}
+              </Typography>
+              <Typography fontSize={11} sx={{ color: 'rgba(0,0,0,0.5)' }} noWrap>
+                User : / {decodedName}
+                {encrypted?.encryptedUserName ? ` / ${encrypted.encryptedUserName}` : ''}
+              </Typography>
+            </Box>
+            <Stack direction="row" alignItems="center" spacing={1} flexShrink={0}>
+              {sectionSelect}
+              <IconButton
+                size="small"
+                aria-label="Close"
+                onClick={() => onClose?.()}
+                sx={{
+                  border: '1px solid #e5e7eb',
+                  bgcolor: '#fff',
+                  '&:hover': { bgcolor: '#f3f4f6' },
+                }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          </Stack>
         </Box>
-        / {decodedName}
-        {encrypted?.encryptedUserName ? ` / ${encrypted.encryptedUserName}` : ''}
-      </Typography>
+      ) : (
+        /* Renders beside AppShell Back button (same row, right side). */
+        <>
+          <BackRowActions>{sectionSelect}</BackRowActions>
+          <Typography
+            sx={{
+              fontSize: 12,
+              color: 'rgba(0,0,0,0.55)',
+              mb: 0.75,
+              px: 0.25,
+            }}
+          >
+            <Box component="span" sx={{ opacity: 0.7 }}>
+              User :{' '}
+            </Box>
+            / {decodedName}
+            {encrypted?.encryptedUserName ? ` / ${encrypted.encryptedUserName}` : ''}
+          </Typography>
+        </>
+      )}
 
       {loading && !encrypted ? (
         <Stack alignItems="center" py={6}>

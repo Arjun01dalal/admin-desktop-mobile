@@ -332,7 +332,7 @@ export function normalizeSubAdminOption(row: unknown): DarSubAdminOption | null 
   const obj = (row || {}) as Record<string, unknown>;
   const id = text(obj._id || obj.id);
   if (!id) return null;
-  const name = text(obj.name || obj.userName);
+  const name = text(obj.name || obj.userName || obj.Name || obj.fullName);
   const empCode = text(obj.empCode || obj.employeeCode || obj.emp_code);
   const label = [name || id, empCode ? `Emp ${empCode}` : '', id.slice(-6)]
     .filter(Boolean)
@@ -340,15 +340,52 @@ export function normalizeSubAdminOption(row: unknown): DarSubAdminOption | null 
   return { id, label, name: name || id, empCode };
 }
 
+function isBlockedSubAdmin(row: unknown): boolean {
+  const obj = (row || {}) as Record<string, unknown>;
+  return obj.block === true || obj.Block === true;
+}
+
+/** `/SubAdmin/subadmins-by-role` → dropdown options (same source as Mid Limits / Funds). */
+export function parseSubAdminsFromByRole(data: unknown): DarSubAdminOption[] {
+  const root =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  const nested =
+    root.payload && typeof root.payload === 'object' && !Array.isArray(root.payload)
+      ? (root.payload as Record<string, unknown>)
+      : root;
+  const byRole = Array.isArray(nested.byRole)
+    ? (nested.byRole as Array<{ subAdmins?: unknown[] }>)
+    : Array.isArray(root.byRole)
+      ? (root.byRole as Array<{ subAdmins?: unknown[] }>)
+      : [];
+  const seen = new Set<string>();
+  const out: DarSubAdminOption[] = [];
+  for (const group of byRole) {
+    for (const row of group.subAdmins || []) {
+      if (isBlockedSubAdmin(row)) continue;
+      const option = normalizeSubAdminOption(row);
+      if (!option || seen.has(option.id)) continue;
+      seen.add(option.id);
+      out.push(option);
+    }
+  }
+  return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+
 /** `users.getSubAdmins` response → dropdown options (filters blocked users). */
 export function parseSubAdminOptions(data: unknown): DarSubAdminOption[] {
   const payload = unwrapListPayload(data);
   const rows = pickItems(payload);
-  return rows
-    .filter((row) => {
-      const obj = (row || {}) as Record<string, unknown>;
-      return obj.block !== true && obj.Block !== true;
-    })
+  const fromItems = rows
+    .filter((row) => !isBlockedSubAdmin(row))
+    .map(normalizeSubAdminOption)
+    .filter((option): option is DarSubAdminOption => option !== null);
+  if (fromItems.length) return fromItems;
+  // Some envelopes only expose `users` / `user` — asList covers those.
+  return asList(data)
+    .filter((row) => !isBlockedSubAdmin(row))
     .map(normalizeSubAdminOption)
     .filter((option): option is DarSubAdminOption => option !== null);
 }

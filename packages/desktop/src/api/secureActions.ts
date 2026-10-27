@@ -351,6 +351,7 @@ export const SECURE_ACTIONS = [
   'gtel.dispositions',
   'gtel.callDetails',
   'gtel.clickToCall',
+  'gtel.redial',
   'gtel.hangup',
   'gtel.updateDisposition',
   'gtel.quickStatus',

@@ -51,6 +51,7 @@ import {
 } from '@/auth/permissions';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import { useSosFlagGuard } from '@/hooks/useSosFlagGuard';
+import { GtelCallSessionProvider } from '@/screens/panel/gtel/GtelCallSession';
 import type { AuthUser } from '@/types/gcalc';
 
 const DRAWER_WIDTH = 240;
@@ -63,7 +64,9 @@ type Props = {
 export function AppShell(props: Props) {
   return (
     <BackRowActionsProvider>
-      <AppShellInner {...props} />
+      <GtelCallSessionProvider>
+        <AppShellInner {...props} />
+      </GtelCallSessionProvider>
     </BackRowActionsProvider>
   );
 }

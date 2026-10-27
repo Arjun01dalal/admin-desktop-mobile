@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildGtelCallsQuery,
+  canConfirmGtelHangup,
   canShowGtelMobile,
+  deriveGtelActiveCallPhase,
   emptyGtelFilters,
   formatGtelDuration,
   GTEL_SHOW_MOBILE_OVERRIDE,
+  gtelActiveCallStatusLabel,
+  gtelActiveCallStatusTone,
   gtelCallMatchesStatus,
+  isDispositionAlreadySetMessage,
   maskGtelPhone,
   normalizeGtelCallsPage,
   sanitizeGtelPhone,
@@ -127,5 +132,88 @@ describe('canShowGtelMobile', () => {
   it('allows tracked legacy override mobile only', () => {
     expect(canShowGtelMobile({ mobile: GTEL_SHOW_MOBILE_OVERRIDE } as never)).toBe(true);
     expect(canShowGtelMobile({ mobile: '0000000000' } as never)).toBe(false);
+  });
+});
+
+describe('deriveGtelActiveCallPhase', () => {
+  it('prioritizes ended over hangup form', () => {
+    expect(
+      deriveGtelActiveCallPhase({
+        starting: false,
+        callId: 'c1',
+        ended: true,
+        showRedial: false,
+        confirmHangup: true,
+      }),
+    ).toBe('ended');
+  });
+
+  it('maps dialing / active / hangupForm / redial', () => {
+    expect(
+      deriveGtelActiveCallPhase({
+        starting: true,
+        callId: '',
+        ended: false,
+        showRedial: false,
+        confirmHangup: false,
+      }),
+    ).toBe('dialing');
+    expect(
+      deriveGtelActiveCallPhase({
+        starting: false,
+        callId: 'c1',
+        ended: false,
+        showRedial: false,
+        confirmHangup: false,
+      }),
+    ).toBe('active');
+    expect(
+      deriveGtelActiveCallPhase({
+        starting: false,
+        callId: 'c1',
+        ended: false,
+        showRedial: false,
+        confirmHangup: true,
+      }),
+    ).toBe('hangupForm');
+    expect(
+      deriveGtelActiveCallPhase({
+        starting: false,
+        callId: 'c1',
+        ended: false,
+        showRedial: true,
+        confirmHangup: false,
+      }),
+    ).toBe('redial');
+  });
+});
+
+describe('gtelActiveCallStatusTone / label', () => {
+  it('uses green when answered', () => {
+    expect(
+      gtelActiveCallStatusTone({ phase: 'active', answered: true }),
+    ).toBe('#22c55e');
+    expect(
+      gtelActiveCallStatusLabel({ phase: 'active', answered: true }),
+    ).toBe('Answered');
+  });
+});
+
+describe('isDispositionAlreadySetMessage', () => {
+  it('detects locked disposition errors', () => {
+    expect(isDispositionAlreadySetMessage('Disposition already set')).toBe(true);
+    expect(isDispositionAlreadySetMessage('Cannot be changed')).toBe(true);
+    expect(isDispositionAlreadySetMessage('ok')).toBe(false);
+  });
+});
+
+describe('canConfirmGtelHangup', () => {
+  it('requires callId + disposition and blocks while hanging up', () => {
+    expect(canConfirmGtelHangup({ callId: 'c1', disposition: 'Connected' })).toBe(true);
+    expect(canConfirmGtelHangup({ callId: '', disposition: 'Connected' })).toBe(false);
+    expect(canConfirmGtelHangup({ callId: 'c1', disposition: '' })).toBe(false);
+    expect(
+      canConfirmGtelHangup({ callId: 'c1', disposition: 'Connected', hangingUp: true }),
+    ).toBe(false);
   });
 });

@@ -643,19 +643,53 @@ function unwrapBody(data: unknown): Record<string, unknown> | unknown[] {
   return root;
 }
 
+function dispositionListFrom(value: unknown): unknown[] | null {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return null;
+  const obj = asRecord(value);
+  for (const key of [
+    'dispositions',
+    'disposition',
+    'items',
+    'list',
+    'rows',
+    'data',
+    'payload',
+    'result',
+  ] as const) {
+    if (Array.isArray(obj[key])) return obj[key] as unknown[];
+  }
+  return null;
+}
+
+/** Parse GET /dialer/dispositions — tolerates nested / encrypted envelopes. */
 export function extractGtelDispositions(data: unknown): string[] {
-  const body = unwrapBody(data);
-  const list = Array.isArray(body)
-    ? body
-    : Array.isArray(asRecord(body).dispositions)
-      ? (asRecord(body).dispositions as unknown[])
-      : [];
+  const candidates: unknown[] = [data, unwrapBody(data)];
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const root = asRecord(data);
+    candidates.push(root.data, root.payload, root.result, asRecord(root.data).payload);
+  }
+
+  let list: unknown[] = [];
+  for (const candidate of candidates) {
+    const found = dispositionListFrom(candidate);
+    if (found?.length) {
+      list = found;
+      break;
+    }
+    if (found && !list.length) list = found;
+  }
+
   return list
     .map((item) =>
       typeof item === 'string'
         ? item
         : String(
-            asRecord(item).name ?? asRecord(item).label ?? asRecord(item).value ?? '',
+            asRecord(item).name ??
+              asRecord(item).label ??
+              asRecord(item).value ??
+              asRecord(item).disposition ??
+              '',
           ),
     )
     .map((item) => item.trim())
@@ -864,5 +898,315 @@ export function emptyGtelFilters(today: string, lockedEmpCode = ''): GtelFilters
     disposition: '',
     empCode: lockedEmpCode,
     status: '',
+  };
+}
+
+/* —— Active Call / Click2Call helpers (admin-panel Click2CallBtn parity) —— */
+
+export type GtelCallQuickStatus = {
+  callId: string;
+  answered: boolean;
+  hangup: boolean;
+};
+
+export type GtelPreviousNote = {
+  text: string;
+  callId?: string;
+  callAt?: string;
+  by?: string;
+};
+
+export type GtelC2cTarget = {
+  phoneNumber: string;
+  userId?: string;
+  userName?: string;
+  appName?: string;
+  lastActivity?: string;
+  balance?: string | number;
+  bonusBalance?: string | number;
+  campaignDataId?: string;
+  source?: 'Manual' | 'Campaign';
+  isProspect?: boolean;
+  /** Override dialer extension (e.g. KYC / Incoming Bot). */
+  extensionId?: string;
+  /** Hide Redial; next click starts a fresh call. */
+  disableRedial?: boolean;
+};
+
+function toQuickBool(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  const s = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes';
+}
+
+function pickQuickStatusSource(body: unknown): Record<string, unknown> {
+  const root = asRecord(body);
+  const raw = root.data ?? root.payload ?? body;
+  const resolved =
+    typeof raw === 'string'
+      ? (() => {
+          try {
+            return asRecord(JSON.parse(raw));
+          } catch {
+            return {};
+          }
+        })()
+      : asRecord(raw);
+  if ('answered' in resolved || 'hangup' in resolved || 'callId' in resolved) {
+    return resolved;
+  }
+  const nested = asRecord(resolved.data ?? resolved.payload);
+  return Object.keys(nested).length ? nested : resolved;
+}
+
+/** Parse GET /dialer/call/{callId}/quick-status payload. */
+export function parseGtelQuickStatus(
+  data: unknown,
+  fallbackCallId = '',
+): GtelCallQuickStatus | null {
+  const payload = pickQuickStatusSource(data);
+  if (!Object.keys(payload).length && !fallbackCallId) return null;
+  return {
+    callId: String(payload.callId || fallbackCallId).trim(),
+    answered: toQuickBool(payload.answered),
+    hangup: toQuickBool(payload.hangup),
+  };
+}
+
+export function isNoActiveCallError(message?: string | null): boolean {
+  return /no active call/i.test(String(message || ''));
+}
+
+export function formatGtelCallElapsed(seconds: number): string {
+  const mins = Math.floor(Math.max(0, seconds) / 60);
+  const secs = Math.max(0, seconds) % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+/** Formal Active Call UI phase (replaces ad-hoc boolean soup at the call site). */
+export type GtelActiveCallPhase = 'dialing' | 'active' | 'hangupForm' | 'redial' | 'ended';
+
+export function deriveGtelActiveCallPhase(args: {
+  starting: boolean;
+  callId: string;
+  ended: boolean;
+  showRedial: boolean;
+  confirmHangup: boolean;
+}): GtelActiveCallPhase {
+  if (args.ended) return 'ended';
+  if (args.starting && !args.callId) return 'dialing';
+  if (args.showRedial) return 'redial';
+  if (args.confirmHangup) return 'hangupForm';
+  return 'active';
+}
+
+export function gtelActiveCallStatusTone(args: {
+  phase: GtelActiveCallPhase;
+  answered?: boolean;
+  hangup?: boolean;
+}): string {
+  if (args.phase === 'ended' || args.hangup) return '#ef4444';
+  if (args.answered) return '#22c55e';
+  return '#f59e0b';
+}
+
+export function gtelActiveCallStatusLabel(args: {
+  phase: GtelActiveCallPhase;
+  answered?: boolean;
+  hangup?: boolean;
+}): string {
+  if (args.phase === 'ended') return 'Ended';
+  if (args.hangup) return 'Hangup';
+  if (args.answered) return 'Answered';
+  if (args.phase === 'dialing') return 'Connecting…';
+  if (args.phase === 'redial') return 'Redial';
+  return 'Calling';
+}
+
+/** True when disposition response is a soft-success (already locked on dialer). */
+export function isDispositionAlreadySetMessage(message?: string | null): boolean {
+  return /already set|cannot be changed/i.test(String(message || ''));
+}
+
+/** Confirm Hang Up enabled only when call + disposition are ready. */
+export function canConfirmGtelHangup(args: {
+  callId?: string | null;
+  disposition?: string | null;
+  hangingUp?: boolean;
+}): boolean {
+  return Boolean(String(args.callId || '').trim() && String(args.disposition || '').trim() && !args.hangingUp);
+}
+
+/** datetime-local `2026-10-14T18:30` → IST string `2026-10-14 18:30`. */
+export function formatCallbackDueAtIst(datetimeLocal?: string): string {
+  const value = String(datetimeLocal || '').trim();
+  if (!value) return '';
+  return value.replace('T', ' ').slice(0, 16);
+}
+
+export function normalizeDispositionLabel(value?: string | null): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isGreenDisposition(value?: string | null): boolean {
+  const normalized = normalizeDispositionLabel(value);
+  if (!normalized) return false;
+  if (GREEN_DISPOSITIONS.has(normalized)) return true;
+  for (const item of GREEN_DISPOSITIONS) {
+    if (normalizeDispositionLabel(item) === normalized) return true;
+  }
+  return false;
+}
+
+export function formatGtelBalanceDisplay(value?: string | number | null): string {
+  if (value == null || value === '') return '—';
+  const num = Number(String(value).replace(/,/g, '').trim());
+  if (!Number.isNaN(num)) return String(Math.floor(num));
+  return String(value);
+}
+
+export function isNegativeGtelBalance(value?: string | number | null): boolean {
+  if (value == null || value === '') return false;
+  const num = Number(String(value).replace(/,/g, '').trim());
+  return !Number.isNaN(num) && num < 0;
+}
+
+export function formatPreviousNoteCallAt(value?: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${day}-${month}-${year} ${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+}
+
+export function parsePreviousNote(value: unknown): GtelPreviousNote | null {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    const text = value.trim();
+    return text ? { text } : null;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return { text: String(value) };
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const parsed = parsePreviousNote(item);
+      if (parsed?.text) return parsed;
+    }
+    return null;
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const text = String(
+      obj.text ?? obj.note ?? obj.notes ?? obj.message ?? obj.comment ?? '',
+    ).trim();
+    const callId = String(obj.callId ?? obj.call_id ?? '').trim() || undefined;
+    const callAt = String(obj.callAt ?? obj.call_at ?? '').trim() || undefined;
+    const by = String(obj.by ?? obj.byUserId ?? obj.userId ?? '').trim() || undefined;
+    if (text || callId || callAt || by) {
+      return { text: text || '—', callId, callAt, by };
+    }
+    const nested = obj.previousNote ?? obj.previousNotes ?? obj.lastNote;
+    if (nested != null && nested !== value) return parsePreviousNote(nested);
+  }
+  return null;
+}
+
+export function formatPreviousNoteValue(value: unknown): string {
+  const parsed = parsePreviousNote(value);
+  if (!parsed) return '';
+  const lines = [parsed.text];
+  const when = formatPreviousNoteCallAt(parsed.callAt);
+  if (when) lines.push(when);
+  return lines.filter(Boolean).join('\n');
+}
+
+function previousNoteCandidates(source: unknown): unknown[] {
+  if (!source || typeof source !== 'object') return [];
+  const row = source as Record<string, unknown>;
+  const nested =
+    (row.data && typeof row.data === 'object' ? row.data : null) ||
+    (row.payload && typeof row.payload === 'object' ? row.payload : null) ||
+    (row.call && typeof row.call === 'object' ? row.call : null) ||
+    (row.campaignData && typeof row.campaignData === 'object' ? row.campaignData : null);
+
+  return [
+    row.previousNote,
+    row.previousNotes,
+    row.previous_note,
+    row.lastNote,
+    row.lastNotes,
+    nested && (nested as Record<string, unknown>).previousNote,
+    nested && (nested as Record<string, unknown>).previousNotes,
+    nested && (nested as Record<string, unknown>).previous_note,
+    nested && (nested as Record<string, unknown>).lastNote,
+  ];
+}
+
+/** Pick previousNote `{ text, callId, callAt, by }` from dialer / campaign payloads. */
+export function extractPreviousNoteDetails(...sources: unknown[]): GtelPreviousNote | null {
+  for (const source of sources) {
+    for (const candidate of previousNoteCandidates(source)) {
+      const parsed = parsePreviousNote(candidate);
+      if (parsed && (parsed.text || parsed.callAt)) return parsed;
+    }
+  }
+  return null;
+}
+
+export function extractPreviousNote(...sources: unknown[]): string {
+  const details = extractPreviousNoteDetails(...sources);
+  return details ? formatPreviousNoteValue(details) : '';
+}
+
+/** Build click-to-call POST body (Manual / Campaign / Prospect). */
+export function buildGtelClickToCallBody(args: {
+  callId: string;
+  phone: string;
+  extension: string;
+  subAdminId: string;
+  target: GtelC2cTarget;
+}): Record<string, unknown> {
+  const { callId, phone, extension, subAdminId, target } = args;
+  const isCampaign = Boolean(target.campaignDataId);
+  if (target.isProspect) {
+    return {
+      callId,
+      phoneNumber: phone,
+      isProspect: true,
+      source: target.source || 'Manual',
+      extension,
+    };
+  }
+  if (isCampaign) {
+    return {
+      callId,
+      phoneNumber: phone,
+      campaignDataId: target.campaignDataId,
+      source: target.source || 'Campaign',
+      userId: target.userId || '',
+    };
+  }
+  return {
+    callId,
+    phoneNumber: phone,
+    extension,
+    userId: target.userId || '',
+    subAdminId,
+    source: target.source || 'Manual',
   };
 }

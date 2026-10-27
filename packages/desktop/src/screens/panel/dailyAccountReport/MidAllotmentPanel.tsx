@@ -118,30 +118,30 @@ export default function MidAllotmentPanel({
     }
   }, [updatedBy.userId, rosterMode, filterSubAdminId]);
 
-  const loadOptions = useCallback(async (force = false) => {
-    if (optionsLoadedRef.current && !force) return;
+  const loadOptions = useCallback(async (force = false): Promise<SubAdminOption[]> => {
+    if (optionsLoadedRef.current && !force) return [];
     const gen = ++optionsGenRef.current;
     setOptionsLoading(true);
-    try {
-      const [midsResult, subAdminList] = await Promise.all([
-        fetchMids({ status: 'active', page: 1, limit: 200 }),
-        loadSubAdminOptions(),
-      ]);
-      if (gen !== optionsGenRef.current) return;
-      setActiveMids(midsResult.items);
-      setSubAdmins(subAdminList);
-      optionsLoadedRef.current = true;
-    } catch {
-      if (gen !== optionsGenRef.current) return;
-      setActiveMids([]);
-      setSubAdmins([]);
-    } finally {
-      if (gen === optionsGenRef.current) setOptionsLoading(false);
-    }
+    // Load independently so a MID list failure does not wipe the sub-admin dropdown.
+    const midsPromise = fetchMids({ page: 1, limit: 500 })
+      .then((result) =>
+        result.items.filter((mid) => (mid.status || 'active') === 'active'),
+      )
+      .catch((): MidRecord[] => []);
+    const subsPromise = loadSubAdminOptions().catch((): SubAdminOption[] => []);
+
+    const [mids, subAdminList] = await Promise.all([midsPromise, subsPromise]);
+    if (gen !== optionsGenRef.current) return subAdminList;
+    setActiveMids(mids);
+    setSubAdmins(subAdminList);
+    optionsLoadedRef.current = true;
+    setOptionsLoading(false);
+    return subAdminList;
   }, []);
 
   useEffect(() => {
     optionsLoadedRef.current = false;
+    void loadOptions(true);
     let cancelled = false;
     fetchActiveAllotments({})
       .then((result) => {
@@ -153,7 +153,7 @@ export default function MidAllotmentPanel({
     return () => {
       cancelled = true;
     };
-  }, [midVersion]);
+  }, [midVersion, loadOptions]);
 
   useEffect(() => {
     if (!open || tab !== 1) return;
@@ -163,19 +163,24 @@ export default function MidAllotmentPanel({
     };
   }, [open, tab, loadRoster, midVersion]);
 
+  const ensureOptions = async () => {
+    const list = await loadOptions(true);
+    if (!list.length) toast.error('Sub-admin list could not be loaded');
+  };
+
   const openModal = async (nextTab = 0) => {
     setAssignMode('allot');
     setAssignForm(emptyAssign);
     setTab(nextTab);
     setOpen(true);
-    if (nextTab === 0) await loadOptions();
+    if (nextTab === 0) await ensureOptions();
   };
 
   const openCreateTab = async () => {
     setAssignMode('allot');
     setAssignForm(emptyAssign);
     setTab(0);
-    await loadOptions();
+    await ensureOptions();
   };
 
   const openReassign = async (row: MidAllotment) => {
@@ -188,7 +193,7 @@ export default function MidAllotmentPanel({
       remark: '',
     });
     setTab(0);
-    await loadOptions();
+    await ensureOptions();
   };
 
   const openRevoke = (row: MidAllotment) => {
@@ -313,7 +318,7 @@ export default function MidAllotmentPanel({
             if (value === 0) {
               setAssignMode('allot');
               setAssignForm(emptyAssign);
-              if (!activeMids.length || !subAdmins.length) void loadOptions();
+              void loadOptions(true);
             }
           }}
         >

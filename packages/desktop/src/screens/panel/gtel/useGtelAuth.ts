@@ -1,6 +1,6 @@
 /** Shared auth / role flags for Gtel screens. */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { getRoleId, getSessionUser, hasPermission, isCallerRole } from '@/auth/permissions';
 import {
@@ -13,7 +13,15 @@ import {
 } from '@astro/shared';
 
 export function useGtelAuth() {
-  const admin = useMemo(() => getSessionUser(), []);
+  // Re-read session when responsibilities / profile update (don't freeze empty mount).
+  const [sessionTick, setSessionTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setSessionTick((n) => n + 1);
+    window.addEventListener('gcalc:user-updated', bump);
+    return () => window.removeEventListener('gcalc:user-updated', bump);
+  }, []);
+
+  const admin = useMemo(() => getSessionUser(), [sessionTick]);
   const loginMobile = String(admin?.mobile || '').trim();
   const loginEmpCode = String(admin?.empCode || '').trim();
   const loginUserId = String(admin?._id || '').trim();

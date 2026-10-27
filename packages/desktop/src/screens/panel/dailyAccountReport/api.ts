@@ -22,6 +22,7 @@ import {
   normalizeAllotment,
   normalizeDailyBalance,
   parseSubAdminOptions,
+  parseSubAdminsFromByRole,
   validateBalanceImageFile,
 } from '@astro/shared/dailyAccountReport';
 
@@ -188,13 +189,28 @@ export async function fetchAllotmentHistory(
 export { normalizeAllotment };
 
 // ---------------------------------------------------------------------------
-// Sub-admins — reuse existing `users.getSubAdmins` secure action.
+// Sub-admins — prefer subadmins-by-role (dropdown source used elsewhere),
+// fall back to get-all-subadmins if by-role is empty / unavailable.
 // ---------------------------------------------------------------------------
 
 export async function loadSubAdminOptions(): Promise<DarSubAdminOption[]> {
-  const res = await secureApi('users.getSubAdmins', { pageNo: 1, itemPerPage: 1000 });
-  if (!res.ok) return [];
-  return parseSubAdminOptions(res.data);
+  try {
+    const byRoleRes = await secureApi('caller.subadminsByRole', { filter: {} });
+    if (byRoleRes.ok) {
+      const fromRoles = parseSubAdminsFromByRole(byRoleRes.data);
+      if (fromRoles.length) return fromRoles;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    const res = await secureApi('users.getSubAdmins', { pageNo: 1, itemPerPage: 1000 });
+    if (!res.ok) return [];
+    return parseSubAdminOptions(res.data);
+  } catch {
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------

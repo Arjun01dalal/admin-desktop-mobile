@@ -182,6 +182,7 @@ export function GtelCallsScreen() {
         onClose={() => g.setC2cTarget(null)}
         onEnded={() => void g.refresh()}
         canShowMobile={g.canShowMobile}
+        onOpenReport={g.openUserReport}
       />
     </>
   );

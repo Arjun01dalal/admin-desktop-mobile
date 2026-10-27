@@ -1,30 +1,33 @@
+/**
+ * Manual Call — bottom-right dock (Call Start / Active Call parity).
+ * Phone → user search → dial via shell Active Call session.
+ */
 import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
-
-import { orangeBtnSx, fieldSx } from '@/screens/panel/transactions/shared';
-import { appCodeForName } from '@/constants/clientNames';
-import CloseIcon from '@mui/icons-material/Close';
-import { display } from '@/screens/panel/shared';
 import CallIcon from '@mui/icons-material/Call';
-import { secureApi } from '@/api/secureClient';
-import { useGtelAuth } from './useGtelAuth';
-import {
-  createGtelCallId,
-  maskGtelPhone,
-  sanitizeGtelPhone,
-} from '@astro/shared';
+import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   IconButton,
+  Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import { maskGtelPhone, sanitizeGtelPhone } from '@astro/shared';
+import { appCodeForName } from '@/constants/clientNames';
+import { secureApi } from '@/api/secureClient';
+import { display } from '@/screens/panel/shared';
+import { fieldSx } from '@/screens/panel/transactions/shared';
+import { UserReportModal } from '@/screens/panel/userReport/UserReportModal';
+import { useGtelAuth } from './useGtelAuth';
+import { useGtelCallSession } from './GtelCallSession';
+import { GtelBusyDock } from './GtelBusyDock';
+import { GTEL_Z } from './gtelOverlayZIndex';
 
 export type ManualDialUser = {
   _id?: string;
@@ -66,18 +69,18 @@ function extractUsers(data: unknown): ManualDialUser[] {
     (Array.isArray(obj.items) && obj.items) ||
     (Array.isArray(obj.users) && obj.users) ||
     [];
-  return raw.filter(
-    (row): row is ManualDialUser => Boolean(row && typeof row === 'object'),
-  );
+  return raw.filter((row): row is ManualDialUser => Boolean(row && typeof row === 'object'));
 }
 
 export function GtelManualCallModals({ open, onClose, onCalled }: Props) {
-  const { admin, canShowMobile, loginExtensionId } = useGtelAuth();
+  const { canShowMobile, canShowC2c } = useGtelAuth();
+  const { startC2c, callingPhone } = useGtelCallSession();
   const [phone, setPhone] = useState('');
   const [searching, setSearching] = useState(false);
   const [calling, setCalling] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
   const [users, setUsers] = useState<ManualDialUser[]>([]);
+  const [reportUser, setReportUser] = useState<{ id: string; name: string } | null>(null);
 
   const reset = useCallback(() => {
     setPhone('');
@@ -85,20 +88,13 @@ export function GtelManualCallModals({ open, onClose, onCalled }: Props) {
     setCalling(false);
     setUsersOpen(false);
     setUsers([]);
+    setReportUser(null);
   }, []);
 
-  const handleClosePhone = () => {
-    if (searching) return;
+  const handleClose = () => {
+    if (searching || calling) return;
     reset();
     onClose();
-  };
-
-  const handleCloseUsers = () => {
-    if (calling) return;
-    setUsersOpen(false);
-    setUsers([]);
-    onClose();
-    reset();
   };
 
   const searchUsers = async () => {
@@ -125,77 +121,134 @@ export function GtelManualCallModals({ open, onClose, onCalled }: Props) {
     }
   };
 
-  const startC2c = async (user?: ManualDialUser | null) => {
-    const digits = sanitizeGtelPhone(user?.mobile || phone);
+  const dial = async (user?: ManualDialUser | null) => {
+    const rawPhone = user?.mobile || phone;
+    const digits = sanitizeGtelPhone(rawPhone);
     if (digits.length !== 10) {
       toast.error('Valid 10 digit number required');
       return;
     }
-    if (!loginExtensionId) {
-      toast.error('Extension not found for your account');
+    if (!canShowC2c) {
+      toast.error('C2C not available for your account');
       return;
     }
     setCalling(true);
     try {
-      const callId = createGtelCallId();
       const userId = String(user?._id || user?.dp_id || '').trim();
-      const res = await secureApi(
-        'gtel.clickToCall',
-        user
-          ? {
-              callId,
-              phoneNumber: digits,
-              extension: loginExtensionId,
-              userId,
-              subAdminId: String(admin?._id || ''),
-              source: 'Manual',
-            }
-          : {
-              callId,
-              phoneNumber: digits,
-              isProspect: true,
-              source: 'Manual',
-              extension: loginExtensionId,
-            },
+      const ok = startC2c(
+        {
+          phoneNumber: rawPhone,
+          userId: userId || undefined,
+          userName: String(user?.name || user?.userName || user?.username || ''),
+          appName: String(user?.clientName || ''),
+          lastActivity: String(
+            user?.lastActivity || user?.last_activity || user?.activeUser || user?.active_user || '',
+          ),
+          balance: user?.balance ?? user?.walletBalance,
+          bonusBalance: user?.bonusWalletBalance ?? user?.bonusBalance,
+          source: 'Manual',
+          isProspect: !user,
+        },
+        undefined,
+        onCalled,
       );
-      if (!res.ok || res.success === false) {
-        toast.error(res.message || 'Call could not be initiated');
+      if (!ok) {
+        toast.error('Call could not be initiated');
         return;
       }
-      toast.success('Call initiated');
       reset();
       onClose();
-      onCalled?.();
     } finally {
       setCalling(false);
     }
   };
 
+  if (!open) return null;
+
+  if (callingPhone) {
+    return (
+      <GtelBusyDock
+        title="Manual Call paused"
+        phoneMasked={callingPhone}
+        onClose={handleClose}
+      />
+    );
+  }
+
   return (
     <>
-      <Dialog open={open && !usersOpen} onClose={handleClosePhone} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ pr: 6, fontWeight: 800 }}>
-          Manual Call
-          <IconButton
-            aria-label="Close"
-            size="small"
-            disabled={searching}
-            onClick={handleClosePhone}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Enter a 10-digit number to find matching users, then start C2C.
+    <Paper
+      elevation={8}
+      sx={{
+        position: 'fixed',
+        right: 16,
+        bottom: 16,
+        zIndex: GTEL_Z.dock,
+        width: usersOpen ? 420 : 300,
+        maxWidth: 'calc(100vw - 32px)',
+        maxHeight: 'min(480px, calc(100vh - 32px))',
+        borderRadius: 2.5,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
+        transition: 'width 160ms ease',
+      }}
+    >
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{
+          px: 1.25,
+          py: 1,
+          bgcolor: (t) =>
+            t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        <Box
+          sx={{
+            width: 8,
+            height: 8,
+            flexShrink: 0,
+            borderRadius: '50%',
+            bgcolor: '#ff9f0a',
+            boxShadow: '0 0 0 3px #ff9f0a33',
+          }}
+        />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography fontWeight={800} fontSize={12} noWrap>
+            Manual Call
           </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', lineHeight: 1.2 }}
+            noWrap
+          >
+            {usersOpen
+              ? `Users for ${maskGtelPhone(phone, canShowMobile)}`
+              : 'Enter 10-digit number'}
+          </Typography>
+        </Box>
+        <IconButton size="small" onClick={handleClose} disabled={searching || calling}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+
+      {!usersOpen ? (
+        <Stack spacing={1.25} sx={{ p: 1.5 }}>
           <TextField
             autoFocus
             fullWidth
             size="small"
             label="Caller Number"
-            placeholder="Enter 10 digit number"
+            placeholder="10 digit number"
             value={phone}
             disabled={searching}
             inputProps={{ inputMode: 'numeric', maxLength: 10 }}
@@ -208,128 +261,155 @@ export function GtelManualCallModals({ open, onClose, onCalled }: Props) {
             }}
             sx={fieldSx}
           />
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button
-              variant="contained"
-              startIcon={
-                searching ? <CircularProgress size={14} color="inherit" /> : <CallIcon />
-              }
-              disabled={phone.length !== 10 || searching}
-              onClick={() => void searchUsers()}
-              sx={orangeBtnSx}
-            >
-              {searching ? 'Searching…' : 'Call'}
-            </Button>
-          </Box>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={usersOpen} onClose={handleCloseUsers} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ pr: 6, fontWeight: 800 }}>
-          Users for {maskGtelPhone(phone, canShowMobile)}
-          <IconButton
-            aria-label="Close"
-            size="small"
-            disabled={calling}
-            onClick={handleCloseUsers}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
+          <Button
+            variant="contained"
+            fullWidth
+            startIcon={
+              searching ? <CircularProgress size={14} color="inherit" /> : <SearchIcon />
+            }
+            disabled={phone.length !== 10 || searching}
+            onClick={() => void searchUsers()}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 800,
+              bgcolor: '#ff9f0a',
+              color: '#111',
+              '&:hover': { bgcolor: '#e08c00' },
+            }}
           >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
+            {searching ? 'Searching…' : 'Find & Call'}
+          </Button>
+        </Stack>
+      ) : (
+        <Box sx={{ overflow: 'auto', flex: 1, p: 1.25 }}>
           {users.length === 0 ? (
-            <Stack spacing={2} alignItems="flex-start">
-              <Typography color="text.secondary">No users found for this number.</Typography>
+            <Stack spacing={1.25} alignItems="stretch">
+              <Typography variant="caption" color="text.secondary">
+                No users found for this number.
+              </Typography>
               <Button
                 variant="contained"
                 startIcon={
                   calling ? <CircularProgress size={14} color="inherit" /> : <CallIcon />
                 }
-                disabled={calling || phone.length !== 10}
-                onClick={() => void startC2c(null)}
-                sx={orangeBtnSx}
+                disabled={calling || phone.length !== 10 || !canShowC2c}
+                onClick={() => void dial(null)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  bgcolor: '#ff9f0a',
+                  color: '#111',
+                  '&:hover': { bgcolor: '#e08c00' },
+                }}
               >
                 C2C Call Anyway
               </Button>
+              <Button
+                size="small"
+                onClick={() => {
+                  setUsersOpen(false);
+                  setUsers([]);
+                }}
+                sx={{ textTransform: 'none' }}
+              >
+                Back
+              </Button>
             </Stack>
           ) : (
-            <Box sx={{ overflow: 'auto' }}>
-              <Box
-                component="table"
-                sx={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  '& th, & td': {
-                    px: 1.25,
-                    py: 1,
-                    borderBottom: '1px solid',
-                    borderColor: 'divider',
-                    textAlign: 'left',
-                    fontSize: 13,
-                  },
-                  '& th': { fontWeight: 800, whiteSpace: 'nowrap' },
+            <Stack spacing={0.75}>
+              {users.map((user, index) => {
+                const name =
+                  String(user.name || user.userName || user.username || '').trim() || '—';
+                const mobile = String(user.mobile || phone || '');
+                const dpId = String(user._id || user.dp_id || '').trim();
+                return (
+                  <Stack
+                    key={dpId || `${mobile}-${index}`}
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    sx={{
+                      px: 1,
+                      py: 0.75,
+                      borderRadius: 1.5,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography fontSize={12} fontWeight={800} noWrap>
+                        {name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap display="block">
+                        {canShowMobile ? mobile || '—' : '**********'}
+                        {` · ${appCodeForName(user.clientName) || display(user.clientName)}`}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color={dpId ? 'primary.main' : 'text.secondary'}
+                        noWrap
+                        display="block"
+                        onClick={
+                          dpId
+                            ? () => setReportUser({ id: dpId, name: name === '—' ? dpId : name })
+                            : undefined
+                        }
+                        sx={{
+                          cursor: dpId ? 'pointer' : 'default',
+                          textDecoration: dpId ? 'underline' : 'none',
+                          fontWeight: dpId ? 700 : 400,
+                        }}
+                      >
+                        {dpId || '—'}
+                        {user.state ? ` · ${display(user.state)}` : ''}
+                      </Typography>
+                    </Box>
+                    <Tooltip title="C2C Call">
+                      <span>
+                        <IconButton
+                          size="small"
+                          disabled={calling || !canShowC2c}
+                          onClick={() => void dial(user)}
+                          sx={{
+                            bgcolor: '#ff9f0a',
+                            color: '#111',
+                            '&:hover': { bgcolor: '#e08c00' },
+                            '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
+                          }}
+                        >
+                          {calling ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <CallIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                );
+              })}
+              <Button
+                size="small"
+                onClick={() => {
+                  setUsersOpen(false);
+                  setUsers([]);
                 }}
+                sx={{ textTransform: 'none', alignSelf: 'flex-start' }}
               >
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    {canShowMobile ? <th>Mobile</th> : null}
-                    <th>App</th>
-                    <th>DP ID</th>
-                    <th>State</th>
-                    <th>City</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user, index) => {
-                    const name =
-                      String(user.name || user.userName || user.username || '').trim() ||
-                      '—';
-                    const mobile = String(user.mobile || phone || '');
-                    const dpId = String(user._id || user.dp_id || '').trim();
-                    return (
-                      <tr key={dpId || `${mobile}-${index}`}>
-                        <td>{name}</td>
-                        {canShowMobile ? (
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                            {mobile || '—'}
-                          </td>
-                        ) : null}
-                        <td>{appCodeForName(user.clientName) || display(user.clientName)}</td>
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                          {dpId || '—'}
-                        </td>
-                        <td>{display(user.state)}</td>
-                        <td>{display(user.city)}</td>
-                        <td>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            startIcon={
-                              calling ? (
-                                <CircularProgress size={12} color="inherit" />
-                              ) : (
-                                <CallIcon fontSize="small" />
-                              )
-                            }
-                            disabled={calling}
-                            onClick={() => void startC2c(user)}
-                            sx={{ ...orangeBtnSx, height: 32, px: 1.25 }}
-                          >
-                            C2C Call
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Box>
-            </Box>
+                Back
+              </Button>
+            </Stack>
           )}
-        </DialogContent>
-      </Dialog>
+        </Box>
+      )}
+    </Paper>
+
+    <UserReportModal
+      open={Boolean(reportUser?.id)}
+      userId={reportUser?.id || ''}
+      userName={reportUser?.name}
+      onClose={() => setReportUser(null)}
+    />
     </>
   );
 }

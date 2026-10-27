@@ -267,6 +267,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'gtel.dispositions': {"method":"GET","path":"/dialer/dispositions","encryptRequest":false,"decryptResponse":true},
   'gtel.callDetails': {"method":"GET","path":"/dialer/call/{callId}","encryptRequest":false,"decryptResponse":true},
   'gtel.clickToCall': {"method":"POST","path":"/dialer/click-to-call","encryptRequest":false,"decryptResponse":true},
+  'gtel.redial': {"method":"POST","path":"/dialer/call/{originalCallId}/redial","encryptRequest":false,"decryptResponse":true},
   'gtel.hangup': {"method":"POST","path":"/dialer/hangup","encryptRequest":false,"decryptResponse":true},
   'gtel.updateDisposition': {"method":"POST","path":"/dialer/call/{callId}/disposition","encryptRequest":false,"decryptResponse":true},
   'gtel.quickStatus': {"method":"GET","path":"/dialer/call/{callId}/quick-status","encryptRequest":false,"decryptResponse":true},
