@@ -573,6 +573,26 @@ export function canAccessDashboard(
   return false;
 }
 
+/** Role_ID for `dev_full_access` (inactivity-logout exempt). */
+export const DEV_FULL_ACCESS_ROLE_ID = '6a33c137a6558491e0d20464';
+
+/** True only for `dev_full_access` (not generic full_access). */
+export function isDevFullAccessRole(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  const roleId = getRoleId(user, storage);
+  if (roleId === DEV_FULL_ACCESS_ROLE_ID) return true;
+
+  for (const candidate of collectRoleNameCandidates(user, storage)) {
+    const normalized = normalizeRoleName(candidate);
+    if (normalized === 'dev_full_access' || normalized.includes('dev_full_access')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * full_access / dev_full_access — always see original UI labels (no Jyotish /
  * reverse-code mapping) and do not get the Reveal codes OTP control.
@@ -584,7 +604,7 @@ export function seesOriginalDisplayLabels(
   const roleId = getRoleId(user, storage);
   if (
     roleId === '64f710d9a2ab78980020c5fb' || // full_access
-    roleId === '6a33c137a6558491e0d20464' // dev_full_access
+    roleId === DEV_FULL_ACCESS_ROLE_ID
   ) {
     return true;
   }

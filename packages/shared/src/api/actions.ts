@@ -12,6 +12,7 @@ export const ApiActions = {
     getSosFlag: 'auth.getSosFlag',
     sosFlag: 'auth.sosFlag',
     getAllSosBlocks: 'auth.getAllSosBlocks',
+    inactivityLogoutStatus: 'auth.inactivityLogoutStatus',
   },
   users: {
     getAll: 'users.getAll',

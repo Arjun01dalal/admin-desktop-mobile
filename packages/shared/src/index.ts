@@ -8,6 +8,7 @@ export * from './states';
 export * from './callerRoles';
 export * from './callerResponsibilityBots';
 export * from './permissions';
+export * from './inactivityLogout';
 export * from './campaignList';
 export * from './callerDialerIds';
 export * from './botIds';

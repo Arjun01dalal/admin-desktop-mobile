@@ -4,6 +4,7 @@ import { AppShell } from '@/layout/AppShell';
 import { TokenValidator } from '@/components/TokenValidator';
 import { BlockedUserCheck } from '@/components/BlockedUserCheck';
 import { ActivityTracker } from '@/components/ActivityTracker';
+import { InactivityLogoutTracker } from '@/components/InactivityLogoutTracker';
 import type { AuthUser } from '@/types/gcalc';
 import { PanelRouteFallback } from '@/app/PanelRouteFallback';
 import {
@@ -138,6 +139,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
       <TokenValidator />
       <BlockedUserCheck />
       <ActivityTracker userId={user?._id} />
+      <InactivityLogoutTracker user={user} onLogout={logout} />
       <Suspense fallback={<PanelRouteFallback />}>
         <Routes>
           <Route element={<AppShell onLogout={logout} onUserChanged={goPanel} />}>

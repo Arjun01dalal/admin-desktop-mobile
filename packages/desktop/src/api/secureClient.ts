@@ -26,6 +26,7 @@ const SKIP_SESSION_RECHECK = new Set<SecureAction>([
   'auth.getAllSosBlocks',
   'auth.updateActiveTime',
   'auth.updateInactiveTime',
+  'auth.inactivityLogoutStatus',
 ]);
 
 /**

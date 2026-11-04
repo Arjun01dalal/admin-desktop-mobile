@@ -73,6 +73,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  'auth.inactivityLogoutStatus': {
+    method: 'POST',
+    path: '/SubAdmin/inactivity-logout-status',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'auth.updateFcmToken': {
     method: 'POST',
     path: '/SubAdmin/update-fcm-token',

@@ -14,6 +14,7 @@ export const SECURE_ACTIONS = [
   'auth.getAllSosBlocks',
   'auth.updateActiveTime',
   'auth.updateInactiveTime',
+  'auth.inactivityLogoutStatus',
   'auth.updateFcmToken',
   'houseGames.transactions',
   'houseGames.updateBetStatus',

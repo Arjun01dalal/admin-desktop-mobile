@@ -22,6 +22,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'auth.getAllSosBlocks': {"method":"POST","path":"/SubAdmin/get-all-sos-blocks","encryptRequest":false,"decryptResponse":false},
   'auth.updateActiveTime': {"method":"POST","path":"/SubAdmin/update-activeTime-time","encryptRequest":false,"decryptResponse":false},
   'auth.updateInactiveTime': {"method":"POST","path":"/SubAdmin/update-inactive-time","encryptRequest":false,"decryptResponse":false},
+  'auth.inactivityLogoutStatus': {"method":"POST","path":"/SubAdmin/inactivity-logout-status","encryptRequest":true,"decryptResponse":true},
   'auth.updateFcmToken': {"method":"POST","path":"/SubAdmin/update-fcm-token","encryptRequest":true,"decryptResponse":true},
   'houseGames.transactions': {"method":"POST","path":"/Ludo/admin/transactions","encryptRequest":true,"decryptResponse":true},
   'houseGames.updateBetStatus': {"method":"POST","path":"/Ludo/admin/update-bet-status","encryptRequest":true,"decryptResponse":true},

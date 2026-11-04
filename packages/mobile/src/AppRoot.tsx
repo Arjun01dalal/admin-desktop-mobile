@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { appQueryClient } from './api/queryClient';
 import { setupQueryLifecycle } from './api/setupQueryLifecycle';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import { useInactivityLogout } from './auth/useInactivityLogout';
 import { ThemeProvider, useTheme } from './features/theme';
 import { AppNavigator } from './navigation/AppNavigator';
 import { ErrorBoundary } from './observability/ErrorBoundary';
@@ -43,11 +44,19 @@ function OfflineHost() {
 }
 
 function Root() {
-  const { ready, token, logout } = useAuth();
+  const { ready, token, user, logout } = useAuth();
   const [screen, setScreen] = useState<GateScreen>('splash');
   const [returnTo, setReturnTo] = useState<GateScreen>('astro-login');
   const [siteAccessToken, setSiteAccessToken] = useState('');
+  const [activitySignal, setActivitySignal] = useState(0);
   const appliedDeepLinkRaw = useRef('');
+
+  useInactivityLogout({
+    user,
+    enabled: Boolean(token && user && screen === 'panel'),
+    onLogout: logout,
+    activitySignal,
+  });
 
   const goAstroLogin = useCallback(() => {
     setSiteAccessToken('');
@@ -132,7 +141,11 @@ function Root() {
 
   if (inPanel) {
     return (
-      <>
+      <View
+        style={{ flex: 1 }}
+        onTouchStart={() => setActivitySignal((n) => n + 1)}
+        collapsable={false}
+      >
         <AppNavigator />
         <LocationRequiredGate
           open={blocked}
@@ -141,7 +154,7 @@ function Root() {
           onRetry={retry}
           onOpenSettings={openSettings}
         />
-      </>
+      </View>
     );
   }
 
