@@ -23,7 +23,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import TuneIcon from '@mui/icons-material/Tune';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { hasPermission } from '@/auth/permissions';
+import { hasPermission, isFullAccessNavRole } from '@/auth/permissions';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
@@ -60,11 +60,14 @@ import {
   WithdrawalActionTable,
   type WithdrawalColumnFilterSlots,
 } from '@/screens/panel/withdrawal/WithdrawalActionTable';
+import { WithdrawalBifurcationDialog } from '@/screens/panel/withdrawal/WithdrawalBifurcationDialog';
 import {
   buildBenePendingOptions,
   normalizeBeneAccountCountSummary,
   type BenePendingOption,
 } from '@astro/shared/beneficiaryAccountCounts';
+import { Permissions } from '@astro/shared/permissions';
+import { validateBifurcationDateRange } from '@astro/shared/withdrawalBifurcation';
 
 const CLIENT_NAME_OPTIONS = ['', ...CLIENT_NAMES];
 const STATE_OPTIONS = ['', ...INDIA_STATES];
@@ -81,6 +84,8 @@ export function WithdrawalPage() {
 
   const canDownload = hasPermission('Download_Withdrawal') || hasPermission('show_download_botton');
   const showAllInProgress = hasPermission('show_all_withdrawal');
+  const canSeeBifurcation =
+    hasPermission(Permissions.see_withdrawal_bifurcation) || isFullAccessNavRole();
   const location = useLocation();
   const navState = (location.state ?? null) as {
     status?: string;
@@ -121,6 +126,7 @@ export function WithdrawalPage() {
     open: false,
     filter: { type: 'Withdrawal Sheet' },
   });
+  const [bifurcationOpen, setBifurcationOpen] = useState(false);
   const sheetAfterOtp = useRef<(() => void) | null>(null);
   const requestSheetDownload = (filter: SheetDownloadFilter, run: () => void) => {
     sheetAfterOtp.current = run;
@@ -604,6 +610,23 @@ export function WithdrawalPage() {
               >
                 Refresh
               </Button>
+              {canSeeBifurcation ? (
+                <Button
+                  variant="contained"
+                  disabled={loading}
+                  onClick={() => {
+                    const check = validateBifurcationDateRange(startDate, endDate);
+                    if (!check.ok) {
+                      toast.error(check.message);
+                      return;
+                    }
+                    setBifurcationOpen(true);
+                  }}
+                  sx={orangeBtnSx}
+                >
+                  Withdrawal Bifurcation
+                </Button>
+              ) : null}
               {canDownload ? (
                 <>
                   <Button
@@ -855,6 +878,14 @@ export function WithdrawalPage() {
         filter={sheetOtp.filter}
         onClose={() => setSheetOtp((s) => ({ ...s, open: false }))}
         onVerified={() => sheetAfterOtp.current?.()}
+      />
+
+      <WithdrawalBifurcationDialog
+        open={bifurcationOpen}
+        onClose={() => setBifurcationOpen(false)}
+        startDate={startDate}
+        endDate={endDate}
+        clientName={draft.clientName || query.filters.clientName}
       />
     </Box>
   );

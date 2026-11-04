@@ -1,14 +1,22 @@
 /**
- * Unique Deposit Pending — port of desktop UniqueDepositPendingPage
- * (/unique_deposit_pending). Lists pending unique deposits (uniquePending.list)
- * with date filter, app-code chips, DP-id search, per-page chips and a pending
- * summary chip (uniquePending.fundRequest). Row tap opens the detail sheet with:
+ * Unique Deposit Pending — dual-summary admin-panel/desktop parity port of
+ * desktop's UniqueDepositPendingPage. Loads uniquePending.amountSummary +
+ * uniquePending.amountAllSummary in parallel, assembles the full row/bucket/
+ * gateway/region/byState view via @astro/shared's assembleUniquePendingSummary,
+ * then filters (gateway/region, client-only) + paginates for display.
+ *
+ * Silently polls every UNIQUE_PENDING_POLL_MS via a ref so the interval never
+ * flips `loading` or closes the open detail sheet.
+ *
+ * Row tap opens the detail sheet with:
  *   - Comment: add a note (uniquePending.message) when the row has none yet,
  *   - WhatsApp: open a state-aware WhatsApp message to the user (whatsapp_icon),
- *   - Change Status: submit a remark (uniquePending.statusChange) (change_status).
+ *   - Change Status: submit a remark (uniquePending.statusChange) (change_status),
+ *   - C2C Call / User Report.
  * The header "Download Data" runs the OTP flow (users.sendBlockOtp /
  * users.verifyBlockOtp + reports.sheetDownloadAuditCreate) gated by
- * show_download_botton; the actual CSV is exported via the share sheet.
+ * show_download_botton, then exports the full filtered display list (not just
+ * the current page) via the share sheet.
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,6 +25,7 @@ import {
   Linking,
   Modal,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -25,12 +34,23 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   appCodeForName,
-  asPaged,
+  assembleUniquePendingSummary,
   buildDepositWhatsAppMessage,
+  buildUniquePendingSummaryPayload,
+  filterUniquePendingDisplay,
+  paginateUniquePendingRows,
+  parseDistinctMidOptions,
   sanitizeGtelPhone,
-  unpackPayload,
+  uniquePendingPaymentMethod,
+  uniquePendingStatusColor,
+  UNIQUE_PENDING_POLL_MS,
+  type UniquePendingBucket,
+  type UniquePendingByStateRow,
+  type UniquePendingRegion,
+  type UniquePendingRow,
 } from '@astro/shared';
 import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
@@ -39,6 +59,7 @@ import {
   canShowUniqueDepositEmpCode,
   getSessionUser,
   hasPermission,
+  Permissions,
 } from '../../../auth/permissions';
 import {
   canShowGtelC2c,
@@ -55,28 +76,6 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './UniqueDepositPendingScreen.styles';
 
-type UniquePendingRow = {
-  _id: string;
-  userId?: string;
-  userName?: string;
-  userMobile?: string;
-  mobile?: string;
-  orderId?: string;
-  amount?: number | string;
-  paymentGatewayName?: string;
-  mid?: string | number;
-  status?: string;
-  createdOn?: string;
-  clientName?: string;
-  userState?: string;
-  state?: string;
-  userCity?: string;
-  city?: string;
-  empCode?: string;
-  transactionId?: string;
-  uniquePendingReason?: { reason?: string; name?: string; _id?: string };
-};
-
 function rowMobile(row: UniquePendingRow): string {
   return String(row.userMobile || row.mobile || '').trim();
 }
@@ -85,21 +84,6 @@ function formatIN(value: unknown): string {
   const n = Number(value ?? 0);
   if (!Number.isFinite(n)) return '0';
   return n.toLocaleString('en-IN');
-}
-
-function paymentMethod(gw: unknown, mid: unknown): string {
-  const g = gw === null || gw === undefined || gw === '' ? '' : String(gw);
-  const m = mid != null && mid !== '' ? String(mid) : '';
-  if (!g && !m) return '—';
-  return m ? `${g} - ${m}` : g;
-}
-
-function statusBadge(status: unknown): string | undefined {
-  const s = String(status || '').toLowerCase();
-  if (s === 'approve' || s === 'approved' || s === 'success') return '#16a34a';
-  if (s === 'pending') return '#d97706';
-  if (s === 'failed' || s === 'reject' || s === 'rejected') return '#dc2626';
-  return undefined;
 }
 
 function csvEscape(value: unknown): string {
@@ -115,11 +99,127 @@ function toCsv(rows: Record<string, unknown>[]): string {
   return lines.join('\r\n');
 }
 
+/** One filter field editable via the shared DetailFilterBar search box; `empCode` is client-only. */
+type ColumnFilters = {
+  userId: string;
+  amount: string;
+  city: string;
+  state: string;
+  empCode: string;
+};
+
+const EMPTY_FILTERS: ColumnFilters = { userId: '', amount: '', city: '', state: '', empCode: '' };
+
+/** Shared pill look for region / gateway / MID toggles. */
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.chip, active && styles.chipActive]}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/** Compact Total / Pending / Approved card — Req · Amt · Cust. */
+function SummaryCard({
+  label,
+  bucket,
+  accent,
+}: {
+  label: string;
+  bucket: UniquePendingBucket;
+  accent: string;
+}) {
+  return (
+    <View style={styles.summaryCard}>
+      <View style={[styles.summaryCardAccent, { backgroundColor: accent }]} />
+      <Text style={[styles.summaryCardLabel, { color: accent }]}>{label.toUpperCase()}</Text>
+      <View style={styles.summaryStatsRow}>
+        <View style={styles.summaryStat}>
+          <Text style={styles.summaryStatLabel}>Req</Text>
+          <Text style={styles.summaryStatValue}>{bucket.uniqueRequestCount}</Text>
+        </View>
+        <View style={styles.summaryStat}>
+          <Text style={styles.summaryStatLabel}>Amt</Text>
+          <Text style={styles.summaryStatValue}>{formatIN(bucket.totalAmount)}</Text>
+        </View>
+        <View style={styles.summaryStat}>
+          <Text style={styles.summaryStatLabel}>Cust</Text>
+          <Text style={styles.summaryStatValue}>{bucket.uniqueCustomerCount}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** One row inside the "By State" modal — Total / Pending / Approved groups. */
+function ByStateRow({
+  row,
+  active,
+  onPress,
+}: {
+  row: UniquePendingByStateRow;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.byStateRow, active && styles.byStateRowActive]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={[styles.byStateRowTitle, active && styles.byStateRowTitleActive]}>
+        {row.state}
+      </Text>
+      <View style={styles.byStateGroupsRow}>
+        <View style={styles.byStateGroup}>
+          <Text style={[styles.byStateGroupLabel, { color: '#60a5fa' }]}>Total</Text>
+          <Text style={styles.byStateGroupValue}>
+            {row.allUniqueRequestCount} · {formatIN(row.allTotalAmount)} ·{' '}
+            {row.allUniqueCustomerCount}
+          </Text>
+        </View>
+        <View style={styles.byStateGroup}>
+          <Text style={[styles.byStateGroupLabel, { color: colors.primary }]}>Pending</Text>
+          <Text style={styles.byStateGroupValue}>
+            {row.uniqueRequestCount} · {formatIN(row.totalAmount)} · {row.uniqueCustomerCount}
+          </Text>
+        </View>
+        <View style={styles.byStateGroup}>
+          <Text style={[styles.byStateGroupLabel, { color: colors.success }]}>Approved</Text>
+          <Text style={styles.byStateGroupValue}>
+            {row.approvedTxnCount} · {formatIN(row.approvedTotalAmount)} ·{' '}
+            {row.approvedCustomerCount}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export function UniqueDepositPendingScreen() {
   const navigation = useNavigation<{ navigate: (route: string, params?: object) => void }>();
+  const insets = useSafeAreaInsets();
   // Read once — getSessionUser returns a fresh object each call.
   const admin = useMemo(
-    () => getSessionUser() as { _id?: string; name?: string; mobile?: string } | null,
+    () =>
+      getSessionUser() as {
+        _id?: string;
+        name?: string;
+        mobile?: string;
+        accessibleStates?: string[];
+      } | null,
     [],
   );
   const canChangeStatus = hasPermission('change_status');
@@ -127,6 +227,7 @@ export function UniqueDepositPendingScreen() {
   const canWhatsApp = hasPermission('whatsapp_icon');
   const canShowMobile = hasPermission('show_mobile');
   const canShowEmpCode = canShowUniqueDepositEmpCode(admin);
+  const canCallerWise = hasPermission(Permissions.show_caller_wise_unique_pending);
   const canShowC2c = canShowGtelC2c(admin);
   const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
   const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>
@@ -152,24 +253,23 @@ export function UniqueDepositPendingScreen() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [clientName, setClientName] = useState('');
+  const [midOptions, setMidOptions] = useState<string[]>([]);
+  const [midFilter, setMidFilter] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
-  const [searchField, setSearchField] = useState('userId');
-  const [applied, setApplied] = useState<{ field: string; text: string }>({
-    field: 'userId',
-    text: '',
-  });
+  const [searchField, setSearchField] = useState<keyof ColumnFilters>('userId');
+  const [appliedFilters, setAppliedFilters] = useState<ColumnFilters>(EMPTY_FILTERS);
 
-  const [rows, setRows] = useState<UniquePendingRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [gatewayFilter, setGatewayFilter] = useState('');
+  const [region, setRegion] = useState<UniquePendingRegion>('');
+  const [byStateOpen, setByStateOpen] = useState(false);
+
+  const [pendingSummaryData, setPendingSummaryData] = useState<unknown>(null);
+  const [allSummaryData, setAllSummaryData] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [pendingAmount, setPendingAmount] = useState(0);
   const [sheetRow, setSheetRow] = useState<UniquePendingRow | null>(null);
   const [busy, setBusy] = useState(false);
   const genRef = useRef(0);
-  const summaryGenRef = useRef(0);
 
   // Remark/comment input modal.
   const [inputOpen, setInputOpen] = useState(false);
@@ -191,13 +291,25 @@ export function UniqueDepositPendingScreen() {
     };
   }, [canShowEmpCode]);
 
+  // Load distinct MIDs once (client-side select options for the MID filter).
+  useEffect(() => {
+    let active = true;
+    void secureApi<unknown>('uniquePending.mids', {}).then((res) => {
+      if (!active || !res.ok) return;
+      setMidOptions(parseDistinctMidOptions(res.data));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const searchFields = useMemo(
     () => [
       { key: 'userId', label: 'DP Id' },
-      ...(canShowEmpCode ? [{ key: 'empCode', label: 'Emp Code' }] : []),
       { key: 'amount', label: 'Amount' },
       { key: 'city', label: 'City' },
       { key: 'state', label: 'State' },
+      ...(canShowEmpCode ? [{ key: 'empCode', label: 'Emp Code' }] : []),
     ],
     [canShowEmpCode],
   );
@@ -211,69 +323,97 @@ export function UniqueDepositPendingScreen() {
     [empCodeNameMap],
   );
 
-  const load = useCallback(async () => {
-    const gen = ++genRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const filter: Record<string, unknown> = {};
-      if (clientName) filter.clientName = clientName;
-      const text = applied.text.trim();
-      if (text) filter[applied.field] = text;
-      const payload: Record<string, unknown> = {
-        pageNo: page,
-        itemsPerPage: pageSize,
-        filter,
-      };
-      if (startDate) payload.startDate = startDate;
-      if (endDate) payload.endDate = endDate;
-      const res = await secureApi<unknown>('uniquePending.list', payload);
-      if (gen !== genRef.current) return;
-      if (!res.ok) {
-        setError(res.message || 'Failed to load unique pending deposits');
-        setRows([]);
-        setTotal(0);
-        setTotalPages(1);
-        return;
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = Boolean(opts?.silent);
+      const gen = ++genRef.current;
+      if (!silent) {
+        setLoading(true);
+        setError(null);
       }
-      const paged = asPaged<UniquePendingRow>(res.data);
-      setSheetRow(null);
-      setRows(paged.rows);
-      setTotal(paged.total);
-      setTotalPages(Math.max(1, paged.totalPages));
-    } finally {
-      if (gen === genRef.current) setLoading(false);
-    }
-  }, [clientName, applied, page, pageSize, startDate, endDate]);
+      try {
+        const payload = buildUniquePendingSummaryPayload(
+          startDate,
+          endDate,
+          {
+            userId: appliedFilters.userId,
+            amount: appliedFilters.amount,
+            city: appliedFilters.city,
+            state: appliedFilters.state,
+            clientName,
+            mid: midFilter,
+          },
+          todayIST(),
+        );
+        const [pendingRes, allRes] = await Promise.all([
+          secureApi<unknown>('uniquePending.amountSummary', payload),
+          secureApi<unknown>('uniquePending.amountAllSummary', payload),
+        ]);
+        if (gen !== genRef.current) return;
+        if (!pendingRes.ok) {
+          if (!silent) setError(pendingRes.message || 'Failed to load unique pending deposits');
+          return;
+        }
+        if (!allRes.ok) {
+          if (!silent) setError(allRes.message || 'Failed to load unique pending deposits');
+          return;
+        }
+        if (!silent) setSheetRow(null);
+        setPendingSummaryData(pendingRes.data);
+        setAllSummaryData(allRes.data);
+      } finally {
+        if (gen === genRef.current && !silent) setLoading(false);
+      }
+    },
+    [startDate, endDate, clientName, midFilter, appliedFilters],
+  );
 
-  const loadSummary = useCallback(async () => {
-    const gen = ++summaryGenRef.current;
-    try {
-      const res = await secureApi<unknown>('uniquePending.fundRequest', {
-        startDate: startDate || todayIST(),
-        endDate: endDate || todayIST(),
-      });
-      if (gen !== summaryGenRef.current) return;
-      if (!res.ok) return;
-      const body = unpackPayload(res.data);
-      const detail =
-        body.uniquePendingDetail && typeof body.uniquePendingDetail === 'object'
-          ? (body.uniquePendingDetail as Record<string, unknown>)
-          : body;
-      setPendingCount(Number(detail.pendingCount) || 0);
-      setPendingAmount(Number(detail.pendingAmount) || 0);
-    } catch {
-      /* ignore */
-    }
-  }, [startDate, endDate]);
+  /** Keep a ref to the latest load() so the silent poll interval never closes over stale state. */
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   useEffect(() => {
+    setPage(1);
     void load();
   }, [load]);
 
   useEffect(() => {
-    void loadSummary();
-  }, [loadSummary]);
+    const id = setInterval(() => {
+      void loadRef.current({ silent: true });
+    }, UNIQUE_PENDING_POLL_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  const summary = useMemo(
+    () =>
+      assembleUniquePendingSummary({
+        pendingData: pendingSummaryData,
+        allData: allSummaryData,
+        accessibleStates: admin?.accessibleStates,
+        empCode: canShowEmpCode ? appliedFilters.empCode : '',
+      }),
+    [
+      pendingSummaryData,
+      allSummaryData,
+      admin?.accessibleStates,
+      canShowEmpCode,
+      appliedFilters.empCode,
+    ],
+  );
+
+  const displayRows = useMemo(
+    () => filterUniquePendingDisplay(summary.rows, { gatewayName: gatewayFilter, region }),
+    [summary.rows, gatewayFilter, region],
+  );
+
+  const { pageRows, totalPages, total, safePage } = useMemo(
+    () => paginateUniquePendingRows(displayRows, page, pageSize),
+    [displayRows, page, pageSize],
+  );
+
+  useEffect(() => {
+    if (safePage !== page) setPage(safePage);
+  }, [safePage, page]);
 
   const applyDates = useCallback(() => {
     setStartDate(draftStart);
@@ -282,9 +422,49 @@ export function UniqueDepositPendingScreen() {
   }, [draftStart, draftEnd]);
 
   const search = useCallback(() => {
-    setApplied({ field: searchField, text: draftSearch });
+    setAppliedFilters((prev) => ({ ...prev, [searchField]: draftSearch }));
     setPage(1);
   }, [searchField, draftSearch]);
+
+  const toggleMid = useCallback((name: string) => {
+    setMidFilter((prev) => (prev === name ? '' : name));
+    setPage(1);
+  }, []);
+
+  const toggleGateway = useCallback((name: string) => {
+    setGatewayFilter((prev) => (prev === name ? '' : name));
+    setPage(1);
+  }, []);
+
+  const clearGateway = useCallback(() => {
+    setGatewayFilter('');
+    setPage(1);
+  }, []);
+
+  /** Region is a broader client filter than a single state — clear any active state filter. */
+  const toggleRegion = useCallback((next: UniquePendingRegion) => {
+    setRegion((prev) => (prev === next ? '' : next));
+    setAppliedFilters((prev) => (prev.state ? { ...prev, state: '' } : prev));
+    setPage(1);
+  }, []);
+
+  /** Tapping a state in the "By State" modal applies/toggles the server state filter. */
+  const applyStateFilter = useCallback((state: string) => {
+    setAppliedFilters((prev) => ({
+      ...prev,
+      state: prev.state.trim().toLowerCase() === state.trim().toLowerCase() ? '' : state,
+    }));
+    setByStateOpen(false);
+    setPage(1);
+  }, []);
+
+  const isActiveState = useCallback(
+    (state: string) => {
+      const active = appliedFilters.state.trim();
+      return Boolean(active) && active.toLowerCase() === state.trim().toLowerCase();
+    },
+    [appliedFilters.state],
+  );
 
   const openInput = useCallback((mode: 'comment' | 'status', row: UniquePendingRow) => {
     if (!row.orderId) {
@@ -326,11 +506,10 @@ export function UniqueDepositPendingScreen() {
       setInputRow(null);
       setInputText('');
       void load();
-      if (inputMode === 'status') void loadSummary();
     } finally {
       setBusy(false);
     }
-  }, [inputRow, inputText, inputMode, admin, load, loadSummary]);
+  }, [inputRow, inputText, inputMode, admin, load]);
 
   const openWhatsApp = useCallback((row: UniquePendingRow) => {
     const rawMobile = row.userMobile || row.mobile;
@@ -349,15 +528,28 @@ export function UniqueDepositPendingScreen() {
   }, []);
 
   const downloadCsv = useCallback(async () => {
-    if (!rows.length) {
+    if (!displayRows.length) {
       Alert.alert('No data to export');
       return false;
     }
-    return shareCsvFile(
-      `unique_pending_${Date.now()}.csv`,
-      toCsv(rows as unknown as Record<string, unknown>[]),
-    );
-  }, [rows]);
+    const exportRows = displayRows.map((row) => ({
+      UserName: row.userName || '',
+      AppCode: appCodeForName(row.clientName),
+      DPId: row.userId || '',
+      Mobile: row.userMobile || row.mobile || '',
+      Amount: row.amount ?? '',
+      State: row.userState || row.state || '',
+      City: row.userCity || row.city || '',
+      TransactionId: row.orderId || row.transactionId || '',
+      PaymentMethod: uniquePendingPaymentMethod(row.paymentGatewayName, row.mid),
+      Date: formatDisplayDate(row.createdOn) || '',
+      Time: formatDisplayTime(row.createdOn) || '',
+      Status: row.status || '',
+      Comment: row.uniquePendingReason?.reason || '',
+      ...(canShowEmpCode ? { EmpCode: row.empCode || '' } : {}),
+    }));
+    return shareCsvFile(`unique_pending_data_${Date.now()}.csv`, toCsv(exportRows));
+  }, [displayRows, canShowEmpCode]);
 
   const openUserReport = useCallback(
     (row: UniquePendingRow) => {
@@ -389,14 +581,14 @@ export function UniqueDepositPendingScreen() {
       },
       {
         label: 'Payment Method',
-        value: paymentMethod(sheetRow.paymentGatewayName, sheetRow.mid),
+        value: uniquePendingPaymentMethod(sheetRow.paymentGatewayName, sheetRow.mid),
       },
       { label: 'Date', value: formatDisplayDate(sheetRow.createdOn) || '—' },
       { label: 'Time', value: formatDisplayTime(sheetRow.createdOn) || '—' },
       {
         label: 'Status',
         value: display(sheetRow.status),
-        badgeColor: statusBadge(sheetRow.status),
+        badgeColor: uniquePendingStatusColor(sheetRow.status),
       },
       {
         label: 'Comment',
@@ -509,18 +701,90 @@ export function UniqueDepositPendingScreen() {
         }}
         searchFields={searchFields}
         searchField={searchField}
-        onSearchFieldChange={setSearchField}
+        onSearchFieldChange={(v) => setSearchField(v as keyof ColumnFilters)}
         searchText={draftSearch}
         onSearchTextChange={setDraftSearch}
         onSearchSubmit={search}
-      />
+      >
+        {midOptions.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.midScrollContent}
+          >
+            <Text style={styles.rowLabel}>MID</Text>
+            <FilterChip label="All" active={!midFilter} onPress={() => setMidFilter('')} />
+            {midOptions.map((m) => (
+              <FilterChip key={m} label={m} active={midFilter === m} onPress={() => toggleMid(m)} />
+            ))}
+          </ScrollView>
+        ) : null}
+      </DetailFilterBar>
 
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryChip}>
-          <Text style={styles.summaryText}>
-            Pending: ({pendingCount}) : {formatIN(pendingAmount)}
-          </Text>
-        </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.summaryScroll}
+        contentContainerStyle={styles.summaryScrollContent}
+      >
+        <SummaryCard label="Total" bucket={summary.all} accent="#60a5fa" />
+        <SummaryCard label="Pending" bucket={summary.pending} accent={colors.primary} />
+        <SummaryCard label="Approved" bucket={summary.approved} accent={colors.success} />
+      </ScrollView>
+
+      <View style={styles.regionRow}>
+        <FilterChip
+          label={`South (${summary.regionCounts.south})`}
+          active={region === 'south'}
+          onPress={() => toggleRegion('south')}
+        />
+        <FilterChip
+          label={`North (${summary.regionCounts.north})`}
+          active={region === 'north'}
+          onPress={() => toggleRegion('north')}
+        />
+      </View>
+
+      {summary.gatewayCounts.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.gatewayScroll}
+          contentContainerStyle={styles.gatewayScrollContent}
+        >
+          {summary.gatewayCounts.map((g) => (
+            <FilterChip
+              key={g.name}
+              label={`${g.name} (${g.count})`}
+              active={gatewayFilter === g.name}
+              onPress={() => toggleGateway(g.name)}
+            />
+          ))}
+          {gatewayFilter ? (
+            <TouchableOpacity style={styles.clearChip} onPress={clearGateway}>
+              <Text style={styles.clearChipText}>Clear</Text>
+            </TouchableOpacity>
+          ) : null}
+        </ScrollView>
+      ) : null}
+
+      <View style={styles.utilityRow}>
+        <TouchableOpacity style={styles.byStateBtn} onPress={() => setByStateOpen(true)}>
+          <Text style={styles.byStateBtnText}>By State</Text>
+        </TouchableOpacity>
+        {canCallerWise ? (
+          <TouchableOpacity
+            style={styles.byStateBtn}
+            onPress={() =>
+              navigation.navigate('/unique_deposit_pending/caller-wise', {
+                startDate,
+                endDate,
+              })
+            }
+          >
+            <Text style={styles.byStateBtnText}>Caller Wise Deposit Pending</Text>
+          </TouchableOpacity>
+        ) : null}
         {canDownload ? (
           <TouchableOpacity style={styles.downloadChip} onPress={() => setDownloadOpen(true)}>
             <Text style={styles.downloadChipText}>⬇ Download Data</Text>
@@ -561,7 +825,7 @@ export function UniqueDepositPendingScreen() {
       <ScreenFlatList
         style={styles.screen}
         contentContainerStyle={styles.content}
-        data={rows}
+        data={pageRows}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         listHeader={listHeader}
@@ -571,7 +835,6 @@ export function UniqueDepositPendingScreen() {
         refreshing={loading}
         onRefresh={() => {
           void load();
-          void loadSummary();
         }}
       />
 
@@ -588,6 +851,53 @@ export function UniqueDepositPendingScreen() {
         onClose={() => setC2cTarget(null)}
         canShowMobile={!!canShowMobile}
       />
+
+      {/* "By State" — state rows with Total / Pending / Approved groups. */}
+      <Modal
+        visible={byStateOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setByStateOpen(false)}
+      >
+        <View style={styles.backdrop}>
+          <TouchableWithoutFeedback onPress={() => setByStateOpen(false)}>
+            <View style={styles.backdropTouch} />
+          </TouchableWithoutFeedback>
+          <View style={styles.byStateModalSheet}>
+            <View style={styles.byStateModalHeader}>
+              <Text style={styles.byStateModalTitle}>By State</Text>
+              <TouchableOpacity
+                onPress={() => setByStateOpen(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={styles.byStateScroll}
+              contentContainerStyle={[
+                styles.byStateList,
+                { paddingBottom: Math.max(48, insets.bottom + 24) },
+              ]}
+              showsVerticalScrollIndicator
+              keyboardShouldPersistTaps="handled"
+            >
+              {summary.byState.length === 0 ? (
+                <Text style={styles.byStateEmpty}>No state-wise data</Text>
+              ) : (
+                summary.byState.map((row) => (
+                  <ByStateRow
+                    key={row.state}
+                    row={row}
+                    active={isActiveState(row.state)}
+                    onPress={() => applyStateFilter(row.state)}
+                  />
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Comment / Change-status input modal */}
       <Modal
@@ -672,9 +982,9 @@ const UniquePendingCard = memo(function UniquePendingCard({
   onOpenReport,
   onC2cCall,
 }: UniquePendingCardProps) {
-  const badge = statusBadge(row.status);
+  const badge = uniquePendingStatusColor(row.status);
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onOpenSheet}>
+    <TouchableOpacity style={[styles.card, styles.cardSpaced]} activeOpacity={0.75} onPress={onOpenSheet}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
         <Text style={styles.cardTitle} numberOfLines={1}>
@@ -742,4 +1052,3 @@ const UniquePendingCard = memo(function UniquePendingCard({
     </TouchableOpacity>
   );
 });
-

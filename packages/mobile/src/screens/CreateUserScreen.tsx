@@ -174,7 +174,7 @@ export function CreateUserScreen({ onCreated }: Props) {
     label: string,
     props?: Partial<React.ComponentProps<typeof TextInput>>,
   ) => {
-    if (key === 'master') return null;
+    if (key === 'master' || key === 'isBot') return null;
     return (
       <View style={styles.field}>
         <Text style={styles.label}>{label}</Text>
@@ -264,7 +264,7 @@ export function CreateUserScreen({ onCreated }: Props) {
                     setErrors({});
                     setOtpStep(false);
                     setOtp('');
-                    setForm((prev) => ({ ...prev, master: false }));
+                    setForm((prev) => ({ ...prev, master: false, isBot: false }));
                   }}
                 >
                   <Text
@@ -334,6 +334,21 @@ export function CreateUserScreen({ onCreated }: Props) {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.masterTitle}>Master User</Text>
                     <Text style={styles.masterSub}>Skip OTP · create as master</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : null}
+
+              {isAdmin ? (
+                <TouchableOpacity
+                  style={[styles.masterCard, form.isBot && styles.botCardActive]}
+                  onPress={() => setField('isBot', !form.isBot)}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.masterCheck, form.isBot && styles.botCheckOn]}>
+                    {form.isBot ? <Text style={styles.masterCheckMark}>✓</Text> : null}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.masterTitle}>Is Bot</Text>
                   </View>
                 </TouchableOpacity>
               ) : null}

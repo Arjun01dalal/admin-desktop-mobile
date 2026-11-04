@@ -8,7 +8,7 @@ import {
   type GtelCallerDashRow,
 } from '@astro/shared';
 import { queryKeys } from '../../../../api/queryKeys';
-import { hasPermission, isCallerRole } from '../../../../auth/permissions';
+import { hasPermission, isCallerRole, isFullAccessNavRole } from '../../../../auth/permissions';
 import { useScreenQuery } from '../../../../hooks/useScreenQuery';
 import { getStoredUser } from '../../../../lib/webShim';
 import { fetchGtelCallerDashboard } from './fetchGtelCallerDashboard';
@@ -28,7 +28,8 @@ export function useGtelCallerDashboard(filters: {
   refresh: () => Promise<unknown>;
 } {
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
-  const canAccess = hasPermission('show_gtel_dashboard', admin);
+  const canAccess =
+    hasPermission('show_gtel_dashboard', admin) || isFullAccessNavRole(admin);
   const loginEmpCode = String(admin?.empCode || '').trim();
   const loginUserId = String(admin?._id || '').trim();
   const roleId = String(admin?.Role_ID || '');

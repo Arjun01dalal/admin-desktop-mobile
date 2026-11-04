@@ -137,15 +137,15 @@ export function canAccessDailyAccountReport(user: StoredUser | null = getSession
 }
 
 export function canManageDarBankAccounts(user: StoredUser | null = getSessionUser()): boolean {
-  return sharedCanManageDarBankAccounts(user);
+  return sharedCanManageDarBankAccounts(user, storage);
 }
 
 export function canManageDarMids(user: StoredUser | null = getSessionUser()): boolean {
-  return sharedCanManageDarMids(user);
+  return sharedCanManageDarMids(user, storage);
 }
 
 export function canManageDarAllotments(user: StoredUser | null = getSessionUser()): boolean {
-  return sharedCanManageDarAllotments(user);
+  return sharedCanManageDarAllotments(user, storage);
 }
 
 export function canPushToC2cCampaign(user: StoredUser | null = getSessionUser()): boolean {

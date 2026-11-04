@@ -67,6 +67,7 @@ export const Permissions = {
   Toggle_UPI: 'Toggle_UPI',
   View_PayIn_Accounts: 'View_PayIn_Accounts',
   Add_PayIn_Account: 'Add_PayIn_Account',
+  show_add_provider_btn: 'show_add_provider_btn',
   Toggle_PayIn_Account: 'Toggle_PayIn_Account',
   Delete_PayIn_Account: 'Delete_PayIn_Account',
   /** MID Limits page — view list and limits. */
@@ -102,15 +103,14 @@ export const Permissions = {
   view_casino_balance: 'view_casino_balance',
   hide_show_games: 'hide_show_games',
   house_game: 'house_game',
-  /** Laxmi Responsibilities.update_ludo_bets — edit House Games bet status. */
   update_ludo_bets: 'update_ludo_bets',
-  /** Laxmi Responsibilities.show_wining_btn — House Games trophy / winning point. */
   show_wining_btn: 'show_wining_btn',
   View_Deposit_List: 'View_Deposit_List',
   Bonus_Wallet_Fund_Request: 'Bonus_Wallet_Fund_Request',
   Bonus_Wallet_Request: 'Bonus_Wallet_Request',
   View_Deposits_Approved_Report: 'View_Deposits_Approved_Report',
   Unique_Deposit_Pending_User: 'Unique_Deposit_Pending_User',
+  show_caller_wise_unique_pending: 'show_caller_wise_unique_pending',
   View_Deposits: 'View_Deposits',
   View_Withdrawals: 'View_Withdrawals',
   withdrawal_fund: 'withdrawal_fund',
@@ -126,10 +126,12 @@ export const Permissions = {
   show_all_withdrawal: 'show_all_withdrawal',
   View_Delay_Reason: 'View_Delay_Reason',
   Disable_Withdrawals_Check: 'Disable_Withdrawals_Check',
+  see_withdrawal_bifurcation: 'see_withdrawal_bifurcation',
   change_status: 'change_status',
   show_mobile: 'show_mobile',
   show_gtel_calls: 'show_gtel_calls',
   show_gtel_dashboard: 'show_gtel_dashboard',
+  show_ask_ai_btn: 'show_ask_ai_btn',
   show_suspicious_call: 'show_suspicious_call',
   show_c2cBtn: 'show_c2cBtn',
   c2c_campaign_data: 'c2c_campaign_data',
@@ -408,6 +410,12 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'gtel_dashboard',
     'gtelDashboard',
   ],
+  show_ask_ai_btn: [
+    'show_ask_ai_btn',
+    'Show_Ask_Ai_Btn',
+    'showAskAiBtn',
+    'Ask AI',
+  ],
   show_suspicious_call: [
     'show_suspicious_call',
     'Show_Suspicious_Call',
@@ -565,16 +573,18 @@ export function canAccessDashboard(
   return false;
 }
 
-/** Full / Dev / QA — show complete menu without waiting on new Responsibility rows. */
-export function isFullAccessNavRole(
+/**
+ * full_access / dev_full_access — always see original UI labels (no Jyotish /
+ * reverse-code mapping) and do not get the Reveal codes OTP control.
+ */
+export function seesOriginalDisplayLabels(
   user: PermissionUser | null = null,
   storage?: PermissionStorage | null,
 ): boolean {
   const roleId = getRoleId(user, storage);
   if (
-    roleId === '64f710d9a2ab78980020c5fb' ||
-    roleId === '6a33c137a6558491e0d20464' ||
-    roleId === '68677d68598bcfdd1393885b' // qa_new
+    roleId === '64f710d9a2ab78980020c5fb' || // full_access
+    roleId === '6a33c137a6558491e0d20464' // dev_full_access
   ) {
     return true;
   }
@@ -584,12 +594,27 @@ export function isFullAccessNavRole(
     if (
       normalized === 'full_access' ||
       normalized === 'dev_full_access' ||
-      normalized === 'qa_new' ||
       normalized.endsWith('_full_access') ||
       normalized.includes('dev_full_access')
     ) {
       return true;
     }
+  }
+  return false;
+}
+
+/** Full / Dev / QA — show complete menu without waiting on new Responsibility rows. */
+export function isFullAccessNavRole(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  if (seesOriginalDisplayLabels(user, storage)) return true;
+  const roleId = getRoleId(user, storage);
+  if (roleId === '68677d68598bcfdd1393885b') return true; // qa_new
+
+  for (const candidate of collectRoleNameCandidates(user, storage)) {
+    const normalized = normalizeRoleName(candidate);
+    if (normalized === 'qa_new') return true;
   }
   return false;
 }
@@ -647,17 +672,29 @@ export function canAccessDailyAccountReport(
 }
 
 /** Daily Account Report — Bank accounts section (create/view ledger accounts). */
-export function canManageDarBankAccounts(user: PermissionUser | null = null): boolean {
+export function canManageDarBankAccounts(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  if (isFullAccessNavRole(user, storage)) return true;
   return hasPermission(Permissions.allow_bank_creation, user);
 }
 
 /** Daily Account Report — MID mapping section. */
-export function canManageDarMids(user: PermissionUser | null = null): boolean {
+export function canManageDarMids(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  if (isFullAccessNavRole(user, storage)) return true;
   return hasPermission(Permissions.allow_mid_mapping, user);
 }
 
 /** Daily Account Report — MID allotment section (allot/reassign/revoke). */
-export function canManageDarAllotments(user: PermissionUser | null = null): boolean {
+export function canManageDarAllotments(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  if (isFullAccessNavRole(user, storage)) return true;
   return hasPermission(Permissions.allow_mid_allotment, user);
 }
 

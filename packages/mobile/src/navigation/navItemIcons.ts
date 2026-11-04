@@ -24,6 +24,7 @@ const NAV_ITEM_ICONS: Record<string, MaterialIconName> = {
   gameActivity: 'sports-esports',
   callLogs: 'call',
   gtelCalls: 'phone-callback',
+  gtelCallerDashboard: 'dashboard',
   c2cCampaignData: 'campaign',
   dialerPushData: 'ring-volume',
   botPerformance: 'smart-toy',

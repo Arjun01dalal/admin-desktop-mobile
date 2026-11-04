@@ -27,7 +27,8 @@ export const styles = makeStyles({
     backgroundColor: colors.surface,
     gap: spacing(2),
   },
-  botChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1.5), marginTop: spacing(1.5) },
+  botChipScroll: { marginTop: spacing(1.5) },
+  botChipRow: { flexDirection: 'row', gap: spacing(1.5) },
   botChip: {
     fontSize: 11,
     fontWeight: '700',
@@ -36,9 +37,13 @@ export const styles = makeStyles({
     borderRadius: 999,
     overflow: 'hidden',
   },
-  botChipNew: { color: '#1d4ed8', backgroundColor: 'rgba(59,130,246,0.14)' },
-  botChipActive: { color: '#047857', backgroundColor: 'rgba(16,185,129,0.14)' },
-  botChipInactive: { color: '#4b5563', backgroundColor: 'rgba(148,163,184,0.16)' },
+  /** Admin-panel amber chip tone (#fff7ed / #c2410c), adapted for the dark theme. */
+  botChipAmber: {
+    color: '#fdba74',
+    backgroundColor: 'rgba(249,115,22,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(194,65,12,0.45)',
+  },
   autoSummaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',

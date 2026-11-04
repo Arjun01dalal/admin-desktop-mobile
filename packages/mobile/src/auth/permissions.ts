@@ -13,9 +13,13 @@ import {
   type SosFlagType,
   DASHBOARD_ROLE_IDS,
   buildSosEnablePayload as sharedBuildSosEnablePayload,
+  canAccessDailyAccountReport as sharedCanAccessDailyAccountReport,
   canAccessDashboard as sharedCanAccessDashboard,
   canAccessNavItem as sharedCanAccessNavItem,
   canEditMidLimits as sharedCanEditMidLimits,
+  canManageDarAllotments as sharedCanManageDarAllotments,
+  canManageDarBankAccounts as sharedCanManageDarBankAccounts,
+  canManageDarMids as sharedCanManageDarMids,
   canPushToC2cCampaign as sharedCanPushToC2cCampaign,
   canShowMyCoinHistory as sharedCanShowMyCoinHistory,
   canShowSos as sharedCanShowSos,
@@ -28,6 +32,8 @@ import {
   hasPermission as sharedHasPermission,
   canUseAdminLlmChat as sharedCanUseAdminLlmChat,
   isCallerRole as sharedIsCallerRole,
+  isFullAccessNavRole as sharedIsFullAccessNavRole,
+  seesOriginalDisplayLabels as sharedSeesOriginalDisplayLabels,
   isPathAllowed,
   isSosExemptRole as sharedIsSosExemptRole,
   canShowUniqueDepositEmpCode as sharedCanShowUniqueDepositEmpCode,
@@ -105,6 +111,15 @@ export function isCallerRole(user: StoredUser | null = getSessionUser()): boolea
   return sharedIsCallerRole(user, storage);
 }
 
+export function isFullAccessNavRole(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedIsFullAccessNavRole(user, storage);
+}
+
+/** full_access / dev_full_access — always original labels; no Reveal codes OTP. */
+export function seesOriginalDisplayLabels(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedSeesOriginalDisplayLabels(user, storage);
+}
+
 export function canAccessNavItem(
   item: { id: string; permission?: string },
   user: StoredUser | null = getSessionUser(),
@@ -123,6 +138,22 @@ export function canViewMidLimits(user: StoredUser | null = getSessionUser()): bo
 
 export function canEditMidLimits(user: StoredUser | null = getSessionUser()): boolean {
   return sharedCanEditMidLimits(user);
+}
+
+export function canAccessDailyAccountReport(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanAccessDailyAccountReport(user, storage);
+}
+
+export function canManageDarBankAccounts(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanManageDarBankAccounts(user, storage);
+}
+
+export function canManageDarMids(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanManageDarMids(user, storage);
+}
+
+export function canManageDarAllotments(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedCanManageDarAllotments(user, storage);
 }
 
 export function canPushToC2cCampaign(user: StoredUser | null = getSessionUser()): boolean {

@@ -6,6 +6,7 @@ export { TotalBeneListModal } from './TotalBeneListModal';
 export { WithdrawalCardFooter } from './WithdrawalCardFooter';
 export { WithdrawalModals } from './WithdrawalModals';
 export { WithdrawalToolbar } from './WithdrawalToolbar';
+export type { WithdrawalBifurcationParams } from './bifurcationTypes';
 export { styles as withdrawalStyles } from './WithdrawalScreen.styles';
 export {
   display,

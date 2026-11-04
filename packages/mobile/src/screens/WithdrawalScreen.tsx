@@ -6,22 +6,26 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { sanitizeGtelPhone } from '@astro/shared';
 import {
   resolveWithdrawalReportUserId,
   showWithdrawalMidReport,
 } from '@astro/shared/depositWithdrawalReport';
+
+import type { WithdrawalBifurcationParams } from '../features/withdrawal/bifurcationTypes';
+import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
+import { SheetDownloadOtpModal } from '../components/SheetDownloadOtpModal';
+import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
+import { getStoredUser } from '../lib/webShim';
+import { colors } from '../theme';
 import {
   canShowGtelC2c,
   GtelClick2CallModal,
   type GtelC2cTarget,
 } from '../components/GtelClick2CallModal';
-import { getStoredUser } from '../lib/webShim';
-import { colors } from '../theme';
-import { ResponsiveTable } from '../dashboards/ui/ResponsiveTable';
-import { RowDetailSheet, type SheetField } from './dashboards/details/RowDetailSheet';
-import { SheetDownloadOtpModal } from '../components/SheetDownloadOtpModal';
 import {
   DepositWithdrawalMidModal,
   TotalBeneListModal,
@@ -37,6 +41,7 @@ import {
   useWithdrawalScreen,
   withdrawalStyles as styles,
 } from '../features/withdrawal';
+
 
 const COPYABLE_COLUMN_KEYS = new Set(['sendToBank', 'bank', 'accountNo', 'ifsc']);
 
@@ -83,6 +88,9 @@ function buildWithdrawalSheetFields(
 
 export function WithdrawalScreen() {
   const model = useWithdrawalScreen();
+  const navigation = useNavigation<{
+    navigate: (name: '/withdrawal-bifurcation', params?: WithdrawalBifurcationParams) => void;
+  }>();
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
   const canShowC2c = canShowGtelC2c(admin);
   const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
@@ -311,6 +319,15 @@ export function WithdrawalScreen() {
         toggleBenePendingPanel={toggleBenePendingPanel}
         applyBenePendingPanel={applyBenePendingPanel}
         canDownload={perms.download}
+        canSeeBifurcation={perms.bifurcation}
+        onOpenBifurcation={() => {
+          setStartDate(draftStart);
+          setEndDate(draftEnd);
+          navigation.navigate('/withdrawal-bifurcation', {
+            startDate: draftStart,
+            endDate: draftEnd,
+          });
+        }}
         requestSheetDownload={requestSheetDownload}
         downloadData={downloadData}
         downloadPayok={downloadPayok}

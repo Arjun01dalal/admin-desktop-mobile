@@ -32,6 +32,7 @@ type Props<T> = {
   onEndReachedThreshold?: number;
   keyboardShouldPersistTaps?: FlatListProps<T>['keyboardShouldPersistTaps'];
   ListEmptyComponent?: React.ReactElement | null;
+  ItemSeparatorComponent?: FlatListProps<T>['ItemSeparatorComponent'];
   extraData?: unknown;
 };
 
@@ -52,6 +53,7 @@ export function ScreenFlatList<T>({
   onEndReachedThreshold,
   keyboardShouldPersistTaps = 'handled',
   ListEmptyComponent,
+  ItemSeparatorComponent,
   extraData,
 }: Props<T>) {
   return (
@@ -62,6 +64,7 @@ export function ScreenFlatList<T>({
       extraData={extraData}
       ListHeaderComponent={listHeader ?? undefined}
       ListFooterComponent={listFooter ?? undefined}
+      ItemSeparatorComponent={ItemSeparatorComponent}
       ListEmptyComponent={
         ListEmptyComponent ?? (
           <Text style={{ color: colors.muted, textAlign: 'center', marginVertical: 24 }}>

@@ -16,9 +16,15 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../auth/AuthContext';
-import { canAccessNavItem } from '../auth/permissions';
+import { canAccessNavItem, hasPermission, Permissions } from '../auth/permissions';
 import { toDisplayText } from '../dashboards/jyotish/jyotishMapping';
-import { BalanceStatsRow, useMenuStats } from '../features/menu';
+import {
+  BalanceStatsRow,
+  MENU_ROUTES,
+  UniquePendingStatsRow,
+  useMenuStats,
+  useMenuUniquePending,
+} from '../features/menu';
 import {
   groupNavItemsByCategory,
   type NavCategoryGroup,
@@ -51,8 +57,28 @@ export function WelcomeScreen() {
     () => items.some((item) => item.id === 'withdrawal'),
     [items],
   );
+  /** Unique Pending Menu KPIs — only with Unique_Deposit_Pending_User responsibility. */
+  const canSeeUniquePending = useMemo(
+    () => hasPermission(Permissions.Unique_Deposit_Pending_User, user),
+    [user],
+  );
   const { stats, loading: statsLoading, refreshing, refresh } = useMenuStats(canSeeDashboard);
+  const {
+    stats: uniquePendingStats,
+    loading: uniquePendingLoading,
+    refreshing: uniquePendingRefreshing,
+    errorMessage: uniquePendingError,
+    refresh: refreshUniquePending,
+  } = useMenuUniquePending(canSeeUniquePending);
   const categories = useMemo(() => groupNavItemsByCategory(items), [items]);
+
+  const pullRefreshing = refreshing || uniquePendingRefreshing;
+  const onPullRefresh = useCallback(() => {
+    const jobs: Array<Promise<unknown>> = [];
+    if (canSeeDashboard) jobs.push(refresh());
+    if (canSeeUniquePending) jobs.push(refreshUniquePending());
+    return Promise.all(jobs);
+  }, [canSeeDashboard, canSeeUniquePending, refresh, refreshUniquePending]);
 
   const filteredMenus = useMemo(() => {
     if (!activeCategory) return [];
@@ -100,8 +126,17 @@ export function WelcomeScreen() {
       nav.navigate('/incoming-bot-call');
       return;
     }
+    if (item.id === 'gtelCallerDashboard') {
+      nav.navigate('/gtel-caller-dashboard');
+      return;
+    }
     nav.navigate(screenNameFor(item));
   };
+
+  const openUniquePending = useCallback(() => {
+    const nav = navigation as { navigate: (name: string) => void };
+    nav.navigate(MENU_ROUTES.uniqueDepositPending);
+  }, [navigation]);
 
   const hero = (
     <View style={styles.hero}>
@@ -121,6 +156,15 @@ export function WelcomeScreen() {
           canSeeDashboard={canSeeDashboard}
           canOpenWithdrawal={canOpenWithdrawal}
           asOfDate={stats?.asOfDate}
+        />
+      ) : null}
+      {canSeeUniquePending ? (
+        <UniquePendingStatsRow
+          stats={uniquePendingStats}
+          loading={uniquePendingLoading}
+          errorMessage={uniquePendingError}
+          onRetry={() => void refreshUniquePending()}
+          onOpen={openUniquePending}
         />
       ) : null}
     </View>
@@ -232,10 +276,10 @@ export function WelcomeScreen() {
           nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
           refreshControl={
-            canSeeDashboard ? (
+            canSeeDashboard || canSeeUniquePending ? (
               <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => void refresh()}
+                refreshing={pullRefreshing}
+                onRefresh={() => void onPullRefresh()}
                 tintColor={colors.primary}
               />
             ) : undefined

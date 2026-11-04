@@ -10,6 +10,11 @@ export type ActiveBotUserRow = Record<string, unknown> & {
   userName?: string;
   mobile?: string;
   userMobile?: string;
+  lastSecondActivity?: unknown;
+  previousActivity?: unknown;
+  prevActivity?: unknown;
+  played?: unknown;
+  empCode?: unknown;
 };
 
 export type ActiveBotSummaryItem = { bot: string; count: number };
@@ -34,6 +39,34 @@ export type AutomationBotCallsSummary = {
   bots: AutomationBotCallItem[];
   total: number;
 };
+
+export type AutomationBotCallsTotals = {
+  successful: number;
+  unsuccessful: number;
+  total: number;
+};
+
+/** Bot key subtracted from Active Customer (By Bots) and hidden from chips. */
+export const UNIQUE_PENDING_DEPOSIT_BOT_KEY = 'unique_pending_deposit';
+
+/** On-demand unique-pending bot — also hidden from chips and excluded from total. */
+export const UNIQUE_PENDING_DEPOSIT_ONDEMAND_BOT_KEY = 'unique_pending_deposit_ondemand';
+
+/** Bot keys that must not appear in chips and must not count toward the display total. */
+export const HIDDEN_ACTIVE_BOT_SUMMARY_KEYS = new Set([
+  UNIQUE_PENDING_DEPOSIT_BOT_KEY,
+  UNIQUE_PENDING_DEPOSIT_ONDEMAND_BOT_KEY,
+]);
+
+export function normalizeAutomationBotKey(bot: unknown): string {
+  return String(bot || '')
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+}
+
+export function isHiddenActiveBotSummaryKey(bot: unknown): boolean {
+  return HIDDEN_ACTIVE_BOT_SUMMARY_KEYS.has(normalizeAutomationBotKey(bot));
+}
 
 /** New API: payload.bots[].users — also supports legacy payload.users */
 export function flattenActiveBotUsersPayload(payload: unknown): FlattenedActiveBotUsers {
@@ -103,10 +136,12 @@ export function parseAutomationBotCallsSummary(body: unknown): AutomationBotCall
 
 /** Display label for bot keys (new_user → New Register). */
 export function formatAutomationBotLabel(bot: string): string {
-  const key = String(bot || '')
-    .toLowerCase()
-    .replace(/\s+/g, '_');
+  const key = normalizeAutomationBotKey(bot);
   if (key === 'new_user') return 'New Register';
+  if (key === UNIQUE_PENDING_DEPOSIT_BOT_KEY) return 'Unique Pending Deposit';
+  if (key === UNIQUE_PENDING_DEPOSIT_ONDEMAND_BOT_KEY) {
+    return 'Unique Pending Deposit Ondemand';
+  }
   return String(bot || '')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -116,11 +151,66 @@ export function getActiveBotCountByType(
   summary: ActiveBotSummaryItem[],
   ...names: string[]
 ): number {
-  const keys = new Set(names.map((n) => String(n || '').toLowerCase().replace(/\s+/g, '_')));
-  const match = summary.find((b) =>
-    keys.has(String(b?.bot || '').toLowerCase().replace(/\s+/g, '_')),
-  );
+  const keys = new Set(names.map((n) => normalizeAutomationBotKey(n)));
+  const match = summary.find((b) => keys.has(normalizeAutomationBotKey(b?.bot)));
   return Number(match?.count) || 0;
+}
+
+export function getUniquePendingDepositBotCount(
+  summary: readonly ActiveBotSummaryItem[] | null | undefined,
+): number {
+  return getActiveBotCountByType(
+    Array.isArray(summary) ? [...summary] : [],
+    UNIQUE_PENDING_DEPOSIT_BOT_KEY,
+  );
+}
+
+/** Sum of all bot counts that are excluded from the display total. */
+export function getHiddenActiveBotSummaryCount(
+  summary: readonly ActiveBotSummaryItem[] | null | undefined,
+): number {
+  let sum = 0;
+  for (const item of summary || []) {
+    if (isHiddenActiveBotSummaryKey(item?.bot)) sum += Number(item?.count) || 0;
+  }
+  return sum;
+}
+
+/**
+ * Display count = max(0, total − hidden unique-pending bots).
+ * Excludes `unique_pending_deposit` and `unique_pending_deposit_ondemand`.
+ */
+export function displayedActiveBotUsersCount(
+  total: unknown,
+  summary: readonly ActiveBotSummaryItem[] | null | undefined,
+): number {
+  return Math.max(0, (Number(total) || 0) - getHiddenActiveBotSummaryCount(summary));
+}
+
+/** Chip row — hide unique-pending bot keys (still subtracted from the display total). */
+export function visibleActiveBotSummary(
+  summary: readonly ActiveBotSummaryItem[] | null | undefined,
+): ActiveBotSummaryItem[] {
+  return (summary || []).filter((b) => !isHiddenActiveBotSummaryKey(b?.bot));
+}
+
+export function automationBotCallsTotals(
+  summary: AutomationBotCallsSummary | null | undefined,
+): AutomationBotCallsTotals {
+  const bots = summary?.bots || [];
+  let successful = 0;
+  let unsuccessful = 0;
+  let total = 0;
+  for (const item of bots) {
+    successful += Number(item?.successful) || 0;
+    unsuccessful += Number(item?.unsuccessful) || 0;
+    total += Number(item?.total) || 0;
+  }
+  return {
+    successful,
+    unsuccessful,
+    total: Number(summary?.total) || total,
+  };
 }
 
 /** API expects DD/MM/YYYY for automation-bot-calls-summary. */
@@ -128,4 +218,40 @@ export function toDdMmYyyy(isoDate: string): string {
   const parts = String(isoDate || '').split('-');
   if (parts.length !== 3) return String(isoDate || '');
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+/** Yesterday IST as YYYY-MM-DD — max selectable Previous Activity date. */
+export function previousActivityMaxDateIST(now = new Date()): string {
+  const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+  ist.setUTCDate(ist.getUTCDate() - 1);
+  return ist.toISOString().slice(0, 10);
+}
+
+export function toDateKeyIST(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+  const d = new Date(value as string | number | Date);
+  if (!Number.isFinite(d.getTime())) return '';
+  const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+  return ist.toISOString().slice(0, 10);
+}
+
+export function filterActiveBotUsers(
+  rows: readonly ActiveBotUserRow[],
+  opts: { botType?: string; previousActivityDate?: string } = {},
+): ActiveBotUserRow[] {
+  const botType = String(opts.botType || '').trim();
+  const prevDate = String(opts.previousActivityDate || '').trim();
+  return rows.filter((row) => {
+    if (botType && String(row.botType || '') !== botType) return false;
+    if (prevDate) {
+      const key = toDateKeyIST(
+        row.lastSecondActivity ?? row.previousActivity ?? row.prevActivity,
+      );
+      if (key !== prevDate) return false;
+    }
+    return true;
+  });
 }

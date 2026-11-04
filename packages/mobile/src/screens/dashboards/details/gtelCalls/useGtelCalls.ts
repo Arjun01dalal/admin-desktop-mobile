@@ -34,7 +34,7 @@ import {
 } from '@astro/shared';
 import { queryKeys } from '../../../../api/queryKeys';
 import { secureApi } from '../../../../api/client';
-import { hasPermission, isCallerRole } from '../../../../auth/permissions';
+import { hasPermission, isCallerRole, isFullAccessNavRole } from '../../../../auth/permissions';
 import { canShowGtelC2c, type GtelC2cTarget } from '../../../../components/GtelClick2CallModal';
 import { useScreenQuery } from '../../../../hooks/useScreenQuery';
 import { getStoredUser } from '../../../../lib/webShim';
@@ -51,7 +51,8 @@ export function useGtelCalls() {
   const admin = useMemo(() => getStoredUser<Record<string, unknown>>(), []);
   const canShowMobile = canShowGtelMobile(admin);
   const canShowC2c = canShowGtelC2c(admin);
-  const canShowGtelDashboard = hasPermission('show_gtel_dashboard', admin);
+  const canShowGtelDashboard =
+    hasPermission('show_gtel_dashboard', admin) || isFullAccessNavRole(admin);
   const loginEmpCode = String(admin?.empCode || '').trim();
   const loginExtensionId = getNumericExtension(admin?.extensionId);
   const roleId = String(admin?.Role_ID || '');

@@ -32,9 +32,11 @@ import {
   parseDistinctMidOptions,
   parseGatewayNameOptions,
   parseGatewayUpisResponse,
+  setTypeSettingActive,
   validateGatewayMidForm,
   type GatewayMidFormState,
   type GatewayMidRow,
+  type GatewayMidTypeSetting,
 } from '@astro/shared/gatewayMid';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../../theme';
@@ -79,6 +81,8 @@ export function WhatsappMidScreen() {
   const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<GatewayMidRow[]>([]);
   const [apiTypeOptions, setApiTypeOptions] = useState<string[]>([]);
+  const [typeSettings, setTypeSettings] = useState<GatewayMidTypeSetting[]>([]);
+  const [typeActionKey, setTypeActionKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sheetRow, setSheetRow] = useState<GatewayMidRow | null>(null);
@@ -102,12 +106,15 @@ export function WhatsappMidScreen() {
         setError(res.message || 'Failed to load Gateway MIDs');
         setRows([]);
         setApiTypeOptions([]);
+        setTypeSettings([]);
         return;
       }
       setSheetRow(null);
-      const { rows: nextRows, types } = parseGatewayUpisResponse(res.data);
+      const { rows: nextRows, types, typeSettings: nextTypeSettings } =
+        parseGatewayUpisResponse(res.data);
       setRows(nextRows);
       setApiTypeOptions(types);
+      setTypeSettings(nextTypeSettings);
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
@@ -192,6 +199,40 @@ export function WhatsappMidScreen() {
       Alert.alert('Error', res.message || 'Failed to update status');
     }
   };
+
+  const handleTypeAction = useCallback(
+    async (type: string, action: 'start' | 'stop') => {
+      const typeKey = String(type || '').trim();
+      if (!typeKey || submitting || typeActionKey) return;
+
+      const actionKey = `${action}:${typeKey}`;
+      const previousSettings = typeSettings;
+      const nextActive = action === 'start';
+      const label = formatGatewayTypeLabel(typeKey) || typeKey;
+
+      setTypeActionKey(actionKey);
+      setSubmitting(true);
+      setTypeSettings((list) => setTypeSettingActive(list, typeKey, nextActive));
+
+      try {
+        const res = await secureApi(
+          action === 'start' ? 'whatsappMid.startType' : 'whatsappMid.stopType',
+          { type: typeKey },
+        );
+        if (!res.ok) {
+          setTypeSettings(previousSettings);
+          Alert.alert('Error', res.message || `Failed to ${action} ${label}`);
+          return;
+        }
+        await load();
+        setTypeSettings((list) => setTypeSettingActive(list, typeKey, nextActive));
+      } finally {
+        setTypeActionKey('');
+        setSubmitting(false);
+      }
+    },
+    [load, submitting, typeActionKey, typeSettings],
+  );
 
   const submitSave = async () => {
     const nextErrors = validateGatewayMidForm(form);
@@ -317,6 +358,47 @@ export function WhatsappMidScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
+
+      {typeSettings.length > 0 ? (
+        <View style={styles.typeControls}>
+          <Text style={styles.typeControlsTitle}>Types</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.typeChipRow}
+          >
+            {typeSettings.map(({ type, isActive }) => {
+              const starting = typeActionKey === `start:${type}`;
+              const stopping = typeActionKey === `stop:${type}`;
+              const busy = starting || stopping;
+              return (
+                <View
+                  key={type}
+                  style={[styles.typeChip, isActive ? styles.typeChipOn : null]}
+                >
+                  <View style={[styles.typeDot, isActive ? styles.typeDotOn : null]} />
+                  <Text style={styles.typeName} numberOfLines={1}>
+                    {formatGatewayTypeLabel(type) || type}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.typeBtn,
+                      isActive ? styles.typeBtnStop : styles.typeBtnStart,
+                      submitting && styles.btnDisabled,
+                    ]}
+                    disabled={submitting}
+                    onPress={() => void handleTypeAction(type, isActive ? 'stop' : 'start')}
+                  >
+                    <Text style={isActive ? styles.typeBtnStopText : styles.typeBtnStartText}>
+                      {busy ? '…' : isActive ? 'Stop' : 'Start'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
     </>
   );
 
@@ -329,6 +411,7 @@ export function WhatsappMidScreen() {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         listHeader={listHeader}
+        ItemSeparatorComponent={GroupSeparator}
         loading={loading}
         emptyMessage="No Gateway MIDs found"
         refreshing={loading}
@@ -529,6 +612,10 @@ export function WhatsappMidScreen() {
   );
 }
 
+function GroupSeparator() {
+  return <View style={styles.groupSeparator} />;
+}
+
 type WhatsappMidGroupCardProps = {
   group: { name: string; rows: GatewayMidRow[] };
   onOpenRow: (row: GatewayMidRow) => void;
@@ -554,6 +641,7 @@ const WhatsappMidGroupCard = memo(function WhatsappMidGroupCard({
           <Text style={styles.groupCount}>{group.rows.length}</Text>
         </View>
       </View>
+      <View style={styles.cardStack}>
       {group.rows.map((row, i) => (
         <TouchableOpacity
           key={getGatewayMidRowId(row) || `${group.name}-${i}`}
@@ -580,6 +668,7 @@ const WhatsappMidGroupCard = memo(function WhatsappMidGroupCard({
           </Text>
         </TouchableOpacity>
       ))}
+      </View>
     </View>
   );
 });

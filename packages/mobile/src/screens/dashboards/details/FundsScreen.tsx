@@ -6,9 +6,17 @@
  * Automatic / Scanner Add / Scanner Remove selector.
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View, type ListRenderItemInfo } from 'react-native';
+import {
+  Alert,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { colors, spacing } from '../../../theme';
+import { colors } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { whatsappPaymentGatewayName } from '@astro/shared';
@@ -150,6 +158,7 @@ export function FundsScreen() {
   const [drillName, setDrillName] = useState('');
   const [drillMids, setDrillMids] = useState<MidRow[]>([]);
   const [selectedMid, setSelectedMid] = useState('');
+  const [gatewayPickerOpen, setGatewayPickerOpen] = useState(false);
 
   // Payin (transaction list) state.
   const [payinLoading, setPayinLoading] = useState(false);
@@ -317,6 +326,11 @@ export function FundsScreen() {
       void loadPayin(mid);
     },
     [loadPayin],
+  );
+
+  const tableTotalAmount = useMemo(
+    () => rows.reduce((sum, row) => sum + (Number(row.totalFinalAmount) || 0), 0),
+    [rows],
   );
 
   const columns = useMemo<DataTableColumn<Row>[]>(
@@ -551,29 +565,20 @@ export function FundsScreen() {
         <TouchableOpacity onPress={() => setView('main')}>
           <Text style={styles.backLink}>‹ Back to Funds</Text>
         </TouchableOpacity>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: spacing(2) }}
+        <Text style={styles.fieldLabel}>Gateway</Text>
+        <TouchableOpacity
+          style={styles.gatewaySelectBtn}
+          onPress={() => setGatewayPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Select gateway"
         >
-          {rows.map((r, i) => {
-            const label = r.name === 'coinRemove' ? 'Other Removal' : String(r.name);
-            const active = label === drillName;
-            return (
-              <TouchableOpacity
-                key={`${r.name}-${i}`}
-                style={[styles.chip, active && styles.chipActive, { marginRight: spacing(1.5) }]}
-                onPress={() => {
-                  if (!active) openMids(r);
-                }}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+          <Text style={styles.gatewaySelectBtnText} numberOfLines={1}>
+            {drillName || 'Select gateway'}
+          </Text>
+          <Text style={styles.gatewaySelectChevron}>▾</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>{drillName} — MIDs</Text>
-        <Text style={styles.sub}>
+        <Text style={[styles.sub, styles.midsHeaderGap]}>
           {startDate} → {endDate} · {drillMids.length} MIDs
           {gatewayOnly ? ' · Gateway-only access — MID details are locked' : ''}
         </Text>
@@ -601,6 +606,49 @@ export function FundsScreen() {
           listHeader={midsHeader}
           emptyMessage="No MIDs"
         />
+
+        <Modal
+          visible={gatewayPickerOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setGatewayPickerOpen(false)}
+        >
+          <View style={styles.pickerBackdrop}>
+            <View style={styles.pickerCard}>
+              <Text style={styles.pickerTitle}>Select Gateway</Text>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={styles.pickerList}
+                keyboardShouldPersistTaps="handled"
+              >
+                {rows.map((r, i) => {
+                  const label = r.name === 'coinRemove' ? 'Other Removal' : String(r.name);
+                  const active = label === drillName;
+                  return (
+                    <TouchableOpacity
+                      key={`${r.name}-${i}`}
+                      style={[styles.pickerRow, active && styles.pickerRowActive]}
+                      onPress={() => {
+                        setGatewayPickerOpen(false);
+                        if (!active) openMids(r);
+                      }}
+                    >
+                      <Text style={[styles.pickerRowText, active && styles.pickerRowTextActive]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.pickerClose}
+                onPress={() => setGatewayPickerOpen(false)}
+              >
+                <Text style={styles.pickerCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -754,6 +802,12 @@ export function FundsScreen() {
     <>
       <Text style={styles.title}>Funds</Text>
 
+      <View style={styles.totalBox}>
+        <Text style={styles.totalText}>
+          Total Amount (from Table) = ₹ {formatAmt(tableTotalAmount)}
+        </Text>
+      </View>
+
       {canShowTotal ? (
         <View style={styles.totalBox}>
           <Text style={styles.totalText}>Total Deposits: ₹ {formatAmt(totalDeposit)}</Text>
@@ -844,7 +898,7 @@ type FundsMainCardProps = {
 const FundsMainCard = memo(function FundsMainCard({ row, index, onPress }: FundsMainCardProps) {
   const label = row.name === 'coinRemove' ? 'Other Removal' : display(row.name);
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+    <TouchableOpacity style={[styles.card, styles.cardSpaced]} activeOpacity={0.75} onPress={onPress}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardIndex}>#{index + 1}</Text>
         <Text style={styles.cardTitle} numberOfLines={1}>
@@ -879,7 +933,7 @@ const FundsMidCard = memo(function FundsMidCard({
 }: FundsMidCardProps) {
   return (
     <TouchableOpacity
-      style={[styles.card, gatewayOnly && styles.cardDisabled]}
+      style={[styles.card, styles.cardSpaced, gatewayOnly && styles.cardDisabled]}
       activeOpacity={gatewayOnly ? 1 : 0.75}
       disabled={gatewayOnly}
       onPress={onPress}
@@ -922,7 +976,7 @@ const FundsPayinCard = memo(function FundsPayinCard({
 }: FundsPayinCardProps) {
   const title = isAuto ? display(row.userName) : display(row.userId);
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+    <TouchableOpacity style={[styles.card, styles.cardSpaced]} activeOpacity={0.75} onPress={onPress}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardIndex}>#{index + 1}</Text>
         <Text style={styles.cardTitle} numberOfLines={1}>

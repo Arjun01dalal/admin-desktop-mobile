@@ -235,6 +235,7 @@ export const SECURE_ACTIONS = [
   'withdrawals.lock',
   'withdrawals.unlock',
   'withdrawals.check',
+  'withdrawals.playedBifurcation',
   'withdrawals.mids',
   'withdrawals.bulkLock',
   'withdrawals.bulkUnlock',

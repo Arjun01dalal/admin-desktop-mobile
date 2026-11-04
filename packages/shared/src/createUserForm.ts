@@ -11,6 +11,8 @@ export type CreateUserForm = {
   state: string;
   city: string;
   master: boolean;
+  /** SubAdmin create only — when true, payload includes isBot: true. */
+  isBot: boolean;
 };
 
 export type CreateUserFormErrors = Partial<Record<keyof CreateUserForm | 'otp', string>>;
@@ -24,6 +26,7 @@ export const EMPTY_CREATE_USER_FORM: CreateUserForm = {
   state: '',
   city: '',
   master: false,
+  isBot: false,
 };
 
 /** Normal users need OTP; SubAdmin and Master skip OTP. */
@@ -82,6 +85,7 @@ export function buildCreateUserPayload(
       roleName: form.roleName.trim(),
       state: form.state.trim(),
       city: form.city.trim(),
+      isBot: form.isBot,
     });
   }
 
@@ -115,7 +119,7 @@ export function buildCreateUserPayload(
 function omitEmpty(raw: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(raw).filter(([key, value]) => {
-      if (key === 'master') return value === true;
+      if (key === 'master' || key === 'isBot') return value === true;
       if (value && typeof value === 'object') return Object.keys(value as object).length > 0;
       return String(value ?? '').trim() !== '';
     }),

@@ -16,7 +16,7 @@ describe('balanceNavTarget', () => {
     });
   });
 
-  it('maps Total (Deposits) → Dashboard', () => {
+  it('maps Total Deposit → Dashboard', () => {
     expect(balanceNavTarget('deposit', allOn)).toEqual({
       type: 'stack',
       name: 'dashboard',

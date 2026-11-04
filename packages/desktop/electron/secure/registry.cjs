@@ -2634,6 +2634,12 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  'withdrawals.playedBifurcation': {
+    method: 'POST',
+    path: '/transaction/withdrawal-played-bifurcation',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'withdrawals.mids': {
     method: 'POST',
     path: '/payinAccounts/getAllMidOld',

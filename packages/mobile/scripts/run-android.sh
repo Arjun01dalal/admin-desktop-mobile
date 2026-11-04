@@ -42,10 +42,25 @@ pick_serial() {
   echo "${preferred:-$mdns}"
 }
 
-device_model_name() {
+# Expo `--device` matches `device.name` from its device list:
+#   - emulator → AVD name (`adb -s <serial> emu avd name`)
+#   - physical → `model:` from `adb devices -l` (underscored)
+# Passing the emulator *model* (e.g. sdk_gphone64_arm64) fails with
+# "Could not find device with name: …".
+device_expo_name() {
   local serial="$1"
-  # Expo uses `model:` from `adb devices -l` (underscored), not getprop.
-  "$ADB" devices -l 2>/dev/null \
+  local name=""
+
+  if [[ "$serial" == emulator-* ]]; then
+    # First line is the AVD name; a trailing "OK" line is common.
+    name="$("$ADB" -s "$serial" emu avd name 2>/dev/null | tr -d '\r' | awk 'NF && $0!="OK"{print; exit}')"
+    if [[ -n "$name" ]]; then
+      printf '%s\n' "$name"
+      return
+    fi
+  fi
+
+  name="$("$ADB" devices -l 2>/dev/null \
     | awk -v s="$serial" '
         $1==s {
           for (i = 1; i <= NF; i++) {
@@ -55,7 +70,13 @@ device_model_name() {
               exit
             }
           }
-        }'
+        }')"
+  if [[ -n "$name" ]]; then
+    printf '%s\n' "$name"
+    return
+  fi
+
+  printf 'Device %s\n' "$serial"
 }
 
 # Reconnect wireless devices via IP:port from mDNS discovery, then drop mDNS aliases.
@@ -113,10 +134,7 @@ if ! is_online "$SERIAL"; then
   exit 1
 fi
 
-DEVICE_NAME="$(device_model_name "$SERIAL")"
-if [[ -z "$DEVICE_NAME" ]]; then
-  DEVICE_NAME="Device ${SERIAL}"
-fi
+DEVICE_NAME="$(device_expo_name "$SERIAL")"
 
 # Prove shell works on the chosen serial before Expo starts.
 "$ADB" -s "$SERIAL" shell getprop ro.product.cpu.abilist >/dev/null
@@ -125,7 +143,7 @@ echo "Using Android device: ${DEVICE_NAME} (${SERIAL})"
 
 mkdir -p .metro-tmp
 export TMPDIR="$ROOT/.metro-tmp"
-# Expo --device matches model name, not ADB serial.
+# Expo --device matches Expo's device.name (AVD name / model), not ADB serial.
 # Keep ANDROID_SERIAL so plain `adb` calls hit the same device.
 export ANDROID_SERIAL="$SERIAL"
 

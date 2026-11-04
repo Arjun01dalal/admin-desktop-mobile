@@ -11,6 +11,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -197,6 +198,8 @@ export function DepositScreen() {
   const [startDate, setStartDate] = useState(todayIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [allData, setAllData] = useState(false);
+  const [utrDraft, setUtrDraft] = useState('');
+  const [appliedUtr, setAppliedUtr] = useState('');
   const [midPickerOpen, setMidPickerOpen] = useState(false);
   const [midPickerQuery, setMidPickerQuery] = useState('');
   const [status, setStatus] = useState<string>('Pending');
@@ -272,17 +275,23 @@ export function DepositScreen() {
     setLoading(true);
     setError(null);
     try {
+      const utr = appliedUtr.trim();
       const filter: Record<string, unknown> = {};
-      if (status) filter.status = status;
-      const text = applied.text.trim();
-      if (text) filter[applied.field] = text;
+      if (utr) {
+        filter.utr = utr;
+      } else {
+        if (status) filter.status = status;
+        const text = applied.text.trim();
+        if (text) filter[applied.field] = text;
+      }
       const payload: Record<string, unknown> = {
         type: 'deposit',
         itemsPerPage: pageSize,
         pageNo: page,
         filter,
       };
-      if (!allData) {
+      // UTR search is date-agnostic — omit startDate/endDate.
+      if (!utr && !allData) {
         if (startDate && endDate) {
           payload.startDate = startDate;
           payload.endDate = endDate;
@@ -309,13 +318,15 @@ export function DepositScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [status, applied, page, pageSize, startDate, endDate, allData]);
+  }, [status, applied, appliedUtr, page, pageSize, startDate, endDate, allData]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const applyDates = useCallback(() => {
+    setAppliedUtr('');
+    setUtrDraft('');
     setAllData(false);
     setStartDate(draftStart);
     setEndDate(draftEnd);
@@ -323,6 +334,8 @@ export function DepositScreen() {
   }, [draftStart, draftEnd]);
 
   const applyAllData = useCallback(() => {
+    setAppliedUtr('');
+    setUtrDraft('');
     setDraftStart('');
     setDraftEnd('');
     setStartDate('');
@@ -338,9 +351,38 @@ export function DepositScreen() {
   }, []);
 
   const search = useCallback(() => {
+    setAppliedUtr('');
+    setUtrDraft('');
     setApplied({ field: searchField, text: draftSearch });
     setPage(1);
   }, [searchField, draftSearch]);
+
+  const searchByUtr = useCallback(() => {
+    const next = utrDraft.trim();
+    if (!next) {
+      Alert.alert('Enter a UTR to search');
+      return;
+    }
+    Keyboard.dismiss();
+    setAppliedUtr(next);
+    setAllData(false);
+    setPage(1);
+  }, [utrDraft]);
+
+  const clearUtrSearch = useCallback(() => {
+    setUtrDraft('');
+    setAppliedUtr('');
+    // Dates stay in startDate/endDate — listing returns to the previous date scope.
+    setAllData(false);
+    if (!startDate || !endDate) {
+      const today = todayIST();
+      setDraftStart(today);
+      setDraftEnd(today);
+      setStartDate(today);
+      setEndDate(today);
+    }
+    setPage(1);
+  }, [startDate, endDate]);
 
   const filteredMids = useMemo(() => {
     const q = midPickerQuery.trim().toLowerCase();
@@ -768,9 +810,41 @@ export function DepositScreen() {
     <>
       <Text style={styles.title}>Deposit</Text>
       <Text style={styles.sub}>
-        {allData ? 'All data' : `${startDate} → ${endDate}`} · Total:{' '}
-        {total.toLocaleString('en-IN')}
+        {appliedUtr.trim()
+          ? `UTR: ${appliedUtr.trim()}`
+          : allData
+            ? 'All data'
+            : `${startDate} → ${endDate}`}{' '}
+        · Total: {total.toLocaleString('en-IN')}
       </Text>
+
+      <View style={styles.utrSearchRow}>
+        <TextInput
+          style={styles.utrSearchInput}
+          value={utrDraft}
+          onChangeText={setUtrDraft}
+          placeholder="Search by UTR"
+          placeholderTextColor={colors.muted}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          autoCorrect={false}
+          returnKeyType="search"
+          blurOnSubmit
+          onSubmitEditing={searchByUtr}
+        />
+        <TouchableOpacity
+          style={[styles.utrSearchBtn, !utrDraft.trim() && styles.utrSearchBtnDisabled]}
+          onPress={searchByUtr}
+          disabled={!utrDraft.trim() || loading}
+        >
+          <Text style={styles.utrSearchBtnText}>Search</Text>
+        </TouchableOpacity>
+        {appliedUtr.trim() ? (
+          <TouchableOpacity style={styles.utrClearBtn} onPress={clearUtrSearch} disabled={loading}>
+            <Text style={styles.utrClearBtnText}>Clear</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       <DetailFilterBar
         startDate={draftStart}
@@ -811,6 +885,7 @@ export function DepositScreen() {
             key={s || 'all'}
             style={[styles.chip, status === s && styles.chipActive]}
             onPress={() => {
+              if (appliedUtr.trim()) clearUtrSearch();
               setStatus(s);
               setPage(1);
             }}

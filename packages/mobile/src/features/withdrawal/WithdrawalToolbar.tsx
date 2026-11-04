@@ -1,6 +1,7 @@
 /** Toolbar and bulk controls for the withdrawal list. */
 import React from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { validateBifurcationDateRange } from '@astro/shared/withdrawalBifurcation';
 import { colors } from '../../theme';
 import { DetailFilterBar } from '../../screens/dashboards/details/DetailFilterBar';
 import { SEARCH_FIELDS, STATUSES } from './constants';
@@ -37,6 +38,8 @@ type WithdrawalToolbarProps = {
   toggleBenePendingPanel: () => void;
   applyBenePendingPanel: () => void;
   canDownload: boolean;
+  canSeeBifurcation?: boolean;
+  onOpenBifurcation?: () => void;
   requestSheetDownload: (filter: SheetDownloadFilter, run: () => void | Promise<boolean>) => void;
   downloadData: () => void | Promise<boolean>;
   downloadPayok: () => void | Promise<boolean>;
@@ -102,6 +105,8 @@ export function WithdrawalToolbar({
   toggleBenePendingPanel,
   applyBenePendingPanel,
   canDownload,
+  canSeeBifurcation,
+  onOpenBifurcation,
   requestSheetDownload,
   downloadData,
   downloadPayok,
@@ -139,8 +144,23 @@ export function WithdrawalToolbar({
 }: WithdrawalToolbarProps) {
   return (
     <>
-      {/* Collapsible tools: Sort, Bank Amount, Mid Name, downloads, Add Bene List */}
-      <View style={[styles.toolsRow, { justifyContent: 'flex-end' }]}>
+      {/* Always-visible actions (desktop filter-bar parity) + collapsible Tools */}
+      <View style={[styles.toolsRow, { justifyContent: 'flex-end', flexWrap: 'wrap' }]}>
+        {canSeeBifurcation ? (
+          <TouchableOpacity
+            style={[styles.chip, styles.chipActive]}
+            onPress={() => {
+              const check = validateBifurcationDateRange(draftStart, draftEnd);
+              if (!check.ok) {
+                Alert.alert(check.message);
+                return;
+              }
+              onOpenBifurcation?.();
+            }}
+          >
+            <Text style={[styles.chipText, styles.chipTextActive]}>Withdrawal Bifurcation</Text>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           style={[styles.chip, toolsOpen && styles.chipActive]}
           onPress={() => setToolsOpen((v) => !v)}

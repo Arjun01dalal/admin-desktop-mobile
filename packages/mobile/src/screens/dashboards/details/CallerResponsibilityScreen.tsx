@@ -19,11 +19,13 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
+  automationBotCallsTotals,
+  displayedActiveBotUsersCount,
   flattenActiveBotUsersPayload,
   formatAutomationBotLabel,
-  getActiveBotCountByType,
   parseAutomationBotCallsSummary,
   toDdMmYyyy,
+  visibleActiveBotSummary,
   type ActiveBotSummaryItem,
   type ActiveBotUserRow,
   type AutomationBotCallsSummary,
@@ -31,11 +33,18 @@ import {
 import { secureApi } from '../../../api/client';
 import { getStoredUser } from '../../../lib/webShim';
 import {
+  BOT_MANAGEMENT_ROLE_ID,
   CALLER_HEAD_ROLE_IDS,
   CALLER_ROLE_IDS,
   FULL_ALLOTMENT_ROLE_IDS,
-  OFFICE_LOCATIONS,
   RESP_TOTAL_DEPOSIT,
+  assignedCallerNameCandidates,
+  buildDepositByEmpcodeOfficeBody,
+  filterCallerResponsibilityRows,
+  filterOfficeLocationRows,
+  isDubaiMysoreRole,
+  isGtelAssignedCxRole,
+  officeLocationsForRole,
   type CallerRow,
 } from '../../../auth/callerRoles';
 import { hasPermission, Permissions } from '../../../auth/permissions';
@@ -72,9 +81,12 @@ function botSummaryAccent(bot: string): string {
 type StoredCallerUser = {
   _id?: string;
   name?: string;
+  realName?: string;
+  chatName?: string;
   Role_ID?: string;
   empCode?: string;
   Responsibilities?: string[];
+  roles?: Record<string, unknown>;
 };
 
 function roleFlags(roleId?: string) {
@@ -90,17 +102,6 @@ function canSeeTotalDeposit(user: StoredCallerUser | null): boolean {
   const list = user?.Responsibilities;
   if (!Array.isArray(list) || list.length === 0) return true;
   return list.includes(RESP_TOTAL_DEPOSIT);
-}
-
-function filterCallerRows(
-  rows: CallerRow[],
-  user: StoredCallerUser | null,
-  isCaller: boolean,
-  showCompany: boolean,
-): CallerRow[] {
-  return rows
-    .filter((v) => (isCaller ? v.empCode === user?.empCode : !v.block))
-    .filter((v) => (showCompany ? true : v.officeLocation !== 'Company'));
 }
 
 function roundAmt(value: unknown): string {
@@ -157,10 +158,16 @@ export function CallerResponsibilityScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const user = getStoredUser<StoredCallerUser>();
   const { isCaller, isCallerHead, isCallerOrHead, isFullAllotment } = roleFlags(user?.Role_ID);
+  const roleId = user?.Role_ID;
+  const limitToDubaiMysore = isDubaiMysoreRole(roleId);
+  const isBotManagement = roleId === BOT_MANAGEMENT_ROLE_ID;
+  const assignedOnly = !isBotManagement && isGtelAssignedCxRole(roleId, user?.roles);
+  const assignedNames = useMemo(() => assignedCallerNameCandidates(user), [user]);
   const showTotalDeposit = canSeeTotalDeposit(user);
-  const showCallerHead = !isCallerOrHead || isFullAllotment;
+  const showCallerHead = (!isCallerOrHead || isFullAllotment) && !assignedOnly;
   const showLocation = !isCaller || isFullAllotment;
   const canShowBotAutomaticData = hasPermission(Permissions.show_bot_automatic_data, user);
+  const officeLocations = officeLocationsForRole(roleId);
   // Phone: 2 cols · tablet+: 3 cols
   const autoSummaryThreeCol = windowWidth >= 520;
 
@@ -236,12 +243,16 @@ export function CallerResponsibilityScreen() {
     const gen = ++genRef.current;
     setLoading(true);
     try {
-      const body: Record<string, unknown> = {
+      const body = buildDepositByEmpcodeOfficeBody({
         startDate,
         endDate,
-        callerHead: isCallerHead ? user?.name || '' : callerHead,
-      };
-      if (office) body.officeLocation = office;
+        callerHead,
+        officeLocation: office,
+        roleId,
+        assignedOnly,
+        isCallerHead,
+        loginName: user?.name,
+      });
 
       const botTasks = canShowBotAutomaticData
         ? ([
@@ -268,9 +279,22 @@ export function CallerResponsibilityScreen() {
       } else {
         const data = (depRes.data || {}) as CallerRow;
         const byEmp = Array.isArray(data.byEmpCode) ? (data.byEmpCode as CallerRow[]) : [];
-        setCallerRows(filterCallerRows(byEmp, user, isCaller, showTotalDeposit));
+        setCallerRows(
+          filterCallerResponsibilityRows({
+            rows: byEmp,
+            isCaller,
+            loginEmpCode: user?.empCode,
+            hideCompany: !showTotalDeposit,
+            limitToDubaiMysore,
+            assignedOnly: assignedOnly || isCallerHead,
+            assignedNames,
+          }),
+        );
         setLocationRows(
-          Array.isArray(data.byOfficeLocation) ? (data.byOfficeLocation as CallerRow[]) : [],
+          filterOfficeLocationRows(
+            Array.isArray(data.byOfficeLocation) ? (data.byOfficeLocation as CallerRow[]) : [],
+            limitToDubaiMysore,
+          ),
         );
         setPayload(data);
         setError('');
@@ -301,8 +325,12 @@ export function CallerResponsibilityScreen() {
     endDate,
     callerHead,
     office,
+    roleId,
+    assignedOnly,
+    assignedNames,
     isCallerHead,
     isCaller,
+    limitToDubaiMysore,
     showTotalDeposit,
     canShowBotAutomaticData,
   ]);
@@ -321,14 +349,15 @@ export function CallerResponsibilityScreen() {
     void loadMain();
   }, [startDate, endDate, callerHead, office]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const displayedBotCount = isCaller ? 0 : botCount;
-  const newUserBotCount = isCaller
-    ? 0
-    : getActiveBotCountByType(botSummary, 'new_user', 'new user');
-  const activeBotTypeCount = isCaller
-    ? 0
-    : getActiveBotCountByType(botSummary, 'active', 'non_performing', 'non performing');
-  const inactiveBotCount = isCaller ? 0 : getActiveBotCountByType(botSummary, 'inactive');
+  const displayedBotCount = isCaller ? 0 : displayedActiveBotUsersCount(botCount, botSummary);
+  const visibleBotSummary = useMemo(
+    () => (isCaller ? [] : visibleActiveBotSummary(botSummary)),
+    [isCaller, botSummary],
+  );
+  const callsTotals = useMemo(
+    () => automationBotCallsTotals(automationBotCallsSummary),
+    [automationBotCallsSummary],
+  );
 
   const openBotUsers = useCallback(() => {
     if (isCaller || displayedBotCount <= 0) return;
@@ -635,7 +664,7 @@ export function CallerResponsibilityScreen() {
                       All
                     </Text>
                   </TouchableOpacity>
-                  {OFFICE_LOCATIONS.map((o) => (
+                  {officeLocations.map((o) => (
                     <TouchableOpacity
                       key={o}
                       style={[styles.chip, office === o && styles.chipActive]}
@@ -661,16 +690,20 @@ export function CallerResponsibilityScreen() {
                     Active Customer (By Bots):{' '}
                     <Text style={styles.botCount}>{displayedBotCount}</Text>
                   </Text>
-                  <View style={styles.botChipRow}>
-                    <Text style={[styles.botChip, styles.botChipNew]}>New User: {newUserBotCount}</Text>
-                    <Text style={[styles.botChip, styles.botChipActive]}>
-                      Active: {activeBotTypeCount}
-                    </Text>
-                    <Text style={[styles.botChip, styles.botChipInactive]}>
-                      Inactive: {inactiveBotCount}
-                    </Text>
-                  </View>
                 </TouchableOpacity>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.botChipScroll}
+                >
+                  <View style={styles.botChipRow}>
+                    {visibleBotSummary.map((b) => (
+                      <Text key={b.bot} style={[styles.botChip, styles.botChipAmber]}>
+                        {formatAutomationBotLabel(b.bot)}: {b.count}
+                      </Text>
+                    ))}
+                  </View>
+                </ScrollView>
 
                 <View style={styles.autoSummaryHeader}>
                   <MaterialCommunityIcons name="robot" size={18} color={colors.primary} />
@@ -683,10 +716,16 @@ export function CallerResponsibilityScreen() {
                           : `${startDate} – ${endDate}`}
                       </Text>
                       <Text style={styles.autoSummaryMeta}>·</Text>
-                      <MaterialCommunityIcons name="phone-in-talk" size={13} color={colors.muted} />
-                      <Text style={styles.autoSummaryMeta}>
-                        Total {automationBotCallsSummary?.total ?? 0}
+                      <MaterialCommunityIcons name="check-circle" size={13} color="#16a34a" />
+                      <Text style={[styles.autoSummaryMeta, styles.autoOk]}>
+                        Successful {callsTotals.successful}
                       </Text>
+                      <MaterialCommunityIcons name="close-circle" size={13} color="#dc2626" />
+                      <Text style={[styles.autoSummaryMeta, styles.autoFail]}>
+                        Unsuccessful {callsTotals.unsuccessful}
+                      </Text>
+                      <MaterialCommunityIcons name="phone-in-talk" size={13} color={colors.muted} />
+                      <Text style={styles.autoSummaryMeta}>Total {callsTotals.total}</Text>
                     </View>
                   </View>
                 </View>
@@ -819,11 +858,11 @@ export function CallerResponsibilityScreen() {
       displayedBotCount,
       openBotUsers,
       canShowBotAutomaticData,
-      newUserBotCount,
-      activeBotTypeCount,
-      inactiveBotCount,
+      visibleBotSummary,
+      callsTotals,
       automationBotCallsSummary,
       autoSummaryThreeCol,
+      officeLocations,
       startDate,
       endDate,
       error,

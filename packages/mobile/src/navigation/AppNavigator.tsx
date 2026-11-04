@@ -40,12 +40,17 @@ const HEAVY_STACK_UNMOUNT = new Set([
 ]);
 
 /** Nav items hosted only as path-named stack screens (not by id). */
-const STACK_ONLY_NAV_IDS = new Set(['activeUserWithdrawal', 'incomingBotCall']);
+const STACK_ONLY_NAV_IDS = new Set([
+  'activeUserWithdrawal',
+  'incomingBotCall',
+  'gtelCallerDashboard',
+]);
 
 type RootStackParamList = {
   welcome: undefined;
   profile: undefined;
   '/active-user-withdrawal': undefined;
+  '/withdrawal-bifurcation': undefined;
   '/incoming-bot-call': undefined;
   '/gtel-caller-dashboard': undefined;
   '/gtel-caller-calls': undefined;
@@ -228,6 +233,21 @@ export function AppNavigator() {
                     <LazyScreened
                       path="/active-user-withdrawal"
                       title={toDisplayText('Active User Withdrawal')}
+                    />
+                  );
+                }
+                return Route;
+              }}
+            />
+            <RootStack.Screen
+              name="/withdrawal-bifurcation"
+              options={{ title: toDisplayText('Withdrawal Bifurcation') }}
+              getComponent={() => {
+                function Route() {
+                  return (
+                    <LazyScreened
+                      path="/withdrawal-bifurcation"
+                      title={toDisplayText('Withdrawal Bifurcation')}
                     />
                   );
                 }

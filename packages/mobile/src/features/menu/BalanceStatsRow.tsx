@@ -7,59 +7,10 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../auth/AuthContext';
 import { toDisplayText } from '../../dashboards/jyotish/jyotishMapping';
 import { canOpenPanelPath, openPanelTarget } from '../../navigation/panelDetail';
-import type { ThemeColors } from '../../themeTokens/palettes';
 import { useStyles } from '../theme';
 import { balanceNavTarget, type BalanceStatKey } from './balanceNav';
+import { createMenuStatStyles, formatMenuInr } from './menuStatUi';
 import type { MenuStats } from './useMenuStats';
-
-function formatInr(value: number): string {
-  return `₹${value.toLocaleString('en-IN')}`;
-}
-
-const createBalanceStyles = (c: ThemeColors) => ({
-  statsAsOf: {
-    color: c.muted,
-    fontSize: 9,
-    fontWeight: '700' as const,
-    marginTop: 4,
-    letterSpacing: 0.2,
-    textAlign: 'center' as const,
-  },
-  statsRow: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    gap: 6,
-    marginTop: 6,
-    width: '100%' as const,
-  },
-  statTile: {
-    width: '48%' as const,
-    flexGrow: 1,
-    minWidth: '46%' as const,
-    maxWidth: '49%' as const,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: 10,
-    backgroundColor: c.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    alignItems: 'flex-start' as const,
-  },
-  statLabel: {
-    color: c.muted,
-    fontSize: 11,
-    fontWeight: '700' as const,
-    lineHeight: 14,
-    marginBottom: 2,
-  },
-  statValue: {
-    color: c.foreground,
-    fontSize: 14,
-    fontWeight: '800' as const,
-    width: '100%' as const,
-  },
-  primary: { color: c.primary },
-});
 
 type Props = {
   stats: MenuStats | null;
@@ -78,7 +29,7 @@ export function BalanceStatsRow({
 }: Props) {
   const navigation = useNavigation();
   const { user } = useAuth();
-  const styles = useStyles(createBalanceStyles);
+  const styles = useStyles(createMenuStatStyles);
 
   const canOpenUsersBalance = canOpenPanelPath('/balance-f', user);
 
@@ -116,7 +67,7 @@ export function BalanceStatsRow({
     },
     {
       key: 'deposit' as const,
-      label: 'Total Deposits',
+      label: 'Total Deposit',
       value: stats?.totalDeposit,
       tappable: canSeeDashboard,
     },
@@ -153,14 +104,14 @@ export function BalanceStatsRow({
                   adjustsFontSizeToFit
                   minimumFontScale={0.75}
                 >
-                  {tile.value == null ? '—' : formatInr(tile.value)}
+                  {tile.value == null ? '—' : formatMenuInr(tile.value)}
                 </Text>
               )}
             </>
           );
           if (!tile.tappable) {
             return (
-              <View key={tile.key} style={styles.statTile}>
+              <View key={tile.key} style={styles.tileHalf}>
                 {body}
               </View>
             );
@@ -168,7 +119,7 @@ export function BalanceStatsRow({
           return (
             <TouchableOpacity
               key={tile.key}
-              style={styles.statTile}
+              style={styles.tileHalf}
               onPress={() => onPress(tile.key)}
               activeOpacity={0.75}
               accessibilityRole="button"

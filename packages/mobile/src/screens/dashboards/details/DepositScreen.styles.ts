@@ -3,6 +3,40 @@ import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 
 export const styles = makeStyles({
+  utrSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(2),
+    marginTop: spacing(3),
+  },
+  utrSearchInput: {
+    flex: 1,
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing(3),
+    color: colors.foreground,
+    backgroundColor: colors.surface,
+    fontSize: 13,
+  },
+  utrSearchBtn: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  utrSearchBtnDisabled: { opacity: 0.45 },
+  utrSearchBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  utrClearBtn: {
+    paddingHorizontal: spacing(3),
+    paddingVertical: spacing(2.5),
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  utrClearBtnText: { color: colors.foreground, fontSize: 12, fontWeight: '600' },
   chipsRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center', marginTop: spacing(3) },
   chipsLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   chip: {

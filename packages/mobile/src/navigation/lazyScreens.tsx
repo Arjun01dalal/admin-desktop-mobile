@@ -174,6 +174,11 @@ export const LAZY_IMPLEMENTED: Record<string, () => AnyScreen> = {
     named(require('../screens/dashboards/details/DepositConfigScreen'), 'DepositConfigScreen'),
   '/mid-limits': () =>
     named(require('../screens/dashboards/details/MidLimitsScreen'), 'MidLimitsScreen'),
+  '/daily-account-report': () =>
+    named(
+      require('../screens/dashboards/details/dailyAccountReport/DailyAccountReportScreen'),
+      'DailyAccountReportScreen',
+    ),
   '/deposit': () => named(require('../screens/dashboards/details/DepositScreen'), 'DepositScreen'),
   '/users-kyc': () =>
     named(require('../screens/dashboards/details/UsersKycScreen'), 'UsersKycScreen'),
@@ -249,6 +254,8 @@ export const LAZY_IMPLEMENTED: Record<string, () => AnyScreen> = {
   '/create-user': () => named(require('../screens/CreateUserScreen'), 'CreateUserScreen'),
   '/users': () => named(require('../screens/UsersScreen'), 'UsersScreen'),
   '/withdrawal': () => named(require('../screens/WithdrawalScreen'), 'WithdrawalScreen'),
+  '/withdrawal-bifurcation': () =>
+    named(require('../screens/WithdrawalBifurcationScreen'), 'WithdrawalBifurcationScreen'),
   '/active-user-withdrawal': () =>
     named(
       require('../screens/dashboards/details/ActiveUserWithdrawalScreen'),

@@ -14,7 +14,12 @@ import {
 } from '@astro/shared/beneficiaryAccountCounts';
 import { parseDistinctMidOptions } from '@astro/shared';
 import { secureApi } from '../../api/client';
-import { getSessionUser, hasPermission, Permissions } from '../../auth/permissions';
+import {
+  getSessionUser,
+  hasPermission,
+  isFullAccessNavRole,
+  Permissions,
+} from '../../auth/permissions';
 import { useDeferredTimeout } from '../../hooks/useDeferredTimeout';
 import { BOT_CHECK_HIDDEN_STATUSES, EXTRA_MID, GATEWAY_OPTIONS } from './constants';
 import {
@@ -95,19 +100,23 @@ export function useWithdrawalActions({ onRefresh }: UseWithdrawalActionsOptions)
     setMidReportOpen(true);
   }, []);
 
-  const perms = useMemo(
-    () => ({
-      actions: hasPermission(Permissions.withdrawals_button),
-      checksDisabled: hasPermission(Permissions.Disable_Withdrawals_Check),
-      reject: hasPermission(Permissions.View_Reject),
-      reverse: hasPermission(Permissions.View_Reverse),
-      showAll: hasPermission(Permissions.show_all_withdrawal),
+  const perms = useMemo(() => {
+    const user = getSessionUser();
+    return {
+      actions: hasPermission(Permissions.withdrawals_button, user),
+      checksDisabled: hasPermission(Permissions.Disable_Withdrawals_Check, user),
+      reject: hasPermission(Permissions.View_Reject, user),
+      reverse: hasPermission(Permissions.View_Reverse, user),
+      showAll: hasPermission(Permissions.show_all_withdrawal, user),
       showMobile:
-        hasPermission(Permissions.show_mobile) && !hasPermission('contact_visibility_none'),
-      download: hasPermission(Permissions.Download_Withdrawal),
-    }),
-    [],
-  );
+        hasPermission(Permissions.show_mobile, user) &&
+        !hasPermission('contact_visibility_none', user),
+      download: hasPermission(Permissions.Download_Withdrawal, user),
+      // Same gate as admin-panel-domains + full-access (so admins always see it).
+      bifurcation:
+        hasPermission(Permissions.see_withdrawal_bifurcation, user) || isFullAccessNavRole(user),
+    };
+  }, []);
 
   const txnIdOf = useCallback((r: Rec) => String(r.transactionId ?? r.orderId ?? ''), []);
 

@@ -11,6 +11,8 @@ export type ThemeColors = {
   primaryForeground: string;
   destructive: string;
   success: string;
+  /** Informational accent (e.g. Total / All KPI). */
+  info: string;
 };
 
 export const darkColors: ThemeColors = {
@@ -24,6 +26,7 @@ export const darkColors: ThemeColors = {
   primaryForeground: '#1a1200',
   destructive: '#ef4444',
   success: '#22c55e',
+  info: '#60a5fa',
 };
 
 export const lightColors: ThemeColors = {
@@ -37,4 +40,5 @@ export const lightColors: ThemeColors = {
   primaryForeground: '#ffffff',
   destructive: '#dc2626',
   success: '#16a34a',
+  info: '#2563eb',
 };

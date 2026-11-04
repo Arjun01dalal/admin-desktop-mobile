@@ -10,6 +10,190 @@ import { encryptPayload, decryptPayload } from './crypto';
 import { getApiBaseUrl } from '../config';
 import { appStorage } from '../lib/webShim';
 
+function unwrapDarBalanceJson(json: unknown): ApiResult {
+  let data = (json && typeof json === 'object' ? json : {}) as Record<string, unknown>;
+  if (data?.data != null && typeof data.data === 'string') {
+    try {
+      data = { ...data, data: decryptPayload(data.data as string) };
+    } catch {
+      /* plain body */
+    }
+  }
+  const nested = data?.data;
+  const payloadOut =
+    nested && typeof nested === 'object' && !Array.isArray(nested)
+      ? ((nested as Record<string, unknown>).payload ?? nested)
+      : (data?.payload ?? nested ?? data);
+  return {
+    ok: true,
+    success: data.success !== false,
+    message: typeof data.message === 'string' ? data.message : undefined,
+    data: payloadOut,
+  };
+}
+
+async function upsertDarBalance(
+  payload: Record<string, unknown> = {},
+  tokenOverride?: string | null,
+): Promise<ApiResult> {
+  const midId = String(payload.midId || '').trim();
+  const type = String(payload.type || '').trim();
+  const amountNum = Number(payload.amount);
+  if (!midId) return { ok: false, message: 'MID is required' };
+  if (type !== 'open' && type !== 'close') {
+    return { ok: false, message: 'Balance type must be open or close' };
+  }
+  if (!Number.isFinite(amountNum) || amountNum < 0) {
+    return { ok: false, message: 'Enter a valid amount' };
+  }
+
+  const userId = String(payload.userId || '').slice(0, 64);
+  const userName = String(payload.userName || '').slice(0, 120);
+  const date = payload.date ? String(payload.date).slice(0, 32) : '';
+  const remark = payload.remark ? String(payload.remark).slice(0, 500) : '';
+  const imageUri = typeof payload.imageUri === 'string' ? payload.imageUri.trim() : '';
+  const imageName = String(payload.imageName || 'balance.jpg').replace(/[^A-Za-z0-9._-]/g, '_');
+  const imageMime = String(payload.imageMime || 'image/jpeg').slice(0, 80);
+  const token = tokenOverride ?? appStorage.getItem('token');
+  const url = `${getApiBaseUrl()}/midAllotmentDailyBalances`;
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'User-Agent':
+      'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    let res: Response;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120_000);
+    try {
+      if (imageUri) {
+        const form = new FormData();
+        form.append('image', { uri: imageUri, name: imageName, type: imageMime } as unknown as Blob);
+        form.append('midId', midId);
+        form.append('type', type);
+        form.append('amount', String(amountNum));
+        if (date) form.append('date', date);
+        if (remark) form.append('remark', remark);
+        form.append('userId', userId);
+        form.append('userName', userName);
+        res = await fetch(url, { method: 'POST', headers, body: form, signal: controller.signal });
+      } else {
+        headers['Content-Type'] = 'application/json';
+        res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            midId,
+            type,
+            amount: amountNum,
+            ...(date ? { date } : {}),
+            ...(remark ? { remark } : {}),
+            updatedBy: { userId, userName },
+            userId,
+            userName,
+          }),
+          signal: controller.signal,
+        });
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+
+    let json: unknown = null;
+    try {
+      json = await res.json();
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok) {
+      const message = pickMessage(json, `Request failed (${res.status})`);
+      maybeAuthFailure('dailyAccountReport.balances.upsert', Boolean(token), res.status, message);
+      return { ok: false, message, status: res.status };
+    }
+    return { ...unwrapDarBalanceJson(json), status: res.status };
+  } catch (err) {
+    const message =
+      err instanceof Error && err.name === 'AbortError'
+        ? 'Request timed out'
+        : err instanceof Error
+          ? err.message
+          : 'Failed to save balance';
+    return { ok: false, message };
+  }
+}
+
+async function correctDarBalance(
+  payload: Record<string, unknown> = {},
+  tokenOverride?: string | null,
+): Promise<ApiResult> {
+  const id = String(payload._id || '').trim();
+  const amountNum = Number(payload.amount);
+  const remark = String(payload.remark || '').trim().slice(0, 500);
+  if (!id) return { ok: false, message: 'Balance id is required' };
+  if (!Number.isFinite(amountNum) || amountNum < 0) {
+    return { ok: false, message: 'Enter a valid amount' };
+  }
+  if (!remark) return { ok: false, message: 'Remark is required for correction' };
+
+  const userId = String(payload.userId || '').slice(0, 64);
+  const userName = String(payload.userName || '').slice(0, 120);
+  const imageUri = typeof payload.imageUri === 'string' ? payload.imageUri.trim() : '';
+  const imageName = String(payload.imageName || 'balance.jpg').replace(/[^A-Za-z0-9._-]/g, '_');
+  const imageMime = String(payload.imageMime || 'image/jpeg').slice(0, 80);
+  const token = tokenOverride ?? appStorage.getItem('token');
+  const url = `${getApiBaseUrl()}/midAllotmentDailyBalances/update`;
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'User-Agent':
+      'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const form = new FormData();
+    form.append('_id', id);
+    form.append('amount', String(amountNum));
+    form.append('remark', remark);
+    form.append('userId', userId);
+    form.append('userName', userName);
+    if (imageUri) {
+      form.append('image', { uri: imageUri, name: imageName, type: imageMime } as unknown as Blob);
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120_000);
+    let res: Response;
+    try {
+      res = await fetch(url, { method: 'POST', headers, body: form, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    let json: unknown = null;
+    try {
+      json = await res.json();
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok) {
+      const message = pickMessage(json, `Request failed (${res.status})`);
+      maybeAuthFailure('dailyAccountReport.balances.correct', Boolean(token), res.status, message);
+      return { ok: false, message, status: res.status };
+    }
+    return { ...unwrapDarBalanceJson(json), status: res.status };
+  } catch (err) {
+    const message =
+      err instanceof Error && err.name === 'AbortError'
+        ? 'Request timed out'
+        : err instanceof Error
+          ? err.message
+          : 'Failed to correct balance';
+    return { ok: false, message };
+  }
+}
+
 export type ApiResult<T = unknown> = {
   ok: boolean;
   success?: boolean;
@@ -323,6 +507,12 @@ export async function secureApi<T = unknown>(
   }
   if (action === 'llmChat.sendVoice') {
     return uploadLlmVoice(payload, tokenOverride) as Promise<ApiResult<T>>;
+  }
+  if (action === 'dailyAccountReport.balances.upsert') {
+    return upsertDarBalance(payload, tokenOverride) as Promise<ApiResult<T>>;
+  }
+  if (action === 'dailyAccountReport.balances.correct') {
+    return correctDarBalance(payload, tokenOverride) as Promise<ApiResult<T>>;
   }
 
   if (entry.type === 'local' || !entry.method || !entry.path) {

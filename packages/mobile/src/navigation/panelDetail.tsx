@@ -56,6 +56,7 @@ const DETAIL_PERMISSION_BY_PATH: Readonly<Record<string, Permission>> = {
   '/caller-responsibility/details': Permissions.caller_responsibility,
   '/caller-responsibility/bot-users': Permissions.caller_responsibility,
   '/funds/mid-groups': Permissions.Deposit_Config,
+  '/unique_deposit_pending/caller-wise': Permissions.Unique_Deposit_Pending_User,
 };
 
 function named(
@@ -331,6 +332,16 @@ export const PANEL_DETAIL_ROUTES: PanelDetailRoute[] = [
     ),
   },
   {
+    path: '/unique_deposit_pending/caller-wise',
+    title: 'Caller Wise Deposit Pending',
+    getComponent: lazyOnce('/unique_deposit_pending/caller-wise', () =>
+      named(
+        require('../screens/dashboards/details/uniquePending/CallerWiseDepositPendingScreen'),
+        'CallerWiseDepositPendingScreen',
+      ),
+    ),
+  },
+  {
     path: '/caller-responsibility/deposit-list',
     title: 'Caller Deposit List',
     getComponent: lazyOnce('/caller-responsibility/deposit-list', () =>
@@ -377,6 +388,25 @@ export function canAccessPanelDetail(path: string, user: AuthUser | null | undef
       canAccessNavItem({ id: 'detail:/gtel-calls', permission: Permissions.show_gtel_calls }, user) ||
       canAccessNavItem(
         { id: 'detail:/gtel-calls-dash', permission: Permissions.show_gtel_dashboard },
+        user,
+      )
+    );
+  }
+  // Nested under Unique Pending — parent page OR dedicated caller-wise button perm.
+  if (path === '/unique_deposit_pending/caller-wise') {
+    return (
+      canAccessNavItem(
+        {
+          id: 'detail:/unique_deposit_pending/caller-wise',
+          permission: Permissions.Unique_Deposit_Pending_User,
+        },
+        user,
+      ) ||
+      canAccessNavItem(
+        {
+          id: 'detail:/unique_deposit_pending/caller-wise-btn',
+          permission: Permissions.show_caller_wise_unique_pending,
+        },
         user,
       )
     );

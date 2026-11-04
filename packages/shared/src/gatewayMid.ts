@@ -161,13 +161,117 @@ const unwrapRoot = (body: unknown): unknown => {
   return obj;
 };
 
+export type GatewayMidTypeSetting = {
+  type: string;
+  isActive: boolean;
+};
+
+const FALSE_ACTIVE_TOKENS = new Set([
+  'start',
+  'stopped',
+  'inactive',
+  'off',
+  'disabled',
+  '0',
+  'false',
+]);
+const TRUE_ACTIVE_TOKENS = new Set([
+  'stop',
+  'active',
+  'started',
+  'running',
+  'on',
+  'enabled',
+  '1',
+  'true',
+]);
+
+/** Normalize API boolean / status / next-action tokens into isActive. */
+export function readTypeActiveFlag(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const key = value.trim().toLowerCase();
+    if (FALSE_ACTIVE_TOKENS.has(key)) return false;
+    if (TRUE_ACTIVE_TOKENS.has(key)) return true;
+    return false;
+  }
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.isActive === 'boolean') return obj.isActive;
+    if (typeof obj.isCurrentlyActive === 'boolean') return obj.isCurrentlyActive;
+    if (typeof obj.active === 'boolean') return obj.active;
+    if (typeof obj.enabled === 'boolean') return obj.enabled;
+    if (typeof obj.started === 'boolean') return obj.started;
+    if (typeof obj.running === 'boolean') return obj.running;
+    if (typeof obj.isStopped === 'boolean') return !obj.isStopped;
+    if (typeof obj.stopped === 'boolean') return !obj.stopped;
+    if (obj.action != null) return readTypeActiveFlag(obj.action);
+    if (obj.nextAction != null) return readTypeActiveFlag(obj.nextAction);
+    if (obj.status != null) return readTypeActiveFlag(obj.status);
+    if (obj.state != null) return readTypeActiveFlag(obj.state);
+  }
+  return false;
+}
+
+/** Parse typeSettings map/array into typed start/stop state (admin WhatsappMid parity). */
+export function parseTypeSettings(raw: unknown): GatewayMidTypeSetting[] {
+  if (!raw) return [];
+
+  if (Array.isArray(raw)) {
+    const out: GatewayMidTypeSetting[] = [];
+    for (const item of raw) {
+      if (typeof item === 'string') {
+        const type = item.trim();
+        if (type) out.push({ type, isActive: false });
+        continue;
+      }
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      const type = String(row.type || row.name || row.key || '').trim();
+      if (!type) continue;
+      out.push({ type, isActive: readTypeActiveFlag(item) });
+    }
+    return out;
+  }
+
+  if (typeof raw === 'object') {
+    return Object.entries(raw as Record<string, unknown>)
+      .map(([type, value]) => {
+        const key = String(type || '').trim();
+        if (!key) return null;
+        return { type: key, isActive: readTypeActiveFlag(value) };
+      })
+      .filter((item): item is GatewayMidTypeSetting => !!item);
+  }
+
+  return [];
+}
+
+/** Optimistic flip for one type's Running/Stopped control. */
+export function setTypeSettingActive(
+  list: GatewayMidTypeSetting[],
+  type: string,
+  isActive: boolean,
+): GatewayMidTypeSetting[] {
+  const typeKey = String(type || '').trim();
+  if (!typeKey) return list;
+  let found = false;
+  const next = list.map((item) => {
+    if (item.type !== typeKey) return item;
+    found = true;
+    return { ...item, isActive };
+  });
+  return found ? next : [...next, { type: typeKey, isActive }];
+}
+
 /**
- * get-all-gateway-upis → { gateways, types }
+ * get-all-gateway-upis → { gateways, types, typeSettings }
  * Thin fallback: root array treated as gateways.
  */
 export const parseGatewayUpisResponse = (
   body: unknown,
-): { rows: GatewayMidRow[]; types: string[] } => {
+): { rows: GatewayMidRow[]; types: string[]; typeSettings: GatewayMidTypeSetting[] } => {
   const root = unwrapRoot(body);
   const rootObj = root && typeof root === 'object' && !Array.isArray(root)
     ? (root as Record<string, unknown>)
@@ -182,9 +286,22 @@ export const parseGatewayUpisResponse = (
   const types = Array.isArray(rawTypes)
     ? dedupeStrings(rawTypes.map((t) => String(t ?? '').trim()))
     : [];
+
+  // typeSettings may live on payload root or decrypt wrapper
+  const bodyObj = body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+  const nestedPayload =
+    bodyObj?.payload && typeof bodyObj.payload === 'object' && !Array.isArray(bodyObj.payload)
+      ? (bodyObj.payload as Record<string, unknown>)
+      : null;
+  const typeSettingsRaw =
+    (rootObj && !Array.isArray(root) ? rootObj.typeSettings : undefined) ??
+    (bodyObj && !Array.isArray(body) ? bodyObj.typeSettings : undefined) ??
+    nestedPayload?.typeSettings;
+
   return {
     rows,
     types: types.length ? types : dedupeStrings(rows.map((row) => row.type)),
+    typeSettings: parseTypeSettings(typeSettingsRaw),
   };
 };
 

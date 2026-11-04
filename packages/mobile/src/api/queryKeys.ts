@@ -5,6 +5,10 @@ export const queryKeys = {
     all: ['menuStats'] as const,
     today: (day: string) => ['menuStats', 'today', day] as const,
   },
+  menuUniquePending: {
+    all: ['menuUniquePending'] as const,
+    today: (day: string) => ['menuUniquePending', 'today', day] as const,
+  },
   users: {
     all: ['users'] as const,
     list: (params: unknown) => ['users', 'list', params] as const,

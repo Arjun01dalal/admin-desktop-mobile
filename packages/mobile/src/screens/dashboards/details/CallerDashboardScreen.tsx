@@ -26,6 +26,8 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { colors, spacing } from '../../../theme';
 import { todayIST } from '../../../utils/dates';
 import { useGtelCallerDashboard } from './callerDashboard/useGtelCallerDashboard';
+import { NaradAskModal } from './callerDashboard/NaradAskModal';
+import { getSessionUser, hasPermission, Permissions } from '../../../auth/permissions';
 
 
 
@@ -165,6 +167,8 @@ export function CallerDashboardScreen() {
   const [empCode, setEmpCode] = useState(routeEmp);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [dispRow, setDispRow] = useState<GtelCallerDashRow | null>(null);
+  const [naradAskOpen, setNaradAskOpen] = useState(false);
+  const canShowAskAiBtn = hasPermission(Permissions.show_ask_ai_btn, getSessionUser());
 
   const { canAccess, lockEmpCode, loginEmpCode, cards, callers, loading, error, refresh } =
     useGtelCallerDashboard({ from, to, empCode });
@@ -238,7 +242,26 @@ export function CallerDashboardScreen() {
 
   const listHeader = (
     <>
-      <Text style={styles.title}>Caller Dashboard</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <Text style={[styles.title, { flex: 1 }]}>Caller Dashboard</Text>
+        {canShowAskAiBtn ? (
+          <TouchableOpacity
+            style={{
+              backgroundColor: colors.primary,
+              borderRadius: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+            }}
+            onPress={() => setNaradAskOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Ask AI"
+          >
+            <Text style={{ color: colors.primaryForeground, fontWeight: '800', fontSize: 12 }}>
+              Ask AI
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
       <Text style={styles.sub}>Caller-wise Gtel call metrics for the selected date range.</Text>
 
       {cards.length ? (
@@ -341,6 +364,10 @@ export function CallerDashboardScreen() {
           </View>
         </View>
       </Modal>
+
+      {canShowAskAiBtn ? (
+        <NaradAskModal open={naradAskOpen} onClose={() => setNaradAskOpen(false)} />
+      ) : null}
     </>
   );
 }

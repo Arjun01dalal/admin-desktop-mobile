@@ -70,6 +70,14 @@ export const styles = makeStyles({
     paddingHorizontal: spacing(3),
     marginBottom: spacing(2),
   },
+  botCardActive: {
+    borderColor: '#f1a144',
+    backgroundColor: 'rgba(241,161,68,0.10)',
+  },
+  botCheckOn: {
+    backgroundColor: '#f1a144',
+    borderColor: '#f1a144',
+  },
   masterCardActive: {
     borderColor: '#c62828',
     backgroundColor: 'rgba(198,40,40,0.08)',

@@ -17,7 +17,8 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import { colors } from '../../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
@@ -65,6 +66,8 @@ function asPagedItems<T>(data: unknown): T[] {
 const EMPTY_FORM = { name: '', link: '', mid: '', type: '', openInBrowser: true };
 
 export function InstantDepositProvidersScreen() {
+  const insets = useSafeAreaInsets();
+  const modalBottomPad = Math.max(insets.bottom, spacing(3)) + spacing(4);
   const user = useMemo(() => getStoredUser<{ _id?: string; name?: string }>(), []);
 
   const [nameDraft, setNameDraft] = useState('');
@@ -421,6 +424,7 @@ export function InstantDepositProvidersScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setEditRow(null)}
+        statusBarTranslucent
       >
         <KeyboardAvoidingView
           style={styles.backdrop}
@@ -429,7 +433,7 @@ export function InstantDepositProvidersScreen() {
           <TouchableWithoutFeedback onPress={() => setEditRow(null)}>
             <View style={styles.backdropTouch} />
           </TouchableWithoutFeedback>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { paddingBottom: modalBottomPad }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle} numberOfLines={1}>
                 Edit {editLabel}
@@ -468,6 +472,7 @@ export function InstantDepositProvidersScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setAddOpen(false)}
+        statusBarTranslucent
       >
         <KeyboardAvoidingView
           style={[styles.backdrop, styles.backdropCentered]}
@@ -476,7 +481,7 @@ export function InstantDepositProvidersScreen() {
           <TouchableWithoutFeedback onPress={() => setAddOpen(false)}>
             <View style={styles.backdropTouchFill} />
           </TouchableWithoutFeedback>
-          <View style={[styles.modalSheet, styles.modalSheetRaised]}>
+          <View style={[styles.modalSheet, styles.modalSheetRaised, { paddingBottom: modalBottomPad }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add provider</Text>
               <TouchableOpacity

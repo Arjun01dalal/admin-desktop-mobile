@@ -13,8 +13,11 @@ import {
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import {
+  filterActiveBotUsers,
   flattenActiveBotUsersPayload,
   formatAutomationBotLabel,
+  previousActivityMaxDateIST,
+  visibleActiveBotSummary,
   type ActiveBotSummaryItem,
   type ActiveBotUserRow,
 } from '@astro/shared';
@@ -37,22 +40,6 @@ type ListParams = {
   startDate?: string;
   endDate?: string;
 };
-
-/** Yesterday IST — previous-activity filter max (web parity). */
-function previousActivityMaxDate(): string {
-  const d = new Date(Date.now() + 5.5 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000);
-  return d.toISOString().slice(0, 10);
-}
-
-function toDateKey(value?: unknown): string {
-  if (value == null || value === '') return '';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 function formatBalance(value: unknown): string {
   const n = Number(value);
@@ -214,7 +201,7 @@ export function ActiveBotUsersScreen() {
   const params = (useRoute().params ?? {}) as ListParams;
   const canShowMobile = hasPermission(RESP_SHOW_MOBILE, getSessionUser());
   const hadNavUsers = Array.isArray(params.activeBotUsers) && params.activeBotUsers.length > 0;
-  const prevMax = useMemo(() => previousActivityMaxDate(), []);
+  const prevMax = useMemo(() => previousActivityMaxDateIST(), []);
 
   const [draftStart, setDraftStart] = useState(() => params.startDate || todayIST());
   const [draftEnd, setDraftEnd] = useState(() => params.endDate || todayIST());
@@ -278,16 +265,11 @@ export function ActiveBotUsersScreen() {
     [prevMax],
   );
 
-  const filteredRows = useMemo(() => {
-    return (rows || []).filter((r) => {
-      if (botFilter && String(r.botType || '') !== botFilter) return false;
-      if (previousActivityDate) {
-        const key = toDateKey(r.lastSecondActivity ?? r.previousActivity ?? r.prevActivity);
-        if (key !== previousActivityDate) return false;
-      }
-      return true;
-    });
-  }, [rows, botFilter, previousActivityDate]);
+  const filteredRows = useMemo(
+    () => filterActiveBotUsers(rows, { botType: botFilter, previousActivityDate }),
+    [rows, botFilter, previousActivityDate],
+  );
+  const visibleBotSummary = useMemo(() => visibleActiveBotSummary(botSummary), [botSummary]);
 
   const sheetFields = useMemo<SheetField[]>(() => {
     if (!selected) return [];
@@ -357,7 +339,7 @@ export function ActiveBotUsersScreen() {
           >
             <Text style={styles.filterChipText}>All</Text>
           </TouchableOpacity>
-          {botSummary.map((b) => {
+          {visibleBotSummary.map((b) => {
             const selected = botFilter === b.bot;
             const tone = botTone(b.bot);
             const chipStyle = botFilterChipStyles(tone, selected);
@@ -400,7 +382,7 @@ export function ActiveBotUsersScreen() {
       loading,
       applyDates,
       onPreviousActivityChange,
-      botSummary,
+      visibleBotSummary,
     ],
   );
 

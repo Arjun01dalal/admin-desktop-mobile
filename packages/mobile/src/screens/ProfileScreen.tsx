@@ -23,6 +23,7 @@ import {
 import { useSos } from '../auth/useSosGuard';
 import { secureApi } from '../api/client';
 import { getRoleOptions } from '../auth/roleSelection';
+import { seesOriginalDisplayLabels } from '../auth/permissions';
 import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
 import { useRevealCodes } from '../context/useRevealCodes';
 import { useTheme } from '../features/theme';
@@ -68,6 +69,7 @@ function ThemePicker() {
 function RevealCodesRow() {
   const reveal = useRevealCodes();
   const [otpOpen, setOtpOpen] = useState(false);
+  if (seesOriginalDisplayLabels()) return null;
 
   return (
     <>

@@ -18,7 +18,18 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { CLIENT_NAMES } from '@astro/shared';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  CLIENT_NAMES,
+  DEPOSIT_PROVIDER_EXTRA_STATES,
+  INDIA_STATES,
+  buildCityNotAllowedPayload,
+  buildStateNotAllowedPayload,
+  buildWhatsappRedirectionLink,
+  normalizeStringList,
+  parseRedirectionMobile,
+  splitListInput,
+} from '@astro/shared';
 import { colors, spacing } from '../../../theme';
 import type { DataTableColumn } from '../../../dashboards/ui/DataTable';
 import { secureApi } from '../../../api/client';
@@ -29,6 +40,13 @@ import { DetailFilterBar } from './DetailFilterBar';
 import { RowDetailSheet, type SheetAction, type SheetField } from './RowDetailSheet';
 import { styles } from './DepositProvidersScreen.styles';
 import { display } from '../../../utils/display';
+
+const STATE_OPTIONS = [...INDIA_STATES, ...DEPOSIT_PROVIDER_EXTRA_STATES];
+
+function formatList(value: unknown): string {
+  const list = normalizeStringList(value);
+  return list.length ? list.join(', ') : '—';
+}
 
 type Row = {
   _id?: string;
@@ -92,8 +110,22 @@ const LIST_FIELDS = [
   { key: 'state', label: 'Blocked states' },
 ] as const;
 
+type ListKey = (typeof LIST_FIELDS)[number]['key'];
+
+function listValuesForKey(row: Row | null, key: ListKey): string[] {
+  if (!row) return [];
+  if (key === 'mid') return normalizeStringList(row.midArray?.length ? row.midArray : row.mid);
+  if (key === 'upi') return normalizeStringList(row.upiArray?.length ? row.upiArray : row.link);
+  if (key === 'whatsapp') return normalizeStringList(row.whatsAppNumbers);
+  if (key === 'city') return normalizeStringList(row.cityNotAllowed);
+  return normalizeStringList(row.stateNotAllowed);
+}
+
 export function DepositProvidersScreen() {
+  const insets = useSafeAreaInsets();
+  const modalBottomPad = Math.max(insets.bottom, spacing(3)) + spacing(4);
   const canAdd = hasPermission('Add_PayIn_Account');
+  const canAddMid = hasPermission('show_add_provider_btn');
   const canToggle = hasPermission('Toggle_PayIn_Account');
   const canDelete = hasPermission('Delete_PayIn_Account');
   const canEdit = !hasPermission('Disable_Deposit_Provider_Edit');
@@ -132,7 +164,8 @@ export function DepositProvidersScreen() {
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [editKey, setEditKey] = useState<(typeof EDIT_FIELDS)[number]['key']>('displayName');
   const [listRow, setListRow] = useState<Row | null>(null);
-  const [listKey, setListKey] = useState<(typeof LIST_FIELDS)[number]['key']>('mid');
+  const [listKey, setListKey] = useState<ListKey>('mid');
+  const [stateDraft, setStateDraft] = useState<string[]>([]);
 
   // Amount modal.
   const [amountRow, setAmountRow] = useState<Row | null>(null);
@@ -190,6 +223,17 @@ export function DepositProvidersScreen() {
     void load();
   }, [load]);
 
+  // Keep manage-list modal in sync after reload without closing it.
+  useEffect(() => {
+    if (!listRow?._id) return;
+    const fresh = rows.find((r) => r._id === listRow._id);
+    if (!fresh) return;
+    setListRow(fresh);
+    if (listKey === 'state') {
+      setStateDraft(normalizeStringList(fresh.stateNotAllowed));
+    }
+  }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps -- sync from reload only
+
   const run = useCallback(
     async (action: string, payload: Record<string, unknown>): Promise<string | null> => {
       const res = await secureApi<unknown>(action, payload);
@@ -228,14 +272,14 @@ export function DepositProvidersScreen() {
         badge: (r) => (r.status ? '#16a34a' : '#dc2626'),
       },
       { key: 'mid', label: 'MID', width: 140, render: (r) => display(r.mid) },
-      { key: 'midArray', label: 'MID List', width: 180, render: (r) => display(r.midArray) },
+      { key: 'midArray', label: 'MID List', width: 180, render: (r) => formatList(r.midArray) },
       { key: 'link', label: 'Link', width: 180, render: (r) => display(r.link) },
-      { key: 'upiArray', label: 'UPI List', width: 180, render: (r) => display(r.upiArray) },
+      { key: 'upiArray', label: 'UPI List', width: 180, render: (r) => formatList(r.upiArray) },
       {
         key: 'whatsAppNumbers',
         label: 'WhatsApp Numbers',
         width: 180,
-        render: (r) => display(r.whatsAppNumbers),
+        render: (r) => formatList(r.whatsAppNumbers),
       },
       {
         key: 'redirectionLink',
@@ -247,13 +291,13 @@ export function DepositProvidersScreen() {
         key: 'states',
         label: 'Blocked States',
         width: 180,
-        render: (r) => display(r.stateNotAllowed),
+        render: (r) => formatList(r.stateNotAllowed),
       },
       {
         key: 'cities',
         label: 'Blocked Cities',
         width: 180,
-        render: (r) => display(r.cityNotAllowed),
+        render: (r) => formatList(r.cityNotAllowed),
       },
       {
         key: 'stateUpdatedBy',
@@ -390,6 +434,7 @@ export function DepositProvidersScreen() {
         onPress: () => {
           setListRow(sheetRow);
           setListKey('mid');
+          setStateDraft(normalizeStringList(sheetRow.stateNotAllowed));
           setInputValue('');
           setModalMsg('');
           setSheetRow(null);
@@ -492,61 +537,137 @@ export function DepositProvidersScreen() {
     }
   }, [editRow, editKey, inputValue, run]);
 
+  const patchListRow = useCallback((patch: Partial<Row>) => {
+    setListRow((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
   const submitListAdd = useCallback(async () => {
-    if (!listRow) return;
+    if (!listRow?._id) return;
+
+    // Blocked states: multi-select + Submit (admin Deposit_Withdraw_Providers parity).
+    if (listKey === 'state') {
+      const states = normalizeStringList(stateDraft);
+      setBusy(true);
+      setModalMsg('');
+      try {
+        const err = await run('depositProviders.updateBonusAndClients', {
+          _id: listRow._id,
+          stateNotAllowed: buildStateNotAllowedPayload(states, 'add'),
+          updatedBy,
+        });
+        if (err) {
+          setModalMsg(err);
+          return;
+        }
+        patchListRow({ stateNotAllowed: states });
+        setModalMsg('States updated');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    if (listKey === 'mid' && !canAddMid) {
+      setModalMsg('No permission to add MID');
+      return;
+    }
+
     const value = inputValue.trim();
     if (!value) {
       setModalMsg('Value is required');
       return;
     }
+    const additions = listKey === 'city' ? splitListInput(value) : [value];
+    if (!additions.length) {
+      setModalMsg('Value is required');
+      return;
+    }
+    const existing = listValuesForKey(listRow, listKey);
+    const dup = additions.find((v) => existing.some((x) => x.toLowerCase() === v.toLowerCase()));
+    if (dup) {
+      setModalMsg(`"${dup}" already exists`);
+      return;
+    }
+
     setBusy(true);
     setModalMsg('');
     try {
       let err: string | null;
       if (listKey === 'mid') {
-        err = await run('depositProviders.updateMidArray', { _id: listRow._id, midArray: [value] });
+        err = await run('depositProviders.updateMidArray', {
+          _id: listRow._id,
+          midArray: additions,
+        });
+        if (!err) {
+          // Best-effort activate (admin CitySelector updateRecoredInDB).
+          void secureApi('depositProviders.updateMidNameLink', {
+            _id: listRow._id,
+            mid: additions[0],
+          });
+          patchListRow({
+            midArray: normalizeStringList([...(listRow.midArray || []), ...additions]),
+            mid: additions[0],
+          });
+        }
       } else if (listKey === 'upi') {
-        err = await run('depositProviders.updateUpiArray', { _id: listRow._id, upiArray: [value] });
+        err = await run('depositProviders.updateUpiArray', {
+          _id: listRow._id,
+          upiArray: additions,
+        });
+        if (!err) {
+          void secureApi('depositProviders.updateMidNameLink', {
+            _id: listRow._id,
+            link: additions[0],
+          });
+          patchListRow({
+            upiArray: normalizeStringList([...(listRow.upiArray || []), ...additions]),
+            link: additions[0],
+          });
+        }
       } else if (listKey === 'whatsapp') {
         err = await run('depositProviders.updateWhatsappNumbers', {
           _id: listRow._id,
-          whatsAppNumbers: [value],
+          whatsAppNumbers: additions,
         });
-      } else if (listKey === 'city') {
-        err = await run('depositProviders.updateBonusAndClients', {
-          _id: listRow._id,
-          cityNotAllowed: {
-            cities: value
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean),
-            action: 'add',
-          },
-          updatedBy,
-        });
+        if (!err) {
+          const redirectionLink = buildWhatsappRedirectionLink(additions[0]);
+          void secureApi('depositProviders.updateMidNameLink', {
+            _id: listRow._id,
+            redirectionLink,
+          });
+          patchListRow({
+            whatsAppNumbers: normalizeStringList([
+              ...(listRow.whatsAppNumbers || []),
+              ...additions,
+            ]),
+            redirectionLink,
+          });
+        }
       } else {
         err = await run('depositProviders.updateBonusAndClients', {
           _id: listRow._id,
-          stateNotAllowed: {
-            states: value
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean),
-            action: 'add',
-          },
+          cityNotAllowed: buildCityNotAllowedPayload(additions, 'add'),
           updatedBy,
         });
+        if (!err) {
+          patchListRow({
+            cityNotAllowed: normalizeStringList([
+              ...(listRow.cityNotAllowed || []),
+              ...additions,
+            ]),
+          });
+        }
       }
       if (err) {
         setModalMsg(err);
         return;
       }
-      setListRow(null);
       setInputValue('');
+      setModalMsg('Added');
     } finally {
       setBusy(false);
     }
-  }, [listRow, listKey, inputValue, run, updatedBy]);
+  }, [listRow, listKey, inputValue, stateDraft, run, updatedBy, patchListRow, canAddMid]);
 
   const submitListRemoveMid = useCallback(
     async (mid: string) => {
@@ -681,6 +802,7 @@ export function DepositProvidersScreen() {
       transparent
       animationType={opts?.raise ? 'fade' : 'slide'}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <KeyboardAvoidingView
         style={[styles.backdrop, opts?.raise && styles.backdropCentered]}
@@ -689,7 +811,13 @@ export function DepositProvidersScreen() {
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={opts?.raise ? styles.backdropTouchFill : styles.backdropTouch} />
         </TouchableWithoutFeedback>
-        <View style={[styles.modalSheet, opts?.raise && styles.modalSheetRaised]}>
+        <View
+          style={[
+            styles.modalSheet,
+            opts?.raise && styles.modalSheetRaised,
+            { paddingBottom: modalBottomPad },
+          ]}
+        >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle} numberOfLines={1}>
               {title}
@@ -704,6 +832,7 @@ export function DepositProvidersScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             style={{ maxHeight: opts?.raise ? 480 : 420 }}
+            contentContainerStyle={{ paddingBottom: spacing(2) }}
             keyboardShouldPersistTaps="handled"
           >
             {children}
@@ -859,19 +988,37 @@ export function DepositProvidersScreen() {
           sheetRow
             ? columns
                 .filter((c) => c.key !== 'idx')
-                .map<SheetField>((c) => ({
-                  label: c.label,
-                  value: c.render(sheetRow, 0),
-                  multiline: [
-                    'midArray',
-                    'upiArray',
-                    'whatsAppNumbers',
-                    'states',
-                    'cities',
-                    'link',
-                    'redirectionLink',
-                  ].includes(c.key),
-                }))
+                .map<SheetField>((c) => {
+                  const listKeys = {
+                    midArray: sheetRow.midArray,
+                    upiArray: sheetRow.upiArray,
+                    whatsAppNumbers: sheetRow.whatsAppNumbers,
+                    states: sheetRow.stateNotAllowed,
+                    cities: sheetRow.cityNotAllowed,
+                  } as const;
+                  const listSource =
+                    c.key in listKeys
+                      ? listKeys[c.key as keyof typeof listKeys]
+                      : undefined;
+                  const listItems =
+                    listSource !== undefined ? normalizeStringList(listSource) : undefined;
+                  return {
+                    label: c.label,
+                    value: c.render(sheetRow, 0),
+                    multiline: [
+                      'midArray',
+                      'upiArray',
+                      'whatsAppNumbers',
+                      'states',
+                      'cities',
+                      'link',
+                      'redirectionLink',
+                    ].includes(c.key),
+                    ...(listItems && listItems.length > 0
+                      ? { listItems, listPreviewCount: 3 }
+                      : null),
+                  };
+                })
             : []
         }
         actions={sheetActions}
@@ -957,7 +1104,7 @@ export function DepositProvidersScreen() {
         </View>,
       )}
 
-      {/* Manage-list modal (add + remove MID) */}
+      {/* Manage-list modal (MID / UPI / WhatsApp / City / State) */}
       {renderModalShell(
         listRow !== null,
         `Manage list — ${listRow?.name || ''}`,
@@ -968,7 +1115,14 @@ export function DepositProvidersScreen() {
               <TouchableOpacity
                 key={f.key}
                 style={[styles.chip, listKey === f.key && styles.chipActive]}
-                onPress={() => setListKey(f.key)}
+                onPress={() => {
+                  setListKey(f.key);
+                  setModalMsg('');
+                  setInputValue('');
+                  if (f.key === 'state' && listRow) {
+                    setStateDraft(normalizeStringList(listRow.stateNotAllowed));
+                  }
+                }}
               >
                 <Text style={[styles.chipText, listKey === f.key && styles.chipTextActive]}>
                   {f.label}
@@ -976,80 +1130,153 @@ export function DepositProvidersScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {listKey === 'mid' && Array.isArray(listRow?.midArray) && listRow!.midArray!.length > 0 ? (
+
+          {listKey === 'state' ? (
             <View style={{ gap: spacing(1.5), marginTop: spacing(2) }}>
-              {listRow!.midArray!.map((mid) => {
-                const midStr = String(mid);
-                const isActive = String(listRow?.mid || '') === midStr;
-                return (
-                  <View key={midStr} style={styles.midRow}>
+              <Text style={styles.chipText}>
+                Selected: {stateDraft.length ? stateDraft.join(', ') : 'none'}
+              </Text>
+              <View style={styles.chipsWrap}>
+                {STATE_OPTIONS.map((state) => {
+                  const active = stateDraft.includes(state);
+                  return (
                     <TouchableOpacity
-                      style={[styles.midEnableBtn, isActive && styles.midEnableBtnActive]}
-                      disabled={busy || isActive}
-                      onPress={() => {
-                        void (async () => {
-                          setBusy(true);
-                          setModalMsg('');
-                          try {
-                            const err = await run('depositProviders.updateMidNameLink', {
-                              _id: listRow!._id,
-                              mid: midStr,
-                            });
-                            if (err) {
-                              setModalMsg(err);
-                              return;
-                            }
-                            setListRow((prev) => (prev ? { ...prev, mid: midStr } : prev));
-                            void load();
-                          } finally {
-                            setBusy(false);
-                          }
-                        })();
-                      }}
+                      key={state}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() =>
+                        setStateDraft((prev) =>
+                          prev.includes(state)
+                            ? prev.filter((s) => s !== state)
+                            : [...prev, state],
+                        )
+                      }
                     >
-                      <Text
-                        style={[styles.midEnableText, isActive && styles.midEnableTextActive]}
-                      >
-                        {isActive ? 'Active' : 'Enable'}
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {state}
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.midDeleteBtn}
-                      disabled={busy}
-                      onPress={() => void submitListRemoveMid(midStr)}
-                    >
-                      <Text style={styles.midDeleteText}>Delete</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.midName} numberOfLines={2}>
-                      {midStr}
-                    </Text>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </View>
+          ) : (
+            <View style={{ gap: spacing(1.5), marginTop: spacing(2) }}>
+              {listValuesForKey(listRow, listKey).length === 0 ? (
+                <Text style={styles.chipText}>No items yet</Text>
+              ) : (
+                listValuesForKey(listRow, listKey).map((item) => {
+                  const isMid = listKey === 'mid';
+                  const isWhatsapp = listKey === 'whatsapp';
+                  const isUpi = listKey === 'upi';
+                  const activeMobile = parseRedirectionMobile(listRow?.redirectionLink);
+                  const isActive = isMid
+                    ? String(listRow?.mid || '') === item
+                    : isUpi
+                      ? String(listRow?.link || '') === item
+                      : isWhatsapp
+                        ? activeMobile === item ||
+                          activeMobile === parseRedirectionMobile(item)
+                        : false;
+                  const canEnable = isMid || isUpi || isWhatsapp;
+                  return (
+                    <View key={item} style={styles.midRow}>
+                      {canEnable ? (
+                        <TouchableOpacity
+                          style={[styles.midEnableBtn, isActive && styles.midEnableBtnActive]}
+                          disabled={busy || isActive}
+                          onPress={() => {
+                            void (async () => {
+                              setBusy(true);
+                              setModalMsg('');
+                              try {
+                                const payload: Record<string, unknown> = { _id: listRow!._id };
+                                if (isMid) payload.mid = item;
+                                else if (isUpi) payload.link = item;
+                                else payload.redirectionLink = buildWhatsappRedirectionLink(item);
+                                const err = await run(
+                                  'depositProviders.updateMidNameLink',
+                                  payload,
+                                );
+                                if (err) {
+                                  setModalMsg(err);
+                                  return;
+                                }
+                                patchListRow(
+                                  isMid
+                                    ? { mid: item }
+                                    : isUpi
+                                      ? { link: item }
+                                      : { redirectionLink: buildWhatsappRedirectionLink(item) },
+                                );
+                              } finally {
+                                setBusy(false);
+                              }
+                            })();
+                          }}
+                        >
+                          <Text
+                            style={[styles.midEnableText, isActive && styles.midEnableTextActive]}
+                          >
+                            {isActive ? 'Active' : 'Enable'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {isMid ? (
+                        <TouchableOpacity
+                          style={styles.midDeleteBtn}
+                          disabled={busy}
+                          onPress={() => void submitListRemoveMid(item)}
+                        >
+                          <Text style={styles.midDeleteText}>Delete</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      <Text style={styles.midName} numberOfLines={2}>
+                        {item}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
+
+          {listKey !== 'state' && (listKey !== 'mid' || canAddMid) ? (
+            <TextInput
+              style={styles.modalInput}
+              value={inputValue}
+              onChangeText={setInputValue}
+              placeholder={
+                listKey === 'city'
+                  ? 'City (comma-separated)…'
+                  : listKey === 'mid'
+                    ? 'MID to add…'
+                    : listKey === 'whatsapp'
+                      ? 'Mobile number…'
+                      : 'Value to add…'
+              }
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType={listKey === 'whatsapp' ? 'phone-pad' : 'default'}
+            />
           ) : null}
-          <TextInput
-            style={styles.modalInput}
-            value={inputValue}
-            onChangeText={setInputValue}
-            placeholder={
-              listKey === 'city' || listKey === 'state'
-                ? 'Comma-separated values…'
-                : listKey === 'mid'
-                  ? 'MID to add…'
-                  : 'Value to add…'
-            }
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TouchableOpacity
-            style={[styles.submitBtn, busy && styles.btnDisabled]}
-            disabled={busy}
-            onPress={() => void submitListAdd()}
-          >
-            <Text style={styles.submitText}>{busy ? 'Adding…' : 'Add'}</Text>
-          </TouchableOpacity>
+          {listKey === 'state' || listKey !== 'mid' || canAddMid ? (
+            <TouchableOpacity
+              style={[styles.submitBtn, busy && styles.btnDisabled]}
+              disabled={busy}
+              onPress={() => void submitListAdd()}
+            >
+              <Text style={styles.submitText}>
+                {busy
+                  ? listKey === 'state'
+                    ? 'Saving…'
+                    : 'Adding…'
+                  : listKey === 'state'
+                    ? 'Submit states'
+                    : 'Add'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           {modalMsg ? <Text style={styles.modalMsg}>{modalMsg}</Text> : null}
         </View>,
       )}
