@@ -1597,6 +1597,17 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: true,
   },
+  // Narad Ask (external) — Bearer from env NARAD_ASK_TOKEN overrides default.
+  'gtel.naradAsk': {
+    method: 'POST',
+    path: 'https://narad.laxminarayan.live/ask',
+    encryptRequest: false,
+    decryptResponse: false,
+    headers: {
+      Authorization:
+        'Bearer 78bc61f239eecdcddf48bc5c1ae7a999af3a4889058620edffa8597157b6ac25',
+    },
+  },
   'gtel.callerDashboard': {
     method: 'GET',
     path: '/dialer/caller-dashboard',
@@ -2486,6 +2497,19 @@ module.exports = {
     encryptRequest: true,
     decryptResponse: true,
   },
+  /** Dual summary APIs — primary Unique Pending list + analytics (admin-panel parity). */
+  'uniquePending.amountSummary': {
+    method: 'POST',
+    path: '/transaction/unique-pending-amount-summary',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
+  'uniquePending.amountAllSummary': {
+    method: 'POST',
+    path: '/transaction/unique-pending-amount-all-summary',
+    encryptRequest: true,
+    decryptResponse: true,
+  },
   'uniquePending.message': {
     method: 'POST',
     path: '/transaction/uniquePending-message',
@@ -2500,8 +2524,8 @@ module.exports = {
   },
   'uniquePending.mids': {
     method: 'POST',
-    path: '/payinAccounts/getAllMidOld',
-    encryptRequest: true,
+    path: '/payinAccounts/getAllDistinctMids',
+    encryptRequest: false,
     decryptResponse: true,
   },
 
@@ -2910,6 +2934,18 @@ module.exports = {
   'whatsappMid.delete': {
     method: 'POST',
     path: '/SubAdmin/delete-gateway-upi',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'whatsappMid.startType': {
+    method: 'POST',
+    path: '/SubAdmin/start-gateway-upi-type',
+    encryptRequest: false,
+    decryptResponse: true,
+  },
+  'whatsappMid.stopType': {
+    method: 'POST',
+    path: '/SubAdmin/stop-gateway-upi-type',
     encryptRequest: false,
     decryptResponse: true,
   },

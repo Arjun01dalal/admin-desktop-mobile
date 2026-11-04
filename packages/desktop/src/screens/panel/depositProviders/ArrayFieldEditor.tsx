@@ -9,12 +9,21 @@ import {
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
+import {
+  buildCityNotAllowedPayload,
+  buildWhatsappRedirectionLink,
+  matchListOption,
+  normalizeStringList,
+  splitListInput,
+} from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
 import type { SecureAction } from '@/api/secureActions';
 
+type SelectedKey = 'mid' | 'link' | 'redirectionLink' | 'city';
+
 type Props = {
   rowId: string;
-  values: string[];
+  values: unknown;
   selectedValue?: string;
   label: string;
   placeholder: string;
@@ -23,7 +32,9 @@ type Props = {
   /** Optional remove API (e.g. depositProviders.removeMidArray for MIDs). */
   removeAction?: SecureAction;
   arrayKey?: string;
-  selectedKey?: 'mid' | 'link' | 'redirectionLink' | 'city';
+  selectedKey?: SelectedKey;
+  /** When false, hide Add input/button (MID uses show_add_provider_btn). Default true. */
+  canAdd?: boolean;
   onRefresh: () => void;
   userId?: string;
   userName?: string;
@@ -53,8 +64,8 @@ const smallActionBtnSx = {
 
 /**
  * Nested list editor for Mid / Link / WhatsApp / City.
- * MID manage (Enable/Delete) opens in a popover so the table row stays compact
- * and virtualized scrolling does not lock up.
+ * Admin CitySelector parity: always show current list + add; activate on select
+ * for mid/link/whatsapp; city uses updateBonusAndClients.
  */
 export function ArrayFieldEditor({
   rowId,
@@ -66,34 +77,41 @@ export function ArrayFieldEditor({
   removeAction,
   arrayKey,
   selectedKey = 'city',
+  canAdd = true,
   onRefresh,
   userId,
   userName,
 }: Props) {
-  const [list, setList] = useState<string[]>([]);
+  const [list, setList] = useState<string[]>(() => normalizeStringList(values));
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    setList(Array.isArray(values) ? values.map(String) : []);
+    setList(normalizeStringList(values));
   }, [values]);
 
+  const isCity = selectedKey === 'city';
+  const canActivate = selectedKey !== 'city';
+  const showManage = Boolean(removeAction) && canActivate;
+  const showAdd = canAdd !== false;
+
   const activateSelected = async (name: string, { quiet }: { quiet?: boolean } = {}) => {
-    if (selectedKey === 'city') return false;
+    if (!canActivate) return false;
     const data: Record<string, unknown> = { _id: rowId };
     if (selectedKey === 'mid') data.mid = name;
     else if (selectedKey === 'link') data.link = name;
-    else if (selectedKey === 'redirectionLink') data.redirectionLink = `https://wa.me/${name}`;
+    else if (selectedKey === 'redirectionLink') {
+      data.redirectionLink = buildWhatsappRedirectionLink(name);
+    }
 
     const res = await secureApi('depositProviders.updateMidNameLink', data);
     if (!res.ok) {
-      toast.error(res.message || 'Failed to set active value');
+      if (!quiet) toast.error(res.message || 'Failed to set active value');
       return false;
     }
     if (!quiet) toast.success(`${name} enabled`);
-    onRefresh();
     return true;
   };
 
@@ -103,7 +121,8 @@ export function ArrayFieldEditor({
     setBusy(true);
     setBusyKey(`enable:${trimmed}`);
     try {
-      await activateSelected(trimmed);
+      const ok = await activateSelected(trimmed);
+      if (ok) onRefresh();
     } finally {
       setBusy(false);
       setBusyKey(null);
@@ -111,35 +130,38 @@ export function ArrayFieldEditor({
   };
 
   const handleAdd = async () => {
+    if (!showAdd) return;
     const trimmed = draft.trim();
     if (!trimmed) return;
-    if (list.some((v) => v.toLowerCase() === trimmed.toLowerCase())) {
-      toast.warn(`"${trimmed}" already exists`);
+    const additions = isCity ? splitListInput(trimmed) : [trimmed];
+    if (!additions.length) return;
+
+    const dup = additions.find((v) => list.some((x) => x.toLowerCase() === v.toLowerCase()));
+    if (dup) {
+      toast.warn(`"${dup}" already exists`);
       return;
     }
+
     setBusy(true);
     try {
       if (arrayAction && arrayKey) {
-        const res = await secureApi(arrayAction, { _id: rowId, [arrayKey]: [trimmed] });
+        const res = await secureApi(arrayAction, { _id: rowId, [arrayKey]: additions });
         if (!res.ok) {
           toast.error(res.message || `Failed to add ${placeholder}`);
           return;
         }
         toast.success(`${placeholder} added`);
         setDraft('');
-        await activateSelected(trimmed, { quiet: true });
+        setList((prev) => normalizeStringList([...prev, ...additions]));
+        // Best-effort activate — never block list refresh (admin updateData → updateRecoredInDB).
+        await activateSelected(additions[0], { quiet: true });
+        onRefresh();
         return;
       }
 
       const res = await secureApi('depositProviders.updateBonusAndClients', {
         _id: rowId,
-        cityNotAllowed: {
-          cities: trimmed
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
-          action: 'add',
-        },
+        cityNotAllowed: buildCityNotAllowedPayload(additions, 'add'),
         updatedBy: { userId, userName },
       });
       if (!res.ok) {
@@ -148,6 +170,7 @@ export function ArrayFieldEditor({
       }
       toast.success('City added');
       setDraft('');
+      setList((prev) => normalizeStringList([...prev, ...additions]));
       onRefresh();
     } finally {
       setBusy(false);
@@ -173,7 +196,6 @@ export function ArrayFieldEditor({
         return;
       }
       toast.success(`${trimmed} deleted`);
-      // Drop locally so popover stays responsive before parent reload finishes.
       setList((prev) => prev.filter((v) => v !== trimmed));
       onRefresh();
     } finally {
@@ -182,13 +204,18 @@ export function ArrayFieldEditor({
     }
   };
 
-  const selected =
-    selectedValue && list.includes(String(selectedValue)) ? String(selectedValue) : '';
+  const matchedSelected = selectedValue
+    ? matchListOption(String(selectedValue), list)
+    : '';
+  const selected = matchedSelected && list.includes(matchedSelected) ? matchedSelected : '';
   const manageOpen = Boolean(anchorEl);
-  const showManage = Boolean(removeAction) && selectedKey !== 'city';
 
   return (
-    <Stack spacing={0.5} alignItems="stretch" sx={{ minWidth: 150, maxWidth: 200, py: 0.25 }}>
+    <Stack
+      spacing={0.5}
+      alignItems="stretch"
+      sx={{ minWidth: 150, maxWidth: 220, width: '100%', py: 0.25, overflow: 'visible' }}
+    >
       <Typography
         variant="caption"
         sx={{ fontWeight: 700, color: 'rgba(255,255,255,0.7)', lineHeight: 1.2 }}
@@ -196,12 +223,12 @@ export function ArrayFieldEditor({
         {label}
       </Typography>
 
-      {list.length > 0 && selectedKey !== 'city' ? (
+      {list.length > 0 ? (
         showManage ? (
           <Stack direction="row" spacing={0.5} alignItems="center">
             <TextField
               size="small"
-              value={selected || '—'}
+              value={selected || list.join(', ')}
               InputProps={{ readOnly: true }}
               sx={{
                 flex: 1,
@@ -214,7 +241,7 @@ export function ArrayFieldEditor({
                   whiteSpace: 'nowrap',
                 },
               }}
-              title={selected || undefined}
+              title={(selected || list.join(', ')) || undefined}
             />
             <Button
               size="small"
@@ -235,7 +262,7 @@ export function ArrayFieldEditor({
               Manage
             </Button>
           </Stack>
-        ) : (
+        ) : canActivate ? (
           <TextField
             select
             size="small"
@@ -252,56 +279,61 @@ export function ArrayFieldEditor({
               </MenuItem>
             ))}
           </TextField>
+        ) : (
+          <Typography
+            variant="caption"
+            component="div"
+            sx={{
+              color: 'rgba(255,255,255,0.75)',
+              whiteSpace: 'normal',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              lineHeight: 1.3,
+              maxWidth: '100%',
+              textAlign: 'left',
+            }}
+            title={list.join(', ')}
+          >
+            {list.join(', ')}
+          </Typography>
         )
-      ) : null}
-
-      {selectedKey === 'city' && list.length > 0 && (
-        <Typography
-          variant="caption"
-          component="div"
-          sx={{
-            color: 'rgba(255,255,255,0.75)',
-            whiteSpace: 'normal',
-            overflowWrap: 'anywhere',
-            wordBreak: 'break-word',
-            lineHeight: 1.3,
-            maxWidth: '100%',
-            textAlign: 'left',
-          }}
-        >
-          {list.join(', ')}
+      ) : (
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)', textAlign: 'left' }}>
+          No items yet
         </Typography>
       )}
 
-      <Stack direction="row" spacing={0.5} alignItems="center">
-        <TextField
-          size="small"
-          placeholder={placeholder}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              void handleAdd();
-            }
-          }}
-          sx={{
-            flex: 1,
-            minWidth: 0,
-            '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 11, minHeight: 30 },
-            '& .MuiInputBase-input': { py: 0.5 },
-          }}
-        />
-        <Button
-          size="small"
-          variant="contained"
-          disabled={busy}
-          onClick={() => void handleAdd()}
-          sx={orangeBtnSx}
-        >
-          ADD
-        </Button>
-      </Stack>
+      {showAdd ? (
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <TextField
+            size="small"
+            placeholder={placeholder}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void handleAdd();
+              }
+            }}
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 11, minHeight: 30 },
+              '& .MuiInputBase-input': { py: 0.5 },
+            }}
+          />
+          <Button
+            size="small"
+            variant="contained"
+            disabled={busy || !draft.trim()}
+            onClick={() => void handleAdd()}
+            sx={orangeBtnSx}
+          >
+            ADD
+          </Button>
+        </Stack>
+      ) : null}
 
       <Popover
         open={manageOpen}

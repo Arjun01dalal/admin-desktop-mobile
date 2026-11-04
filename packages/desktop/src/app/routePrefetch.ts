@@ -103,6 +103,8 @@ const LOADERS: Record<string, Loader> = {
   '/bonus-wallet': () => import('@/screens/panel/BonusWalletRequestsPage'),
   '/DepositApprovedReport': () => import('@/screens/panel/DepositApprovedReportPage'),
   '/unique_deposit_pending': () => import('@/screens/panel/UniqueDepositPendingPage'),
+  '/unique_deposit_pending/caller-wise': () =>
+    import('@/screens/panel/uniquePending/CallerWiseDepositPendingPage'),
   '/deposit': () => import('@/screens/panel/DepositPage'),
   '/state-wise-deposit': () => import('@/screens/panel/StateWiseDepositPage'),
   '/withdrawal': () => import('@/screens/panel/WithdrawalPage'),

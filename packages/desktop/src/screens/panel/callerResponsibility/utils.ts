@@ -3,6 +3,7 @@ import {
   CALLER_ROLE_IDS,
   FULL_ALLOTMENT_ROLE_IDS,
   RESP_TOTAL_DEPOSIT,
+  matchesCallerHeadName as sharedMatchesCallerHeadName,
   type CallerRow,
 } from './constants';
 import { formatAmount } from '@/utils/dates';
@@ -10,11 +11,14 @@ import { formatAmount } from '@/utils/dates';
 export type StoredCallerUser = {
   _id?: string;
   name?: string;
+  realName?: string;
+  chatName?: string;
   Role_ID?: string;
   empCode?: string;
   Responsibilities?: string[];
   extensionId?: string[] | string;
   serverId?: string | number;
+  roles?: Record<string, unknown>;
 };
 
 export function roundAmt(value: unknown): number | string {
@@ -42,22 +46,8 @@ export function displayName(value: unknown, empty = '-'): string {
   return s;
 }
 
-/** Match laxmi caller-head assignment (array or comma/pipe-separated names). */
-export function matchesCallerHeadName(value: unknown, name: unknown): boolean {
-  const expected = String(name ?? '')
-    .trim()
-    .toLowerCase();
-  if (!expected || value == null) return false;
-
-  const assigned = Array.isArray(value) ? value : String(value).split(/[,|]/);
-
-  return assigned.some((entry) => {
-    const normalized = String(entry ?? '')
-      .trim()
-      .toLowerCase();
-    return normalized !== 'not assigned' && normalized === expected;
-  });
-}
+/** Match caller-head assignment (array or comma/pipe-separated names) — delegates to shared. */
+export const matchesCallerHeadName = sharedMatchesCallerHeadName;
 
 /** Look up minutes for the page startDate inside inactiveTime/activeTime arrays. */
 export function minutesForDate(data: unknown, startDate: string): string {
@@ -82,17 +72,6 @@ export function canSeeTotalDeposit(user: StoredCallerUser | null): boolean {
   const list = user?.Responsibilities;
   if (!Array.isArray(list) || list.length === 0) return true;
   return list.includes(RESP_TOTAL_DEPOSIT);
-}
-
-export function filterCallerRows(
-  rows: CallerRow[],
-  user: StoredCallerUser | null,
-  isCaller: boolean,
-  showCompany: boolean,
-): CallerRow[] {
-  return rows
-    .filter((v) => (isCaller ? v.empCode === user?.empCode : !v.block))
-    .filter((v) => (showCompany ? true : v.officeLocation !== 'Company'));
 }
 
 export function ecs(row: CallerRow): Record<string, unknown> {

@@ -12,14 +12,16 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import { CallerDashCallsModal } from '@/screens/panel/gtel/CallerDashCallsModal';
 import { CallerDashListModal } from '@/screens/panel/gtel/CallerDashListModal';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import type { GtelCallerDashCard, GtelCallerDashRow } from '@astro/shared';
 import { dashToneColor, useDashPalette } from '@/screens/panel/gtel/tones';
 import { CallerDashCharts } from '@/screens/panel/gtel/CallerDashCharts';
 import { CallerDashTable } from '@/screens/panel/gtel/CallerDashTable';
+import { NaradAskModal } from '@/screens/panel/gtel/NaradAskModal';
 import { PanelAccessDenied } from '@/components/PanelAccessDenied';
 import { GtelKpiCards } from '@/screens/panel/gtel/GtelKpiCards';
 import { useGtelAuth } from '@/screens/panel/gtel/useGtelAuth';
-import { fieldSx } from '@/screens/panel/transactions/shared';
+import { fieldSx, orangeBtnSx } from '@/screens/panel/transactions/shared';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { todayIST } from '@/utils/dates';
 import {
@@ -50,7 +52,7 @@ export function GtelCallerDashboardPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const palette = useDashPalette();
-  const { canShowGtelDashboard, lockEmpCode, loginEmpCode } = useGtelAuth();
+  const { canShowGtelDashboard, canShowAskAiBtn, lockEmpCode, loginEmpCode } = useGtelAuth();
 
   const initialFrom = params.get('from')?.trim() || todayIST();
   const initialTo = params.get('to')?.trim() || todayIST();
@@ -72,6 +74,7 @@ export function GtelCallerDashboardPage() {
     name: string;
     empCode: string;
   } | null>(null);
+  const [naradAskOpen, setNaradAskOpen] = useState(false);
 
   const { cards, callers, loading, error } = useGtelCallerDashboard({ from, to, empCode });
 
@@ -142,15 +145,28 @@ export function GtelCallerDashboardPage() {
             Dialer caller stats, dispositions, campaign & allotment overview
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/gtel-calls')}
-          sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
-        >
-          Back to Gtel Calls
-        </Button>
+        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+          {canShowAskAiBtn ? (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AutoAwesomeIcon />}
+              onClick={() => setNaradAskOpen(true)}
+              sx={{ ...orangeBtnSx, height: 36 }}
+            >
+              Ask AI
+            </Button>
+          ) : null}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/gtel-calls')}
+            sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
+          >
+            Back to Gtel Calls
+          </Button>
+        </Stack>
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -285,6 +301,9 @@ export function GtelCallerDashboardPage() {
         to={to.trim() || todayIST()}
         onClose={() => setCallsModal(null)}
       />
+      {canShowAskAiBtn ? (
+        <NaradAskModal open={naradAskOpen} onClose={() => setNaradAskOpen(false)} />
+      ) : null}
     </Box>
   );
 }

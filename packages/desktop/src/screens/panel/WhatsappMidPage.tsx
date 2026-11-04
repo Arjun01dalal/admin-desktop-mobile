@@ -38,11 +38,13 @@ import {
   parseDistinctMidOptions,
   parseGatewayNameOptions,
   parseGatewayUpisResponse,
+  setTypeSettingActive,
   validateGatewayMidForm,
   type GatewayMidFormErrors,
   type GatewayMidFormField,
   type GatewayMidFormState,
   type GatewayMidRow,
+  type GatewayMidTypeSetting,
 } from '@astro/shared/gatewayMid';
 import { secureApi } from '@/api/secureClient';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
@@ -69,6 +71,8 @@ const groupHeaderSx = {
 export function WhatsappMidPage() {
   const [rows, setRows] = useState<GatewayMidRow[]>([]);
   const [apiTypeOptions, setApiTypeOptions] = useState<string[]>([]);
+  const [typeSettings, setTypeSettings] = useState<GatewayMidTypeSetting[]>([]);
+  const [typeActionKey, setTypeActionKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [gatewayNameOptions, setGatewayNameOptions] = useState<string[]>([]);
   const [gatewayMidOptions, setGatewayMidOptions] = useState<string[]>([]);
@@ -108,11 +112,14 @@ export function WhatsappMidPage() {
         toast.error(res.message || 'Failed to load Gateway MIDs');
         setRows([]);
         setApiTypeOptions([]);
+        setTypeSettings([]);
         return;
       }
-      const { rows: nextRows, types } = parseGatewayUpisResponse(res.data);
+      const { rows: nextRows, types, typeSettings: nextTypeSettings } =
+        parseGatewayUpisResponse(res.data);
       setRows(nextRows);
       setApiTypeOptions(types);
+      setTypeSettings(nextTypeSettings);
     } finally {
       setLoading(false);
     }
@@ -198,6 +205,41 @@ export function WhatsappMidPage() {
       toast.error(res.message || 'Failed to update status');
     }
   }, []);
+
+  const handleTypeAction = useCallback(
+    async (type: string, action: 'start' | 'stop') => {
+      const typeKey = String(type || '').trim();
+      if (!typeKey || submitting || typeActionKey) return;
+
+      const actionKey = `${action}:${typeKey}`;
+      const previousSettings = typeSettings;
+      const nextActive = action === 'start';
+      const label = formatGatewayTypeLabel(typeKey) || typeKey;
+
+      setTypeActionKey(actionKey);
+      setSubmitting(true);
+      setTypeSettings((list) => setTypeSettingActive(list, typeKey, nextActive));
+
+      try {
+        const res = await secureApi(
+          action === 'start' ? 'whatsappMid.startType' : 'whatsappMid.stopType',
+          { type: typeKey },
+        );
+        if (!res.ok) {
+          setTypeSettings(previousSettings);
+          toast.error(res.message || `Failed to ${action} ${label}`);
+          return;
+        }
+        toast.success(`${label} ${action === 'start' ? 'started' : 'stopped'}`);
+        await load();
+        setTypeSettings((list) => setTypeSettingActive(list, typeKey, nextActive));
+      } finally {
+        setTypeActionKey('');
+        setSubmitting(false);
+      }
+    },
+    [load, submitting, typeActionKey, typeSettings],
+  );
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -344,16 +386,25 @@ export function WhatsappMidPage() {
 
   return (
     <Box sx={{ p: 2 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h6" fontWeight={700}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        spacing={1.5}
+        sx={{ mb: typeSettings.length ? 1 : 1.5 }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h6" fontWeight={800} noWrap>
             Set Gateway Mid
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="text.secondary" noWrap>
             {groupedByName.length} names · {totalUpis} UPIs · {activeCount} active
+            {typeSettings.length
+              ? ` · ${typeSettings.filter((t) => t.isActive).length}/${typeSettings.length} types running`
+              : ''}
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
           <Button
             size="small"
             startIcon={<RefreshIcon />}
@@ -374,6 +425,114 @@ export function WhatsappMidPage() {
           </Button>
         </Stack>
       </Stack>
+
+      {typeSettings.length > 0 ? (
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{
+            mb: 1.5,
+            minHeight: 44,
+            maxHeight: 52,
+            px: 1,
+            py: 0.5,
+            borderRadius: 1.5,
+            border: '1px solid rgba(255,159,10,0.28)',
+            bgcolor: 'rgba(255,159,10,0.06)',
+            overflow: 'hidden',
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              flexShrink: 0,
+              fontWeight: 800,
+              color: 'rgba(255,204,128,0.95)',
+              letterSpacing: 0.3,
+              textTransform: 'uppercase',
+              fontSize: 10,
+            }}
+          >
+            Types
+          </Typography>
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              py: 0.25,
+              '&::-webkit-scrollbar': { height: 0 },
+            }}
+          >
+            {typeSettings.map(({ type, isActive }) => {
+              const starting = typeActionKey === `start:${type}`;
+              const stopping = typeActionKey === `stop:${type}`;
+              const busy = starting || stopping;
+              return (
+                <Stack
+                  key={type}
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.75}
+                  sx={{
+                    flexShrink: 0,
+                    height: 34,
+                    pl: 1,
+                    pr: 0.5,
+                    borderRadius: 999,
+                    border: isActive
+                      ? '1px solid rgba(102,187,106,0.45)'
+                      : '1px solid rgba(255,255,255,0.12)',
+                    bgcolor: isActive ? 'rgba(102,187,106,0.1)' : 'rgba(18,18,24,0.65)',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor: isActive ? '#66bb6a' : 'rgba(255,255,255,0.28)',
+                    }}
+                  />
+                  <Typography variant="caption" fontWeight={700} noWrap sx={{ maxWidth: 110 }}>
+                    {formatGatewayTypeLabel(type) || type}
+                  </Typography>
+                  <Button
+                    size="small"
+                    disabled={submitting}
+                    onClick={() => void handleTypeAction(type, isActive ? 'stop' : 'start')}
+                    sx={{
+                      minWidth: 58,
+                      height: 26,
+                      px: 1,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      borderRadius: 999,
+                      border: '1px solid',
+                      borderColor: isActive ? 'rgba(239,83,80,0.5)' : 'rgba(102,187,106,0.5)',
+                      color: isActive ? '#ef9a9a' : '#a5d6a7',
+                      bgcolor: isActive ? 'rgba(239,83,80,0.1)' : 'rgba(102,187,106,0.1)',
+                      '&:hover': {
+                        borderColor: isActive ? '#ef5350' : '#66bb6a',
+                        bgcolor: isActive ? 'rgba(239,83,80,0.18)' : 'rgba(102,187,106,0.18)',
+                      },
+                      '&.Mui-disabled': { opacity: 0.55 },
+                    }}
+                  >
+                    {busy ? '…' : isActive ? 'Stop' : 'Start'}
+                  </Button>
+                </Stack>
+              );
+            })}
+          </Box>
+        </Stack>
+      ) : null}
 
       <TablePanel>
         {loading && rows.length === 0 ? (

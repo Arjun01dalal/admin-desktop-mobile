@@ -31,6 +31,7 @@ import {
   hasPermission as sharedHasPermission,
   canUseAdminLlmChat as sharedCanUseAdminLlmChat,
   isFullAccessNavRole as sharedIsFullAccessNavRole,
+  seesOriginalDisplayLabels as sharedSeesOriginalDisplayLabels,
   isCallerRole as sharedIsCallerRole,
   isPathAllowed,
   isSosExemptRole as sharedIsSosExemptRole,
@@ -102,6 +103,11 @@ export function canUseAdminLlmChat(user: StoredUser | null = getSessionUser()): 
 
 export function isFullAccessNavRole(user: StoredUser | null = getSessionUser()): boolean {
   return sharedIsFullAccessNavRole(user, storage);
+}
+
+/** full_access / dev_full_access — always original labels; no Reveal codes OTP. */
+export function seesOriginalDisplayLabels(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedSeesOriginalDisplayLabels(user, storage);
 }
 
 export function canAccessDashboard(user: StoredUser | null = getSessionUser()): boolean {

@@ -1052,6 +1052,12 @@ async function execute(action, payload = {}, token = null) {
       ...(action === 'dashboard.sportBook' && process.env.XCHECK_HEADER
         ? { xcheck: process.env.XCHECK_HEADER }
         : {}),
+      // Env override for Narad Ask bearer (registry has default).
+      ...(action === 'gtel.naradAsk' && process.env.NARAD_ASK_TOKEN
+        ? {
+            Authorization: `Bearer ${String(process.env.NARAD_ASK_TOKEN).trim()}`,
+          }
+        : {}),
     };
 
     // Match laxminarayan Live Match calls: dates go in the query string for GET.

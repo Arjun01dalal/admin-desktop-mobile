@@ -365,6 +365,41 @@ export function CreateUserDialog({ open, mode, onClose, onCreated }: Props) {
                 </Box>
               ) : null}
             </Stack>
+
+            {isAdmin ? (
+              <Box
+                sx={{
+                  minHeight: 56,
+                  px: 1.5,
+                  py: 0.75,
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: form.isBot ? 'primary.main' : 'divider',
+                  bgcolor: form.isBot ? 'rgba(241,161,68,0.10)' : 'action.hover',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <FormControlLabel
+                  sx={{ m: 0, width: '100%' }}
+                  control={
+                    <Checkbox
+                      checked={form.isBot}
+                      onChange={(e) => setField('isBot', e.target.checked)}
+                      sx={{
+                        color: '#f1a144',
+                        '&.Mui-checked': { color: '#f1a144' },
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" fontWeight={700}>
+                      Is Bot
+                    </Typography>
+                  }
+                />
+              </Box>
+            ) : null}
           </Stack>
         ) : (
           <Stack spacing={1.5} sx={{ pt: 0.5 }}>

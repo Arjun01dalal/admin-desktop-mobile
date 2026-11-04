@@ -210,6 +210,10 @@ const UniqueDepositPendingPage = lazyNamed(
   () => import('@/screens/panel/UniqueDepositPendingPage'),
   'UniqueDepositPendingPage',
 );
+const CallerWiseDepositPendingPage = lazyNamed(
+  () => import('@/screens/panel/uniquePending/CallerWiseDepositPendingPage'),
+  'CallerWiseDepositPendingPage',
+);
 const DepositPage = lazyNamed(() => import('@/screens/panel/DepositPage'), 'DepositPage');
 const StateWiseDepositPage = lazyNamed(
   () => import('@/screens/panel/StateWiseDepositPage'),
@@ -446,6 +450,7 @@ export {
   BonusWalletRequestsPage,
   DepositApprovedReportPage,
   UniqueDepositPendingPage,
+  CallerWiseDepositPendingPage,
   DepositPage,
   StateWiseDepositPage,
   WithdrawalPage,

@@ -48,6 +48,7 @@ import {
   getSessionUser,
   isPathAllowed,
   isSosExemptRole,
+  seesOriginalDisplayLabels,
 } from '@/auth/permissions';
 import { syncResponsibilitiesForRole } from '@/auth/syncResponsibilities';
 import { useSosFlagGuard } from '@/hooks/useSosFlagGuard';
@@ -105,6 +106,7 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
 
   const user = getSessionUser();
   const sosExempt = isSosExemptRole(user);
+  const hideRevealCodes = seesOriginalDisplayLabels(user);
 
   const navItems = useMemo(() => NAV_ITEMS.filter((item) => canAccessNavItem(item, user)), [user]);
 
@@ -140,6 +142,9 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
     }
     if (paths.includes('/funds')) {
       paths.push('/funds/mid', '/funds/payin', '/funds/mid/payingAccount', '/funds/mid-groups');
+    }
+    if (paths.includes('/unique_deposit_pending')) {
+      paths.push('/unique_deposit_pending/caller-wise');
     }
     if (paths.includes('/users-kyc')) {
       paths.push('/kycList');
@@ -365,30 +370,32 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
               </Button>
             ) : null)}
 
-          <Button
-            size="small"
-            variant={reveal.active ? 'contained' : 'outlined'}
-            color="warning"
-            startIcon={reveal.active ? <VisibilityIcon /> : <VisibilityOffIcon />}
-            title={
-              reveal.active
-                ? 'Click to hide original names (restore secret codes)'
-                : 'Reveal original names (OTP, 1 hour)'
-            }
-            onClick={() => {
-              // Before 60 min expires: click again reverses to secret/Jyotish names.
-              if (reveal.active) {
-                reveal.clear();
-                return;
+          {!hideRevealCodes ? (
+            <Button
+              size="small"
+              variant={reveal.active ? 'contained' : 'outlined'}
+              color="warning"
+              startIcon={reveal.active ? <VisibilityIcon /> : <VisibilityOffIcon />}
+              title={
+                reveal.active
+                  ? 'Click to hide original names (restore secret codes)'
+                  : 'Reveal original names (OTP, 1 hour)'
               }
-              setRevealOtpOpen(true);
-            }}
-            sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
-          >
-            {reveal.active
-              ? `Hide original (${Math.max(1, Math.ceil((reveal.expiresAt - Date.now()) / 60000))}m)`
-              : 'Reveal codes'}
-          </Button>
+              onClick={() => {
+                // Before 60 min expires: click again reverses to secret/Jyotish names.
+                if (reveal.active) {
+                  reveal.clear();
+                  return;
+                }
+                setRevealOtpOpen(true);
+              }}
+              sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              {reveal.active
+                ? `Hide original (${Math.max(1, Math.ceil((reveal.expiresAt - Date.now()) / 60000))}m)`
+                : 'Reveal codes'}
+            </Button>
+          ) : null}
 
           <Button
             size="small"
@@ -625,7 +632,9 @@ function AppShellInner({ onLogout, onUserChanged }: Props) {
         </DialogActions>
       </Dialog>
 
-      <RevealCodesOtpModal open={revealOtpOpen} onClose={() => setRevealOtpOpen(false)} />
+      {!hideRevealCodes ? (
+        <RevealCodesOtpModal open={revealOtpOpen} onClose={() => setRevealOtpOpen(false)} />
+      ) : null}
     </Box>
   );
 }

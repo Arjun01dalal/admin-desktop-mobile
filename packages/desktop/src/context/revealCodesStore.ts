@@ -1,7 +1,11 @@
 /**
  * Temporary reveal of original (non-Jyotish) UI labels after OTP verify.
  * Valid for 1 hour, then auto-resets.
+ *
+ * full_access / dev_full_access always see originals (no OTP).
  */
+
+import { seesOriginalDisplayLabels } from '@/auth/permissions';
 
 const STORAGE_KEY = 'astroRevealCodesUntil';
 export const REVEAL_CODES_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -45,6 +49,7 @@ export function getRevealCodesUntil(): number {
 }
 
 export function isRevealCodesActive(): boolean {
+  if (seesOriginalDisplayLabels()) return true;
   return Date.now() < until;
 }
 

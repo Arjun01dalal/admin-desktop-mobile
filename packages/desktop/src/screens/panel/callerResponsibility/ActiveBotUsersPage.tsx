@@ -13,8 +13,11 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import {
+  filterActiveBotUsers,
   flattenActiveBotUsersPayload,
   formatAutomationBotLabel,
+  previousActivityMaxDateIST,
+  visibleActiveBotSummary,
   type ActiveBotSummaryItem,
   type ActiveBotUserRow,
 } from '@astro/shared';
@@ -26,6 +29,20 @@ import { formatDisplayDate, getStoredUser, todayIST } from '@/utils/dates';
 import { maskMobile } from '@/screens/panel/shared';
 import { RESP_SHOW_MOBILE, type CallerRow } from './constants';
 import type { StoredCallerUser } from './utils';
+
+/** Admin-panel amber chip tone (#fff7ed / #c2410c), adapted for the dark theme. */
+const botChipSx = {
+  fontWeight: 700,
+  color: '#fdba74',
+  bgcolor: 'rgba(249,115,22,0.12)',
+  border: '1px solid rgba(194,65,12,0.45)',
+} as const;
+
+const botChipActiveSx = {
+  ...botChipSx,
+  bgcolor: 'rgba(249,115,22,0.28)',
+  border: '1px solid #c2410c',
+} as const;
 
 type NavState = {
   activeBotUsers?: ActiveBotUserRow[];
@@ -48,6 +65,13 @@ function firstBotId(row: ActiveBotUserRow): string {
   return '-';
 }
 
+function playedLabel(row: ActiveBotUserRow): string {
+  const played = row.played;
+  if (Array.isArray(played) && played.length) return played.map(String).join(', ');
+  if (played != null && played !== '') return String(played);
+  return '—';
+}
+
 export function ActiveBotUsersPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -64,9 +88,11 @@ export function ActiveBotUsersPage() {
   );
   const [botSummary, setBotSummary] = useState<ActiveBotSummaryItem[]>(() => nav.botSummary || []);
   const [botFilter, setBotFilter] = useState('');
+  const [previousActivityDate, setPreviousActivityDate] = useState('');
   const [loading, setLoading] = useState(false);
   const loadGenRef = useRef(0);
   const skippedInitialFetch = useRef(hadNavUsers);
+  const prevActivityMax = useMemo(() => previousActivityMaxDateIST(), []);
 
   const load = useCallback(async () => {
     const gen = ++loadGenRef.current;
@@ -98,10 +124,12 @@ export function ActiveBotUsersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredRows = useMemo(() => {
-    if (!botFilter) return rows;
-    return rows.filter((r) => String(r.botType || '') === botFilter);
-  }, [rows, botFilter]);
+  const filteredRows = useMemo(
+    () => filterActiveBotUsers(rows, { botType: botFilter, previousActivityDate }),
+    [rows, botFilter, previousActivityDate],
+  );
+  const visibleBotSummary = useMemo(() => visibleActiveBotSummary(botSummary), [botSummary]);
+  const filtersActive = Boolean(botFilter || previousActivityDate);
 
   const columns = useMemo<CommonTableColumn<ActiveBotUserRow>[]>(() => {
     const cols: CommonTableColumn<ActiveBotUserRow>[] = [
@@ -160,10 +188,28 @@ export function ActiveBotUsersPage() {
         render: (r) => formatBalance(r.balance),
       },
       {
+        id: 'played',
+        label: 'Played',
+        render: (r) => playedLabel(r),
+      },
+      {
+        id: 'empCode',
+        label: 'Emp Code',
+        render: (r) => String(r.empCode || '-'),
+      },
+      {
         id: 'lastActivity',
         label: 'Last Activity',
         render: (r) => {
           const raw = r.activeUser ?? r.lastActivity ?? r.updatedOn ?? r.updatedAt;
+          return raw ? formatDisplayDate(String(raw)) : '-';
+        },
+      },
+      {
+        id: 'previousActivity',
+        label: 'Previous Activity',
+        render: (r) => {
+          const raw = r.lastSecondActivity ?? r.previousActivity ?? r.prevActivity;
           return raw ? formatDisplayDate(String(raw)) : '-';
         },
       },
@@ -186,21 +232,24 @@ export function ActiveBotUsersPage() {
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography variant="h6" fontWeight={800} sx={{ mr: 1 }}>
-            Active Bot Users
+            Active Bot Users ({filteredRows.length}
+            {filtersActive ? ` / ${total}` : ''})
           </Typography>
           <Chip size="small" label={`Total: ${total}`} sx={{ fontWeight: 700 }} />
-          {botSummary.map((b) => (
-            <Chip
-              key={b.bot}
-              size="small"
-              label={`${formatAutomationBotLabel(b.bot)}: ${b.count}`}
-              onClick={() => setBotFilter((prev) => (prev === b.bot ? '' : b.bot))}
-              color={botFilter === b.bot ? 'primary' : 'default'}
-              variant={botFilter === b.bot ? 'filled' : 'outlined'}
-              sx={{ fontWeight: 700 }}
-            />
-          ))}
         </Stack>
+        <Box sx={{ overflowX: 'auto', pb: 0.5, mt: 1 }}>
+          <Stack direction="row" spacing={0.75} sx={{ width: 'max-content' }}>
+            {visibleBotSummary.map((b) => (
+              <Chip
+                key={b.bot}
+                size="small"
+                label={`${formatAutomationBotLabel(b.bot)}: ${b.count}`}
+                onClick={() => setBotFilter((prev) => (prev === b.bot ? '' : b.bot))}
+                sx={botFilter === b.bot ? botChipActiveSx : botChipSx}
+              />
+            ))}
+          </Stack>
+        </Box>
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap mt={1.5}>
           <TextField
             type="date"
@@ -221,6 +270,16 @@ export function ActiveBotUsersPage() {
             sx={{ width: 170 }}
           />
           <TextField
+            type="date"
+            label="Previous Activity"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            inputProps={{ max: prevActivityMax }}
+            value={previousActivityDate}
+            onChange={(e) => setPreviousActivityDate(e.target.value)}
+            sx={{ width: 180 }}
+          />
+          <TextField
             select
             label="Bot filter"
             size="small"
@@ -229,7 +288,7 @@ export function ActiveBotUsersPage() {
             sx={{ width: 180 }}
           >
             <MenuItem value="">All bots</MenuItem>
-            {botSummary.map((b) => (
+            {visibleBotSummary.map((b) => (
               <MenuItem key={b.bot} value={b.bot}>
                 {formatAutomationBotLabel(b.bot)}
               </MenuItem>

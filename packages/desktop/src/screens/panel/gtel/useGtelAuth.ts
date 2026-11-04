@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { getRoleId, getSessionUser, hasPermission, isCallerRole } from '@/auth/permissions';
+import {
+  getRoleId,
+  getSessionUser,
+  hasPermission,
+  isCallerRole,
+  isFullAccessNavRole,
+} from '@/auth/permissions';
 import {
   CALLER_ROLE_IDS,
   EMPCODE_LIST_FILTER_ROLE_ID,
@@ -50,7 +56,9 @@ export function useGtelAuth() {
     canShowMobile: canShowGtelMobile(admin),
     canShowC2c: canShowGtelC2c(admin),
     canShowGtelCalls: hasPermission('show_gtel_calls', admin),
-    canShowGtelDashboard: hasPermission('show_gtel_dashboard', admin),
+    canShowGtelDashboard:
+      hasPermission('show_gtel_dashboard', admin) || isFullAccessNavRole(admin),
+    canShowAskAiBtn: hasPermission('show_ask_ai_btn', admin),
     canShowSuspiciousCall: hasPermission('show_suspicious_call', admin),
     canShowRecording: !isCaller,
   };

@@ -30,6 +30,11 @@ import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
+import {
+  buildStateNotAllowedPayload,
+  normalizeStringList,
+  parseRedirectionMobile,
+} from '@astro/shared';
 import { CLIENT_NAMES } from '@/constants/clientNames';
 import { formatDisplayDate, formatDisplayTime, getStoredUser, todayIST } from '@/utils/dates';
 import { asList, display, useReportQuery } from '@/screens/panel/shared';
@@ -130,11 +135,6 @@ const dateFieldSx = {
   '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 13 },
 };
 
-function asStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map(String).filter(Boolean);
-}
-
 function auditLine(user?: AuditUser, fallbackTime?: string) {
   if (!user?.userName && !fallbackTime && !user?.time) return '—';
   const time = user?.time || fallbackTime;
@@ -158,6 +158,7 @@ function auditLine(user?: AuditUser, fallbackTime?: string) {
 export function DepositProvidersPage() {
   const user = getStoredUser<{ _id?: string; name?: string }>();
   const canAdd = hasPermission(Permissions.Add_PayIn_Account);
+  const canAddMid = hasPermission(Permissions.show_add_provider_btn);
   const canToggle = hasPermission(Permissions.Toggle_PayIn_Account);
   const canDelete = hasPermission(Permissions.Delete_PayIn_Account);
   const canEdit = !hasPermission(Permissions.Disable_Deposit_Provider_Edit);
@@ -422,12 +423,12 @@ export function DepositProvidersPage() {
   };
 
   const saveStates = async (row: DepositProviderRow) => {
-    const states = stateDraft[row._id] ?? asStringList(row.stateNotAllowed);
+    const states = normalizeStringList(stateDraft[row._id] ?? row.stateNotAllowed);
     setSubmitting(true);
     try {
       const res = await secureApi('depositProviders.updateBonusAndClients', {
         _id: row._id,
-        stateNotAllowed: { states, action: 'add' },
+        stateNotAllowed: buildStateNotAllowedPayload(states, 'add'),
         updatedBy: { userId: user?._id, userName: user?.name },
       });
       if (!res.ok) {
@@ -435,6 +436,11 @@ export function DepositProvidersPage() {
         return;
       }
       toast.success('States updated');
+      setStateDraft((prev) => {
+        const next = { ...prev };
+        delete next[row._id];
+        return next;
+      });
       void load();
     } finally {
       setSubmitting(false);
@@ -678,13 +684,15 @@ export function DepositProvidersPage() {
             width={110}
           />
         ),
+        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'top' },
         render: (row) => {
-          const mids = asStringList(row.midArray);
-          if (mids.length > 0) {
+          const mids = normalizeStringList(row.midArray);
+          // Always show list editor (admin CitySelector) so empty midArray can still add.
+          if (mids.length > 0 || Array.isArray(row.midArray) || canEdit) {
             return (
               <ArrayFieldEditor
                 rowId={row._id}
-                values={mids}
+                values={mids.length ? mids : row.mid ? [row.mid] : []}
                 selectedValue={row.mid}
                 label="MID"
                 placeholder="Add Mid"
@@ -692,6 +700,7 @@ export function DepositProvidersPage() {
                 removeAction="depositProviders.removeMidArray"
                 arrayKey="midArray"
                 selectedKey="mid"
+                canAdd={canAddMid}
                 onRefresh={() => void load()}
                 userId={user?._id}
                 userName={user?.name}
@@ -701,11 +710,6 @@ export function DepositProvidersPage() {
           return (
             <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
               <Typography variant="body2">{display(row.mid)}</Typography>
-              {canEdit && (
-                <IconButton size="small" onClick={() => openUpdate(row, 'mid', row.mid)}>
-                  <EditIcon sx={{ fontSize: 15 }} />
-                </IconButton>
-              )}
             </Stack>
           );
         },
@@ -722,9 +726,10 @@ export function DepositProvidersPage() {
             width={120}
           />
         ),
+        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'top' },
         render: (row) => {
-          const links = asStringList(row.upiArray);
-          if (links.length > 0 || row.upiArray) {
+          const links = normalizeStringList(row.upiArray);
+          if (links.length > 0 || row.upiArray != null || canEdit) {
             return (
               <ArrayFieldEditor
                 rowId={row._id}
@@ -747,11 +752,6 @@ export function DepositProvidersPage() {
               >
                 {display(row.link)}
               </Typography>
-              {canEdit && (
-                <IconButton size="small" onClick={() => openUpdate(row, 'link', row.link)}>
-                  <EditIcon sx={{ fontSize: 15 }} />
-                </IconButton>
-              )}
             </Stack>
           );
         },
@@ -759,22 +759,22 @@ export function DepositProvidersPage() {
       {
         id: 'restriction',
         label: 'Restriction Info',
+        width: 220,
+        cellSx: { whiteSpace: 'normal', overflow: 'visible', verticalAlign: 'top' },
         filter: <Box />,
         render: (row) => (
           <ArrayFieldEditor
             rowId={row._id}
-            values={asStringList(row.whatsAppNumbers)}
-            selectedValue={
-              row.redirectionLink?.includes('wa.me/')
-                ? row.redirectionLink.split('wa.me/')[1]
-                : row.redirectionLink
-            }
+            values={normalizeStringList(row.whatsAppNumbers)}
+            selectedValue={parseRedirectionMobile(row.redirectionLink)}
             label="Mobile No"
             placeholder="Add Mobile"
             arrayAction="depositProviders.updateWhatsappNumbers"
             arrayKey="whatsAppNumbers"
             selectedKey="redirectionLink"
             onRefresh={() => void load()}
+            userId={user?._id}
+            userName={user?.name}
           />
         ),
       },
@@ -785,12 +785,12 @@ export function DepositProvidersPage() {
         cellSx: {
           whiteSpace: 'normal',
           maxWidth: 220,
-          overflow: 'hidden',
+          overflow: 'visible',
           verticalAlign: 'top',
         },
         filter: <Box />,
         render: (row) => {
-          const selected = stateDraft[row._id] ?? asStringList(row.stateNotAllowed);
+          const selected = normalizeStringList(stateDraft[row._id] ?? row.stateNotAllowed);
           return (
             <Stack
               spacing={0.75}
@@ -798,7 +798,7 @@ export function DepositProvidersPage() {
                 width: '100%',
                 maxWidth: 200,
                 minWidth: 0,
-                overflow: 'hidden',
+                overflow: 'visible',
               }}
             >
               <Select
@@ -815,10 +815,16 @@ export function DepositProvidersPage() {
                 }}
                 input={<OutlinedInput />}
                 renderValue={(vals) =>
-                  vals.length > 2
-                    ? `${vals.slice(0, 2).join(', ')} +${vals.length - 2}`
-                    : vals.join(', ')
+                  vals.length === 0
+                    ? 'Select states…'
+                    : vals.length > 2
+                      ? `${vals.slice(0, 2).join(', ')} +${vals.length - 2}`
+                      : vals.join(', ')
                 }
+                MenuProps={{
+                  PaperProps: { style: { maxHeight: 360 } },
+                  disableAutoFocusItem: true,
+                }}
                 sx={{
                   bgcolor: '#121218',
                   fontSize: 12,
@@ -837,6 +843,24 @@ export function DepositProvidersPage() {
                   </MenuItem>
                 ))}
               </Select>
+              {selected.length > 0 ? (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'rgba(255,255,255,0.7)',
+                    textAlign: 'left',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {selected.join(', ')}
+                </Typography>
+              ) : (
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)', textAlign: 'left' }}>
+                  No blocked states
+                </Typography>
+              )}
               <Button
                 size="small"
                 variant="contained"
@@ -857,14 +881,14 @@ export function DepositProvidersPage() {
         cellSx: {
           whiteSpace: 'normal',
           maxWidth: 200,
-          overflow: 'hidden',
+          overflow: 'visible',
           verticalAlign: 'top',
         },
         filter: <Box />,
         render: (row) => (
           <ArrayFieldEditor
             rowId={row._id}
-            values={asStringList(row.cityNotAllowed)}
+            values={normalizeStringList(row.cityNotAllowed)}
             label="City"
             placeholder="Add City"
             selectedKey="city"
@@ -1039,6 +1063,7 @@ export function DepositProvidersPage() {
     canDelete,
     canToggle,
     canEdit,
+    canAddMid,
     canUpdateAmount,
     togglingId,
     stateDraft,
@@ -1133,6 +1158,7 @@ export function DepositProvidersPage() {
           emptyMessage="No deposit providers"
           dense
           virtualize
+          estimateRowHeight={120}
           maxHeight="100%"
         />
       </TablePanel>

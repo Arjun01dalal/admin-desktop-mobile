@@ -109,6 +109,13 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.show_gtel_calls,
   },
   {
+    id: 'gtelCallerDashboard',
+    category: 'Caller & Dialer',
+    label: 'Gtel Dashboard',
+    path: '/gtel-caller-dashboard',
+    permission: Permissions.show_gtel_dashboard,
+  },
+  {
     id: 'c2cCampaignData',
     category: 'Caller & Dialer',
     label: 'C2C Campaign Data',
@@ -548,6 +555,7 @@ export type PanelPath = (typeof NAV_ITEMS)[number]['path'];
 
 export const PANEL_PATHS = new Set<string>([
   ...NAV_ITEMS.map((item) => item.path),
+  '/unique_deposit_pending/caller-wise',
   '/caller-responsibility/deposit-list',
   '/caller-responsibility/bot-users',
   '/caller-responsibility/details',

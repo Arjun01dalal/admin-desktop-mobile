@@ -181,6 +181,11 @@ export function FundsPage() {
     setEditOpen(true);
   }, []);
 
+  const tableTotalAmount = useMemo(
+    () => rows.reduce((sum, row) => sum + (Number(row.totalFinalAmount) || 0), 0),
+    [rows],
+  );
+
   const columns = useMemo<CommonTableColumn<FundRow>[]>(() => {
     const cols: CommonTableColumn<FundRow>[] = [
       {
@@ -314,6 +319,20 @@ export function FundsPage() {
           <Button onClick={() => navigate('/funds/mid-groups')} sx={orangeBtnSx}>
             MID Groups
           </Button>
+          <Paper
+            elevation={0}
+            sx={{
+              px: 2,
+              py: 1,
+              ml: 1,
+              bgcolor: 'background.paper',
+              border: '1px solid rgba(255,255,255,0.12)',
+            }}
+          >
+            <Typography fontWeight={700} whiteSpace="nowrap">
+              Total Amount (from Table) = ₹ {roundAmt(tableTotalAmount)}
+            </Typography>
+          </Paper>
           {canShowTotal && (
             <Paper
               elevation={0}
@@ -332,6 +351,7 @@ export function FundsPage() {
         </Stack>
       </CollapsibleFilterPanel>
 
+      <Box sx={{ mt: 2 }}>
       <TablePanel>
         <CommonTable
           columns={columns}
@@ -344,6 +364,7 @@ export function FundsPage() {
           onRowClick={(row) => openMid(row)}
         />
       </TablePanel>
+      </Box>
 
       <FundsEditAccessModal
         open={editOpen}

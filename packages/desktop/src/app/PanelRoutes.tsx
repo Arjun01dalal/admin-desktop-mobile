@@ -70,6 +70,7 @@ import {
   BonusWalletRequestsPage,
   DepositApprovedReportPage,
   UniqueDepositPendingPage,
+  CallerWiseDepositPendingPage,
   DepositPage,
   StateWiseDepositPage,
   WithdrawalPage,
@@ -247,6 +248,10 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/bonus-wallet" element={<BonusWalletRequestsPage />} />
             <Route path="/DepositApprovedReport" element={<DepositApprovedReportPage />} />
             <Route path="/unique_deposit_pending" element={<UniqueDepositPendingPage />} />
+            <Route
+              path="/unique_deposit_pending/caller-wise"
+              element={<CallerWiseDepositPendingPage />}
+            />
             <Route path="/deposit" element={<DepositPage />} />
             <Route path="/state-wise-deposit" element={<StateWiseDepositPage />} />
             <Route path="/withdrawal" element={<WithdrawalPage />} />

@@ -30,11 +30,13 @@ import TuneIcon from '@mui/icons-material/Tune';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { toast } from 'react-toastify';
 import {
+  automationBotCallsTotals,
+  displayedActiveBotUsersCount,
   flattenActiveBotUsersPayload,
   formatAutomationBotLabel,
-  getActiveBotCountByType,
   parseAutomationBotCallsSummary,
   toDdMmYyyy,
+  visibleActiveBotSummary,
   type ActiveBotSummaryItem,
   type ActiveBotUserRow,
   type AutomationBotCallsSummary,
@@ -46,16 +48,20 @@ import { TablePanel } from '@/components/TablePanel';
 import { todayIST, getStoredUser } from '@/utils/dates';
 import {
   CALLER_HEAD_ROLE_IDS,
-  OFFICE_LOCATIONS,
+  BOT_MANAGEMENT_ROLE_ID,
+  assignedCallerNameCandidates,
+  buildDepositByEmpcodeOfficeBody,
+  filterCallerResponsibilityRows,
+  filterOfficeLocationRows,
+  isDubaiMysoreRole,
+  isGtelAssignedCxRole,
+  officeLocationsForRole,
   type CallerRow,
 } from './callerResponsibility/constants';
-import { CsvUploadModal } from './callerResponsibility/CsvUploadModal';
 import {
   canSeeTotalDeposit,
   displayName,
   ecs,
-  filterCallerRows,
-  matchesCallerHeadName,
   minutesForDate,
   pnl,
   roleFlags,
@@ -78,6 +84,14 @@ const viewIconBtnSx = {
 
 /** Header labels split with `\n`: keep each line intact so it stays 2 lines. */
 const twoLineHeadSx = { whiteSpace: 'nowrap', lineHeight: 1.3, py: 0.9 } as const;
+
+/** Admin-panel amber chip tone (#fff7ed / #c2410c), adapted for the dark theme. */
+const botChipSx = {
+  fontWeight: 700,
+  color: '#fdba74',
+  bgcolor: 'rgba(249,115,22,0.12)',
+  border: '1px solid rgba(194,65,12,0.45)',
+} as const;
 
 function botSummaryVisual(bot: string): {
   icon: ReactNode;
@@ -105,12 +119,18 @@ export function CallerResponsibilityPage() {
   const navigate = useNavigate();
   const user = getStoredUser<StoredCallerUser>();
   const { isCaller, isCallerHead, isCallerOrHead, isFullAllotment } = roleFlags(user?.Role_ID);
+  const roleId = user?.Role_ID;
+  const limitToDubaiMysore = isDubaiMysoreRole(roleId);
+  const isBotManagement = roleId === BOT_MANAGEMENT_ROLE_ID;
+  const assignedOnly = !isBotManagement && isGtelAssignedCxRole(roleId, user?.roles);
+  const assignedNames = useMemo(() => assignedCallerNameCandidates(user), [user]);
   const showTotalDeposit = canSeeTotalDeposit(user);
-  const showCallerHead = !isCallerOrHead || isFullAllotment;
+  const showCallerHead = (!isCallerOrHead || isFullAllotment) && !assignedOnly;
   const showLocation = !isCaller || isFullAllotment;
   const showOfficeSummary = showTotalDeposit && showLocation;
   const showAssignedCallerTotal = isCallerHead && !showOfficeSummary;
   const canShowBotAutomaticData = hasPermission(Permissions.show_bot_automatic_data, user);
+  const officeLocations = officeLocationsForRole(roleId);
 
   // Always open on today's IST date (Laxmi default); still persist when user changes filters.
   const [startDate, setStartDate] = useState(() => todayIST());
@@ -127,7 +147,6 @@ export function CallerResponsibilityPage() {
   const [automationBotCallsSummary, setAutomationBotCallsSummary] =
     useState<AutomationBotCallsSummary | null>(null);
   const [loading, setLoading] = useState(false);
-  const [validateOpen, setValidateOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const loadGenRef = useRef(0);
   const didInitialLoad = useRef(false);
@@ -154,12 +173,16 @@ export function CallerResponsibilityPage() {
     const gen = ++loadGenRef.current;
     setLoading(true);
     try {
-      const body: Record<string, unknown> = {
+      const body = buildDepositByEmpcodeOfficeBody({
         startDate,
         endDate,
-        callerHead: isCallerHead ? user?.name || '' : callerHead,
-      };
-      if (office) body.officeLocation = office;
+        callerHead,
+        officeLocation: office,
+        roleId,
+        assignedOnly,
+        isCallerHead,
+        loginName: user?.name,
+      });
 
       const botTasks = canShowBotAutomaticData
         ? ([
@@ -186,12 +209,21 @@ export function CallerResponsibilityPage() {
       } else {
         const data = (depRes.data || {}) as CallerRow;
         const byEmp = Array.isArray(data.byEmpCode) ? (data.byEmpCode as CallerRow[]) : [];
-        const visibleRows = filterCallerRows(byEmp, user, isCaller, showTotalDeposit).filter(
-          (row) => !isCallerHead || matchesCallerHeadName(row.callerHead, user?.name),
-        );
+        const visibleRows = filterCallerResponsibilityRows({
+          rows: byEmp,
+          isCaller,
+          loginEmpCode: user?.empCode,
+          hideCompany: !showTotalDeposit,
+          limitToDubaiMysore,
+          assignedOnly: assignedOnly || isCallerHead,
+          assignedNames,
+        });
         setCallerRows(visibleRows);
         setLocationRows(
-          Array.isArray(data.byOfficeLocation) ? (data.byOfficeLocation as CallerRow[]) : [],
+          filterOfficeLocationRows(
+            Array.isArray(data.byOfficeLocation) ? (data.byOfficeLocation as CallerRow[]) : [],
+            limitToDubaiMysore,
+          ),
         );
         setPayload(data);
       }
@@ -220,8 +252,12 @@ export function CallerResponsibilityPage() {
     endDate,
     callerHead,
     office,
+    roleId,
+    assignedOnly,
+    assignedNames,
     isCallerHead,
     isCaller,
+    limitToDubaiMysore,
     showTotalDeposit,
     user,
     canShowBotAutomaticData,
@@ -234,14 +270,15 @@ export function CallerResponsibilityPage() {
     void loadMain();
   }, [loadHeads, loadMain]);
 
-  const displayedBotCount = isCaller ? 0 : botCount;
-  const newUserBotCount = isCaller
-    ? 0
-    : getActiveBotCountByType(botSummary, 'new_user', 'new user');
-  const activeBotTypeCount = isCaller
-    ? 0
-    : getActiveBotCountByType(botSummary, 'active', 'non_performing', 'non performing');
-  const inactiveBotCount = isCaller ? 0 : getActiveBotCountByType(botSummary, 'inactive');
+  const displayedBotCount = isCaller ? 0 : displayedActiveBotUsersCount(botCount, botSummary);
+  const visibleBotSummary = useMemo(
+    () => (isCaller ? [] : visibleActiveBotSummary(botSummary)),
+    [isCaller, botSummary],
+  );
+  const callsTotals = useMemo(
+    () => automationBotCallsTotals(automationBotCallsSummary),
+    [automationBotCallsSummary],
+  );
 
   const openBotUsers = useCallback(() => {
     if (isCaller || displayedBotCount <= 0) return;
@@ -785,7 +822,7 @@ export function CallerResponsibilityPage() {
                   <MenuItem value="">
                     <em>Select</em>
                   </MenuItem>
-                  {OFFICE_LOCATIONS.map((o) => (
+                  {officeLocations.map((o) => (
                     <MenuItem key={o} value={o}>
                       {o}
                     </MenuItem>
@@ -800,16 +837,6 @@ export function CallerResponsibilityPage() {
               >
                 Apply
               </Button>
-              {!isCaller && (
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => setValidateOpen(true)}
-                  sx={{ flexShrink: 0, fontWeight: 700 }}
-                >
-                  Validate Data
-                </Button>
-              )}
               {loading && <CircularProgress size={22} />}
             </Stack>
           </Box>
@@ -829,23 +856,18 @@ export function CallerResponsibilityPage() {
             <Typography variant="body2" fontWeight={700} sx={{ mb: 0.75 }}>
               Active Customer (By Bots): {displayedBotCount}
             </Typography>
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-              <Chip
-                size="small"
-                label={`New User: ${newUserBotCount}`}
-                sx={{ fontWeight: 700, bgcolor: 'rgba(59,130,246,0.14)', color: '#93c5fd' }}
-              />
-              <Chip
-                size="small"
-                label={`Active: ${activeBotTypeCount}`}
-                sx={{ fontWeight: 700, bgcolor: 'rgba(16,185,129,0.14)', color: '#6ee7b7' }}
-              />
-              <Chip
-                size="small"
-                label={`Inactive: ${inactiveBotCount}`}
-                sx={{ fontWeight: 700, bgcolor: 'rgba(148,163,184,0.16)', color: '#cbd5e1' }}
-              />
-            </Stack>
+            <Box sx={{ overflowX: 'auto', pb: 0.5 }}>
+              <Stack direction="row" spacing={0.75} sx={{ width: 'max-content' }}>
+                {visibleBotSummary.map((b) => (
+                  <Chip
+                    key={b.bot}
+                    size="small"
+                    label={`${formatAutomationBotLabel(b.bot)}: ${b.count}`}
+                    sx={botChipSx}
+                  />
+                ))}
+              </Stack>
+            </Box>
           </Box>
 
           <Box
@@ -872,9 +894,17 @@ export function CallerResponsibilityPage() {
                   <Typography variant="caption" color="text.secondary">
                     ·
                   </Typography>
+                  <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#4ade80' }} />
+                  <Typography variant="caption" sx={{ color: '#4ade80' }} fontWeight={700}>
+                    Successful {callsTotals.successful}
+                  </Typography>
+                  <HighlightOffIcon sx={{ fontSize: 14, color: '#f87171' }} />
+                  <Typography variant="caption" sx={{ color: '#f87171' }} fontWeight={700}>
+                    Unsuccessful {callsTotals.unsuccessful}
+                  </Typography>
                   <PhoneInTalkOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                   <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                    Total {automationBotCallsSummary?.total ?? 0}
+                    Total {callsTotals.total}
                   </Typography>
                 </Stack>
               </Box>
@@ -1075,8 +1105,6 @@ export function CallerResponsibilityPage() {
           />
         </TablePanel>
       </Box>
-
-      <CsvUploadModal open={validateOpen} onClose={() => setValidateOpen(false)} />
     </Box>
   );
 }

@@ -3,6 +3,7 @@ import {
   activateRevealCodes,
   clearRevealCodes,
   getRevealCodesUntil,
+  isRevealCodesActive,
   subscribeRevealCodes,
 } from './revealCodesStore';
 
@@ -10,7 +11,9 @@ import {
 export function useRevealCodes() {
   // Single snapshot (expiresAt) — clearing sets 0 so UI flips immediately on toggle-off.
   const expiresAt = useSyncExternalStore(subscribeRevealCodes, getRevealCodesUntil, () => 0);
-  const active = expiresAt > Date.now();
+  // Re-read role-aware flag when store ticks (and on every render for full_access).
+  void expiresAt;
+  const active = isRevealCodesActive();
 
   return {
     active,

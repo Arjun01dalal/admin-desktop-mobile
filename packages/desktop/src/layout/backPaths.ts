@@ -43,6 +43,9 @@ export function getBackPath(pathname: string): string | null {
   if (pathname === '/customer-allotted') return '/customer-allotment';
   if (pathname === '/customer-count') return '/leaderboard';
   if (pathname.startsWith('/playerRtp/details')) return '/playerRtp';
+  if (pathname.startsWith('/unique_deposit_pending/caller-wise')) {
+    return '/unique_deposit_pending';
+  }
   if (pathname.startsWith('/caller-responsibility/deposit-list')) {
     return '/caller-responsibility';
   }

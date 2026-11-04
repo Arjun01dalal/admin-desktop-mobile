@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -14,20 +13,41 @@ import {
   MenuItem,
   Pagination,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   TextField,
   Tooltip,
   Typography,
+  type SxProps,
+  type Theme,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { canShowUniqueDepositEmpCode, hasPermission } from '@/auth/permissions';
+import { canShowUniqueDepositEmpCode, hasPermission, Permissions } from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { TablePanel } from '@/components/TablePanel';
-import { TableSearchBar } from '@/components/TableSearchBar';
-import { buildDepositWhatsAppMessage } from '@astro/shared';
+import {
+  buildDepositWhatsAppMessage,
+  parseDistinctMidOptions,
+  UNIQUE_PENDING_POLL_MS,
+  assembleUniquePendingSummary,
+  buildUniquePendingSummaryPayload,
+  filterUniquePendingDisplay,
+  paginateUniquePendingRows,
+  uniquePendingPaymentMethod,
+  uniquePendingStatusColor,
+  type UniquePendingRow,
+  type UniquePendingRegion,
+  type UniquePendingByStateRow,
+  type UniquePendingBucket,
+  type UniquePendingGatewayCount,
+} from '@astro/shared';
 import { CLIENT_NAMES, appCodeForName } from '@/constants/clientNames';
 import {
   formatAmount,
@@ -37,7 +57,7 @@ import {
   todayIST,
 } from '@/utils/dates';
 import { DEFAULT_ITEMS_PER_PAGE, ITEMS_PER_PAGE_OPTIONS } from '@/utils/pagination';
-import { asPaged, display, useReportQuery } from '@/screens/panel/shared';
+import { display } from '@/screens/panel/shared';
 import { getCachedEmpCodeNameMap, getEmpCodeNameMap } from '@/utils/empCodeNameCache';
 import { INDIA_STATES } from '@/screens/panel/users/constants';
 import { CallingBtn } from '@/screens/panel/users/CallingBtn';
@@ -45,34 +65,13 @@ import { SheetDownloadOtpModal } from '@/components/SheetDownloadOtpModal';
 import { saveWorkbook } from '@/utils/downloadSheet';
 import type { UserRow } from '@/screens/panel/users/utils';
 
-type UniquePendingRow = {
-  _id: string;
-  userId?: string;
-  userName?: string;
-  userMobile?: string;
-  mobile?: string;
-  orderId?: string;
-  amount?: number | string;
-  paymentGatewayName?: string;
-  mid?: string | number;
-  status?: string;
-  createdOn?: string;
-  clientName?: string;
-  userState?: string;
-  state?: string;
-  userCity?: string;
-  city?: string;
-  empCode?: string;
-  transactionId?: string;
-  uniquePendingReason?: { reason?: string; name?: string; _id?: string };
-};
-
 type ColumnFilters = {
-  clientName: string;
   userId: string;
   amount: string;
   state: string;
   city: string;
+  clientName: string;
+  mid: string;
   empCode: string;
 };
 
@@ -83,11 +82,12 @@ type QueryState = {
 };
 
 const EMPTY_FILTERS: ColumnFilters = {
-  clientName: '',
   userId: '',
   amount: '',
   state: '',
   city: '',
+  clientName: '',
+  mid: '',
   empCode: '',
 };
 
@@ -118,26 +118,336 @@ const fieldSx = {
   '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 13 },
 };
 
-const filterSelectSx = {
-  '& .MuiInputBase-root': { bgcolor: '#121218', fontSize: 12 },
+const byStateHeadSx: SxProps<Theme> = {
+  bgcolor: '#ff9f0a',
+  color: '#1a1200',
+  fontWeight: 800,
+  border: '1px solid rgba(0,0,0,0.2)',
+  whiteSpace: 'nowrap',
 };
 
-function unpackPayload(data: unknown): Record<string, unknown> {
-  if (!data || typeof data !== 'object') return {};
-  const obj = data as Record<string, unknown>;
-  if (obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)) {
-    return obj.payload as Record<string, unknown>;
-  }
-  return obj;
+const byStateSubHeadSx: SxProps<Theme> = {
+  bgcolor: '#2c3340',
+  color: '#e8e8ea',
+  fontWeight: 700,
+  fontSize: 11.5,
+  border: '1px solid rgba(255,255,255,0.12)',
+  whiteSpace: 'nowrap',
+};
+
+const byStateCellSx: SxProps<Theme> = {
+  fontSize: 12.5,
+  border: '1px solid rgba(255,255,255,0.1)',
+  whiteSpace: 'nowrap',
+};
+
+function byStateGroupHeadSx(color: string): SxProps<Theme> {
+  return {
+    bgcolor: `${color} !important`,
+    color: '#fff !important',
+    fontWeight: 800,
+    border: '1px solid rgba(0,0,0,0.2)',
+    whiteSpace: 'nowrap',
+  };
+}
+
+/** Total / Pending / Approved — Requests, Amount, Customers cards above the table. */
+function SummaryCards({
+  all,
+  pending,
+  approved,
+}: {
+  all: UniquePendingBucket;
+  pending: UniquePendingBucket;
+  approved: UniquePendingBucket;
+}) {
+  const cards: Array<{ label: string; bucket: UniquePendingBucket; color: string }> = [
+    { label: 'Total (All)', bucket: all, color: '#60a5fa' },
+    { label: 'Pending', bucket: pending, color: '#ff9f0a' },
+    { label: 'Approved', bucket: approved, color: '#16a34a' },
+  ];
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+        gap: 1.25,
+        mb: 1.5,
+      }}
+    >
+      {cards.map((card) => (
+        <Box
+          key={card.label}
+          sx={{
+            borderRadius: 1.5,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderLeft: '4px solid',
+            borderLeftColor: card.color,
+            bgcolor: 'background.paper',
+            px: 1.5,
+            py: 1,
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{ color: card.color, fontWeight: 800, letterSpacing: 0.4 }}
+          >
+            {card.label.toUpperCase()}
+          </Typography>
+          <Stack direction="row" spacing={2.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Requests
+              </Typography>
+              <Typography fontWeight={700}>{card.bucket.uniqueRequestCount}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Amount
+              </Typography>
+              <Typography fontWeight={700}>{formatAmount(card.bucket.totalAmount)}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Customers
+              </Typography>
+              <Typography fontWeight={700}>{card.bucket.uniqueCustomerCount}</Typography>
+            </Box>
+          </Stack>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/** Clickable South / North region cards — toggle off when the same one is clicked again. */
+function RegionCard({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Box
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      sx={{
+        cursor: 'pointer',
+        borderRadius: 1.5,
+        border: '1px solid',
+        borderColor: active ? '#ff9f0a' : 'divider',
+        bgcolor: active ? 'rgba(255,159,10,0.18)' : 'background.paper',
+        px: 1.75,
+        py: 1,
+        minWidth: 110,
+        textAlign: 'center',
+        userSelect: 'none',
+        '&:hover': { borderColor: '#ff9f0a' },
+      }}
+    >
+      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="subtitle1"
+        fontWeight={800}
+        sx={{ color: active ? '#ff9f0a' : 'text.primary' }}
+      >
+        {count}
+      </Typography>
+    </Box>
+  );
+}
+
+/** Gateway chips with counts — click toggles the gateway display filter. */
+function GatewayChips({
+  counts,
+  active,
+  onToggle,
+  onClear,
+}: {
+  counts: UniquePendingGatewayCount[];
+  active: string;
+  onToggle: (name: string) => void;
+  onClear: () => void;
+}) {
+  if (!counts.length) return null;
+  return (
+    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+      {counts.map((item) => {
+        const isActive = active === item.name;
+        return (
+          <Chip
+            key={item.name}
+            label={`${item.name} (${item.count})`}
+            onClick={() => onToggle(item.name)}
+            sx={{
+              fontWeight: 700,
+              border: '1px solid #ff9f0a',
+              color: isActive ? '#1a1200' : '#ff9f0a',
+              bgcolor: isActive ? '#ff9f0a' : 'transparent',
+              '&:hover': { bgcolor: isActive ? '#e08c00' : 'rgba(255,159,10,0.12)' },
+            }}
+          />
+        );
+      })}
+      {active ? (
+        <Chip
+          label="Clear gateway"
+          onClick={onClear}
+          variant="outlined"
+          sx={{ fontWeight: 700, color: 'text.secondary' }}
+        />
+      ) : null}
+    </Stack>
+  );
+}
+
+/** "By State" dialog — State / Total / Pending / Approved (Req, Amt, Cust). */
+function ByStateDialog({
+  open,
+  onClose,
+  rows,
+  activeState,
+  onSelectState,
+}: {
+  open: boolean;
+  onClose: () => void;
+  rows: UniquePendingByStateRow[];
+  activeState: string;
+  onSelectState: (state: string) => void;
+}) {
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
+      <DialogTitle>By State</DialogTitle>
+      <DialogContent sx={{ p: 0 }}>
+        <Box sx={{ overflow: 'auto', maxHeight: '70vh', pb: 2 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell rowSpan={2} align="center" sx={byStateHeadSx}>
+                  State
+                </TableCell>
+                <TableCell colSpan={3} align="center" sx={byStateGroupHeadSx('#60a5fa')}>
+                  Total
+                </TableCell>
+                <TableCell colSpan={3} align="center" sx={byStateGroupHeadSx('#ff9f0a')}>
+                  Pending
+                </TableCell>
+                <TableCell colSpan={3} align="center" sx={byStateGroupHeadSx('#16a34a')}>
+                  Approved
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                {['Req', 'Amt', 'Cust', 'Req', 'Amt', 'Cust', 'Req', 'Amt', 'Cust'].map(
+                  (label, i) => (
+                    <TableCell key={`${label}-${i}`} align="center" sx={byStateSubHeadSx}>
+                      {label}
+                    </TableCell>
+                  ),
+                )}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} align="center" sx={byStateCellSx}>
+                    No state-wise data
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((row) => {
+                  const active =
+                    Boolean(activeState) &&
+                    row.state.trim().toLowerCase() === activeState.trim().toLowerCase();
+                  return (
+                    <TableRow
+                      key={row.state}
+                      hover
+                      onClick={() => onSelectState(row.state)}
+                      sx={{
+                        cursor: 'pointer',
+                        bgcolor: active ? 'rgba(255,159,10,0.16)' : undefined,
+                      }}
+                    >
+                      <TableCell align="center" sx={byStateCellSx}>
+                        <Typography
+                          fontWeight={active ? 800 : 600}
+                          sx={{ color: active ? '#ff9f0a' : 'inherit', fontSize: 'inherit' }}
+                        >
+                          {row.state}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {row.allUniqueRequestCount}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {formatAmount(row.allTotalAmount)}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {row.allUniqueCustomerCount}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {row.uniqueRequestCount}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {formatAmount(row.totalAmount)}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {row.uniqueCustomerCount}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {row.approvedTxnCount}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {formatAmount(row.approvedTotalAmount)}
+                      </TableCell>
+                      <TableCell align="center" sx={byStateCellSx}>
+                        {row.approvedCustomerCount}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 export function UniqueDepositPendingPage() {
   const navigate = useNavigate();
-  const admin = getStoredUser<{ _id?: string; name?: string; mobile?: string }>();
+  const admin = getStoredUser<{
+    _id?: string;
+    name?: string;
+    mobile?: string;
+    accessibleStates?: string[];
+  }>();
   const canShowEmpCode = canShowUniqueDepositEmpCode(admin);
   const canChangeStatus = hasPermission('change_status');
   const canDownload = hasPermission('show_download_botton');
   const canWhatsApp = hasPermission('whatsapp_icon');
+  const canCallerWise = hasPermission(Permissions.show_caller_wise_unique_pending);
   const today = todayIST();
 
   const [page, setPage] = useState(1);
@@ -150,9 +460,16 @@ export function UniqueDepositPendingPage() {
     endDate: today,
     filters: EMPTY_FILTERS,
   });
-  const [pendingCount, setPendingCount] = useState(0);
-  const [pendingAmount, setPendingAmount] = useState(0);
-  const [summaryLoading, setSummaryLoading] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+  const [pendingSummaryData, setPendingSummaryData] = useState<unknown>(null);
+  const [allSummaryData, setAllSummaryData] = useState<unknown>(null);
+
+  const [gatewayFilter, setGatewayFilter] = useState('');
+  const [region, setRegion] = useState<UniquePendingRegion>('');
+  const [byStateOpen, setByStateOpen] = useState(false);
+  const [midOptions, setMidOptions] = useState<string[]>([]);
+
   const [comments, setComments] = useState<Record<string, string>>({});
   const [submittingCommentId, setSubmittingCommentId] = useState('');
   const [statusOpen, setStatusOpen] = useState(false);
@@ -175,76 +492,113 @@ export function UniqueDepositPendingPage() {
     };
   }, [canShowEmpCode]);
 
-  const buildPayload = useCallback(() => {
-    const filter: Record<string, unknown> = {};
-    const f = query.filters;
-    if (f.clientName) filter.clientName = f.clientName;
-    if (f.city.trim()) filter.city = f.city.trim();
-    if (f.state) filter.state = f.state;
-    if (f.amount.trim()) filter.amount = f.amount.trim();
-    if (f.userId.trim()) filter.userId = f.userId.trim();
-    if (canShowEmpCode && f.empCode.trim()) filter.empCode = f.empCode.trim();
-
-    const payload: Record<string, unknown> = {
-      pageNo: page,
-      itemsPerPage,
-      filter,
+  // Load distinct MIDs once (client-side select options for the MID filter).
+  useEffect(() => {
+    let active = true;
+    void secureApi('uniquePending.mids', {}).then((res) => {
+      if (!active || !res.ok) return;
+      setMidOptions(parseDistinctMidOptions(res.data));
+    });
+    return () => {
+      active = false;
     };
-    if (query.startDate) payload.startDate = query.startDate;
-    if (query.endDate) payload.endDate = query.endDate;
-    return payload;
-  }, [query, page, itemsPerPage, canShowEmpCode]);
+  }, []);
 
-  const unpack = useCallback((res: { data?: unknown }) => asPaged<UniquePendingRow>(res.data), []);
+  const buildPayload = useCallback(() => {
+    const f = query.filters;
+    return buildUniquePendingSummaryPayload(
+      query.startDate,
+      query.endDate,
+      {
+        userId: f.userId,
+        state: f.state,
+        city: f.city,
+        clientName: f.clientName,
+        mid: f.mid,
+        amount: f.amount,
+      },
+      todayIST(),
+    );
+  }, [query]);
 
-  const { rows, setRows, total, totalPages, loading, load } = useReportQuery<UniquePendingRow>({
-    action: 'uniquePending.list',
-    buildPayload,
-    unpack,
-    autoDeps: [page, itemsPerPage, query],
-    errorMessage: 'Failed to load unique pending deposits',
-    cacheTtlMs: 0,
-  });
-
-  const loadSummary = useCallback(async () => {
-    setSummaryLoading(true);
-    try {
-      const payload = {
-        startDate: query.startDate || todayIST(),
-        endDate: query.endDate || todayIST(),
-      };
-      const res = await secureApi('uniquePending.fundRequest', payload);
-      if (!res.ok) {
-        toast.error(res.message || 'Failed to load pending summary');
-        return;
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = Boolean(opts?.silent);
+      if (!silent) setLoading(true);
+      try {
+        const payload = buildPayload();
+        const [pendingRes, allRes] = await Promise.all([
+          secureApi('uniquePending.amountSummary', payload),
+          secureApi('uniquePending.amountAllSummary', payload),
+        ]);
+        if (!pendingRes.ok) {
+          if (!silent) toast.error(pendingRes.message || 'Failed to load unique pending deposits');
+          return;
+        }
+        if (!allRes.ok) {
+          if (!silent) toast.error(allRes.message || 'Failed to load unique pending deposits');
+          return;
+        }
+        setPendingSummaryData(pendingRes.data);
+        setAllSummaryData(allRes.data);
+      } finally {
+        if (!silent) setLoading(false);
       }
-      const body = unpackPayload(res.data);
-      const detail =
-        body.uniquePendingDetail && typeof body.uniquePendingDetail === 'object'
-          ? (body.uniquePendingDetail as Record<string, unknown>)
-          : body;
-      setPendingCount(Number(detail.pendingCount) || 0);
-      setPendingAmount(Number(detail.pendingAmount) || 0);
-    } finally {
-      setSummaryLoading(false);
-    }
-  }, [query.startDate, query.endDate]);
+    },
+    [buildPayload],
+  );
+
+  /** Keep a ref to the latest load() so the silent poll interval never closes over stale state. */
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
 
   useEffect(() => {
-    void loadSummary();
-  }, [loadSummary]);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
-  const commitQuery = useCallback(
-    (opts?: { filters?: ColumnFilters }) => {
-      setQuery({
-        startDate,
-        endDate,
-        filters: opts?.filters ?? draft,
-      });
-      setPage(1);
-    },
-    [startDate, endDate, draft],
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void loadRef.current({ silent: true });
+    }, UNIQUE_PENDING_POLL_MS);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const summary = useMemo(
+    () =>
+      assembleUniquePendingSummary({
+        pendingData: pendingSummaryData,
+        allData: allSummaryData,
+        accessibleStates: admin?.accessibleStates,
+        empCode: canShowEmpCode ? query.filters.empCode : '',
+      }),
+    [pendingSummaryData, allSummaryData, admin?.accessibleStates, canShowEmpCode, query.filters.empCode],
   );
+
+  const displayRows = useMemo(
+    () => filterUniquePendingDisplay(summary.rows, { gatewayName: gatewayFilter, region }),
+    [summary.rows, gatewayFilter, region],
+  );
+
+  const { pageRows, totalPages, total, safePage } = useMemo(
+    () => paginateUniquePendingRows(displayRows, page, itemsPerPage),
+    [displayRows, page, itemsPerPage],
+  );
+
+  useEffect(() => {
+    if (safePage !== page) setPage(safePage);
+  }, [safePage, page]);
+
+  const commitQuery = useCallback(() => {
+    setQuery({
+      startDate,
+      endDate,
+      filters: draft,
+    });
+    setPage(1);
+  }, [startDate, endDate, draft]);
 
   const clearDates = useCallback(() => {
     setStartDate('');
@@ -263,23 +617,35 @@ export function UniqueDepositPendingPage() {
     [],
   );
 
-  const onDraftChange = useCallback(
-    (key: keyof ColumnFilters) => (e: ChangeEvent<HTMLInputElement>) =>
-      setDraftField(key)(e.target.value),
-    [setDraftField],
-  );
+  const toggleGateway = useCallback((name: string) => {
+    setGatewayFilter((prev) => (prev === name ? '' : name));
+    setPage(1);
+  }, []);
 
-  const searchFilter = useCallback(
-    (key: keyof ColumnFilters, placeholder: string) => (
-      <TableSearchBar
-        value={draft[key]}
-        onChange={onDraftChange(key)}
-        onSearch={() => commitQuery()}
-        placeholder={placeholder}
-      />
-    ),
-    [draft, commitQuery, onDraftChange],
-  );
+  const clearGateway = useCallback(() => {
+    setGatewayFilter('');
+    setPage(1);
+  }, []);
+
+  /** Region is a broader client filter than a single state — clear any active state filter. */
+  const toggleRegion = useCallback((next: UniquePendingRegion) => {
+    setRegion((prev) => (prev === next ? '' : next));
+    setPage(1);
+    setDraft((prev) => (prev.state ? { ...prev, state: '' } : prev));
+    setQuery((prev) =>
+      prev.filters.state ? { ...prev, filters: { ...prev.filters, state: '' } } : prev,
+    );
+  }, []);
+
+  /** Clicking a state in the "By State" dialog applies/toggles the server state filter. */
+  const applyStateFilter = useCallback((state: string) => {
+    setDraft((prev) => ({ ...prev, state: prev.state === state ? '' : state }));
+    setQuery((prev) => {
+      const nextState = prev.filters.state === state ? '' : state;
+      return { ...prev, filters: { ...prev.filters, state: nextState } };
+    });
+    setPage(1);
+  }, []);
 
   const submitComment = useCallback(
     async (row: UniquePendingRow) => {
@@ -288,12 +654,12 @@ export function UniqueDepositPendingPage() {
         toast.error('Missing order id');
         return;
       }
-      const reason = (comments[row._id] || '').trim();
+      const reason = (comments[row._id || ''] || '').trim();
       if (!reason) {
         toast.error('Enter a comment');
         return;
       }
-      setSubmittingCommentId(row._id);
+      setSubmittingCommentId(row._id || '');
       try {
         const res = await secureApi('uniquePending.message', {
           orderId,
@@ -310,28 +676,15 @@ export function UniqueDepositPendingPage() {
         toast.success(res.message || 'Comment submitted');
         setComments((prev) => {
           const next = { ...prev };
-          delete next[row._id];
+          delete next[row._id || ''];
           return next;
         });
-        setRows((prev) =>
-          prev.map((item) =>
-            item._id === row._id
-              ? {
-                  ...item,
-                  uniquePendingReason: {
-                    name: admin?.name || '',
-                    _id: admin?._id || '',
-                    reason,
-                  },
-                }
-              : item,
-          ),
-        );
+        void load();
       } finally {
         setSubmittingCommentId('');
       }
     },
-    [admin, comments, setRows],
+    [admin, comments, load],
   );
 
   const openStatusDialog = useCallback((orderId?: string) => {
@@ -369,18 +722,33 @@ export function UniqueDepositPendingPage() {
       setStatusOrderId('');
       setStatusRemark('');
       void load();
-      void loadSummary();
     } finally {
       setStatusSaving(false);
     }
-  }, [admin, statusOrderId, statusRemark, load, loadSummary]);
+  }, [admin, statusOrderId, statusRemark, load]);
 
   const downloadExcel = useCallback(() => {
-    return saveWorkbook(rows as Record<string, unknown>[], {
+    const exportRows = displayRows.map((row) => ({
+      UserName: row.userName || '',
+      AppCode: appCodeForName(row.clientName),
+      DPId: row.userId || '',
+      Mobile: row.userMobile || row.mobile || '',
+      Amount: row.amount ?? '',
+      State: row.userState || row.state || '',
+      City: row.userCity || row.city || '',
+      TransactionId: row.orderId || row.transactionId || '',
+      PaymentMethod: uniquePendingPaymentMethod(row.paymentGatewayName, row.mid),
+      Date: formatDisplayDate(row.createdOn) || '',
+      Time: formatDisplayTime(row.createdOn) || '',
+      Status: row.status || '',
+      Comment: row.uniquePendingReason?.reason || '',
+      ...(canShowEmpCode ? { EmpCode: row.empCode || '' } : {}),
+    }));
+    return saveWorkbook(exportRows, {
       sheetName: 'Deposit Data',
       filename: `unique_pending_data_${Date.now()}.xlsx`,
     });
-  }, [rows]);
+  }, [displayRows, canShowEmpCode]);
 
   const toCallingItem = useCallback(
     (row: UniquePendingRow): UserRow => ({
@@ -448,41 +816,11 @@ export function UniqueDepositPendingPage() {
       {
         id: 'clientName',
         label: 'App Code',
-        filter: (
-          <TextField
-            select
-            size="small"
-            fullWidth
-            value={draft.clientName}
-            onChange={(e) => {
-              setDraftField('clientName')(e.target.value);
-              commitQuery({
-                filters: { ...draft, clientName: e.target.value },
-              });
-            }}
-            sx={filterSelectSx}
-          >
-            <MenuItem value="">All</MenuItem>
-            {CLIENT_NAMES.map((name) => (
-              <MenuItem key={name} value={name}>
-                {appCodeForName(name)}
-              </MenuItem>
-            ))}
-          </TextField>
-        ),
         render: (row) => appCodeForName(row.clientName),
       },
       {
         id: 'userId',
         label: 'DP ID',
-        filter: (
-          <TableSearchBar
-            value={draft.userId}
-            onChange={onDraftChange('userId')}
-            onSearch={() => commitQuery()}
-            placeholder="DP id"
-          />
-        ),
         render: (row) => display(row.userId),
       },
       ...(canShowEmpCode
@@ -491,7 +829,6 @@ export function UniqueDepositPendingPage() {
               id: 'empCode',
               label: 'Emp Code',
               width: 110,
-              filter: searchFilter('empCode', 'Emp code'),
               render: (row: UniquePendingRow) => {
                 const code = String(row.empCode || '').trim();
                 const empName = code ? empCodeNameMap[code] : '';
@@ -570,54 +907,16 @@ export function UniqueDepositPendingPage() {
       {
         id: 'amount',
         label: 'Amount',
-        filter: (
-          <TableSearchBar
-            value={draft.amount}
-            onChange={onDraftChange('amount')}
-            onSearch={() => commitQuery()}
-            placeholder="Amount"
-          />
-        ),
         render: (row) => formatAmount(row.amount ?? 0),
       },
       {
         id: 'state',
         label: 'State',
-        filter: (
-          <TextField
-            select
-            size="small"
-            fullWidth
-            value={draft.state}
-            onChange={(e) => {
-              setDraftField('state')(e.target.value);
-              commitQuery({
-                filters: { ...draft, state: e.target.value },
-              });
-            }}
-            sx={filterSelectSx}
-          >
-            <MenuItem value="">All</MenuItem>
-            {INDIA_STATES.map((s) => (
-              <MenuItem key={s} value={s}>
-                {s}
-              </MenuItem>
-            ))}
-          </TextField>
-        ),
         render: (row) => display(row.userState || row.state),
       },
       {
         id: 'city',
         label: 'City',
-        filter: (
-          <TableSearchBar
-            value={draft.city}
-            onChange={onDraftChange('city')}
-            onSearch={() => commitQuery()}
-            placeholder="City"
-          />
-        ),
         render: (row) => display(row.userCity || row.city),
       },
       {
@@ -628,12 +927,7 @@ export function UniqueDepositPendingPage() {
       {
         id: 'paymentMethod',
         label: 'Payment Method',
-        render: (row) => {
-          const gw = display(row.paymentGatewayName, '');
-          const mid = row.mid != null && row.mid !== '' ? String(row.mid) : '';
-          if (!gw && !mid) return '—';
-          return mid ? `${gw} - ${mid}` : gw;
-        },
+        render: (row) => uniquePendingPaymentMethod(row.paymentGatewayName, row.mid),
       },
       {
         id: 'date',
@@ -648,7 +942,22 @@ export function UniqueDepositPendingPage() {
       {
         id: 'status',
         label: 'Status',
-        render: (row) => display(row.status),
+        render: (row) => {
+          const color = uniquePendingStatusColor(row.status);
+          return (
+            <Chip
+              size="small"
+              label={display(row.status)}
+              sx={{
+                fontWeight: 700,
+                textTransform: 'capitalize',
+                bgcolor: color ? `${color}22` : 'rgba(255,255,255,0.08)',
+                color: color || 'text.primary',
+                border: color ? `1px solid ${color}55` : undefined,
+              }}
+            />
+          );
+        },
       },
       {
         id: 'comment',
@@ -663,7 +972,7 @@ export function UniqueDepositPendingPage() {
               </Typography>
             );
           }
-          const busy = submittingCommentId === row._id;
+          const busy = submittingCommentId === (row._id || '');
           return (
             <Stack
               direction="row"
@@ -676,8 +985,10 @@ export function UniqueDepositPendingPage() {
                 multiline
                 minRows={2}
                 placeholder="Comment"
-                value={comments[row._id] || ''}
-                onChange={(e) => setComments((prev) => ({ ...prev, [row._id]: e.target.value }))}
+                value={comments[row._id || ''] || ''}
+                onChange={(e) =>
+                  setComments((prev) => ({ ...prev, [row._id || '']: e.target.value }))
+                }
                 sx={{
                   flex: 1,
                   minWidth: 0,
@@ -738,29 +1049,24 @@ export function UniqueDepositPendingPage() {
   }, [
     page,
     itemsPerPage,
-    draft,
     canChangeStatus,
     canShowEmpCode,
     canWhatsApp,
     empCodeNameMap,
     comments,
     submittingCommentId,
-    commitQuery,
-    searchFilter,
-    setDraftField,
     submitComment,
     openStatusDialog,
     toCallingItem,
     openWhatsApp,
     navigate,
-    onDraftChange,
   ]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, px: 1.5, py: 1.25 }}>
       <CollapsibleFilterPanel
         title="Unique Deposit Pending User"
-        summary={`${startDate} → ${endDate}`}
+        summary={`${startDate || '—'} → ${endDate || '—'}`}
       >
         <Box
           sx={{
@@ -769,7 +1075,7 @@ export function UniqueDepositPendingPage() {
               xs: 'repeat(2, minmax(0, 1fr))',
               sm: 'repeat(3, minmax(0, 1fr))',
               md: 'repeat(4, minmax(0, 1fr))',
-              lg: 'repeat(5, minmax(0, 1fr))',
+              lg: 'repeat(6, minmax(0, 1fr))',
             },
             gap: 1.25,
             alignItems: 'center',
@@ -797,6 +1103,81 @@ export function UniqueDepositPendingPage() {
           <TextField
             select
             size="small"
+            label="App"
+            value={draft.clientName}
+            onChange={(e) => setDraftField('clientName')(e.target.value)}
+            sx={fieldSx}
+          >
+            <MenuItem value="">All</MenuItem>
+            {CLIENT_NAMES.map((name) => (
+              <MenuItem key={name} value={name}>
+                {appCodeForName(name)}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            size="small"
+            label="DP ID"
+            value={draft.userId}
+            onChange={(e) => setDraftField('userId')(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            size="small"
+            label="Amount"
+            value={draft.amount}
+            onChange={(e) => setDraftField('amount')(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            size="small"
+            label="City"
+            value={draft.city}
+            onChange={(e) => setDraftField('city')(e.target.value)}
+            sx={fieldSx}
+          />
+          <TextField
+            select
+            size="small"
+            label="State"
+            value={draft.state}
+            onChange={(e) => setDraftField('state')(e.target.value)}
+            sx={fieldSx}
+          >
+            <MenuItem value="">All</MenuItem>
+            {INDIA_STATES.map((s) => (
+              <MenuItem key={s} value={s}>
+                {s}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="MID"
+            value={draft.mid}
+            onChange={(e) => setDraftField('mid')(e.target.value)}
+            sx={fieldSx}
+          >
+            <MenuItem value="">All</MenuItem>
+            {midOptions.map((m) => (
+              <MenuItem key={m} value={m}>
+                {m}
+              </MenuItem>
+            ))}
+          </TextField>
+          {canShowEmpCode ? (
+            <TextField
+              size="small"
+              label="Emp Code"
+              value={draft.empCode}
+              onChange={(e) => setDraftField('empCode')(e.target.value)}
+              sx={fieldSx}
+            />
+          ) : null}
+          <TextField
+            select
+            size="small"
             label="Items / Page"
             value={String(itemsPerPage)}
             onChange={(e) => {
@@ -817,27 +1198,19 @@ export function UniqueDepositPendingPage() {
             alignItems="center"
             flexWrap="wrap"
             useFlexGap
-            sx={{ gridColumn: { xs: '1 / -1', lg: 'span 2' } }}
+            sx={{ gridColumn: '1 / -1' }}
           >
-            <Button
-              variant="contained"
-              disabled={loading}
-              onClick={() => commitQuery()}
-              sx={orangeBtnSx}
-            >
+            <Button variant="contained" disabled={loading} onClick={commitQuery} sx={orangeBtnSx}>
               Apply
             </Button>
             <Button variant="contained" disabled={loading} onClick={clearDates} sx={orangeBtnSx}>
-              Clear
+              Clear Dates
             </Button>
             <Button
               variant="contained"
               startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <RefreshIcon />}
               disabled={loading}
-              onClick={() => {
-                void load();
-                void loadSummary();
-              }}
+              onClick={() => void load()}
               sx={orangeBtnSx}
             >
               Refresh
@@ -856,12 +1229,51 @@ export function UniqueDepositPendingPage() {
         </Box>
       </CollapsibleFilterPanel>
 
-      <Stack direction="row" spacing={1} alignItems="center" mb={1.5}>
-        <Chip
-          label={`Pending: (${pendingCount}) : ${formatAmount(pendingAmount)}`}
-          sx={{ bgcolor: 'rgba(255,159,10,0.15)', color: '#ff9f0a', fontWeight: 700 }}
+      <SummaryCards all={summary.all} pending={summary.pending} approved={summary.approved} />
+
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+        sx={{ mb: 1.5 }}
+      >
+        <RegionCard
+          label="South"
+          count={summary.regionCounts.south}
+          active={region === 'south'}
+          onClick={() => toggleRegion('south')}
         />
-        {summaryLoading ? <CircularProgress size={18} sx={{ color: '#ff9f0a' }} /> : null}
+        <RegionCard
+          label="North"
+          count={summary.regionCounts.north}
+          active={region === 'north'}
+          onClick={() => toggleRegion('north')}
+        />
+        <GatewayChips
+          counts={summary.gatewayCounts}
+          active={gatewayFilter}
+          onToggle={toggleGateway}
+          onClear={clearGateway}
+        />
+        <Box sx={{ flex: 1 }} />
+        <Button variant="contained" onClick={() => setByStateOpen(true)} sx={orangeBtnSx}>
+          By State
+        </Button>
+        {canCallerWise ? (
+          <Button
+            variant="contained"
+            onClick={() =>
+              navigate('/unique_deposit_pending/caller-wise', {
+                state: { startDate: query.startDate, endDate: query.endDate },
+              })
+            }
+            sx={orangeBtnSx}
+          >
+            Caller Wise Deposit Pending
+          </Button>
+        ) : null}
       </Stack>
 
       <TablePanel
@@ -882,7 +1294,7 @@ export function UniqueDepositPendingPage() {
       >
         <CommonTable
           columns={columns}
-          rows={rows}
+          rows={pageRows}
           getRowKey={(row, index) => row._id || row.orderId || index}
           loading={loading}
           emptyMessage="No unique pending deposits found"
@@ -893,6 +1305,14 @@ export function UniqueDepositPendingPage() {
           maxHeight="100%"
         />
       </TablePanel>
+
+      <ByStateDialog
+        open={byStateOpen}
+        onClose={() => setByStateOpen(false)}
+        rows={summary.byState}
+        activeState={query.filters.state}
+        onSelectState={applyStateFilter}
+      />
 
       <Dialog
         open={statusOpen}

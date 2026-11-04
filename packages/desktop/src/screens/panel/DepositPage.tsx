@@ -79,6 +79,8 @@ type QueryState = {
   startDate: string;
   endDate: string;
   allData: boolean;
+  /** When set, dates are omitted from the API and filter.utr is used. */
+  utr: string;
   filters: ColumnFilters;
 };
 
@@ -139,11 +141,13 @@ export function DepositPage() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
+  const [utrDraft, setUtrDraft] = useState('');
   const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
   const [query, setQuery] = useState<QueryState>({
     startDate: today,
     endDate: today,
     allData: false,
+    utr: '',
     filters: EMPTY_FILTERS,
   });
   const [requestType, setRequestType] = useState<RequestType>('automatic');
@@ -151,6 +155,10 @@ export function DepositPage() {
   const [mids, setMids] = useState<MidOption[]>([]);
   const [gateways, setGateways] = useState<string[]>([]);
   const [summary, setSummary] = useState<ReturnType<typeof asFundSummary>>({});
+  const [uniquePendingDeposit, setUniquePendingDeposit] = useState<{
+    pendingCount: number;
+    pendingAmount: number;
+  }>({ pendingCount: 0, pendingAmount: 0 });
   const [scannerTotal, setScannerTotal] = useState(0);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<SelectedOrder[]>([]);
@@ -189,26 +197,31 @@ export function DepositPage() {
 
   const buildPayload = useCallback(() => {
     const f = query.filters;
+    const utr = query.utr.trim();
     const filter: Record<string, unknown> = {};
-    if (f.status) filter.status = f.status;
-    if (f.userName.trim()) filter.userName = f.userName.trim();
-    if (f.empCode.trim()) filter.empCode = f.empCode.trim();
-    if (f.userId.trim()) filter.userId = f.userId.trim();
-    if (f.clientName) filter.clientName = f.clientName;
-    if (f.amount.trim()) {
-      const n = Number(f.amount.trim());
-      filter.amount = Number.isFinite(n) ? n : f.amount.trim();
+    if (utr) {
+      filter.utr = utr;
+    } else {
+      if (f.status) filter.status = f.status;
+      if (f.userName.trim()) filter.userName = f.userName.trim();
+      if (f.empCode.trim()) filter.empCode = f.empCode.trim();
+      if (f.userId.trim()) filter.userId = f.userId.trim();
+      if (f.clientName) filter.clientName = f.clientName;
+      if (f.amount.trim()) {
+        const n = Number(f.amount.trim());
+        filter.amount = Number.isFinite(n) ? n : f.amount.trim();
+      }
+      if (f.userState) filter.userState = f.userState;
+      if (f.userCity.trim()) filter.userCity = f.userCity.trim();
+      if (f.orderId.trim()) filter.orderId = f.orderId.trim();
+      if (f.orderKeyID.trim()) filter.orderKeyID = f.orderKeyID.trim();
+      if (f.userMobile.trim()) filter.userMobile = f.userMobile.trim();
+      if (f.userBankName.trim()) filter.userBankName = f.userBankName.trim();
+      if (f.accountNumber.trim()) filter.accountNumber = f.accountNumber.trim();
+      if (f.aadhaarNumber.trim()) filter.aadhaarNumber = f.aadhaarNumber.trim();
+      if (f.upiId.trim()) filter.upiId = f.upiId.trim();
+      if (f.mid) filter.mid = f.mid;
     }
-    if (f.userState) filter.userState = f.userState;
-    if (f.userCity.trim()) filter.userCity = f.userCity.trim();
-    if (f.orderId.trim()) filter.orderId = f.orderId.trim();
-    if (f.orderKeyID.trim()) filter.orderKeyID = f.orderKeyID.trim();
-    if (f.userMobile.trim()) filter.userMobile = f.userMobile.trim();
-    if (f.userBankName.trim()) filter.userBankName = f.userBankName.trim();
-    if (f.accountNumber.trim()) filter.accountNumber = f.accountNumber.trim();
-    if (f.aadhaarNumber.trim()) filter.aadhaarNumber = f.aadhaarNumber.trim();
-    if (f.upiId.trim()) filter.upiId = f.upiId.trim();
-    if (f.mid) filter.mid = f.mid;
 
     const payload: Record<string, unknown> = {
       type: 'deposit',
@@ -216,7 +229,8 @@ export function DepositPage() {
       pageNo: page,
       filter,
     };
-    if (!query.allData) {
+    // UTR search is date-agnostic — omit startDate/endDate so the API searches all time.
+    if (!utr && !query.allData) {
       if (query.startDate) payload.startDate = query.startDate;
       if (query.endDate) payload.endDate = query.endDate;
     }
@@ -266,23 +280,46 @@ export function DepositPage() {
     setSummaryLoading(true);
     try {
       const payload: Record<string, unknown> = {};
-      if (!query.allData) {
-        payload.startDate = query.startDate || todayIST();
-        payload.endDate = query.endDate || todayIST();
+      const startDate = query.allData ? '' : query.startDate || todayIST();
+      const endDate = query.allData ? '' : query.endDate || todayIST();
+      if (startDate && endDate) {
+        payload.startDate = startDate;
+        payload.endDate = endDate;
       }
-      const res = await secureApi('deposits.fundRequest', payload);
+      const uniquePendingPayload = {
+        startDate: startDate || todayIST(),
+        endDate: endDate || todayIST(),
+        filter: {},
+      };
+
+      const [res, scanRes, uniquePendingRes] = await Promise.all([
+        secureApi('deposits.fundRequest', payload),
+        secureApi('deposits.scannerData', {
+          ...(payload.startDate ? { startDate: payload.startDate } : {}),
+          ...(payload.endDate ? { endDate: payload.endDate } : {}),
+        }),
+        // Admin-panel Deposit: unique pending chip from unique-pending-amount-summary
+        secureApi('uniquePending.amountSummary', uniquePendingPayload),
+      ]);
+
       if (res.ok) setSummary(asFundSummary(res.data));
 
-      const scanRes = await secureApi('deposits.scannerData', {
-        ...(payload.startDate ? { startDate: payload.startDate } : {}),
-        ...(payload.endDate ? { endDate: payload.endDate } : {}),
-      });
       if (scanRes.ok) {
         const body = unpackPayload(scanRes.data);
         const coinTotal = Array.isArray(body.CoinTotalDeposit)
           ? (body.CoinTotalDeposit[0] as { totalAmount?: number })
           : null;
         setScannerTotal(Number(coinTotal?.totalAmount ?? body.totalAmount ?? 0) || 0);
+      }
+
+      if (uniquePendingRes.ok) {
+        const body = unpackPayload(uniquePendingRes.data);
+        setUniquePendingDeposit({
+          pendingCount: Number(body.uniqueRequestCount ?? 0) || 0,
+          pendingAmount: Number(body.totalAmount ?? 0) || 0,
+        });
+      } else {
+        setUniquePendingDeposit({ pendingCount: 0, pendingAmount: 0 });
       }
     } finally {
       setSummaryLoading(false);
@@ -345,16 +382,45 @@ export function DepositPage() {
   const commitQuery = useCallback(
     (opts?: { allData?: boolean; filters?: ColumnFilters }) => {
       const nextAllData = opts?.allData ?? false;
-      setQuery({
+      setQuery((prev) => ({
         startDate: nextAllData ? '' : startDate,
         endDate: nextAllData ? '' : endDate,
         allData: nextAllData,
+        // Date Apply / All Data leaves an active UTR search alone unless clearing all.
+        utr: prev.utr,
         filters: opts?.filters ?? draft,
-      });
+      }));
       setPage(1);
     },
     [startDate, endDate, draft],
   );
+
+  const searchByUtr = useCallback(() => {
+    const next = utrDraft.trim();
+    if (!next) {
+      toast.error('Enter a UTR to search');
+      return;
+    }
+    setQuery((prev) => ({
+      ...prev,
+      utr: next,
+      allData: false,
+    }));
+    setPage(1);
+  }, [utrDraft]);
+
+  const clearUtrSearch = useCallback(() => {
+    setUtrDraft('');
+    setQuery((prev) => ({
+      ...prev,
+      utr: '',
+      // Restore date-scoped listing using the dates still in the form fields.
+      startDate: startDate || today,
+      endDate: endDate || today,
+      allData: false,
+    }));
+    setPage(1);
+  }, [startDate, endDate, today]);
 
   const clearDates = useCallback(() => {
     setStartDate('');
@@ -365,12 +431,14 @@ export function DepositPage() {
 
   const clearAllFilters = useCallback(() => {
     setDraft(EMPTY_FILTERS);
+    setUtrDraft('');
     setStartDate(today);
     setEndDate(today);
     setQuery({
       startDate: today,
       endDate: today,
       allData: false,
+      utr: '',
       filters: EMPTY_FILTERS,
     });
     setPage(1);
@@ -570,11 +638,11 @@ export function DepositPage() {
   );
 
   const depositData = summary.depositData;
-  const uniquePending = summary.uniquePendingDetail;
-  const activeFilterCount = useMemo(
-    () => Object.values(query.filters).filter((value) => value.trim()).length,
-    [query.filters],
-  );
+  const uniquePending = uniquePendingDeposit;
+  const activeFilterCount = useMemo(() => {
+    const filterCount = Object.values(query.filters).filter((value) => value.trim()).length;
+    return filterCount + (query.utr.trim() ? 1 : 0);
+  }, [query.filters, query.utr]);
 
   const { columns, scannerColumns, getRowSx } = useDepositColumns({
     page,
@@ -652,7 +720,16 @@ export function DepositPage() {
                 variant="outlined"
               />
             ) : null}
-            {query.allData ? (
+            {query.utr.trim() ? (
+              <Chip
+                size="small"
+                label={`UTR: ${query.utr.trim()}`}
+                color="warning"
+                variant="outlined"
+                onDelete={clearUtrSearch}
+              />
+            ) : null}
+            {query.allData && !query.utr.trim() ? (
               <Chip size="small" label="All data" color="info" variant="outlined" />
             ) : null}
             {selectedOrders.length > 0 ? (
@@ -802,6 +879,7 @@ export function DepositPage() {
                 InputLabelProps={{ shrink: true }}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                disabled={Boolean(query.utr.trim())}
                 sx={fieldSx}
               />
               <TextField
@@ -811,6 +889,21 @@ export function DepositPage() {
                 InputLabelProps={{ shrink: true }}
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                disabled={Boolean(query.utr.trim())}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                label="UTR"
+                placeholder="Search by UTR"
+                value={utrDraft}
+                onChange={(e) => setUtrDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchByUtr();
+                  }
+                }}
                 sx={fieldSx}
               />
               <TextField
@@ -833,7 +926,25 @@ export function DepositPage() {
 
               <Button
                 variant="contained"
-                disabled={loading || scannerLoading}
+                disabled={loading || scannerLoading || !utrDraft.trim()}
+                onClick={searchByUtr}
+                sx={orangeBtnSx}
+              >
+                Search UTR
+              </Button>
+              {query.utr.trim() ? (
+                <Button
+                  variant="outlined"
+                  disabled={loading}
+                  onClick={clearUtrSearch}
+                  sx={secondaryBtnSx}
+                >
+                  Clear UTR
+                </Button>
+              ) : null}
+              <Button
+                variant="contained"
+                disabled={loading || scannerLoading || Boolean(query.utr.trim())}
                 onClick={() => {
                   if (isScanner) void loadScannerRows();
                   else commitQuery();
