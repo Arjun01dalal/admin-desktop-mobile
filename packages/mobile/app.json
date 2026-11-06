@@ -2,7 +2,7 @@
   "expo": {
     "name": "Astro",
     "slug": "astro",
-    "version": "1.1.2",
+    "version": "1.0.0",
     "scheme": "myastroapp",
     "updates": {
       "enabled": false
