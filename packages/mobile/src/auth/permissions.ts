@@ -38,6 +38,7 @@ import {
   isPathAllowed,
   isSosExemptRole as sharedIsSosExemptRole,
   canShowUniqueDepositEmpCode as sharedCanShowUniqueDepositEmpCode,
+  canShowCallerWiseUniquePending as sharedCanShowCallerWiseUniquePending,
   canUpdateCallerAllotmentEmpCode as sharedCanUpdateCallerAllotmentEmpCode,
 } from '@astro/shared/permissions';
 
@@ -185,6 +186,12 @@ export function isSosExemptRole(user: StoredUser | null = getSessionUser()): boo
 
 export function canShowUniqueDepositEmpCode(user: StoredUser | null = getSessionUser()): boolean {
   return sharedCanShowUniqueDepositEmpCode(user, storage);
+}
+
+export function canShowCallerWiseUniquePending(
+  user: StoredUser | null = getSessionUser(),
+): boolean {
+  return sharedCanShowCallerWiseUniquePending(user, storage);
 }
 
 export function canUpdateCallerAllotmentEmpCode(

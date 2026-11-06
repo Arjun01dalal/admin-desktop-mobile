@@ -56,10 +56,10 @@ import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
 import {
+  canShowCallerWiseUniquePending,
   canShowUniqueDepositEmpCode,
   getSessionUser,
   hasPermission,
-  Permissions,
 } from '../../../auth/permissions';
 import {
   canShowGtelC2c,
@@ -227,7 +227,7 @@ export function UniqueDepositPendingScreen() {
   const canWhatsApp = hasPermission('whatsapp_icon');
   const canShowMobile = hasPermission('show_mobile');
   const canShowEmpCode = canShowUniqueDepositEmpCode(admin);
-  const canCallerWise = hasPermission(Permissions.show_caller_wise_unique_pending);
+  const canCallerWise = canShowCallerWiseUniquePending(admin);
   const canShowC2c = canShowGtelC2c(admin);
   const [c2cTarget, setC2cTarget] = useState<GtelC2cTarget | null>(null);
   const [empCodeNameMap, setEmpCodeNameMap] = useState<Record<string, string>>(() =>

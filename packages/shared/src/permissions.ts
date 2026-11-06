@@ -882,6 +882,21 @@ export function canShowUniqueDepositEmpCode(
   return isSosExemptRole(user, storage);
 }
 
+/**
+ * Caller Wise Deposit Pending button / route.
+ * Same OR as mobile panelDetail: parent Unique Pending page OR dedicated
+ * `show_caller_wise_unique_pending` (full/dev/QA nav roles included via either).
+ */
+export function canShowCallerWiseUniquePending(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  if (isFullAccessNavRole(user, storage)) return true;
+  if (hasPermission(Permissions.show_caller_wise_unique_pending, user)) return true;
+  if (hasPermission(Permissions.Unique_Deposit_Pending_User, user)) return true;
+  return false;
+}
+
 /** Caller Allotment — edit emp code (admin-panel-domains: full_access / full access / dev_full_access). */
 const CALLER_ALLOTMENT_EMPCODE_ROLE_IDS = new Set([
   '64f710d9a2ab78980020c5fb', // full_access

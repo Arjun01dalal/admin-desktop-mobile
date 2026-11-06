@@ -28,7 +28,11 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { canShowUniqueDepositEmpCode, hasPermission, Permissions } from '@/auth/permissions';
+import {
+  canShowCallerWiseUniquePending,
+  canShowUniqueDepositEmpCode,
+  hasPermission,
+} from '@/auth/permissions';
 import { CommonTable, type CommonTableColumn } from '@/components/CommonTable';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { TablePanel } from '@/components/TablePanel';
@@ -447,7 +451,7 @@ export function UniqueDepositPendingPage() {
   const canChangeStatus = hasPermission('change_status');
   const canDownload = hasPermission('show_download_botton');
   const canWhatsApp = hasPermission('whatsapp_icon');
-  const canCallerWise = hasPermission(Permissions.show_caller_wise_unique_pending);
+  const canCallerWise = canShowCallerWiseUniquePending(admin);
   const today = todayIST();
 
   const [page, setPage] = useState(1);

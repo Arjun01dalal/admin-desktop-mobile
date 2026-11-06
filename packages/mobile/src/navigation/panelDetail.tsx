@@ -4,7 +4,12 @@
  * Screen modules load lazily via getComponent on first navigation.
  */
 import React from 'react';
-import { canAccessNavItem, Permissions, type Permission } from '../auth/permissions';
+import {
+  canAccessNavItem,
+  canShowCallerWiseUniquePending,
+  Permissions,
+  type Permission,
+} from '../auth/permissions';
 import type { AuthUser } from '../types/auth';
 import {
   mergeTargetParams,
@@ -394,22 +399,7 @@ export function canAccessPanelDetail(path: string, user: AuthUser | null | undef
   }
   // Nested under Unique Pending — parent page OR dedicated caller-wise button perm.
   if (path === '/unique_deposit_pending/caller-wise') {
-    return (
-      canAccessNavItem(
-        {
-          id: 'detail:/unique_deposit_pending/caller-wise',
-          permission: Permissions.Unique_Deposit_Pending_User,
-        },
-        user,
-      ) ||
-      canAccessNavItem(
-        {
-          id: 'detail:/unique_deposit_pending/caller-wise-btn',
-          permission: Permissions.show_caller_wise_unique_pending,
-        },
-        user,
-      )
-    );
+    return canShowCallerWiseUniquePending(user);
   }
   const permission = DETAIL_PERMISSION_BY_PATH[path];
   if (!permission) return false;
