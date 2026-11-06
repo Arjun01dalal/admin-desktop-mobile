@@ -1,20 +1,13 @@
 /**
  * UpdateGate — OTA prompt (Stallion).
  *
- * Stallion syncs on launch; we also re-sync on foreground so production
- * releases are not missed until the next cold start.
- *
- * Prompt shows when:
- * - SDK says restart is required (PROD + tempHash + meta), OR
- * - native DOWNLOAD_COMPLETE_* fired (meta fetch can lag/fail — Stallion's
- *   isRestartRequired also requires newBundle.id, which often never flips)
- *
- * Mandatory downloads auto-apply after a short delay so OTA cannot get stuck
- * waiting on a modal that never appears in older prompt logic.
+ * Syncs on launch + foreground. Shows when a new release is downloaded
+ * (different hash than the OTA already running). Restart only happens when
+ * the user taps "Update now" — never auto-restart.
  *
  * No-op on web / Expo Go / Metro (__DEV__).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -34,6 +27,7 @@ import {
   useStallionUpdate,
 } from 'react-native-stallion';
 import { colors } from '../theme';
+import { isAlreadyRunningOta } from './otaHash';
 import { styles } from './UpdateGate.styles';
 
 function stallionOtaEnabled(): boolean {
@@ -42,6 +36,17 @@ function stallionOtaEnabled(): boolean {
     Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
     Constants.appOwnership === 'expo';
   return !inExpoGo;
+}
+
+function bundleChecksum(
+  bundle: { sha256Checksum?: string; id?: string } | null | undefined,
+): string {
+  if (!bundle) return '';
+  if (typeof bundle.sha256Checksum === 'string' && bundle.sha256Checksum.trim()) {
+    return bundle.sha256Checksum.trim();
+  }
+  if (typeof bundle.id === 'string' && bundle.id.trim()) return bundle.id.trim();
+  return '';
 }
 
 export function UpdateGate() {
@@ -53,10 +58,10 @@ function StallionUpdatePrompt() {
   const { isRestartRequired, newReleaseBundle } = useStallionUpdate();
   const [downloadReady, setDownloadReady] = useState(false);
   const [downloadNote, setDownloadNote] = useState('');
+  const [pendingHash, setPendingHash] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [dismissed, setDismissed] = useState(false);
-  const autoApplyRef = useRef(false);
 
   const requestSync = useCallback(() => {
     try {
@@ -77,8 +82,7 @@ function StallionUpdatePrompt() {
     }
   }, []);
 
-  // Launch + resume sync — without this, a release published while the app
-  // stayed warm is easy to miss until a full process kill.
+  // Launch + resume sync.
   useEffect(() => {
     requestSync();
     const onAppState = (state: AppStateStatus) => {
@@ -92,27 +96,20 @@ function StallionUpdatePrompt() {
     const onEvent = (event: {
       type?: string;
       releaseNote?: string;
+      releaseHash?: string;
       message?: string;
-      isMandatory?: boolean;
     }) => {
       const type = event?.type || '';
       if (type === 'DOWNLOAD_COMPLETE_PROD' || type === 'DOWNLOAD_COMPLETE_STAGE') {
+        const hash = typeof event.releaseHash === 'string' ? event.releaseHash.trim() : '';
+        // Already on this CodePush — ignore (stops every-launch popup loop).
+        if (!hash || isAlreadyRunningOta(hash)) return;
+
+        setPendingHash(hash);
         setDownloadReady(true);
         setDismissed(false);
         if (typeof event.releaseNote === 'string' && event.releaseNote.trim()) {
           setDownloadNote(event.releaseNote.trim());
-        }
-        // Permanent fix: don't depend on isRestartRequired / modal alone.
-        // Stallion leaves the new bundle in temp until restart() mounts it.
-        if (!autoApplyRef.current) {
-          autoApplyRef.current = true;
-          setTimeout(() => {
-            try {
-              restart();
-            } catch {
-              autoApplyRef.current = false;
-            }
-          }, 1200);
         }
         return;
       }
@@ -124,26 +121,30 @@ function StallionUpdatePrompt() {
     return () => removeEventListener(onEvent);
   }, []);
 
-  // If SDK eventually flips isRestartRequired (meta caught up), apply once.
   useEffect(() => {
-    if (!isRestartRequired || autoApplyRef.current) return;
-    const mandatory =
-      typeof (newReleaseBundle as { isMandatory?: boolean } | undefined)?.isMandatory === 'boolean'
-        ? Boolean((newReleaseBundle as { isMandatory?: boolean }).isMandatory)
-        : true;
-    if (!mandatory) return;
-    autoApplyRef.current = true;
-    const t = setTimeout(() => {
-      try {
-        restart();
-      } catch {
-        autoApplyRef.current = false;
-      }
-    }, 1200);
-    return () => clearTimeout(t);
-  }, [isRestartRequired, newReleaseBundle]);
+    if (!isRestartRequired) return;
+    const metaHash = bundleChecksum(
+      newReleaseBundle as { sha256Checksum?: string; id?: string } | null,
+    );
+    if (!metaHash && !pendingHash) return;
+    const hash = metaHash || pendingHash;
+    if (isAlreadyRunningOta(hash)) return;
 
-  const visible = (isRestartRequired || downloadReady) && !dismissed;
+    setPendingHash(hash);
+    setDownloadReady(true);
+    setDismissed(false);
+  }, [isRestartRequired, newReleaseBundle, pendingHash]);
+
+  const offeredHash =
+    pendingHash ||
+    bundleChecksum(newReleaseBundle as { sha256Checksum?: string; id?: string } | null);
+
+  const visible =
+    !dismissed &&
+    (downloadReady || isRestartRequired) &&
+    Boolean(offeredHash) &&
+    !isAlreadyRunningOta(offeredHash);
+
   if (!visible) return null;
 
   const notes =

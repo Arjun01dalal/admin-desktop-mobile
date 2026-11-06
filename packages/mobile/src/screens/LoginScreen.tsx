@@ -12,7 +12,7 @@ import { secureApi, type ApiResult } from '../api/client';
 import { resolveLocation, useAuth } from '../auth/AuthContext';
 import { AppBackground } from '../components/AppBackground';
 import { Button, Card, ErrorBanner, Input } from '../components/UI';
-import { getAppVersion } from '../utils/appVersion';
+import { AppVersionLabel } from '../updates/AppVersionLabel';
 import type { AuthUser } from '../types/auth';
 import { getRoleOptions, selectActiveRole } from '../auth/roleSelection';
 import { styles } from './LoginScreen.styles';
@@ -269,7 +269,7 @@ export function LoginScreen({
               <Text style={styles.linkMuted}>Terms & Conditions</Text>
             </TouchableOpacity>
           ) : null}
-          <Text style={styles.version}>v{getAppVersion()}</Text>
+          <AppVersionLabel style={styles.version} prefix="v" />
         </Card>
       </KeyboardAvoidingView>
     </SafeAreaView>

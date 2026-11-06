@@ -30,7 +30,8 @@ import { RevealCodesOtpModal } from '../components/RevealCodesOtpModal';
 import { useRevealCodes } from '../context/useRevealCodes';
 import { useTheme } from '../features/theme';
 import { colors, radius, spacing, type ThemeMode } from '../theme';
-import { getAppVersion } from '../utils/appVersion';
+import { AppVersionLabel } from '../updates/AppVersionLabel';
+import { getActiveOtaHash, isAlreadyRunningOta, otaHashesEqual } from '../updates/otaHash';
 import { styles } from './ProfileScreen.styles';
 import { display } from '../utils/display';
 
@@ -296,37 +297,63 @@ function SosRow() {
 }
 
 function CheckUpdatesRow() {
-  const [busy, setBusy] = useState(false);
   if (!stallionOtaEnabled()) return null;
+  return <StallionCheckUpdatesRow />;
+}
+
+/**
+ * Only shown when a *new* OTA is pending (not already running).
+ * If the same CodePush is already applied, hide the row entirely.
+ */
+function StallionCheckUpdatesRow() {
+  const [busy, setBusy] = useState(false);
+  const { useStallionUpdate, sync, restart } = require('react-native-stallion') as {
+    useStallionUpdate: () => {
+      isRestartRequired: boolean;
+      newReleaseBundle: { sha256Checksum?: string; id?: string; releaseNote?: string } | null;
+      currentlyRunningBundle: { sha256Checksum?: string; id?: string; version?: number } | null;
+    };
+    sync?: () => void;
+    restart?: () => void;
+  };
+  const { isRestartRequired, newReleaseBundle, currentlyRunningBundle } = useStallionUpdate();
+
+  const offeredHash =
+    (typeof newReleaseBundle?.sha256Checksum === 'string' && newReleaseBundle.sha256Checksum) ||
+    (typeof newReleaseBundle?.id === 'string' && newReleaseBundle.id) ||
+    '';
+
+  const alreadyOnOffered =
+    Boolean(offeredHash) &&
+    (isAlreadyRunningOta(offeredHash) ||
+      otaHashesEqual(offeredHash, currentlyRunningBundle?.sha256Checksum) ||
+      (typeof currentlyRunningBundle?.id === 'string' &&
+        typeof newReleaseBundle?.id === 'string' &&
+        currentlyRunningBundle.id === newReleaseBundle.id));
+
+  // Hide when up to date: same CodePush already running, or nothing pending.
+  const showRow = Boolean(offeredHash) && !alreadyOnOffered && Boolean(newReleaseBundle || isRestartRequired);
+
+  if (!showRow) return null;
 
   const runCheck = () => {
     setBusy(true);
     try {
-      // Lazy require keeps Profile usable when Stallion native is absent.
-      const stallion = require('react-native-stallion') as {
-        sync?: () => void;
-        restart?: () => void;
-        ACTIVE_RELEASE_HASH?: string;
-      };
       try {
-        stallion.sync?.();
+        sync?.();
       } catch {
         /* sync best-effort */
       }
-      const hash =
-        typeof stallion.ACTIVE_RELEASE_HASH === 'string' && stallion.ACTIVE_RELEASE_HASH
-          ? stallion.ACTIVE_RELEASE_HASH.slice(0, 12)
-          : 'embedded';
       Alert.alert(
-        'Check for updates',
-        `Sync started. Running bundle: ${hash}…\n\nIf a download finishes, tap Restart now to apply it.`,
+        'Update available',
+        'A new CodePush is ready. Restart now to apply it.',
         [
-          { text: 'OK', style: 'cancel' },
+          { text: 'Later', style: 'cancel' },
           {
             text: 'Restart now',
             onPress: () => {
               try {
-                stallion.restart?.();
+                restart?.();
               } catch {
                 Alert.alert('Restart failed', 'Force-close the app and open it again.');
               }
@@ -350,8 +377,12 @@ function CheckUpdatesRow() {
     >
       <MaterialIcons name="system-update" size={20} color={colors.primary} />
       <View style={styles.actionTextWrap}>
-        <Text style={styles.actionTitle}>{busy ? 'Checking…' : 'Check for updates'}</Text>
-        <Text style={styles.actionSub}>Sync Stallion OTA and restart into a downloaded release</Text>
+        <Text style={styles.actionTitle}>{busy ? 'Checking…' : 'Update available'}</Text>
+        <Text style={styles.actionSub}>
+          {getActiveOtaHash()
+            ? 'New CodePush ready — tap to restart'
+            : 'CodePush ready — tap to restart'}
+        </Text>
       </View>
       <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
     </TouchableOpacity>
@@ -408,7 +439,7 @@ export function ProfileScreen() {
           <MaterialIcons name="logout" size={20} color="#fff" />
           <Text style={styles.logoutBtnText}>Logout</Text>
         </TouchableOpacity>
-        <Text style={styles.version}>App version {getAppVersion()}</Text>
+        <AppVersionLabel style={styles.version} prefix="App version " />
       </View>
     </ScrollView>
   );
