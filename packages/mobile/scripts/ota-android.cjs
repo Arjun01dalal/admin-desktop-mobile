@@ -144,33 +144,54 @@ const targetVersions = Array.from(
   ),
 );
 
+function sleep(ms) {
+  // Sync wait — publish→release can race with "bundle not found".
+  spawnSync('sleep', [String(Math.max(1, Math.ceil(ms / 1000)))], {
+    shell: process.platform === 'win32',
+  });
+}
+
 for (const version of targetVersions) {
   // release-bundle fails with "already promoted" if the hash was linked before —
   // still continue to update-release so rollout/pause get corrected.
-  const release = spawnSync(
-    'npx',
-    [
-      'stallion',
-      'release-bundle',
-      '--project-id',
-      projectId,
-      '--hash',
-      hash,
-      '--app-version',
-      version,
-      '--release-note',
-      releaseNote,
-      '--ci-token',
-      ciToken,
-      '--is-mandatory',
-      'true',
-    ],
-    { cwd: root, encoding: 'utf8', env: process.env, shell: process.platform === 'win32' },
-  );
-  const releaseOut = `${release.stdout || ''}${release.stderr || ''}`;
-  process.stdout.write(releaseOut);
-  if (release.status !== 0 && !/already promoted/i.test(releaseOut)) {
-    process.exit(release.status || 1);
+  // Fresh publishes sometimes 404 for a few seconds — retry briefly.
+  let releaseOut = '';
+  let releaseStatus = 1;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    if (attempt > 1) {
+      console.log(`release-bundle retry ${attempt}/5 after publish propagation…`);
+      sleep(4000);
+    }
+    const release = spawnSync(
+      'npx',
+      [
+        'stallion',
+        'release-bundle',
+        '--project-id',
+        projectId,
+        '--hash',
+        hash,
+        '--app-version',
+        version,
+        '--release-note',
+        releaseNote,
+        '--ci-token',
+        ciToken,
+        '--is-mandatory',
+        'true',
+      ],
+      { cwd: root, encoding: 'utf8', env: process.env, shell: process.platform === 'win32' },
+    );
+    releaseOut = `${release.stdout || ''}${release.stderr || ''}`;
+    releaseStatus = release.status || 0;
+    process.stdout.write(releaseOut);
+    if (releaseStatus === 0 || /already promoted/i.test(releaseOut)) break;
+    if (!/bundle not found/i.test(releaseOut)) {
+      process.exit(releaseStatus || 1);
+    }
+  }
+  if (releaseStatus !== 0 && !/already promoted/i.test(releaseOut)) {
+    process.exit(releaseStatus || 1);
   }
 
   // Force 100% rollout — console promotes often land at 0% and devices never see them.
