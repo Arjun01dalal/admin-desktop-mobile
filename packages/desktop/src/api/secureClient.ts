@@ -13,6 +13,7 @@ const SKIP_SESSION_LOGOUT = new Set<SecureAction>([
   'auth.sendOtp',
   'auth.verifyOtp',
   'auth.getResponsibility',
+  'auth.inactivityLogoutStatus',
 ]);
 
 /** Endpoints that already ARE the session check — don't nest another recheck. */

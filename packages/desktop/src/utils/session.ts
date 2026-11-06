@@ -1,5 +1,6 @@
 /** Auth session helpers — clear storage and notify App to leave the panel. */
 
+import { INACTIVITY_LAST_AT_KEY, INACTIVITY_OWNER_KEY } from '@astro/shared';
 import { clearAuthToken } from '@/utils/authToken';
 
 export const SESSION_EXPIRED_EVENT = 'gcalc:session-expired';
@@ -15,6 +16,8 @@ const AUTH_STORAGE_KEYS = [
   'blocked_users_last_checked_at',
   'blocked_users_validation_lock',
   'blocked_user_ids_cache',
+  INACTIVITY_LAST_AT_KEY,
+  INACTIVITY_OWNER_KEY,
 ] as const;
 
 const AUTH_SESSION_KEYS = ['last_panel_path', 'llm_chat_messages', 'llm_chat_open'] as const;

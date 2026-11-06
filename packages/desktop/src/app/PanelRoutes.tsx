@@ -30,6 +30,7 @@ import {
   CoinRemovalDetailsPage,
   ShowMyCoinHistoryPage,
   CustomerAllotmentPage,
+  SubadminReportPage,
   PointsReportPage,
   PointsReportDetailsPage,
   SheetDownloadReportPage,
@@ -198,6 +199,7 @@ export function PanelRoutes({ user, logout, goPanel }: Props) {
             <Route path="/checkers-report" element={<CheckersReportPage />} />
             <Route path="/download-report" element={<SheetDownloadReportPage />} />
             <Route path="/downlaodReport" element={<Navigate to="/download-report" replace />} />
+            <Route path="/subadmin-report" element={<SubadminReportPage />} />
             <Route path="/coins-report" element={<PointsReportPage />} />
             <Route path="/coin-reports/report" element={<PointsReportDetailsPage />} />
             <Route path="/coins-removal" element={<CoinRemovalPage />} />

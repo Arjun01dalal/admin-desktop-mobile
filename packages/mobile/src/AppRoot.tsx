@@ -48,14 +48,14 @@ function Root() {
   const [screen, setScreen] = useState<GateScreen>('splash');
   const [returnTo, setReturnTo] = useState<GateScreen>('astro-login');
   const [siteAccessToken, setSiteAccessToken] = useState('');
-  const [activitySignal, setActivitySignal] = useState(0);
   const appliedDeepLinkRaw = useRef('');
 
-  useInactivityLogout({
+  // Ref-based activity mark — do NOT setState on every touch (that remounts
+  // the navigator and can dismiss Profile logout Alert / break buttons).
+  const { markActivity } = useInactivityLogout({
     user,
     enabled: Boolean(token && user && screen === 'panel'),
     onLogout: logout,
-    activitySignal,
   });
 
   const goAstroLogin = useCallback(() => {
@@ -141,11 +141,7 @@ function Root() {
 
   if (inPanel) {
     return (
-      <View
-        style={{ flex: 1 }}
-        onTouchStart={() => setActivitySignal((n) => n + 1)}
-        collapsable={false}
-      >
+      <View style={{ flex: 1 }} onTouchStart={markActivity} collapsable={false}>
         <AppNavigator />
         <LocationRequiredGate
           open={blocked}

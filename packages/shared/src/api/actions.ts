@@ -21,6 +21,9 @@ export const ApiActions = {
   callLogs: {
     externalDialerBatch: 'callLogs.externalDialerBatch',
   },
+  reports: {
+    automaticLogoutDetails: 'reports.automaticLogoutDetails',
+  },
   withdrawals: {
     byActiveUser: 'withdrawals.byActiveUser',
   },

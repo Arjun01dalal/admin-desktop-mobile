@@ -1,64 +1,39 @@
 /**
  * Auto-logout after 45 minutes without activity (foreground or background).
- * Calls `auth.inactivityLogoutStatus` then `onLogout`.
- *
- * Timers pause while JS is suspended in background — we persist last activity
- * and re-check on AppState `active` / periodic ticks so logout still applies.
+ * Session starts on login (`startInactivitySession`) and stops on any logout
+ * (manual, token-blacklist, or inactivity) via `stopInactivitySession`.
  */
 import { useEffect, useRef } from 'react';
 import { Alert, AppState, type AppStateStatus, type NativeEventSubscription } from 'react-native';
 import {
   inactivityLogoutRemainingMs,
+  inactivitySessionOwnerKey,
   isInactivityLogoutDue,
   isInactivityLogoutExempt,
   normalizeInactivityMobile,
+  readInactivityLastAt,
+  startInactivitySession,
+  stopInactivitySession,
+  touchInactivitySession,
   type InactivityLogoutUser,
 } from '@astro/shared';
 import { secureApi } from '../api/client';
 import { appStorage } from '../lib/webShim';
 
-const STORAGE_KEY = 'astroInactivityLastAt';
 const POINTER_THROTTLE_MS = 1_000;
 const WATCHDOG_MS = 30_000;
+const STATUS_API_TIMEOUT_MS = 8_000;
 
 type Options = {
   user: InactivityLogoutUser | null | undefined;
   enabled?: boolean;
   onLogout: () => void | Promise<void>;
-  /** Optional: parent can call this to mark UI activity (touches / navigation). */
-  activitySignal?: number;
 };
-
-function readLastActivity(): number {
-  try {
-    const n = Number(appStorage.getItem(STORAGE_KEY) || 0);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeLastActivity(at: number): void {
-  try {
-    appStorage.setItem(STORAGE_KEY, String(at));
-  } catch {
-    // ignore
-  }
-}
-
-function clearLastActivity(): void {
-  try {
-    appStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // ignore
-  }
-}
 
 export function useInactivityLogout({
   user,
   enabled = true,
   onLogout,
-  activitySignal = 0,
 }: Options): { markActivity: () => void } {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -71,11 +46,17 @@ export function useInactivityLogout({
   const markActivityRef = useRef(() => {});
   const exempt = isInactivityLogoutExempt(user);
   const mobile = normalizeInactivityMobile(user?.mobile);
-  const userKey = user ? `${String(user._id || '')}:${mobile}` : '';
+  const ownerKey = inactivitySessionOwnerKey(user);
 
   useEffect(() => {
-    if (!enabled || !userKey || exempt) {
-      clearLastActivity();
+    // Stop storage only when logged out (no owner) or exempt.
+    // Leaving panel (`!enabled`) pauses timers but keeps the login-started clock.
+    if (!ownerKey || exempt) {
+      stopInactivitySession(appStorage);
+      markActivityRef.current = () => {};
+      return;
+    }
+    if (!enabled) {
       markActivityRef.current = () => {};
       return;
     }
@@ -99,13 +80,19 @@ export function useInactivityLogout({
       firingRef.current = true;
       clearTimer();
       try {
-        await secureApi('auth.inactivityLogoutStatus', { mobile });
+        await Promise.race([
+          secureApi('auth.inactivityLogoutStatus', { mobile }),
+          new Promise<void>((resolve) => setTimeout(resolve, STATUS_API_TIMEOUT_MS)),
+        ]);
       } catch {
-        // Still force local logout if the status call fails.
+        // Still force local logout if the status call fails / times out.
       }
-      clearLastActivity();
-      Alert.alert('Logged out', 'Session ended due to inactivity.');
-      await onLogoutRef.current();
+      stopInactivitySession(appStorage);
+      try {
+        await onLogoutRef.current();
+      } finally {
+        Alert.alert('Logged out', 'Session ended due to inactivity.');
+      }
     };
 
     const schedule = () => {
@@ -125,8 +112,7 @@ export function useInactivityLogout({
       const now = Date.now();
       if (now - lastMarkRef.current < POINTER_THROTTLE_MS) return;
       lastMarkRef.current = now;
-      lastActivityRef.current = now;
-      writeLastActivity(now);
+      lastActivityRef.current = touchInactivitySession(appStorage, ownerKey, now);
       schedule();
     };
     markActivityRef.current = markActivity;
@@ -139,10 +125,10 @@ export function useInactivityLogout({
       }
     };
 
-    const stored = readLastActivity();
+    // Prefer session started at login; only seed if missing (e.g. app restore).
     const now = Date.now();
-    lastActivityRef.current = stored > 0 ? stored : now;
-    if (!stored) writeLastActivity(now);
+    const stored = readInactivityLastAt(appStorage, ownerKey);
+    lastActivityRef.current = stored ?? startInactivitySession(appStorage, ownerKey, now);
 
     if (isInactivityLogoutDue(lastActivityRef.current, now)) {
       void fireLogout();
@@ -165,11 +151,7 @@ export function useInactivityLogout({
       sub.remove();
       markActivityRef.current = () => {};
     };
-  }, [userKey, mobile, exempt, enabled]);
-
-  useEffect(() => {
-    if (activitySignal > 0) markActivityRef.current();
-  }, [activitySignal]);
+  }, [ownerKey, mobile, exempt, enabled]);
 
   return {
     markActivity: () => markActivityRef.current(),

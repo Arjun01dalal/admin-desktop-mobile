@@ -47,6 +47,7 @@ export const Permissions = {
   sos_blocked_users: 'sos_blocked_users',
   Checkers_Report: 'Checkers_Report',
   sheet_downlaod_report: 'sheet_downlaod_report',
+  show_subadmin_all_report: 'show_subadmin_all_report',
   coin_report: 'coin_report',
   Coin_Removal: 'Coin_Removal',
   Mobile_App: 'Mobile_App',

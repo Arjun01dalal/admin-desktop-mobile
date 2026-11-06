@@ -98,6 +98,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   'reports.getAllMidOld': {"method":"POST","path":"/payinAccounts/getAllMidOld","encryptRequest":true,"decryptResponse":true},
   'reports.checkersData': {"method":"POST","path":"/transaction/checker-data-all","encryptRequest":false,"decryptResponse":false},
   'reports.allUserLoginLogout': {"method":"POST","path":"/SubAdmin/logout-login-panel","encryptRequest":false,"decryptResponse":false},
+  'reports.automaticLogoutDetails': {"method":"GET","path":"/SubAdmin/automatic-logout-details","encryptRequest":false,"decryptResponse":false},
   'reports.loginByRole': {"method":"POST","path":"/SubAdmin/getAllByRole","encryptRequest":true,"decryptResponse":true},
   'ops.socialMediaGetAll': {"method":"POST","path":"/socialMedia/getAll","encryptRequest":true,"decryptResponse":true},
   'ops.socialMediaCreate': {"method":"POST","path":"/socialMedia","encryptRequest":true,"decryptResponse":true},

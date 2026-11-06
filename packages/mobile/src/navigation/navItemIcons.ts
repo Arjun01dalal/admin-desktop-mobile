@@ -36,6 +36,7 @@ const NAV_ITEM_ICONS: Record<string, MaterialIconName> = {
   sosBlockedUsers: 'block',
   checkersReport: 'fact-check',
   sheetDownloadReport: 'download',
+  subadminReport: 'manage-accounts',
   pointsReport: 'toll',
   coinRemoval: 'remove-circle',
   showMyCoinHistory: 'receipt-long',

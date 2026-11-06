@@ -103,6 +103,11 @@ export const LAZY_IMPLEMENTED: Record<string, () => AnyScreen> = {
       require('../screens/dashboards/details/SheetDownloadReportScreen'),
       'SheetDownloadReportScreen',
     ),
+  '/subadmin-report': () =>
+    named(
+      require('../screens/dashboards/details/SubadminReportScreen'),
+      'SubadminReportScreen',
+    ),
   '/coins-report': () =>
     named(require('../screens/dashboards/details/PointsReportScreen'), 'PointsReportScreen'),
   '/coins-removal': () =>

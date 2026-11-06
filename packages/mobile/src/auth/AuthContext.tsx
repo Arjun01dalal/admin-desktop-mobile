@@ -7,7 +7,12 @@ import { secureApi, setAuthFailureHandler } from '../api/client';
 import { eraseSessionSecrets, persistToken, persistUser } from '../lib/secureStorage';
 import { appStorage } from '../lib/webShim';
 import { persistRoleFromLogin } from './permissions';
-import { clearLlmChatStorage } from '@astro/shared';
+import {
+  clearLlmChatStorage,
+  inactivitySessionOwnerKey,
+  startInactivitySession,
+  stopInactivitySession,
+} from '@astro/shared';
 import { registerSubAdminFcmToken } from './registerFcmToken';
 import { resetTokenValidationThrottle } from './sessionCheck';
 import { useTokenValidator } from './useTokenValidator';
@@ -68,6 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* role mapping is best-effort */
     }
+    // 45m inactivity clock starts at login (stopped on any logout path).
+    const owner = inactivitySessionOwnerKey(newUser);
+    if (owner) startInactivitySession(appStorage, owner);
     setToken(newToken);
     setUser(newUser);
     void registerSubAdminFcmToken(newUser);
@@ -95,6 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearLlmChatStorage(appStorage);
     appStorage.removeItem('token');
     appStorage.removeItem('user');
+    // Manual logout + token-blacklist / auth-failure all go through here.
+    stopInactivitySession(appStorage);
     await eraseSessionSecrets();
     appStorage.removeItem('role_id');
     appStorage.removeItem('role');

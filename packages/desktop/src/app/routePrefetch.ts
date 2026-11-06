@@ -52,6 +52,7 @@ const LOADERS: Record<string, Loader> = {
   '/checkers-report': () => import('@/screens/panel/CheckersReportPage'),
   '/download-report': () => import('@/screens/panel/SheetDownloadReportPage'),
   '/downlaodReport': () => import('@/screens/panel/SheetDownloadReportPage'),
+  '/subadmin-report': () => import('@/screens/panel/SubadminReportPage'),
   '/coins-report': () => import('@/screens/panel/PointsReportPage'),
   '/coin-reports/report': () => import('@/screens/panel/pointsReport/PointsReportDetailsPage'),
   '/coins-removal': () => import('@/screens/panel/CoinRemovalPage'),

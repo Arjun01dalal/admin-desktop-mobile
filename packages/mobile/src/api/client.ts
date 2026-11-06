@@ -222,6 +222,7 @@ const SKIP_SESSION_LOGOUT = new Set<SecureAction>([
   'auth.sendOtp',
   'auth.verifyOtp',
   'auth.getResponsibility',
+  'auth.inactivityLogoutStatus',
 ]);
 
 /** True when the response signals an invalid/blacklisted/expired session. */

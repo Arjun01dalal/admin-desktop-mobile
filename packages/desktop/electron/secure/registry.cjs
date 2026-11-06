@@ -541,6 +541,12 @@ module.exports = {
     encryptRequest: false,
     decryptResponse: false,
   },
+  'reports.automaticLogoutDetails': {
+    method: 'GET',
+    path: '/SubAdmin/automatic-logout-details',
+    encryptRequest: false,
+    decryptResponse: false,
+  },
   'reports.loginByRole': {
     method: 'POST',
     path: '/SubAdmin/getAllByRole',

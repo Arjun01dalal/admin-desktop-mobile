@@ -3,6 +3,9 @@ import { makeStyles } from '../../../styles/common';
 import { colors, radius, spacing } from '../../../theme';
 
 export const styles = makeStyles({
+  /** FlatList does not honor `gap` on content — space cards with this / ItemSeparator. */
+  cardSpaced: { marginBottom: spacing(2.5) },
+  listSeparator: { height: spacing(2.5) },
   quickRow: { marginTop: spacing(3), flexGrow: 0 },
   chip: {
     backgroundColor: colors.surface,

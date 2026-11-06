@@ -92,6 +92,7 @@ export const SECURE_ACTIONS = [
   'reports.getAllMidOld',
   'reports.checkersData',
   'reports.allUserLoginLogout',
+  'reports.automaticLogoutDetails',
   'reports.loginByRole',
   // Ops / management pages
   'ops.socialMediaGetAll',

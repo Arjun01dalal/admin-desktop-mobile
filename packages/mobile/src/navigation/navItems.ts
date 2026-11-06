@@ -187,6 +187,13 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.sheet_downlaod_report,
   },
   {
+    id: 'subadminReport',
+    category: 'Reports',
+    label: 'Subadmin Report',
+    path: '/subadmin-report',
+    permission: Permissions.show_subadmin_all_report,
+  },
+  {
     id: 'pointsReport',
     category: 'Reports',
     label: 'Points Report',

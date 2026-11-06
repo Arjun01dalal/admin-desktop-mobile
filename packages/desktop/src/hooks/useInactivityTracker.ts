@@ -7,12 +7,11 @@ const MAX_CHUNK = HEARTBEAT_INTERVAL + 2_000;
 /** Throttle pointer moves — raw mousemove floods the main thread on Windows. */
 const POINTER_THROTTLE_MS = 1_000;
 
+/** Lean set — skip click/keypress duplicates that flood Windows with scroll/typing. */
 const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
   'mousedown',
-  'click',
   'scroll',
   'keydown',
-  'keypress',
   'touchstart',
 ];
 
@@ -25,7 +24,7 @@ export function useInactivityTracker(userId?: string): void {
   const heartbeatTimer = useRef<number | null>(null);
   const sessionStart = useRef(Date.now());
   const isInactive = useRef(false);
-  const lastPointerActivity = useRef(0);
+  const lastActivityAt = useRef(0);
 
   useEffect(() => {
     if (!userId) return;
@@ -40,18 +39,15 @@ export function useInactivityTracker(userId?: string): void {
     };
 
     const handleActivity = () => {
+      const now = Date.now();
+      // Throttle ALL input (not only mousemove) — scroll/keydown bursts stuck laptops.
+      if (now - lastActivityAt.current < POINTER_THROTTLE_MS) return;
+      lastActivityAt.current = now;
       if (isInactive.current) {
-        sessionStart.current = Date.now();
+        sessionStart.current = now;
         isInactive.current = false;
       }
       resetInactivityTimer();
-    };
-
-    const handlePointerMove = () => {
-      const now = Date.now();
-      if (now - lastPointerActivity.current < POINTER_THROTTLE_MS) return;
-      lastPointerActivity.current = now;
-      handleActivity();
     };
 
     const heartbeat = () => {
@@ -75,7 +71,7 @@ export function useInactivityTracker(userId?: string): void {
     ACTIVITY_EVENTS.forEach((event) => {
       window.addEventListener(event, handleActivity, { passive: true });
     });
-    window.addEventListener('mousemove', handlePointerMove, { passive: true });
+    window.addEventListener('mousemove', handleActivity, { passive: true });
     window.addEventListener('beforeunload', heartbeat);
 
     return () => {
@@ -89,7 +85,7 @@ export function useInactivityTracker(userId?: string): void {
       ACTIVITY_EVENTS.forEach((event) => {
         window.removeEventListener(event, handleActivity);
       });
-      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('beforeunload', heartbeat);
     };
     // Intentionally not keyed on route — remounting every navigation sent extra heartbeats

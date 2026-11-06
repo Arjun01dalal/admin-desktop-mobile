@@ -321,7 +321,13 @@ export function ProfileScreen() {
           onPress={() => {
             Alert.alert('Logout', 'Sign out of Astro Admin?', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Logout', style: 'destructive', onPress: logout },
+              {
+                text: 'Logout',
+                style: 'destructive',
+                onPress: () => {
+                  void logout();
+                },
+              },
             ]);
           }}
         >

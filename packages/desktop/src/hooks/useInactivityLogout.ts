@@ -1,13 +1,23 @@
 /**
  * Auto-logout after 45 minutes without user input (foreground or background).
- * Calls `auth.inactivityLogoutStatus` then `onLogout`.
+ * Session starts on login (`startInactivitySession`) and stops on any logout
+ * (manual, token-blacklist, or inactivity) via `stopInactivitySession`.
+ *
+ * Windows note: do NOT clearTimeout/setTimeout or write localStorage on every
+ * pointer/scroll event — that flooded the main thread and made laptops sticky.
+ * Keep last-activity in memory; persist + due-check on a slow cadence.
  */
 import { useEffect, useRef } from 'react';
 import {
   inactivityLogoutRemainingMs,
+  inactivitySessionOwnerKey,
   isInactivityLogoutDue,
   isInactivityLogoutExempt,
   normalizeInactivityMobile,
+  readInactivityLastAt,
+  startInactivitySession,
+  stopInactivitySession,
+  touchInactivitySession,
   type InactivityLogoutUser,
 } from '@astro/shared';
 import { secureApi } from '@/api/secureClient';
@@ -15,62 +25,45 @@ import { toast } from 'react-toastify';
 
 const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
   'mousedown',
-  'click',
-  'scroll',
   'keydown',
-  'keypress',
   'touchstart',
+  'scroll',
 ];
-const POINTER_THROTTLE_MS = 1_000;
-const STORAGE_KEY = 'astroInactivityLastAt';
+/** Ignore bursts of input — raw mousemove/scroll floods Windows Electron. */
+const ACTIVITY_THROTTLE_MS = 1_000;
+/** localStorage sync is expensive; persist at most this often while active. */
+const STORAGE_THROTTLE_MS = 10_000;
+/** Cap timeout chunks so a stale timer re-checks after activity without rescheduling every move. */
+const CHECK_CHUNK_MS = 30_000;
+const STATUS_API_TIMEOUT_MS = 8_000;
 
 type Options = {
   user: InactivityLogoutUser | null | undefined;
+  enabled?: boolean;
   onLogout: () => void;
 };
 
-function readLastActivity(): number {
-  try {
-    const n = Number(localStorage.getItem(STORAGE_KEY) || 0);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeLastActivity(at: number): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(at));
-  } catch {
-    // ignore quota / private mode
-  }
-}
-
-function clearLastActivity(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // ignore
-  }
-}
-
-export function useInactivityLogout({ user, onLogout }: Options): void {
+export function useInactivityLogout({ user, enabled = true, onLogout }: Options): void {
   const timerRef = useRef<number | null>(null);
   const lastActivityRef = useRef(0);
-  const lastPointerRef = useRef(0);
+  const lastMarkRef = useRef(0);
+  const lastPersistRef = useRef(0);
   const firingRef = useRef(false);
   const onLogoutRef = useRef(onLogout);
   onLogoutRef.current = onLogout;
 
   const exempt = isInactivityLogoutExempt(user);
   const mobile = normalizeInactivityMobile(user?.mobile);
-  const userKey = user ? `${String(user._id || '')}:${mobile}` : '';
+  const ownerKey = inactivitySessionOwnerKey(user);
 
   useEffect(() => {
-    if (!userKey || exempt) {
-      clearLastActivity();
+    // Stop storage only when logged out (no owner) or exempt.
+    // `!enabled` pauses timers but keeps the login-started clock.
+    if (!ownerKey || exempt) {
+      stopInactivitySession(localStorage);
       return;
     }
+    if (!enabled) return;
 
     if (!mobile) return;
 
@@ -83,16 +76,25 @@ export function useInactivityLogout({ user, onLogout }: Options): void {
       }
     };
 
+    const persist = (at: number, force = false) => {
+      if (!force && at - lastPersistRef.current < STORAGE_THROTTLE_MS) return;
+      lastPersistRef.current = at;
+      touchInactivitySession(localStorage, ownerKey, at);
+    };
+
     const fireLogout = async () => {
       if (firingRef.current) return;
       firingRef.current = true;
       clearTimer();
       try {
-        await secureApi('auth.inactivityLogoutStatus', { mobile });
+        await Promise.race([
+          secureApi('auth.inactivityLogoutStatus', { mobile }),
+          new Promise<void>((resolve) => window.setTimeout(resolve, STATUS_API_TIMEOUT_MS)),
+        ]);
       } catch {
-        // Still force local logout if the status call fails.
+        // Still force local logout if the status call fails / times out.
       }
-      clearLastActivity();
+      stopInactivitySession(localStorage);
       toast.error('Logged out due to inactivity.');
       onLogoutRef.current();
     };
@@ -104,24 +106,25 @@ export function useInactivityLogout({ user, onLogout }: Options): void {
         void fireLogout();
         return;
       }
+      // Chunk long waits so we re-read lastActivity after user input
+      // without clearTimeout/setTimeout on every mouse move.
       timerRef.current = window.setTimeout(() => {
-        void fireLogout();
-      }, remaining);
+        if (isInactivityLogoutDue(lastActivityRef.current)) {
+          void fireLogout();
+        } else {
+          schedule();
+        }
+      }, Math.min(remaining, CHECK_CHUNK_MS));
     };
 
     const markActivity = () => {
       if (firingRef.current) return;
       const now = Date.now();
+      if (now - lastMarkRef.current < ACTIVITY_THROTTLE_MS) return;
+      lastMarkRef.current = now;
       lastActivityRef.current = now;
-      writeLastActivity(now);
-      schedule();
-    };
-
-    const handlePointerMove = () => {
-      const now = Date.now();
-      if (now - lastPointerRef.current < POINTER_THROTTLE_MS) return;
-      lastPointerRef.current = now;
-      markActivity();
+      persist(now);
+      // Do not reschedule here — next CHECK_CHUNK tick picks up the new lastActivity.
     };
 
     const checkDue = () => {
@@ -132,10 +135,10 @@ export function useInactivityLogout({ user, onLogout }: Options): void {
       }
     };
 
-    const stored = readLastActivity();
     const now = Date.now();
-    lastActivityRef.current = stored > 0 ? stored : now;
-    if (!stored) writeLastActivity(now);
+    const stored = readInactivityLastAt(localStorage, ownerKey);
+    lastActivityRef.current = stored ?? startInactivitySession(localStorage, ownerKey, now);
+    lastPersistRef.current = lastActivityRef.current;
 
     if (isInactivityLogoutDue(lastActivityRef.current, now)) {
       void fireLogout();
@@ -146,18 +149,22 @@ export function useInactivityLogout({ user, onLogout }: Options): void {
     ACTIVITY_EVENTS.forEach((event) => {
       window.addEventListener(event, markActivity, { passive: true });
     });
-    window.addEventListener('mousemove', handlePointerMove, { passive: true });
+    window.addEventListener('mousemove', markActivity, { passive: true });
     document.addEventListener('visibilitychange', checkDue);
     window.addEventListener('focus', checkDue);
 
     return () => {
+      // Flush latest activity so restore / other windows see it.
+      if (lastActivityRef.current > 0) {
+        persist(lastActivityRef.current, true);
+      }
       clearTimer();
       ACTIVITY_EVENTS.forEach((event) => {
         window.removeEventListener(event, markActivity);
       });
-      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mousemove', markActivity);
       document.removeEventListener('visibilitychange', checkDue);
       window.removeEventListener('focus', checkDue);
     };
-  }, [userKey, mobile, exempt]);
+  }, [ownerKey, mobile, exempt, enabled]);
 }

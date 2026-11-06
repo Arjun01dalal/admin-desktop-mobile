@@ -23,6 +23,7 @@ import type { AddressInfo, AuthUser } from '@/types/gcalc';
 import { getAuthToken, setAuthToken } from '@/utils/authToken';
 import { resetTokenValidationThrottle } from '@/utils/sessionCheck';
 import { resetSessionExpiredGuard } from '@/utils/session';
+import { inactivitySessionOwnerKey, startInactivitySession } from '@astro/shared';
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
@@ -232,6 +233,8 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
 
       toast.success('Login successful');
       void registerSubAdminFcmToken(syncedUser);
+      const owner = inactivitySessionOwnerKey(syncedUser);
+      if (owner) startInactivitySession(localStorage, owner);
       onSuccess(syncedUser, result.token);
     } finally {
       setLoading(false);
@@ -254,6 +257,8 @@ export function Login({ onSuccess, onBack, initialMobile, initialEmail }: Props)
       const nextUser = await selectActiveRole(pendingUser, role);
       toast.success('Role is updated');
       void registerSubAdminFcmToken(nextUser);
+      const owner = inactivitySessionOwnerKey(nextUser);
+      if (owner) startInactivitySession(localStorage, owner);
       onSuccess(nextUser, getAuthToken() || '');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update role');

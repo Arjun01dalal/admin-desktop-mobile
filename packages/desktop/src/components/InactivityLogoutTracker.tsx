@@ -6,8 +6,8 @@ type Props = {
   onLogout: () => void;
 };
 
-/** Panel-wide 45m inactivity logout; renders no UI. */
+/** Panel-wide 45m inactivity logout; renders no UI. Stops when user is gone. */
 export function InactivityLogoutTracker({ user, onLogout }: Props) {
-  useInactivityLogout({ user, onLogout });
+  useInactivityLogout({ user, enabled: Boolean(user), onLogout });
   return null;
 }

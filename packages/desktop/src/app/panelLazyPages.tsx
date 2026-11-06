@@ -76,6 +76,10 @@ const CustomerAllotmentPage = lazyNamed(
   () => import('@/screens/panel/CustomerAllotmentPage'),
   'CustomerAllotmentPage',
 );
+const SubadminReportPage = lazyNamed(
+  () => import('@/screens/panel/SubadminReportPage'),
+  'SubadminReportPage',
+);
 const PointsReportPage = lazyNamed(
   () => import('@/screens/panel/PointsReportPage'),
   'PointsReportPage',
@@ -409,6 +413,7 @@ export {
   CoinRemovalDetailsPage,
   ShowMyCoinHistoryPage,
   CustomerAllotmentPage,
+  SubadminReportPage,
   PointsReportPage,
   PointsReportDetailsPage,
   SheetDownloadReportPage,
