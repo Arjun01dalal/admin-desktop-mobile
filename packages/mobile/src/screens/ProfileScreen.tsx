@@ -7,12 +7,14 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useAuth } from '../auth/AuthContext';
 import {
   buildSosEnablePayload,
@@ -31,6 +33,14 @@ import { colors, radius, spacing, type ThemeMode } from '../theme';
 import { getAppVersion } from '../utils/appVersion';
 import { styles } from './ProfileScreen.styles';
 import { display } from '../utils/display';
+
+function stallionOtaEnabled(): boolean {
+  if (Platform.OS === 'web' || __DEV__) return false;
+  const inExpoGo =
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+    Constants.appOwnership === 'expo';
+  return !inExpoGo;
+}
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'dark', label: 'Dark' },
@@ -285,6 +295,69 @@ function SosRow() {
   );
 }
 
+function CheckUpdatesRow() {
+  const [busy, setBusy] = useState(false);
+  if (!stallionOtaEnabled()) return null;
+
+  const runCheck = () => {
+    setBusy(true);
+    try {
+      // Lazy require keeps Profile usable when Stallion native is absent.
+      const stallion = require('react-native-stallion') as {
+        sync?: () => void;
+        restart?: () => void;
+        ACTIVE_RELEASE_HASH?: string;
+      };
+      try {
+        stallion.sync?.();
+      } catch {
+        /* sync best-effort */
+      }
+      const hash =
+        typeof stallion.ACTIVE_RELEASE_HASH === 'string' && stallion.ACTIVE_RELEASE_HASH
+          ? stallion.ACTIVE_RELEASE_HASH.slice(0, 12)
+          : 'embedded';
+      Alert.alert(
+        'Check for updates',
+        `Sync started. Running bundle: ${hash}…\n\nIf a download finishes, tap Restart now to apply it.`,
+        [
+          { text: 'OK', style: 'cancel' },
+          {
+            text: 'Restart now',
+            onPress: () => {
+              try {
+                stallion.restart?.();
+              } catch {
+                Alert.alert('Restart failed', 'Force-close the app and open it again.');
+              }
+            },
+          },
+        ],
+      );
+    } catch {
+      Alert.alert('Updates unavailable', 'OTA is not available on this build.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.actionRow}
+      disabled={busy}
+      onPress={runCheck}
+      accessibilityLabel="Check for updates"
+    >
+      <MaterialIcons name="system-update" size={20} color={colors.primary} />
+      <View style={styles.actionTextWrap}>
+        <Text style={styles.actionTitle}>{busy ? 'Checking…' : 'Check for updates'}</Text>
+        <Text style={styles.actionSub}>Sync Stallion OTA and restart into a downloaded release</Text>
+      </View>
+      <MaterialIcons name="chevron-right" size={22} color={colors.muted} />
+    </TouchableOpacity>
+  );
+}
+
 export function ProfileScreen() {
   const { user, logout } = useAuth();
   const role = getRoleName(user) || '—';
@@ -316,6 +389,7 @@ export function ProfileScreen() {
         <RevealCodesRow />
         <ThemePicker />
         <SosRow />
+        <CheckUpdatesRow />
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={() => {

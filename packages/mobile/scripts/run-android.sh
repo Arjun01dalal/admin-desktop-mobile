@@ -8,6 +8,26 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Pin Gradle to JDK 17. JDK 24+ prints "restricted method in java.lang.System"
+# during Prefab/CMake; AGP treats that WARNING as :react-native-worklets CMake failure.
+JAVA17_HOME="${JAVA17_HOME:-/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home}"
+if [[ -x "$JAVA17_HOME/bin/java" ]]; then
+  export JAVA_HOME="$JAVA17_HOME"
+  export PATH="$JAVA_HOME/bin:$PATH"
+else
+  echo "Warning: JDK 17 not found at $JAVA17_HOME" >&2
+  echo "Install Zulu 17 (or set JAVA17_HOME). JDK 24 breaks react-native-worklets CMake." >&2
+fi
+if [[ -x "$ROOT/android/gradlew" ]]; then
+  # Drop daemons that may still be running under JDK 21/24 from Android Studio.
+  (cd "$ROOT/android" && ./gradlew --stop >/dev/null 2>&1) || true
+fi
+if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/java" ]]; then
+  echo "Using JAVA_HOME: $JAVA_HOME ($("$JAVA_HOME/bin/java" -version 2>&1 | head -1))"
+else
+  echo "Using JAVA_HOME: (unset — Gradle may pick JDK 24 and fail worklets CMake)" >&2
+fi
+
 ADB="${ADB:-$(command -v adb || true)}"
 if [[ -z "${ADB}" && -x "${HOME}/Library/Android/sdk/platform-tools/adb" ]]; then
   ADB="${HOME}/Library/Android/sdk/platform-tools/adb"

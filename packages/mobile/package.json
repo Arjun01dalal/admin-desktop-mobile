@@ -71,6 +71,8 @@
     "ota:export:ios": "expo export:embed --platform ios --dev false --reset-cache --bundle-output ./build-ios/main.jsbundle --assets-dest ./build-ios --bytecode",
     "ota:publish:android": "npx stallion publish-bundle --upload-path=${STALLION_UPLOAD_PATH:-pixelastro/astroadmin/production} --platform=android --custom-bundle-path=build-android",
     "ota:publish:ios": "npx stallion publish-bundle --upload-path=${STALLION_UPLOAD_PATH:-pixelastro/astroadmin/production} --platform=ios --custom-bundle-path=build-ios",
+    "ota:android": "node scripts/ota-android.cjs",
+    "ota:release:android": "node scripts/ota-android.cjs",
     "build:preview": "env TMPDIR=/tmp eas build --profile preview --platform all",
     "build:preview:android": "env TMPDIR=/tmp eas build --profile preview --platform android",
     "build:preview:ios": "env TMPDIR=/tmp eas build --profile preview --platform ios",

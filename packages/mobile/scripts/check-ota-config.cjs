@@ -1,5 +1,6 @@
 const projectId = String(process.env.STALLION_PROJECT_ID || '').trim();
 const appToken = String(process.env.STALLION_APP_TOKEN || '').trim();
+const ciToken = String(process.env.STALLION_CI_TOKEN || '').trim();
 
 if (process.env.EAS_BUILD === '1') {
   const profile = String(process.env.EAS_BUILD_PROFILE || '').toLowerCase();
@@ -15,8 +16,16 @@ if (appToken && !appToken.startsWith('spb_')) {
   throw new Error('STALLION_APP_TOKEN must start with spb_');
 }
 
+if (ciToken && ciToken.startsWith('eyJ')) {
+  throw new Error(
+    'STALLION_CI_TOKEN looks like a login JWT — use the Stallion dashboard CI token (stl_…)',
+  );
+}
+
 console.log(
   projectId
-    ? `Stallion OTA configured (project ${projectId.slice(0, 8)}…)`
+    ? `Stallion OTA configured (project ${projectId.slice(0, 8)}…)${
+        ciToken ? '; CI token present for release-bundle' : '; CI token missing (publish-only until set)'
+      }`
     : 'Stallion OTA credentials not set (ok for local Metro / Expo Go)',
 );
