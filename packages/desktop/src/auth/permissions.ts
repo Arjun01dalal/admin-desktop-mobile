@@ -34,6 +34,7 @@ import {
   isDevFullAccessRole as sharedIsDevFullAccessRole,
   seesOriginalDisplayLabels as sharedSeesOriginalDisplayLabels,
   isCallerRole as sharedIsCallerRole,
+  isUserCoinRole as sharedIsUserCoinRole,
   isPathAllowed,
   isSosExemptRole as sharedIsSosExemptRole,
   canShowUniqueDepositEmpCode as sharedCanShowUniqueDepositEmpCode,
@@ -122,6 +123,11 @@ export function canAccessDashboard(user: StoredUser | null = getSessionUser()): 
 
 export function isCallerRole(user: StoredUser | null = getSessionUser()): boolean {
   return sharedIsCallerRole(user, storage);
+}
+
+/** "User & Coin" — Deposit page is pending-only. */
+export function isUserCoinRole(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedIsUserCoinRole(user, storage);
 }
 
 export function canAccessNavItem(

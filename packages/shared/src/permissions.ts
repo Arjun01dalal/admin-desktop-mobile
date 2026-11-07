@@ -744,6 +744,23 @@ export function isCallerRole(
   return roleNameVariants(name).some((v) => v === 'caller' || v === 'caller_new');
 }
 
+/** Laxmi / admin-panel-domains: "User & Coin" — Deposit list is pending-only. */
+export const USER_COIN_ROLE_ID = '6572e1c3327erfffa3c9738';
+
+export function isUserCoinRole(
+  user: PermissionUser | null = null,
+  storage?: PermissionStorage | null,
+): boolean {
+  const roleId = getRoleId(user, storage);
+  if (roleId && roleId === USER_COIN_ROLE_ID) return true;
+  const name = getRoleName(user, storage);
+  return roleNameVariants(name).some((v) => {
+    // "User & Coin" / user_coin / user&coin → usercoin
+    const compact = v.replace(/[&_\s-]/g, '');
+    return compact === 'usercoin' || compact === 'userandcoin';
+  });
+}
+
 /**
  * Laxmi admin-panel-domains: "Show My Coin History" nav uses `User.data.showCoins`
  * (coin-role flag from /SubAdmin/update-coin-roles) — not a Responsibility string.

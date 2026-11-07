@@ -22,7 +22,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-toastify';
 import { secureApi } from '@/api/secureClient';
-import { hasPermission } from '@/auth/permissions';
+import { hasPermission, isUserCoinRole } from '@/auth/permissions';
 import { CommonTable } from '@/components/CommonTable';
 import { TablePanel } from '@/components/TablePanel';
 import { TableSearchBar } from '@/components/TableSearchBar';
@@ -134,7 +134,13 @@ export function DepositPage() {
   const canShowMobile = hasPermission('show_mobile');
   const canStateWise = hasPermission('State_Wise_Deposit');
   const canUpdateMid = hasPermission('update_deposit_mid');
+  /** User & Coin — Deposit list is locked to Pending only (Laxmi parity). */
+  const pendingOnly = isUserCoinRole();
   const today = todayIST();
+  const pendingOnlyFilters = useMemo(
+    () => ({ ...EMPTY_FILTERS, status: 'Pending' }),
+    [],
+  );
 
   const [page, setPage] = useState(1);
   /** Default 20 so one screen shows ~15–20 deposit rows. */
@@ -142,14 +148,16 @@ export function DepositPage() {
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [utrDraft, setUtrDraft] = useState('');
-  const [draft, setDraft] = useState<ColumnFilters>(EMPTY_FILTERS);
-  const [query, setQuery] = useState<QueryState>({
+  const [draft, setDraft] = useState<ColumnFilters>(() =>
+    pendingOnly ? { ...EMPTY_FILTERS, status: 'Pending' } : EMPTY_FILTERS,
+  );
+  const [query, setQuery] = useState<QueryState>(() => ({
     startDate: today,
     endDate: today,
     allData: false,
     utr: '',
-    filters: EMPTY_FILTERS,
-  });
+    filters: pendingOnly ? { ...EMPTY_FILTERS, status: 'Pending' } : EMPTY_FILTERS,
+  }));
   const [requestType, setRequestType] = useState<RequestType>('automatic');
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [mids, setMids] = useState<MidOption[]>([]);
@@ -202,7 +210,6 @@ export function DepositPage() {
     if (utr) {
       filter.utr = utr;
     } else {
-      if (f.status) filter.status = f.status;
       if (f.userName.trim()) filter.userName = f.userName.trim();
       if (f.empCode.trim()) filter.empCode = f.empCode.trim();
       if (f.userId.trim()) filter.userId = f.userId.trim();
@@ -222,6 +229,9 @@ export function DepositPage() {
       if (f.upiId.trim()) filter.upiId = f.upiId.trim();
       if (f.mid) filter.mid = f.mid;
     }
+    // User & Coin: always Pending — even with UTR search.
+    if (pendingOnly) filter.status = 'Pending';
+    else if (!utr && f.status) filter.status = f.status;
 
     const payload: Record<string, unknown> = {
       type: 'deposit',
@@ -235,7 +245,7 @@ export function DepositPage() {
       if (query.endDate) payload.endDate = query.endDate;
     }
     return payload;
-  }, [query, page, itemsPerPage]);
+  }, [query, page, itemsPerPage, pendingOnly]);
 
   const { rows, total, totalPages, loading, load } = useReportQuery<DepositRow>({
     action: 'deposits.transactions',
@@ -430,7 +440,8 @@ export function DepositPage() {
   }, []);
 
   const clearAllFilters = useCallback(() => {
-    setDraft(EMPTY_FILTERS);
+    const cleared = pendingOnly ? pendingOnlyFilters : EMPTY_FILTERS;
+    setDraft(cleared);
     setUtrDraft('');
     setStartDate(today);
     setEndDate(today);
@@ -439,11 +450,23 @@ export function DepositPage() {
       endDate: today,
       allData: false,
       utr: '',
-      filters: EMPTY_FILTERS,
+      filters: cleared,
     });
     setPage(1);
     setSelectedOrders([]);
-  }, [today]);
+  }, [today, pendingOnly, pendingOnlyFilters]);
+
+  // User & Coin cannot leave Pending status (Laxmi Deposit.tsx parity).
+  useEffect(() => {
+    if (!pendingOnly) return;
+    if (draft.status !== 'Pending') setDraft((prev) => ({ ...prev, status: 'Pending' }));
+    if (query.filters.status !== 'Pending') {
+      setQuery((prev) => ({
+        ...prev,
+        filters: { ...prev.filters, status: 'Pending' },
+      }));
+    }
+  }, [pendingOnly, draft.status, query.filters.status]);
 
   const setDraftField = useCallback(
     (key: keyof ColumnFilters) => (value: string) =>
@@ -593,27 +616,35 @@ export function DepositPage() {
   );
 
   const selectFilter = useCallback(
-    (key: keyof ColumnFilters, options: { value: string; label: string }[]) => (
-      <TextField
-        select
-        size="small"
-        fullWidth
-        value={draft[key]}
-        onChange={(e) => {
-          const value = e.target.value;
-          setDraftField(key)(value);
-          commitQuery({ filters: { ...draft, [key]: value } });
-        }}
-        sx={filterSelectSx}
-      >
-        {options.map((o) => (
-          <MenuItem key={o.value || 'all'} value={o.value}>
-            {o.label}
-          </MenuItem>
-        ))}
-      </TextField>
-    ),
-    [draft, commitQuery, setDraftField],
+    (key: keyof ColumnFilters, options: { value: string; label: string }[]) => {
+      const lockedPending = pendingOnly && key === 'status';
+      const opts = lockedPending
+        ? [{ value: 'Pending', label: 'Pending' }]
+        : options;
+      return (
+        <TextField
+          select
+          size="small"
+          fullWidth
+          value={lockedPending ? 'Pending' : draft[key]}
+          disabled={lockedPending}
+          onChange={(e) => {
+            if (lockedPending) return;
+            const value = e.target.value;
+            setDraftField(key)(value);
+            commitQuery({ filters: { ...draft, [key]: value } });
+          }}
+          sx={filterSelectSx}
+        >
+          {opts.map((o) => (
+            <MenuItem key={o.value || 'all'} value={o.value}>
+              {o.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      );
+    },
+    [draft, commitQuery, setDraftField, pendingOnly],
   );
 
   const midOptions = useMemo(
@@ -920,6 +951,26 @@ export function DepositPage() {
                 {PAGE_SIZE_OPTIONS.map((n) => (
                   <MenuItem key={n} value={n}>
                     {n}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                select
+                size="small"
+                label="MID"
+                value={draft.mid}
+                disabled={Boolean(query.utr.trim())}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDraftField('mid')(value);
+                  commitQuery({ filters: { ...draft, mid: value } });
+                }}
+                sx={fieldSx}
+              >
+                {midOptions.map((o) => (
+                  <MenuItem key={o.value || 'all'} value={o.value}>
+                    {o.label}
                   </MenuItem>
                 ))}
               </TextField>

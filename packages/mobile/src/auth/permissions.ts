@@ -32,6 +32,7 @@ import {
   hasPermission as sharedHasPermission,
   canUseAdminLlmChat as sharedCanUseAdminLlmChat,
   isCallerRole as sharedIsCallerRole,
+  isUserCoinRole as sharedIsUserCoinRole,
   isFullAccessNavRole as sharedIsFullAccessNavRole,
   isDevFullAccessRole as sharedIsDevFullAccessRole,
   seesOriginalDisplayLabels as sharedSeesOriginalDisplayLabels,
@@ -111,6 +112,11 @@ export function canAccessDashboard(user: StoredUser | null = getSessionUser()): 
 
 export function isCallerRole(user: StoredUser | null = getSessionUser()): boolean {
   return sharedIsCallerRole(user, storage);
+}
+
+/** "User & Coin" — Deposit page is pending-only. */
+export function isUserCoinRole(user: StoredUser | null = getSessionUser()): boolean {
+  return sharedIsUserCoinRole(user, storage);
 }
 
 export function isFullAccessNavRole(user: StoredUser | null = getSessionUser()): boolean {

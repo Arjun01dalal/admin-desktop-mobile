@@ -40,7 +40,7 @@ import {
 import { colors } from '../../../theme';
 import { ScreenFlatList } from '../../../dashboards/ui/ScreenFlatList';
 import { secureApi } from '../../../api/client';
-import { getSessionUser, hasPermission } from '../../../auth/permissions';
+import { getSessionUser, hasPermission, isUserCoinRole } from '../../../auth/permissions';
 import {
   canShowGtelC2c,
   GtelClick2CallModal,
@@ -202,7 +202,11 @@ export function DepositScreen() {
   const [appliedUtr, setAppliedUtr] = useState('');
   const [midPickerOpen, setMidPickerOpen] = useState(false);
   const [midPickerQuery, setMidPickerQuery] = useState('');
+  /** User & Coin — Deposit list is locked to Pending only (Laxmi parity). */
+  const pendingOnly = isUserCoinRole();
   const [status, setStatus] = useState<string>('Pending');
+  /** List MID filter — when set, only that MID's transactions load. */
+  const [midFilter, setMidFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [draftSearch, setDraftSearch] = useState('');
@@ -280,10 +284,13 @@ export function DepositScreen() {
       if (utr) {
         filter.utr = utr;
       } else {
-        if (status) filter.status = status;
+        if (midFilter) filter.mid = midFilter;
         const text = applied.text.trim();
         if (text) filter[applied.field] = text;
       }
+      // User & Coin: always Pending — even with UTR search.
+      if (pendingOnly) filter.status = 'Pending';
+      else if (!utr && status) filter.status = status;
       const payload: Record<string, unknown> = {
         type: 'deposit',
         itemsPerPage: pageSize,
@@ -318,11 +325,17 @@ export function DepositScreen() {
     } finally {
       if (gen === genRef.current) setLoading(false);
     }
-  }, [status, applied, appliedUtr, page, pageSize, startDate, endDate, allData]);
+  }, [status, midFilter, applied, appliedUtr, page, pageSize, startDate, endDate, allData, pendingOnly]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // User & Coin cannot leave Pending status.
+  useEffect(() => {
+    if (!pendingOnly) return;
+    if (status !== 'Pending') setStatus('Pending');
+  }, [pendingOnly, status]);
 
   const applyDates = useCallback(() => {
     setAppliedUtr('');
@@ -880,11 +893,13 @@ export function DepositScreen() {
         contentContainerStyle={styles.chipsRow}
       >
         <Text style={styles.chipsLabel}>Status</Text>
-        {STATUS_OPTIONS.map((s) => (
+        {(pendingOnly ? (['Pending'] as const) : STATUS_OPTIONS).map((s) => (
           <TouchableOpacity
             key={s || 'all'}
             style={[styles.chip, status === s && styles.chipActive]}
+            disabled={pendingOnly}
             onPress={() => {
+              if (pendingOnly) return;
               if (appliedUtr.trim()) clearUtrSearch();
               setStatus(s);
               setPage(1);
@@ -896,6 +911,39 @@ export function DepositScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {mids.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          <Text style={styles.chipsLabel}>MID</Text>
+          <TouchableOpacity
+            style={[styles.chip, !midFilter && styles.chipActive]}
+            onPress={() => {
+              if (appliedUtr.trim()) clearUtrSearch();
+              setMidFilter('');
+              setPage(1);
+            }}
+          >
+            <Text style={[styles.chipText, !midFilter && styles.chipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {mids.map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[styles.chip, midFilter === m && styles.chipActive]}
+              onPress={() => {
+                if (appliedUtr.trim()) clearUtrSearch();
+                setMidFilter((prev) => (prev === m ? '' : m));
+                setPage(1);
+              }}
+            >
+              <Text style={[styles.chipText, midFilter === m && styles.chipTextActive]}>{m}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      ) : null}
 
       {error ? (
         <View style={styles.errorBox}>
