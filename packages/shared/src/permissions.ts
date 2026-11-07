@@ -104,6 +104,8 @@ export const Permissions = {
   view_casino_balance: 'view_casino_balance',
   hide_show_games: 'hide_show_games',
   house_game: 'house_game',
+  /** Laxmi SideNavItems — Show My Coin History Responsibility (also gated by showCoins). */
+  show_my_coin_history: 'show_my_coin_history',
   update_ludo_bets: 'update_ludo_bets',
   show_wining_btn: 'show_wining_btn',
   View_Deposit_List: 'View_Deposit_List',
@@ -387,6 +389,12 @@ const PERMISSION_ALIASES: Record<string, string[]> = {
     'HouseGame',
     'HouseGames',
   ],
+  show_my_coin_history: [
+    'show_my_coin_history',
+    'Show_My_Coin_History',
+    'Show My Coin History',
+    'showMyCoinHistory',
+  ],
   dialer_push_data: [
     'dialer_push_data',
     'Dialer_Push_Data',
@@ -517,22 +525,7 @@ function normalizeResponsibility(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function isStateWiseRegistrationKey(value?: string): boolean {
-  if (!value) return false;
-  const normalized = normalizeResponsibility(value);
-  return (
-    normalized.includes('statewise') &&
-    (normalized.includes('regist') || normalized.includes('register'))
-  );
-}
-
 function permissionMatches(required: string, list: string[]): boolean {
-  // Match laxminarayan Private_Route: unlock despite Enum typos / ObjectId mismatch.
-  if (isStateWiseRegistrationKey(required)) return true;
-
-  // Bot Performance: laxminarayan route is ungated; unlock for nav consistently.
-  if (normalizeResponsibility(required) === 'botperformance') return true;
-
   if (list.includes(required)) return true;
 
   const requiredNormalized = normalizeResponsibility(required);
@@ -762,13 +755,14 @@ export function isUserCoinRole(
 }
 
 /**
- * Laxmi admin-panel-domains: "Show My Coin History" nav uses `User.data.showCoins`
- * (coin-role flag from /SubAdmin/update-coin-roles) — not a Responsibility string.
+ * Laxmi: old SideNav used `User.data.showCoins`; current SideNavItems uses
+ * Responsibilities.show_my_coin_history. Accept either.
  */
 export function canShowMyCoinHistory(user: PermissionUser | null = null): boolean {
   if (!user) return false;
   const v = user.showCoins;
-  return v === true || v === 'true' || v === 1 || v === '1';
+  if (v === true || v === 'true' || v === 1 || v === '1') return true;
+  return hasPermission(Permissions.show_my_coin_history, user);
 }
 
 /** Final nav visibility: login Responsibilities (+ a few non-Responsibility gates). */
@@ -777,7 +771,7 @@ export function canAccessNavItem(
   user: PermissionUser | null = null,
   storage?: PermissionStorage | null,
 ): boolean {
-  // Coin-role flag only (Laxmi SideNavItems show: User.data.showCoins).
+  // Laxmi: showCoins flag OR show_my_coin_history Responsibility.
   if (item.id === 'showMyCoinHistory') {
     return canShowMyCoinHistory(user);
   }

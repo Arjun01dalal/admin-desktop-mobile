@@ -40,6 +40,7 @@ export const styles = makeStyles({
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing(3),
+    marginBottom: spacing(2.5),
   },
   cardHeader: {
     flexDirection: 'row',

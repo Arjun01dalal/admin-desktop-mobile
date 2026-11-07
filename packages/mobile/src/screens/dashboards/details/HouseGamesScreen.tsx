@@ -212,12 +212,10 @@ function isBotValue(row: TxnRow): string {
 
 export function HouseGamesScreen() {
   const isFocused = useIsFocused();
-  const canOpenHouseGames = canAccessNavItem({
-    id: 'houseGames',
-    permission: Permissions.house_game,
-  });
-  const canUpdateBets = hasPermission(Permissions.update_ludo_bets) || canOpenHouseGames;
-  const canUpdateWinningPoint = hasPermission(Permissions.show_wining_btn) || canOpenHouseGames;
+  // Laxmi SideNav: House Games is ungated for all logged-in roles.
+  const canOpenHouseGames = canAccessNavItem({ id: 'houseGames' });
+  const canUpdateBets = hasPermission(Permissions.update_ludo_bets);
+  const canUpdateWinningPoint = hasPermission(Permissions.show_wining_btn);
 
   const [draftStart, setDraftStart] = useState(monthStartIST());
   const [draftEnd, setDraftEnd] = useState(todayIST());

@@ -39,6 +39,11 @@ function payloadList<T>(data: unknown): T[] {
   return asList<T>(unpacked ?? data);
 }
 
+function display(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value);
+}
+
 export function ShowMyCoinHistoryScreen() {
   const user = useMemo(() => getSessionUser(), []);
   const allowed = canShowMyCoinHistory(user);
@@ -144,7 +149,7 @@ export function ShowMyCoinHistoryScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Subadmin Coin Limit</Text>
         <View style={styles.rowBetween}>
-          <Text style={styles.body}>Coin Limit: {String(coinLimit)}</Text>
+          <Text style={styles.summaryBody}>Coin Limit: {display(coinLimit)}</Text>
           <TouchableOpacity onPress={() => void loadLimit()} disabled={limitLoading}>
             <Text style={styles.link}>{limitLoading ? '…' : 'Refresh'}</Text>
           </TouchableOpacity>
@@ -154,9 +159,11 @@ export function ShowMyCoinHistoryScreen() {
       {summary ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Coin Summary</Text>
-          <Text style={styles.body}>Name: {summary.name || '—'}</Text>
-          <Text style={styles.body}>Amount: {String(summary.totalBalance ?? '—')}</Text>
-          <Text style={styles.body}>Count: {String(summary.count ?? '—')}</Text>
+          <View style={styles.cardSplitRow}>
+            <Text style={styles.cardSplitLeft}>Name: {display(summary.name)}</Text>
+            <Text style={styles.cardSplitRight}>Count: {display(summary.count)}</Text>
+          </View>
+          <Text style={styles.summaryBody}>Amount: {display(summary.totalBalance)}</Text>
         </View>
       ) : null}
 
@@ -200,25 +207,58 @@ const ShowMyCoinHistoryCard = memo(function ShowMyCoinHistoryCard({
   index,
   canShowMobile,
 }: ShowMyCoinHistoryCardProps) {
+  const location = [item.state, item.city].filter(Boolean).join(' / ') || '—';
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>
-        #{index + 1} {item.userName || '—'}
-      </Text>
-      <Text style={styles.body}>
-        Mobile: {canShowMobile ? item.userMobile || '—' : '**********'}
-      </Text>
-      <Text style={styles.body}>App: {item.clientName || '—'}</Text>
-      <Text style={styles.body}>
-        {item.state || '—'} / {item.city || '—'}
-      </Text>
-      <Text style={styles.body}>Opening: {String(item.openingSubadminBalance ?? '—')}</Text>
-      <Text style={styles.body}>Amount: {String(item.balance ?? '—')}</Text>
-      <Text style={styles.body}>Closing: {String(item.closingSubadminBalance ?? '—')}</Text>
-      <Text style={styles.body}>Reason: {item.reason || '—'}</Text>
-      <Text style={styles.body}>Remark: {item.remark || '—'}</Text>
-      <Text style={styles.body}>Tag: {item.tag || '—'}</Text>
-      <Text style={styles.hint}>{item.createdOn || '—'}</Text>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardIndex}>#{index + 1}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {item.userName || '—'}
+        </Text>
+      </View>
+
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft} numberOfLines={1}>
+          App: {display(item.clientName)}
+        </Text>
+        <Text style={styles.cardSplitRight} numberOfLines={1}>
+          Tag: {display(item.tag)}
+        </Text>
+      </View>
+
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Mobile</Text>
+        <Text style={styles.cardValue}>
+          {canShowMobile ? display(item.userMobile) : '**********'}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Location</Text>
+        <Text style={styles.cardValue} numberOfLines={1}>
+          {location}
+        </Text>
+      </View>
+      <View style={styles.cardSplitRow}>
+        <Text style={styles.cardSplitLeft}>Opening: {display(item.openingSubadminBalance)}</Text>
+        <Text style={styles.cardSplitRight}>Amount: {display(item.balance)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Closing</Text>
+        <Text style={styles.cardValue}>{display(item.closingSubadminBalance)}</Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Reason</Text>
+        <Text style={styles.cardValue} numberOfLines={2}>
+          {display(item.reason)}
+        </Text>
+      </View>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardLabel}>Remark</Text>
+        <Text style={styles.cardValue} numberOfLines={3}>
+          {display(item.remark)}
+        </Text>
+      </View>
+      <Text style={styles.metaHint}>{display(item.createdOn)}</Text>
     </View>
   );
 });

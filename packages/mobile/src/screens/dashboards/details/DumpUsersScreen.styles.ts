@@ -28,6 +28,7 @@ export const styles = makeStyles({
     flexWrap: 'wrap',
     gap: spacing(2),
     marginTop: spacing(3),
+    marginBottom: spacing(3),
   },
   chipText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   undumpBtn: {

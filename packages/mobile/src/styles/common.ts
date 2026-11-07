@@ -53,16 +53,19 @@ export const common = StyleSheet.create({
   errorText: { color: colors.destructive, fontSize: 13 },
 
   // ── Cards ─────────────────────────────────────────────────────────────────
-  list: { gap: spacing(2), marginTop: spacing(3) },
+  list: { gap: spacing(2.5), marginTop: spacing(3) },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing(2),
-    paddingHorizontal: spacing(2.5),
-    gap: 2,
+    borderRadius: radius.md,
+    paddingVertical: spacing(2.5),
+    paddingHorizontal: spacing(3),
+    gap: spacing(0.5),
+    marginBottom: spacing(2.5),
   },
+  /** Extra top gap for the first list card under filters / page controls. */
+  cardFirst: { marginTop: spacing(3) },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -86,7 +89,7 @@ export const common = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing(2),
-    paddingVertical: 1,
+    paddingVertical: 2,
   },
   cardLabel: { color: colors.muted, fontSize: 11, fontWeight: '600', width: '38%' },
   cardValue: {
@@ -94,6 +97,8 @@ export const common = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     textAlign: 'right',
   },
   cardSplitRow: {
@@ -101,7 +106,7 @@ export const common = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing(2),
-    paddingVertical: 1,
+    paddingVertical: 2,
   },
   cardSplitLeft: {
     color: colors.foreground,

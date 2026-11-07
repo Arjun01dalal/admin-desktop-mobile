@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { monthStartIST, todayIST, formatAmount } from '@/utils/dates';
-import { canAccessNavItem, Permissions } from '@/auth/permissions';
+import { canAccessNavItem } from '@/auth/permissions';
 import { CollapsibleFilterPanel } from '@/components/CollapsibleFilterPanel';
 import { TablePanel } from '@/components/TablePanel';
 import TransactionTable from './houseGames/TransactionTable';
@@ -25,10 +25,8 @@ import type { HouseGameTransaction } from './houseGames/types';
 
 export function HouseGamesPage() {
   useRevealCodes();
-  const canView = canAccessNavItem({
-    id: 'houseGames',
-    permission: Permissions.house_game,
-  });
+  // Laxmi SideNav: House Games is ungated for all logged-in roles.
+  const canView = canAccessNavItem({ id: 'houseGames' });
   const [startDate, setStartDate] = useState(monthStartIST);
   const [endDate, setEndDate] = useState(todayIST);
   const [itemsPerPage, setItemsPerPage] = useState(50);

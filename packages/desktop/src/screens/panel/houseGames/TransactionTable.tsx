@@ -26,7 +26,7 @@ import { TABLE_COLUMNS, type FiltersState } from './constants';
 import type { HouseGameTransaction } from './types';
 import { formatDateTime, getIsBotValue, getPlayerIdentity } from './utils';
 import { houseGameIdLabel, toDisplayText } from '@/screens/panel/dashboards/ops/jyotishMapping';
-import { canAccessNavItem, hasPermission, Permissions } from '@/auth/permissions';
+import { hasPermission, Permissions } from '@/auth/permissions';
 
 type Props = {
   data: HouseGameTransaction[];
@@ -55,14 +55,9 @@ const TransactionTable = ({
 }: Props) => {
   const rowOffset = (currentPage - 1) * itemsPerPage;
   const deferredData = useDeferredValue(data);
-  const canOpenHouseGames = canAccessNavItem({
-    id: 'houseGames',
-    permission: Permissions.house_game,
-  });
-  // Laxmi: update_ludo_bets for pencil; also allow page-access / full_access.
-  const canUpdateBets = hasPermission(Permissions.update_ludo_bets) || canOpenHouseGames;
-  // Laxmi: show_wining_btn for trophy (world-cup) icon.
-  const canUpdateWinningPoint = hasPermission(Permissions.show_wining_btn) || canOpenHouseGames;
+  // Laxmi: page is ungated; edit actions still need their own Responsibilities.
+  const canUpdateBets = hasPermission(Permissions.update_ludo_bets);
+  const canUpdateWinningPoint = hasPermission(Permissions.show_wining_btn);
 
   const columns = useMemo<CommonTableColumn<HouseGameTransaction>[]>(
     () => [

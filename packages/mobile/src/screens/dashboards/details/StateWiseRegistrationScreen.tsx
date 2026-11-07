@@ -476,7 +476,11 @@ const StateWiseRegistrationCard = memo(function StateWiseRegistrationCard({
   onPress,
 }: StateWiseRegistrationCardProps) {
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.75} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.card, index === 0 && styles.cardFirst]}
+      activeOpacity={0.75}
+      onPress={onPress}
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.cardIndex}>#{(page - 1) * pageSize + index + 1}</Text>
         <Text style={styles.cardTitle} numberOfLines={1}>

@@ -54,11 +54,11 @@ export const NAV_ITEMS: NavItem[] = [
     permission: Permissions.View_Profit_and_Loss,
   },
   {
+    // Laxmi SideNav: no Responsibility (visible to all logged-in roles).
     id: 'houseGames',
     category: 'Dashboards',
     label: 'House Krida',
     path: '/house-games',
-    permission: Permissions.house_game,
   },
   {
     id: 'leaderboard',
@@ -123,12 +123,13 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/c2c-campaign-data',
     permission: Permissions.c2c_campaign_data,
   },
-  // Always listed (laxminarayan App route has no Responsibility gate).
+  // Laxmi SideNavItems gates on bot_performance (route itself is ungated).
   {
     id: 'botPerformance',
     category: 'Caller & Dialer',
     label: 'Bot Performance',
     path: '/botPerformance',
+    permission: Permissions.bot_performance,
   },
   {
     id: 'newRegisters',
@@ -519,7 +520,7 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'skyTalk',
     label: 'Sky Talk',
     path: '/sky-talk',
-    permission: Permissions.view_live_chat,
+    permission: Permissions.show_skyTalk,
     category: 'Ops & Settings',
   },
   {
